@@ -4,7 +4,7 @@ An AI-powered personal stock portfolio dashboard with live market data, interact
 
 ## Live Demo
 
-> Deploy link will go here after Week 4 deployment to Render.
+> Deploy link will go here after deployment to Render.
 
 ---
 
