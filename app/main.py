@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import stocks
+from app.routers import stocks, portfolio
 from app.database import engine
 from app import models  # Import models so SQLAlchemy knows about them
 
@@ -36,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(stocks.router)
+app.include_router(portfolio.router)
 
 
 @app.get("/")

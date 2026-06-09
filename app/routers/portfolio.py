@@ -18,7 +18,7 @@ async def create_portfolio(
     # Create a new portfolio with the provided name and description
     portfolio = Portfolio(name=data.name, description=data.description)
     db.add(portfolio)
-    db.commit()
+    db.commit() 
     db.refresh(portfolio)  # Reload from DB to get the auto-assigned ID
     return {"id": portfolio.id, "name": portfolio.name, "message": "Portfolio created"}
 
