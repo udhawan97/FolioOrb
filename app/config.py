@@ -10,12 +10,10 @@ class Settings:
     DEBUG: bool = os.getenv("DEBUG", "True") == "True"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production")
     APP_NAME: str = "Stock Portfolio Dashboard"
-
-settings = Settings()
-
-# Default portfolio holdings
-DEFAULT_HOLDINGS: list[str] = [
+    DEFAULT_HOLDINGS: list[str] = [
         "NOW", "QTUM", "VOO", "CGDV", "IBIT",
         "VT", "ITA", "IEMG", "SETM", "WSML"
     ]
+
+settings = Settings()
 
