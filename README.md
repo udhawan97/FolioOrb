@@ -65,7 +65,7 @@ This dashboard tracks a personal portfolio of 10 holdings in real time. Every pr
 |-------|------------|
 | Backend | Python 3.12, FastAPI, Uvicorn |
 | Database | SQLite, SQLAlchemy 2.0 ORM |
-| AI | Anthropic Claude 3 Haiku |
+| AI | Anthropic Claude |
 | Stock Data | yfinance (Yahoo Finance) |
 | Frontend | Bootstrap 5.3, Chart.js 4, Vanilla JS |
 | Auth | Passlib (bcrypt), cookie sessions |
