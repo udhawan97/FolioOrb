@@ -43,3 +43,22 @@ async def get_price_history(
     """
     history = get_historical_prices(ticker.upper(), period)
     return {"ticker": ticker.upper(), "period": period, "data": history}
+
+
+@router.get("/history/batch")
+async def get_batch_history(
+    tickers: str = "NOW,QTUM,VOO,CGDV,IBIT,VT,ITA,IEMG,SETM,WSML",
+    period: str = "1mo"
+):
+    """
+    Fetch historical prices for multiple tickers at once.
+    tickers: comma-separated list
+    period: 1d, 5d, 1mo, 3mo, 6mo, 1y
+    Example: GET /api/stocks/history/batch?period=1mo
+    """
+    ticker_list = [t.strip().upper() for t in tickers.split(",")]
+    result = {}
+    for ticker in ticker_list:
+        result[ticker] = get_historical_prices(ticker, period)
+    return {"period": period, "data": result}
+

@@ -16,6 +16,7 @@ const formatPct = (n) => {
 };
 const formatAllocationPct = (n) => `${toNumber(n).toFixed(1)}%`;
 const colorClass = (v) => v >= 0 ? "text-success" : "text-danger";
+const TREND_DAYS = 7;
  
 // Chart.js color palette
 const CHART_COLORS = [
@@ -107,7 +108,8 @@ async function loadPortfolioValue() {
         }
 
         // Also update the basic prices table
-        updateHoldingsTable(data.holdings);
+        const trendData = await loadTrendData(data.holdings.map(h => h.ticker));
+        updateHoldingsTable(data.holdings, trendData);
         document.getElementById("last-updated").textContent =
             `Updated: ${new Date().toLocaleTimeString()}`;
  
@@ -117,21 +119,146 @@ async function loadPortfolioValue() {
 }
  
  
+async function loadTrendData(tickers) {
+    if (!tickers.length) return {};
+
+    try {
+        const params = new URLSearchParams({
+            tickers: tickers.join(","),
+            period: "1mo",
+        });
+        const res = await fetch(`/api/stocks/history/batch?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return data.data || {};
+    } catch (err) {
+        console.warn("Unable to load trend data:", err);
+        return {};
+    }
+}
+
+
+let historyData = {};  // Cache for sparkline data
+ 
+async function loadSparklineData() {
+    try {
+        const res = await fetch("/api/stocks/history/batch?period=5d");
+        const data = await res.json();
+        historyData = data.data;
+    } catch (e) {
+        console.warn("Could not load sparkline data:", e);
+    }
+}
+ 
+function drawSparkline(canvasId, prices) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || prices.length === 0) return;
+ 
+    const isUp = prices[prices.length-1] >= prices[0];
+    new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: prices.map((_, i) => i),
+            datasets: [{
+                data: prices,
+                borderColor: isUp ? "#3fb950" : "#f85149",
+                borderWidth: 1.5,
+                fill: false,
+                pointRadius: 0,
+                tension: 0.4,
+            }]
+        },
+        options: {
+            animation: false,
+            responsive: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { display: false }, y: { display: false } },
+        }
+    });
+}
+ 
 function updateHoldingsTable(holdings) {
     const tbody = document.getElementById("holdings-table");
     tbody.innerHTML = "";
-    holdings.forEach(h => {
+    holdings.forEach((h, idx) => {
+        const canvasId = `spark-${h.ticker}`;
         const row = tbody.insertRow();
         row.innerHTML = `
             <td class="fw-bold">${h.ticker}</td>
-            <td class="d-none d-md-table-cell text-secondary small">${h.name.substring(0, 28)}</td>
+            <td class="text-secondary small d-none d-md-table-cell">${h.name.substring(0,25)}</td>
             <td class="text-end">${formatCurrency(h.current_price)}</td>
             <td class="text-end ${colorClass(h.day_change_pct)}">
                 ${formatPct(h.day_change_pct)}</td>
             <td class="text-end d-none d-md-table-cell">${formatCurrency(h.current_value)}</td>
-            <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
+            <td class="text-end d-none d-lg-table-cell">${h.allocation_pct}%</td>
+            <td class="text-center d-none d-xl-table-cell">
+                <canvas id="${canvasId}" width="80" height="30"></canvas>
+            </td>
         `;
+ 
+        // Draw sparkline after DOM update
+        setTimeout(() => {
+            const prices = (historyData[h.ticker] || []).map(d => d.close);
+            drawSparkline(canvasId, prices);
+        }, 100);
     });
+}
+ 
+// Load sparklines then portfolio value
+async function initDashboard() {
+    await loadSparklineData();
+    await loadPortfolioValue();
+}
+ 
+document.addEventListener("DOMContentLoaded", initDashboard);
+setInterval(loadPortfolioValue, 300000);
+
+
+
+function drawTrend(canvas, history = []) {
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 3;
+    const closes = history
+        .slice(-TREND_DAYS)
+        .map(point => toNumber(point.close, NaN))
+        .filter(Number.isFinite);
+
+    ctx.clearRect(0, 0, width, height);
+
+    if (closes.length < 2) {
+        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(padding, height / 2);
+        ctx.lineTo(width - padding, height / 2);
+        ctx.stroke();
+        return;
+    }
+
+    const min = Math.min(...closes);
+    const max = Math.max(...closes);
+    const range = max - min || 1;
+    const isPositive = closes[closes.length - 1] >= closes[0];
+
+    ctx.strokeStyle = isPositive ? "#3fb950" : "#f85149";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+
+    closes.forEach((close, index) => {
+        const x = padding + (index * (width - padding * 2)) / (closes.length - 1);
+        const y = height - padding - ((close - min) / range) * (height - padding * 2);
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+
+    ctx.stroke();
 }
  
  

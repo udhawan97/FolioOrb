@@ -22,3 +22,10 @@ table tbody tr:hover {
 .text-danger  { color: #f85149 !important; }  /* GitHub red */
  
 .spinner-border { width: 1rem; height: 1rem; }
+
+.trend-sparkline {
+    display: block;
+    height: 32px;
+    margin: 0 auto;
+    width: 120px;
+}
