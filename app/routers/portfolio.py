@@ -208,18 +208,28 @@ async def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_d
         total_value += current_value
         total_daily_change += daily_value_change
 
-        result.append(
-            {
-                "ticker": ticker,
-                "name": q["name"],
-                "shares": shares,
-                "current_price": q["current_price"],
-                "current_value": round(current_value, 2),
-                "day_change_pct": q["day_change_pct"],
-                "daily_value_change": round(daily_value_change, 2),
-                "allocation_pct": 0,  # Filled in below
-            }
+        
+        cost_basis = (shares * q.get("avg_cost", 0)) if q.get("avg_cost") else 0
+        unrealized_gain = (current_value - cost_basis) if cost_basis > 0 else 0
+        unrealized_gain_pct = (
+            ((current_value - cost_basis) / cost_basis * 100) if cost_basis > 0 else 0
         )
+        
+        result.append({
+            "ticker": ticker,
+            "name": q["name"],
+            "shares": shares,
+            "current_price": q["current_price"],
+            "avg_cost": q.get("avg_cost"),
+            "current_value": round(current_value, 2),
+            "cost_basis": round(cost_basis, 2),
+            "unrealized_gain": round(unrealized_gain, 2),
+            "unrealized_gain_pct": round(unrealized_gain_pct, 2),
+            "day_change_pct": q["day_change_pct"],
+            "daily_value_change": round(daily_value_change, 2),
+            "allocation_pct": 0,
+        })
+
 
     # Calculate allocation percentages
     for item in result:
@@ -227,6 +237,8 @@ async def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_d
             item["allocation_pct"] = round(
                 (item["current_value"] / total_value) * 100, 1
             )
+
+    total_cost_basis = sum(item["cost_basis"] for item in result)
 
     return {
         "total_value": round(total_value, 2),
@@ -238,6 +250,14 @@ async def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_d
                 else 0
             ),
             2,
+        ),
+        "total_cost_basis": round(total_cost_basis, 2),
+        "total_unrealized_gain": round(total_value - total_cost_basis, 2),
+        "best_performer": (
+            max(result, key=lambda x: x["day_change_pct"]) if result else None
+        ),
+        "worst_performer": (
+            min(result, key=lambda x: x["day_change_pct"]) if result else None
         ),
         "holdings": result,
     }

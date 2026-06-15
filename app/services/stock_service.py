@@ -6,8 +6,16 @@ logger = logging.getLogger(__name__)
 
 # Tickers fetched when no specific list is provided
 DEFAULT_HOLDINGS: list[str] = [
-    "NOW", "QTUM", "VOO", "CGDV", "IBIT",
-    "VT", "ITA", "IEMG", "SETM", "WSML",
+    "NOW",
+    "QTUM",
+    "VOO",
+    "CGDV",
+    "IBIT",
+    "VT",
+    "ITA",
+    "IEMG",
+    "SETM",
+    "WSML",
 ]
 
 
@@ -32,9 +40,7 @@ def get_stock_data(ticker: str) -> dict:
             or 0.0
         )
         prev_close: float = (
-            info.get("previousClose")
-            or info.get("regularMarketPreviousClose")
-            or 0.0
+            info.get("previousClose") or info.get("regularMarketPreviousClose") or 0.0
         )
 
         # Calculate day change only when we have both prices
@@ -105,15 +111,37 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
         hist = stock.history(period=period)
         results = []
         for date, row in hist.iterrows():
-            results.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "open": round(float(row["Open"]), 2),
-                "high": round(float(row["High"]), 2),
-                "low": round(float(row["Low"]), 2),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row["Volume"]),
-            })
+            results.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "open": round(float(row["Open"]), 2),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2),
+                    "volume": int(row["Volume"]),
+                }
+            )
         return results
     except Exception as e:
         logger.error(f"Error fetching historical data for {ticker}: {e}")
         return []
+
+
+def save_price_snapshot(
+    ticker: str, price: float, day_change_pct: float, holding_id: int, db
+) -> None:
+    """
+    Save a price snapshot to the database for historical tracking.
+    Called after every price fetch to build historical data.
+    """
+    from app.models import PriceSnapshot
+    from datetime import datetime
+
+    snapshot = PriceSnapshot(
+        holding_id=holding_id,
+        price=price,
+        day_change_pct=day_change_pct,
+        recorded_at=datetime.utcnow(),
+    )
+    db.add(snapshot)
+    db.commit()

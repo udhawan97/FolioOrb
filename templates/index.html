@@ -89,6 +89,27 @@
             </div>
         </div>
     </div>
+        <div class="row g-2 mb-3">
+        <div class="col-4">
+            <div class="card bg-dark border-secondary text-center py-2">
+                <div class="small text-secondary">Best Today</div>
+                <div class="text-success fw-bold" id="best-performer">--</div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card bg-dark border-secondary text-center py-2">
+                <div class="small text-secondary">Worst Today</div>
+                <div class="text-danger fw-bold" id="worst-performer">--</div>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="card bg-dark border-secondary text-center py-2">
+                <div class="small text-secondary">Largest Holding</div>
+                <div class="text-info fw-bold" id="largest-holding">--</div>
+            </div>
+        </div>
+    </div>
+
                
         <!-- ── Holdings Table ─────────────────────────────────────── -->
         <div class="card bg-dark border-secondary">
@@ -101,14 +122,15 @@
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-dark table-hover mb-0">
-                        <thead class="text-secondary small">
-                            <tr>
-                                <th>Ticker</th>
-                                <th>Name</th>
-                                <th class="text-end">Price</th>
-                                <th class="text-end">Today</th>
-                                <th class="text-end">52W Range</th>
-                            </tr>
+                       <thead class="text-secondary small">
+                        <tr>
+                            <th>Ticker</th>
+                            <th class="d-none d-md-table-cell">Name</th>
+                            <th class="text-end">Price</th>
+                            <th class="text-end">Today</th>
+                            <th class="text-end d-none d-md-table-cell">Value</th>
+                            <th class="text-end d-none d-lg-table-cell">Alloc %</th>
+                        </tr>
                         </thead>
                         <tbody id="holdings-table">
                             <tr><td colspan="5" class="text-center py-4">
