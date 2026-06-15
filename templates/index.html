@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Dashboard</title>
+    <!-- Bootstrap 5.3 CSS from CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+          rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- ── Navigation Bar ─────────────────────────────────────────── -->
+    <nav class="navbar navbar-dark bg-dark border-bottom border-secondary">
+        <div class="container-fluid">
+            <span class="navbar-brand fw-bold">
+                <i class="bi bi-graph-up-arrow text-success me-2"></i>
+                Portfolio Dashboard
+            </span>
+            <span class="text-secondary small" id="last-updated">Loading...</span>
+        </div>
+    </nav>
+ 
+    <div class="container-fluid py-3">
+ 
+        <!-- ── Portfolio Summary Cards ───────────────────────────── -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Total Value</div>
+                        <div class="fs-4 fw-bold" id="total-value">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Today's Gain/Loss</div>
+                        <div class="fs-4 fw-bold" id="daily-pnl">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Holdings</div>
+                        <div class="fs-4 fw-bold" id="holding-count">10</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Market Status</div>
+                        <div class="fs-4 fw-bold text-success" id="market-status">Open</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+ 
+        <!-- ── Holdings Table ─────────────────────────────────────── -->
+        <div class="card bg-dark border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Holdings</h5>
+                <button class="btn btn-sm btn-outline-success" onclick="refreshData()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead class="text-secondary small">
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Name</th>
+                                <th class="text-end">Price</th>
+                                <th class="text-end">Today</th>
+                                <th class="text-end">52W Range</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holdings-table">
+                            <tr><td colspan="5" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-secondary"></div>
+                                Loading prices...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+ 
+    </div><!-- /container -->
+ 
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
