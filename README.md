@@ -16,8 +16,6 @@ This dashboard tracks a personal portfolio of 10 holdings in real time. Every pr
 
 ### Dashboard
 
-![Dashboard screenshot — add one after Week 1 Day 5] - To be added
-
 - Live prices and daily gain/loss for all holdings
 - Total portfolio value and daily P&L
 - Color-coded performance (green up, red down)
