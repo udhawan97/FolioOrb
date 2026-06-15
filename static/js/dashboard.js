@@ -82,6 +82,22 @@ async function loadPortfolioValue() {
             });
         }
  
+        // Update best/worst/largest cards
+        if (data.best_performer) {
+            document.getElementById("best-performer").textContent =
+                `${data.best_performer.ticker} ${formatPct(data.best_performer.day_change_pct)}`;
+        }
+        if (data.worst_performer) {
+            document.getElementById("worst-performer").textContent =
+                `${data.worst_performer.ticker} ${formatPct(data.worst_performer.day_change_pct)}`;
+        }
+        if (data.holdings.length) {
+            const largest = data.holdings.reduce((a, b) =>
+                a.current_value > b.current_value ? a : b);
+            document.getElementById("largest-holding").textContent =
+                `${largest.ticker} ${formatCurrency(largest.current_value)}`;
+        }
+
         // Also update the basic prices table
         updateHoldingsTable(data.holdings);
         document.getElementById("last-updated").textContent =
