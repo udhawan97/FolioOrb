@@ -1,35 +1,50 @@
-import yfinance as yf 
-import logging 
+import yfinance as yf
+import logging
 from typing import Optional
 
-#Setting up logging configuration
 logger = logging.getLogger(__name__)
 
-DEFAULT_HOLDINGS: list[str] = ["NOW", "QTUM", "VOO", "CGDV", "IBIT", "VT", "ITA", "IEMG", "SETM", "WSML"]
+# Tickers fetched when no specific list is provided
+DEFAULT_HOLDINGS: list[str] = [
+    "NOW", "QTUM", "VOO", "CGDV", "IBIT",
+    "VT", "ITA", "IEMG", "SETM", "WSML",
+]
 
-#Getting stock data for a specific ticker using yfinance and returning it in a structured format
+
 def get_stock_data(ticker: str) -> dict:
+    """
+    Fetch live quote data for a single ticker using the yfinance library.
+
+    yfinance pulls data from Yahoo Finance — no API key needed.
+    Returns a dict with price, change, range, and metadata.
+    On failure, returns a dict with an "error" key instead of raising an exception.
+    """
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
+
+        # Yahoo Finance uses different field names depending on the security type
+        # (stocks vs ETFs vs mutual funds), so we try several fallbacks
         current_price: float = (
             info.get("currentPrice")
             or info.get("regularMarketPrice")
-            or info.get("navPrice")
+            or info.get("navPrice")  # Used for ETFs/mutual funds
             or 0.0
-            )
+        )
         prev_close: float = (
             info.get("previousClose")
             or info.get("regularMarketPreviousClose")
             or 0.0
-            )
-        
+        )
+
+        # Calculate day change only when we have both prices
         if prev_close > 0 and current_price > 0:
             day_change = current_price - prev_close
             day_change_pct = (day_change / prev_close) * 100
         else:
             day_change = 0.0
             day_change_pct = 0.0
+
         return {
             "ticker": ticker.upper(),
             "name": info.get("longName") or info.get("shortName") or ticker,
@@ -52,6 +67,7 @@ def get_stock_data(ticker: str) -> dict:
 
     except Exception as e:
         logger.error(f"Error fetching data for {ticker}: {e}")
+        # Return a safe error dict so callers can check quote["error"] instead of crashing
         return {
             "ticker": ticker.upper(),
             "name": ticker,
@@ -61,18 +77,29 @@ def get_stock_data(ticker: str) -> dict:
             "error": str(e),
         }
 
-#Getting stock data for a list of tickers and returning it as a list of structured dictionaries
-def get_all_quotes(tickers: list[str] = None) -> list[dict]:
+
+def get_all_quotes(tickers: Optional[list[str]] = None) -> list[dict]:
+    """
+    Fetch live quotes for a list of tickers.
+    Defaults to DEFAULT_HOLDINGS when no list is provided.
+    """
     if tickers is None:
         tickers = DEFAULT_HOLDINGS
-    quotes = [] 
+    quotes = []
     for ticker in tickers:
         quote = get_stock_data(ticker)
         quotes.append(quote)
         logger.info(f"Fetched {ticker}: ${quote.get('current_price', 'N/A')}")
     return quotes
 
-def get_historical_prices (ticker: str, period: str = "1mo") -> dict:
+
+def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
+    """
+    Return daily OHLCV (open/high/low/close/volume) data for a ticker.
+
+    period examples: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "ytd"
+    Returns an empty list if the data cannot be fetched.
+    """
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
