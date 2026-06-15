@@ -4,12 +4,14 @@ from app.database import get_db
 from app.models import Portfolio, Holding
 from app.schemas import HoldingCreate, HoldingUpdate, HoldingResponse, PortfolioCreate
 from app.config import settings
+from app.services.stock_service import get_all_quotes
 
 # All routes in this file are grouped under the /api/portfolio prefix
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
 # ── Portfolio Endpoints ────────────────────────────────────────────────
+
 
 @router.post("/create")
 async def create_portfolio(
@@ -32,6 +34,7 @@ async def get_portfolios(db: Session = Depends(get_db)):
 
 
 # ── Holdings Endpoints ─────────────────────────────────────────────────
+
 
 @router.get("/holdings")
 async def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
@@ -58,7 +61,9 @@ async def add_holding(
     # Make sure the target portfolio actually exists
     portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
     if not portfolio:
-        raise HTTPException(status_code=404, detail=f"Portfolio {portfolio_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Portfolio {portfolio_id} not found"
+        )
 
     # Prevent adding the same ticker twice to the same portfolio
     existing = (
@@ -71,7 +76,9 @@ async def add_holding(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=400, detail=f"{data.ticker} already in portfolio")
+        raise HTTPException(
+            status_code=400, detail=f"{data.ticker} already in portfolio"
+        )
 
     holding = Holding(
         portfolio_id=portfolio_id,
@@ -83,7 +90,11 @@ async def add_holding(
     db.add(holding)
     db.commit()
     db.refresh(holding)
-    return {"id": holding.id, "ticker": holding.ticker, "message": f"{data.ticker} added"}
+    return {
+        "id": holding.id,
+        "ticker": holding.ticker,
+        "message": f"{data.ticker} added",
+    }
 
 
 @router.put("/holdings/{holding_id}")
@@ -127,6 +138,7 @@ async def remove_holding(holding_id: int, db: Session = Depends(get_db)):
 
 # ── Seed Endpoint ──────────────────────────────────────────────────────
 
+
 @router.post("/seed")
 async def seed_portfolio(db: Session = Depends(get_db)):
     """
@@ -138,7 +150,9 @@ async def seed_portfolio(db: Session = Depends(get_db)):
     if existing:
         return {"message": "Already seeded", "portfolio_id": existing.id}
 
-    portfolio = Portfolio(name="My Portfolio", description="Personal stock and ETF portfolio")
+    portfolio = Portfolio(
+        name="My Portfolio", description="Personal stock and ETF portfolio"
+    )
     db.add(portfolio)
     db.flush()  # Write to DB to get the generated ID, but don't commit yet
 
@@ -155,4 +169,75 @@ async def seed_portfolio(db: Session = Depends(get_db)):
         "message": "Portfolio seeded successfully",
         "portfolio_id": portfolio.id,
         "holdings_added": len(settings.DEFAULT_HOLDINGS),
+    }
+
+
+@router.get("/value")
+async def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    """
+    Calculate total portfolio value using live prices × shares.
+    Returns breakdown per holding and grand total.
+    """
+    # Get holdings from database
+    holdings = (
+        db.query(Holding)
+        .filter(Holding.portfolio_id == portfolio_id, Holding.is_active == True)
+        .all()
+    )
+
+    tickers = [h.ticker for h in holdings]
+    shares_map = {h.ticker: h.shares for h in holdings}
+
+    # Fetch live prices
+    from app.services.stock_service import get_all_quotes
+
+    quotes = get_all_quotes(tickers)
+
+    result = []
+    total_value = 0.0
+    total_daily_change = 0.0
+
+    for q in quotes:
+        if q.get("error"):
+            continue
+        ticker = q["ticker"]
+        shares = shares_map.get(ticker, 0)
+        current_value = shares * q["current_price"]
+        daily_value_change = shares * q["day_change"]
+
+        total_value += current_value
+        total_daily_change += daily_value_change
+
+        result.append(
+            {
+                "ticker": ticker,
+                "name": q["name"],
+                "shares": shares,
+                "current_price": q["current_price"],
+                "current_value": round(current_value, 2),
+                "day_change_pct": q["day_change_pct"],
+                "daily_value_change": round(daily_value_change, 2),
+                "allocation_pct": 0,  # Filled in below
+            }
+        )
+
+    # Calculate allocation percentages
+    for item in result:
+        if total_value > 0:
+            item["allocation_pct"] = round(
+                (item["current_value"] / total_value) * 100, 1
+            )
+
+    return {
+        "total_value": round(total_value, 2),
+        "total_daily_change": round(total_daily_change, 2),
+        "total_daily_change_pct": round(
+            (
+                (total_daily_change / (total_value - total_daily_change)) * 100
+                if total_value > 0
+                else 0
+            ),
+            2,
+        ),
+        "holdings": result,
     }

@@ -4,88 +4,113 @@
  * Runs automatically when the page loads.
  */
  
-// Format a number as currency: 547.23 → "$547.23"
-const formatCurrency = (num) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+const formatCurrency = (n) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+const formatPct = (n) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+const colorClass = (v) => v >= 0 ? "text-success" : "text-danger";
  
-// Format percentage: 0.61 → "+0.61%"
-const formatPct = (num) => `${num >= 0 ? "+" : ""}${num.toFixed(2)}%`;
+// Chart.js color palette
+const CHART_COLORS = [
+    "#4299e1","#48bb78","#ed8936","#9f7aea","#f56565",
+    "#38b2ac","#ecc94b","#ed64a6","#667eea","#81e6d9"
+];
  
-// Return Bootstrap color class based on value
-const colorClass = (val) => val >= 0 ? "text-success" : "text-danger";
+let allocationChart = null;  // Keep chart instance for updates
  
  
-// Main data loading function
-async function loadPrices() {
+async function loadPortfolioValue() {
     try {
-        // fetch() makes an HTTP request to our FastAPI API
-        // "await" pauses here until the response arrives
-        const response = await fetch("/api/stocks/prices");
- 
-        // Check if request succeeded (status 200)
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
- 
-        // Parse the JSON response body
-        const data = await response.json();
-        const quotes = data.quotes;
- 
-        // Update the holdings table
-        const tbody = document.getElementById("holdings-table");
-        tbody.innerHTML = "";  // Clear the loading spinner
- 
-        let totalDailyChange = 0;
- 
-        quotes.forEach(q => {
-            if (q.error) return;  // Skip tickers with errors
- 
-            totalDailyChange += q.day_change;
- 
-            // Create a table row for this holding
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td class="fw-bold">${q.ticker}</td>
-                <td class="text-secondary small">${q.name.substring(0, 30)}</td>
-                <td class="text-end">${formatCurrency(q.current_price)}</td>
-                <td class="text-end ${colorClass(q.day_change_pct)}">
-                    ${formatPct(q.day_change_pct)}
-                    <small class="d-block text-muted">${formatCurrency(q.day_change)}</small>
-                </td>
-                <td class="text-end small text-secondary">
-                    ${formatCurrency(q.fifty_two_week_low)} –
-                    ${formatCurrency(q.fifty_two_week_high)}
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
+        const res = await fetch("/api/portfolio/value");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
  
         // Update summary cards
+        document.getElementById("total-value").textContent =
+            formatCurrency(data.total_value);
         document.getElementById("daily-pnl").innerHTML =
-            `<span class="${colorClass(totalDailyChange)}">
-             ${formatCurrency(totalDailyChange)}</span>`;
+            `<span class="${colorClass(data.total_daily_change)}">
+             ${formatCurrency(data.total_daily_change)}
+             (${formatPct(data.total_daily_change_pct)})</span>`;
  
+        // Update allocation breakdown table
+        const allocTable = document.getElementById("allocation-table");
+        allocTable.innerHTML = "";
+        data.holdings.forEach((h, i) => {
+            const row = allocTable.insertRow();
+            row.innerHTML = `
+                <td><span class="badge" style="background:${CHART_COLORS[i]}">&nbsp;</span>
+                    ${h.ticker}</td>
+                <td>${h.shares}</td>
+                <td class="text-end">${formatCurrency(h.current_value)}</td>
+                <td class="text-end">${h.allocation_pct}%</td>
+            `;
+        });
+ 
+        // Build or update the doughnut chart
+        const labels = data.holdings.map(h => h.ticker);
+        const values = data.holdings.map(h => h.current_value);
+ 
+        if (allocationChart) {
+            allocationChart.data.labels = labels;
+            allocationChart.data.datasets[0].data = values;
+            allocationChart.update();
+        } else {
+            const ctx = document.getElementById("allocation-chart").getContext("2d");
+            allocationChart = new Chart(ctx, {
+                type: "doughnut",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: CHART_COLORS,
+                        borderColor: "#1a1a2e",
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) =>
+                                    ` ${ctx.label}: ${formatCurrency(ctx.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+ 
+        // Also update the basic prices table
+        updateHoldingsTable(data.holdings);
         document.getElementById("last-updated").textContent =
             `Updated: ${new Date().toLocaleTimeString()}`;
  
-    } catch (error) {
-        console.error("Failed to load prices:", error);
-        document.getElementById("holdings-table").innerHTML =
-            `<tr><td colspan="5" class="text-center text-danger py-3">
-             Error loading data: ${error.message}</td></tr>`;
+    } catch (err) {
+        console.error("Error loading portfolio value:", err);
     }
 }
  
  
-function refreshData() {
-    document.getElementById("holdings-table").innerHTML =
-        `<tr><td colspan="5" class="text-center py-4">
-         <div class="spinner-border spinner-border-sm text-secondary"></div>
-         Refreshing...</td></tr>`;
-    loadPrices();
+function updateHoldingsTable(holdings) {
+    const tbody = document.getElementById("holdings-table");
+    tbody.innerHTML = "";
+    holdings.forEach(h => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td class="fw-bold">${h.ticker}</td>
+            <td class="text-secondary small">${h.name.substring(0, 28)}</td>
+            <td class="text-end">${formatCurrency(h.current_price)}</td>
+            <td class="text-end ${colorClass(h.day_change_pct)}">
+                ${formatPct(h.day_change_pct)}</td>
+            <td class="text-end">${h.allocation_pct}%</td>
+        `;
+    });
 }
  
  
-// Load data when the page opens
-document.addEventListener("DOMContentLoaded", loadPrices);
+document.addEventListener("DOMContentLoaded", loadPortfolioValue);
+setInterval(loadPortfolioValue, 300000);
  
-// Auto-refresh every 5 minutes (300,000 milliseconds)
-setInterval(loadPrices, 300000);
+function refreshData() { loadPortfolioValue(); }
