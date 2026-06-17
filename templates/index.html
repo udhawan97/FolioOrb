@@ -83,7 +83,12 @@
                         <thead class="text-secondary small">
                             <tr><th>Ticker</th><th>Shares</th>
                                 <th class="text-end">Value</th>
-                                <th class="text-end">Allocation</th></tr>
+                                <th class="text-end" role="button" id="alloc-sort"
+                                    onclick="toggleAllocationSort()"
+                                    title="Sort by allocation">
+                                    Allocation
+                                    <i id="alloc-sort-caret" class="bi bi-caret-down-fill small"></i>
+                                </th></tr>
                         </thead>
                         <tbody id="allocation-table"></tbody>
                     </table>

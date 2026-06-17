@@ -23,8 +23,12 @@ const CHART_COLORS = [
     "#4299e1","#48bb78","#ed8936","#9f7aea","#f56565",
     "#38b2ac","#ecc94b","#ed64a6","#667eea","#81e6d9"
 ];
+// Wrap around the palette so portfolios with >10 holdings still get colors.
+const chartColor = (i) => CHART_COLORS[i % CHART_COLORS.length];
  
 let allocationChart = null;  // Keep chart instance for updates
+let latestHoldings = [];     // Most recent holdings, for re-sorting without a refetch
+let allocSortDir = "desc";   // Allocation sort direction: "desc" | "asc"
  
  
 async function loadPortfolioValue() {
@@ -41,56 +45,10 @@ async function loadPortfolioValue() {
              ${formatCurrency(data.total_daily_change)}
              (${formatPct(data.total_daily_change_pct)})</span>`;
  
-        // Update allocation breakdown table
-        const allocTable = document.getElementById("allocation-table");
-        allocTable.innerHTML = "";
-        data.holdings.forEach((h, i) => {
-            const row = allocTable.insertRow();
-            row.innerHTML = `
-                <td><span class="badge" style="background:${CHART_COLORS[i]}">&nbsp;</span>
-                    ${h.ticker}</td>
-                <td>${h.shares}</td>
-                <td class="text-end">${formatCurrency(h.current_value)}</td>
-                <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
-            `;
-        });
- 
-        // Build or update the doughnut chart
-        const labels = data.holdings.map(h => h.ticker);
-        const values = data.holdings.map(h => h.current_value);
- 
-        if (allocationChart) {
-            allocationChart.data.labels = labels;
-            allocationChart.data.datasets[0].data = values;
-            allocationChart.update();
-        } else {
-            const ctx = document.getElementById("allocation-chart").getContext("2d");
-            allocationChart = new Chart(ctx, {
-                type: "doughnut",
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: CHART_COLORS,
-                        borderColor: "#1a1a2e",
-                        borderWidth: 2,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) =>
-                                    ` ${ctx.label}: ${formatCurrency(ctx.raw)}`
-                            }
-                        }
-                    }
-                }
-            });
-        }
- 
+        // Render the allocation breakdown table and matching doughnut chart
+        latestHoldings = data.holdings;
+        renderAllocation();
+
         // Update best/worst/largest cards
         if (data.best_performer) {
             document.getElementById("best-performer").textContent =
@@ -117,8 +75,82 @@ async function loadPortfolioValue() {
         console.error("Error loading portfolio value:", err);
     }
 }
- 
- 
+
+
+// Render the allocation breakdown table and the doughnut chart in the same
+// (allocation-sorted) order, so the pie slices line up with the table rows.
+function renderAllocation() {
+    const dir = allocSortDir === "asc" ? 1 : -1;
+    const sorted = [...latestHoldings].sort(
+        (a, b) => dir * (toNumber(a.allocation_pct) - toNumber(b.allocation_pct))
+    );
+
+    // Table
+    const allocTable = document.getElementById("allocation-table");
+    allocTable.innerHTML = "";
+    sorted.forEach((h, i) => {
+        const row = allocTable.insertRow();
+        row.innerHTML = `
+            <td><span class="badge" style="background:${chartColor(i)}">&nbsp;</span>
+                ${h.ticker}</td>
+            <td>${h.shares}</td>
+            <td class="text-end">${formatCurrency(h.current_value)}</td>
+            <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
+        `;
+    });
+
+    // Sort-direction indicator on the Allocation header
+    const caret = document.getElementById("alloc-sort-caret");
+    if (caret) {
+        caret.className = `bi small ${allocSortDir === "asc" ? "bi-caret-up-fill" : "bi-caret-down-fill"}`;
+    }
+
+    // Doughnut chart, using the same sorted order
+    const labels = sorted.map(h => h.ticker);
+    const values = sorted.map(h => h.current_value);
+    const colors = sorted.map((_, i) => chartColor(i));
+
+    if (allocationChart) {
+        allocationChart.data.labels = labels;
+        allocationChart.data.datasets[0].data = values;
+        allocationChart.data.datasets[0].backgroundColor = colors;
+        allocationChart.update();
+    } else {
+        const ctx = document.getElementById("allocation-chart").getContext("2d");
+        allocationChart = new Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: "#1a1a2e",
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) =>
+                                ` ${ctx.label}: ${formatCurrency(ctx.raw)}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Clicking the Allocation header toggles sort direction and re-renders.
+function toggleAllocationSort() {
+    allocSortDir = allocSortDir === "asc" ? "desc" : "asc";
+    renderAllocation();
+}
+
+
 async function loadTrendData(tickers) {
     if (!tickers.length) return {};
 
@@ -210,9 +242,8 @@ function drawTrend(canvas, history = []) {
 }
  
  
-document.addEventListener("DOMContentLoaded", loadPortfolioValue);
-setInterval(loadPortfolioValue, 300000);
- 
+document.addEventListener("DOMContentLoaded", initDashboard);
+
 function refreshData() { loadPortfolioValue(); }
 
 
@@ -232,7 +263,7 @@ async function updateMarketStatus() {
  
 // Countdown timer
 function startCountdown() {
-    refreshCountdown = 300;
+    let refreshCountdown = 300;
     const interval = setInterval(() => {
         refreshCountdown--;
         const el = document.getElementById("countdown");
@@ -246,12 +277,12 @@ function startCountdown() {
  
 // Keyboard shortcut: R to refresh
 document.addEventListener("keydown", (e) => {
+    const tag = e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
     if (e.key === "r" || e.key === "R") refreshData();
 });
  
-// Update the initDashboard function:
 async function initDashboard() {
-    await loadSparklineData();
     await loadPortfolioValue();
     await updateMarketStatus();
     startCountdown();
