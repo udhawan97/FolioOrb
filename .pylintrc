@@ -16,6 +16,9 @@ disable=
     broad-exception-caught,
     logging-fstring-interpolation,
     import-outside-toplevel,
+    # The lint job doesn't install the app's third-party deps (no need to pull in
+    # torch/langchain/etc. just to lint), so external imports can't be resolved.
+    import-error,
     # SQLAlchemy's `func.now` is dynamically generated; pylint can't see it's callable.
     not-callable
 
