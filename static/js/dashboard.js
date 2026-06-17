@@ -25,14 +25,96 @@ const CHART_COLORS = [
 ];
  
 let allocationChart = null;  // Keep chart instance for updates
- 
- 
+let allocationSortDir = 'desc';  // 'asc' or 'desc'
+let cachedHoldings = [];
+let cachedTrendData = {};
+
+
+function getSortedHoldings() {
+    return [...cachedHoldings].sort((a, b) =>
+        allocationSortDir === 'desc'
+            ? b.allocation_pct - a.allocation_pct
+            : a.allocation_pct - b.allocation_pct
+    );
+}
+
+function toggleAllocationSort() {
+    allocationSortDir = allocationSortDir === 'desc' ? 'asc' : 'desc';
+    const sorted = getSortedHoldings();
+    renderAllocationTable(sorted);
+    renderAllocationChart(sorted);
+    updateHoldingsTable(sorted, cachedTrendData);
+    updateSortIcons();
+}
+
+function updateSortIcons() {
+    const iconClass = allocationSortDir === 'desc' ? 'bi-sort-down' : 'bi-sort-up';
+    document.querySelectorAll('.alloc-sort-icon').forEach(el => {
+        el.className = `bi ${iconClass} ms-1`;
+    });
+}
+
+function renderAllocationTable(holdings) {
+    const allocTable = document.getElementById("allocation-table");
+    allocTable.innerHTML = "";
+    holdings.forEach((h, i) => {
+        const row = allocTable.insertRow();
+        row.innerHTML = `
+            <td><span class="badge" style="background:${CHART_COLORS[i % CHART_COLORS.length]}">&nbsp;</span>
+                ${h.ticker}</td>
+            <td>${h.shares}</td>
+            <td class="text-end">${formatCurrency(h.current_value)}</td>
+            <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
+        `;
+    });
+}
+
+function renderAllocationChart(holdings) {
+    const labels = holdings.map(h => h.ticker);
+    const values = holdings.map(h => h.current_value);
+    const colors = holdings.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]);
+
+    if (allocationChart) {
+        allocationChart.data.labels = labels;
+        allocationChart.data.datasets[0].data = values;
+        allocationChart.data.datasets[0].backgroundColor = colors;
+        allocationChart.update();
+    } else {
+        const ctx = document.getElementById("allocation-chart").getContext("2d");
+        allocationChart = new Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: "#1a1a2e",
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) =>
+                                ` ${ctx.label}: ${formatCurrency(ctx.raw)}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+
 async function loadPortfolioValue() {
     try {
         const res = await fetch("/api/portfolio/value");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
- 
+
         // Update summary cards
         document.getElementById("total-value").textContent =
             formatCurrency(data.total_value);
@@ -40,57 +122,15 @@ async function loadPortfolioValue() {
             `<span class="${colorClass(data.total_daily_change)}">
              ${formatCurrency(data.total_daily_change)}
              (${formatPct(data.total_daily_change_pct)})</span>`;
- 
-        // Update allocation breakdown table
-        const allocTable = document.getElementById("allocation-table");
-        allocTable.innerHTML = "";
-        data.holdings.forEach((h, i) => {
-            const row = allocTable.insertRow();
-            row.innerHTML = `
-                <td><span class="badge" style="background:${CHART_COLORS[i]}">&nbsp;</span>
-                    ${h.ticker}</td>
-                <td>${h.shares}</td>
-                <td class="text-end">${formatCurrency(h.current_value)}</td>
-                <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
-            `;
-        });
- 
-        // Build or update the doughnut chart
-        const labels = data.holdings.map(h => h.ticker);
-        const values = data.holdings.map(h => h.current_value);
- 
-        if (allocationChart) {
-            allocationChart.data.labels = labels;
-            allocationChart.data.datasets[0].data = values;
-            allocationChart.update();
-        } else {
-            const ctx = document.getElementById("allocation-chart").getContext("2d");
-            allocationChart = new Chart(ctx, {
-                type: "doughnut",
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: CHART_COLORS,
-                        borderColor: "#1a1a2e",
-                        borderWidth: 2,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) =>
-                                    ` ${ctx.label}: ${formatCurrency(ctx.raw)}`
-                            }
-                        }
-                    }
-                }
-            });
-        }
- 
+
+        // Cache holdings for re-sorting
+        cachedHoldings = data.holdings;
+        const sorted = getSortedHoldings();
+
+        renderAllocationTable(sorted);
+        renderAllocationChart(sorted);
+        updateSortIcons();
+
         // Update best/worst/largest cards
         if (data.best_performer) {
             document.getElementById("best-performer").textContent =
@@ -108,11 +148,11 @@ async function loadPortfolioValue() {
         }
 
         // Also update the basic prices table
-        const trendData = await loadTrendData(data.holdings.map(h => h.ticker));
-        updateHoldingsTable(data.holdings, trendData);
+        cachedTrendData = await loadTrendData(data.holdings.map(h => h.ticker));
+        updateHoldingsTable(sorted, cachedTrendData);
         document.getElementById("last-updated").textContent =
             `Updated: ${new Date().toLocaleTimeString()}`;
- 
+
     } catch (err) {
         console.error("Error loading portfolio value:", err);
     }

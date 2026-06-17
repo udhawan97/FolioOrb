@@ -81,7 +81,8 @@
                         <thead class="text-secondary small">
                             <tr><th>Ticker</th><th>Shares</th>
                                 <th class="text-end">Value</th>
-                                <th class="text-end">Allocation</th></tr>
+                                <th class="text-end" style="cursor:pointer;user-select:none" onclick="toggleAllocationSort()">
+                                    Allocation <i class="bi bi-sort-down ms-1 alloc-sort-icon"></i></th></tr>
                         </thead>
                         <tbody id="allocation-table"></tbody>
                     </table>
@@ -129,7 +130,7 @@
                             <th class="text-end">Price</th>
                             <th class="text-end">Today</th>
                             <th class="text-end d-none d-md-table-cell">Value</th>
-                            <th class="text-end">Alloc %</th>
+                            <th class="text-end" style="cursor:pointer;user-select:none" onclick="toggleAllocationSort()">Alloc % <i class="bi bi-sort-down ms-1 alloc-sort-icon"></i></th>
                             <th class="text-center d-none d-xl-table-cell">7-Day Trend</th>
                         </tr>
                         </thead>
