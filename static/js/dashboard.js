@@ -256,3 +256,114 @@ async function initDashboard() {
     await updateMarketStatus();
     startCountdown();
 }
+
+// Load holdings into the management modal
+async function loadManageHoldings() {
+    const res = await fetch("/api/portfolio/holdings");
+    const data = await res.json();
+    const tbody = document.getElementById("manage-holdings-table");
+    tbody.innerHTML = "";
+ 
+    data.holdings.forEach(h => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td class="fw-bold">${h.ticker}</td>
+            <td>
+                <input type="number" value="${h.shares}" min="0.001" step="0.001"
+                       class="form-control form-control-sm bg-dark border-secondary
+                              text-white d-inline" style="width:90px"
+                       id="shares-${h.id}">
+            </td>
+            <td>
+                <input type="number" value="${h.avg_cost || ""}" min="0.01" step="0.01"
+                       class="form-control form-control-sm bg-dark border-secondary
+                              text-white d-inline" style="width:90px"
+                       id="cost-${h.id}" placeholder="--">
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-1"
+                        onclick="updateHolding(${h.id})">
+                    <i class="bi bi-check"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="removeHolding(${h.id}, '${h.ticker}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+    });
+}
+ 
+ 
+async function updateHolding(holdingId) {
+    const shares = parseFloat(document.getElementById(`shares-${holdingId}`).value);
+    const avgCost = parseFloat(document.getElementById(`cost-${holdingId}`).value) || null;
+ 
+    if (isNaN(shares) || shares <= 0) {
+        alert("Shares must be a positive number");
+        return;
+    }
+ 
+    const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shares, avg_cost: avgCost }),
+    });
+    if (res.ok) {
+        showToast("Holding updated!", "success");
+    } else {
+        showToast("Update failed", "danger");
+    }
+}
+ 
+ 
+async function removeHolding(holdingId, ticker) {
+    if (!confirm(`Remove ${ticker} from your portfolio?`)) return;
+ 
+    const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
+        method: "DELETE"
+    });
+    if (res.ok) {
+        showToast(`${ticker} removed`, "warning");
+        loadManageHoldings();  // Refresh the modal list
+        loadPortfolioValue();  // Refresh the main dashboard
+    }
+}
+ 
+ 
+// Add holding form submission
+document.getElementById("add-holding-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();  // Prevent page reload
+    const ticker = document.getElementById("new-ticker").value.trim().toUpperCase();
+    const shares = parseFloat(document.getElementById("new-shares").value);
+    const avgCost = parseFloat(document.getElementById("new-avgcost").value) || null;
+ 
+    const res = await fetch("/api/portfolio/holdings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, shares, avg_cost: avgCost }),
+    });
+    const msg = document.getElementById("add-msg");
+    if (res.ok) {
+        msg.className = "ms-2 small text-success";
+        msg.textContent = `${ticker} added!`;
+        e.target.reset();
+        loadManageHoldings();
+        loadPortfolioValue();
+    } else {
+        const err = await res.json();
+        msg.className = "ms-2 small text-danger";
+        msg.textContent = err.detail || "Error adding holding";
+    }
+});
+ 
+ 
+// Simple toast notification
+function showToast(message, type = "success") {
+    const toast = document.createElement("div");
+    toast.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3`;
+    toast.style.zIndex = "9999";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
