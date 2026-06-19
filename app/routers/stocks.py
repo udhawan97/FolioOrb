@@ -74,10 +74,20 @@ async def get_market_status():
     market_close = now.replace(hour=16, minute=0,  second=0, microsecond=0)
 
     is_open = is_weekday and market_open <= now <= market_close
+
+    # Describe the next opening only while the market is closed.
+    if is_open:
+        next_open = None
+    elif is_weekday and now < market_open:
+        next_open = "9:30 AM ET today"      # weekday, before the bell
+    elif now.weekday() >= 4:
+        next_open = "Mon 9:30 AM ET"        # Fri after close, or the weekend
+    else:
+        next_open = "9:30 AM ET tomorrow"   # Mon–Thu after close
+
     return {
         "is_open": is_open,
         "status": "OPEN" if is_open else "CLOSED",
         "eastern_time": now.strftime("%I:%M %p ET"),
-        "next_open": "Mon 9:30 AM ET" if now.weekday() >= 4 else "9:30 AM ET tomorrow"
-        if not is_open else None,
+        "next_open": next_open,
     }

@@ -67,6 +67,8 @@ async function loadPortfolioValue() {
         // Update summary cards
         document.getElementById("total-value").textContent =
             formatCurrency(data.total_value);
+        document.getElementById("holding-count").textContent =
+            data.holdings.length;
         document.getElementById("daily-pnl").innerHTML =
             `<span class="${colorClass(data.total_daily_change)}">
              ${formatCurrency(data.total_daily_change)}
@@ -469,7 +471,12 @@ function drawTrend(canvas, history = []) {
  
 document.addEventListener("DOMContentLoaded", initDashboard);
 
-function refreshData() { loadPortfolioValue(); }
+// Refresh everything that can go stale: live values, P&L, and market status.
+function refreshData() {
+    loadPortfolioValue();
+    loadPnl();
+    updateMarketStatus();
+}
 
 
 async function updateMarketStatus() {
@@ -495,7 +502,11 @@ function startCountdown() {
         if (el) el.textContent = `Next refresh in ${refreshCountdown}s`;
         if (refreshCountdown <= 0) {
             clearInterval(interval);
-            loadPortfolioValue().then(startCountdown);
+            loadPortfolioValue().then(() => {
+                loadPnl();
+                updateMarketStatus();
+                startCountdown();
+            });
         }
     }, 1000);
 }
