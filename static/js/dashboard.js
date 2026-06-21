@@ -1029,7 +1029,8 @@ async function loadHoldingIntelligence() {
     const tbody = document.getElementById("holdings-table");
     const btn = document.querySelector('[onclick="loadHoldingIntelligence()"]');
 
-    if (intelligenceLoaded) {
+    const hasMoveExplanations = Object.keys(cachedExplanations).length > 0;
+    if (intelligenceLoaded && hasMoveExplanations) {
         // Toggle expand rows open/closed on repeated click
         const allBodies = tbody.querySelectorAll(".summary-body");
         const anyOpen = Array.from(allBodies).some(b => b.classList.contains("open"));
@@ -1066,7 +1067,7 @@ async function loadHoldingIntelligence() {
             });
         }
 
-        intelligenceLoaded = true;
+        intelligenceLoaded = Object.keys(cachedExplanations).length > 0;
         intelligenceLoading = false;
 
         // Render all expanded rows
@@ -1091,7 +1092,7 @@ async function loadHoldingIntelligence() {
 
     } catch (err) {
         intelligenceLoading = false;
-        intelligenceLoaded = true;
+        intelligenceLoaded = false;
         Array.from(tbody.querySelectorAll(".intel-coverage-section")).forEach(s => {
             s.innerHTML = `<div class="intel-coverage"><span style="font-size:.75rem;color:var(--accent-red)">Could not load coverage data</span></div>`;
         });
