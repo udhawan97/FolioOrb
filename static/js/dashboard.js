@@ -34,6 +34,92 @@ const valueClass = (v) => {
     return Number(v) > 0 ? "text-success" : "text-danger";
 };
 const TREND_DAYS = 7;
+const THEME_KEY = "foliosense-theme";
+const THEME_LOGOS = {
+    dark: "/static/img/brand/folio-orbit-mark-dark.svg",
+    light: "/static/img/brand/folio-orbit-mark-light.svg",
+};
+
+const currentTheme = () =>
+    document.documentElement.dataset.bsTheme === "light" ? "light" : "dark";
+
+const cssVar = (name) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function chartTheme() {
+    const isLight = currentTheme() === "light";
+    return {
+        tooltipBg: isLight ? "rgba(255,255,255,0.96)" : "rgba(28,28,34,0.92)",
+        tooltipTitle: cssVar("--text-primary") || (isLight ? "#101828" : "#f5f5f7"),
+        tooltipBody: cssVar("--text-secondary") || (isLight ? "rgba(16,24,40,0.68)" : "rgba(235,235,245,0.85)"),
+        tooltipBorder: cssVar("--hairline") || (isLight ? "rgba(31,41,55,0.11)" : "rgba(255,255,255,0.12)"),
+        tick: cssVar("--text-tertiary") || (isLight ? "rgba(16,24,40,0.45)" : "rgba(235,235,245,0.42)"),
+        grid: isLight ? "rgba(15,23,42,.08)" : "rgba(255,255,255,.06)",
+    };
+}
+
+function tooltipOptions() {
+    const theme = chartTheme();
+    return {
+        backgroundColor: theme.tooltipBg,
+        titleColor: theme.tooltipTitle,
+        bodyColor: theme.tooltipBody,
+        borderColor: theme.tooltipBorder,
+        borderWidth: 1,
+        cornerRadius: 12,
+        padding: 12,
+    };
+}
+
+function applyTheme(theme, persist = false) {
+    const resolved = theme === "light" ? "light" : "dark";
+    document.documentElement.dataset.bsTheme = resolved;
+    const toggle = document.getElementById("theme-toggle");
+    if (toggle) {
+        const isDark = resolved === "dark";
+        toggle.setAttribute("aria-pressed", String(isDark));
+        toggle.setAttribute("aria-label", `Switch to ${isDark ? "light" : "dark"} mode`);
+        toggle.title = `Switch to ${isDark ? "light" : "dark"} mode`;
+    }
+    const toggleLogo = document.getElementById("theme-toggle-logo");
+    if (toggleLogo) toggleLogo.src = THEME_LOGOS[resolved];
+    if (persist) {
+        try { localStorage.setItem(THEME_KEY, resolved); } catch (_) {}
+    }
+    refreshThemeAwareVisuals();
+}
+
+function initThemeToggle() {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
+    const initial = saved || currentTheme();
+    applyTheme(initial, false);
+
+    const toggle = document.getElementById("theme-toggle");
+    if (!toggle) return;
+    toggle.addEventListener("click", () => {
+        const next = currentTheme() === "dark" ? "light" : "dark";
+        applyTheme(next, true);
+    });
+}
+
+function refreshThemeAwareVisuals() {
+    updateChartChrome(allocationChart);
+    updateChartChrome(pnlChart);
+    if (latestHoldings.length) renderHoldings();
+}
+
+function updateChartChrome(chart) {
+    if (!chart?.options) return;
+    const theme = chartTheme();
+    if (chart.options.plugins?.tooltip) {
+        Object.assign(chart.options.plugins.tooltip, tooltipOptions());
+    }
+    if (chart.options.scales?.x?.ticks) chart.options.scales.x.ticks.color = theme.tick;
+    if (chart.options.scales?.y?.ticks) chart.options.scales.y.ticks.color = theme.tick;
+    if (chart.options.scales?.y?.grid) chart.options.scales.y.grid.color = theme.grid;
+    chart.update("none");
+}
 
 // Apple system colors (dark) — vibrant but restrained, matches the UI accents.
 const CHART_COLORS = [
@@ -321,13 +407,7 @@ function renderAllocation() {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "rgba(28,28,34,0.92)",
-                        titleColor: "#f5f5f7",
-                        bodyColor: "rgba(235,235,245,0.85)",
-                        borderColor: "rgba(255,255,255,0.12)",
-                        borderWidth: 1,
-                        cornerRadius: 12,
-                        padding: 12,
+                        ...tooltipOptions(),
                         boxPadding: 6,
                         usePointStyle: true,
                         titleFont: { family: "-apple-system, SF Pro Display, sans-serif",
@@ -379,20 +459,20 @@ const centerTotalPlugin = {
 
         if (displayLabel) {
             // Show hovered / selected segment details
-            ctx.fillStyle = "rgba(235,235,245,0.85)";
+            ctx.fillStyle = cssVar("--text-secondary") || "rgba(235,235,245,0.85)";
             ctx.font = "700 13px -apple-system, 'SF Pro Display', sans-serif";
             ctx.fillText(displayLabel, x, y - 10);
 
-            ctx.fillStyle = "rgba(235,235,245,0.55)";
+            ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.55)";
             ctx.font = "500 10.5px -apple-system, 'SF Pro Text', sans-serif";
             ctx.fillText(displayValue || "", x, y + 8);
         } else {
             // Show total
-            ctx.fillStyle = "rgba(235,235,245,0.42)";
+            ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
             ctx.font = "600 11px -apple-system, 'SF Pro Text', sans-serif";
             ctx.fillText("TOTAL", x, y - 14);
 
-            ctx.fillStyle = "#f5f5f7";
+            ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
             ctx.font = "600 20px -apple-system, 'SF Pro Display', sans-serif";
             ctx.fillText(formatCurrency(allocationTotal), x, y + 6);
         }
@@ -519,6 +599,7 @@ function renderPnlChartMarketRef(history) {
     const values = history.map(h => ((toNumber(h.close) - start) / start) * 100);
     const isUp   = values[values.length - 1] >= 0;
     const line   = isUp ? "#3fb950" : "#f85149";
+    const theme  = chartTheme();
 
     const ctx = canvas.getContext("2d");
     pnlChart = new Chart(ctx, {
@@ -546,13 +627,7 @@ function renderPnlChartMarketRef(history) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: "rgba(28,28,34,0.92)",
-                    titleColor: "#f5f5f7",
-                    bodyColor: "rgba(235,235,245,0.85)",
-                    borderColor: "rgba(255,255,255,0.12)",
-                    borderWidth: 1,
-                    cornerRadius: 12,
-                    padding: 12,
+                    ...tooltipOptions(),
                     callbacks: {
                         label: (item) => `S&P 500 (30d): ${item.raw >= 0 ? "+" : ""}${item.raw.toFixed(2)}%`,
                     }
@@ -561,12 +636,12 @@ function renderPnlChartMarketRef(history) {
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { color: "rgba(235,235,245,.42)", maxRotation: 0, autoSkip: true,
+                    ticks: { color: theme.tick, maxRotation: 0, autoSkip: true,
                              maxTicksLimit: 6, font: { size: 10 } },
                 },
                 y: {
-                    grid: { color: "rgba(255,255,255,.06)" },
-                    ticks: { color: "rgba(235,235,245,.42)", font: { size: 10 },
+                    grid: { color: theme.grid },
+                    ticks: { color: theme.tick, font: { size: 10 },
                              callback: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` }
                 }
             }
@@ -582,6 +657,7 @@ function renderPnlChart(history) {
     const values = history.map(h => toNumber(h.total_return));
     const up = values.length < 2 || values[values.length - 1] >= values[0];
     const line = up ? "#30d158" : "#ff453a";
+    const theme = chartTheme();
 
     const ctx = canvas.getContext("2d");
     const fill = ctx.createLinearGradient(0, 0, 0, canvas.height || 150);
@@ -620,13 +696,7 @@ function renderPnlChart(history) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: "rgba(28,28,34,0.92)",
-                    titleColor: "#f5f5f7",
-                    bodyColor: "rgba(235,235,245,0.85)",
-                    borderColor: "rgba(255,255,255,0.12)",
-                    borderWidth: 1,
-                    cornerRadius: 12,
-                    padding: 12,
+                    ...tooltipOptions(),
                     callbacks: {
                         label: (item) => `Total return: ${formatSignedCurrency(item.raw)}`,
                     }
@@ -635,12 +705,12 @@ function renderPnlChart(history) {
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { color: "rgba(235,235,245,0.42)", maxRotation: 0, autoSkip: true,
+                    ticks: { color: theme.tick, maxRotation: 0, autoSkip: true,
                              maxTicksLimit: 6, font: { size: 10 } },
                 },
                 y: {
-                    grid: { color: "rgba(255,255,255,0.06)" },
-                    ticks: { color: "rgba(235,235,245,0.42)", font: { size: 10 },
+                    grid: { color: theme.grid },
+                    ticks: { color: theme.tick, font: { size: 10 },
                              callback: (v) => formatSignedCurrency(v) },
                 }
             }
@@ -1125,7 +1195,7 @@ function drawTrend(canvas, history = []) {
     ctx.clearRect(0, 0, width, height);
 
     if (closes.length < 2) {
-        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.strokeStyle = cssVar("--text-tertiary") || "rgba(255,255,255,0.22)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(padding, height / 2);
@@ -1138,7 +1208,9 @@ function drawTrend(canvas, history = []) {
     const max = Math.max(...closes);
     const range = max - min || 1;
     const isPositive = closes[closes.length - 1] >= closes[0];
-    const lineColor = isPositive ? "#3fb950" : "#f85149";
+    const lineColor = isPositive
+        ? (cssVar("--accent-green") || "#30d158")
+        : (cssVar("--accent-red") || "#ff453a");
 
     const points = closes.map((close, index) => ({
         x: padding + (index * (width - padding * 2)) / (closes.length - 1),
@@ -1276,7 +1348,7 @@ async function updateMarketStatus() {
         if (icon) {
             icon.style.background = data.is_open
                 ? "rgba(48,209,88,.13)"
-                : "rgba(235,235,245,.06)";
+                : "var(--control-bg)";
             icon.style.color = data.is_open ? "#30d158" : "var(--text-tertiary)";
             icon.classList.toggle("market-open", !!data.is_open);
         }
@@ -1307,6 +1379,10 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { hideKeyboardHelp(); return; }
     if (e.key === "?")      { showKeyboardHelp(); return; }
     if (e.key === "r" || e.key === "R") { refreshData(); return; }
+    if (e.key === "t" || e.key === "T") {
+        applyTheme(currentTheme() === "dark" ? "light" : "dark", true);
+        return;
+    }
     if (e.key === "m" || e.key === "M") {
         const modal = document.getElementById("portfolioModal");
         if (modal) { loadManageHoldings(); new bootstrap.Modal(modal).show(); }
@@ -1316,6 +1392,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 async function initDashboard() {
+    initThemeToggle();
     await loadPortfolioValue();
     await loadPnl();
     await updateMarketStatus();

@@ -281,6 +281,7 @@ class TestRecToDict:
             recommendation_mean=1.8,
             target_price=120.0,
             target_upside_pct=12.0,
+            fcf_yield=None,
             subtext="18 analysts · PT +12%",
             source="yfinance",
         )

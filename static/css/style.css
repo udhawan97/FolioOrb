@@ -9,19 +9,7 @@ html { font-size: 17px; } /* ~6% bump over browser default 16px; scales all rem 
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-    /* Surfaces */
-    --bg-base:        #0a0a0f;
-    --surface:        rgba(255, 255, 255, 0.045);
-    --surface-strong: rgba(255, 255, 255, 0.07);
-    --hairline:       rgba(255, 255, 255, 0.08);
-    --hairline-soft:  rgba(255, 255, 255, 0.05);
-
-    /* Text — mirrors Apple's label hierarchy */
-    --text-primary:   #f5f5f7;
-    --text-secondary: rgba(235, 235, 245, 0.62);
-    --text-tertiary:  rgba(235, 235, 245, 0.42);
-
-    /* Apple system colors (dark) */
+    /* Apple system colors */
     --accent-blue:    #0a84ff;
     --accent-green:   #30d158;
     --accent-red:     #ff453a;
@@ -33,19 +21,81 @@ html { font-size: 17px; } /* ~6% bump over browser default 16px; scales all rem 
     --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+[data-bs-theme="dark"] {
+    color-scheme: dark;
+
+    /* Surfaces */
+    --bg-base:        #0a0a0f;
+    --surface:        rgba(255, 255, 255, 0.045);
+    --surface-strong: rgba(255, 255, 255, 0.07);
+    --surface-hover:  rgba(255, 255, 255, 0.06);
+    --hairline:       rgba(255, 255, 255, 0.08);
+    --hairline-soft:  rgba(255, 255, 255, 0.05);
+    --hairline-hover: rgba(255, 255, 255, 0.14);
+    --nav-surface:    rgba(12, 12, 18, 0.62);
+    --modal-surface:  rgba(22, 22, 28, 0.82);
+    --popover-surface: rgba(20, 20, 28, 0.97);
+    --toast-surface:  rgba(22, 22, 30, 0.95);
+    --control-bg:     rgba(255, 255, 255, 0.03);
+    --control-hover:  rgba(255, 255, 255, 0.1);
+    --field-focus-bg: rgba(255, 255, 255, 0.09);
+    --subtle-ring:    rgba(255, 255, 255, 0.06);
+    --shadow-card:    0 10px 30px -14px rgba(0, 0, 0, 0.7);
+    --shadow-card-hover: 0 22px 48px -18px rgba(0, 0, 0, 0.78);
+    --shadow-float:   0 28px 64px -12px rgba(0, 0, 0, 0.78);
+    --bg-ambient-1:   radial-gradient(1200px 620px at 12% -8%, rgba(10, 132, 255, 0.12), transparent 58%);
+    --bg-ambient-2:   radial-gradient(1000px 520px at 112% 6%, rgba(48, 209, 88, 0.07), transparent 55%);
+
+    /* Text — mirrors Apple's label hierarchy */
+    --text-primary:   #f5f5f7;
+    --text-secondary: rgba(235, 235, 245, 0.62);
+    --text-tertiary:  rgba(235, 235, 245, 0.42);
+    --focus-text:     #ffffff;
+}
+
+[data-bs-theme="light"] {
+    color-scheme: light;
+
+    --bg-base:        #f5f7fb;
+    --surface:        rgba(255, 255, 255, 0.78);
+    --surface-strong: rgba(255, 255, 255, 0.94);
+    --surface-hover:  rgba(10, 23, 45, 0.045);
+    --hairline:       rgba(31, 41, 55, 0.11);
+    --hairline-soft:  rgba(31, 41, 55, 0.075);
+    --hairline-hover: rgba(10, 132, 255, 0.28);
+    --nav-surface:    rgba(255, 255, 255, 0.72);
+    --modal-surface:  rgba(255, 255, 255, 0.94);
+    --popover-surface: rgba(255, 255, 255, 0.97);
+    --toast-surface:  rgba(255, 255, 255, 0.96);
+    --control-bg:     rgba(15, 23, 42, 0.035);
+    --control-hover:  rgba(15, 23, 42, 0.075);
+    --field-focus-bg: rgba(255, 255, 255, 0.98);
+    --subtle-ring:    rgba(15, 23, 42, 0.08);
+    --shadow-card:    0 12px 32px -18px rgba(15, 23, 42, 0.24);
+    --shadow-card-hover: 0 24px 52px -22px rgba(15, 23, 42, 0.28);
+    --shadow-float:   0 24px 64px -22px rgba(15, 23, 42, 0.3);
+    --bg-ambient-1:   radial-gradient(1100px 560px at 8% -12%, rgba(10, 132, 255, 0.13), transparent 58%);
+    --bg-ambient-2:   radial-gradient(900px 480px at 112% 0%, rgba(100, 210, 255, 0.15), transparent 56%);
+
+    --text-primary:   #101828;
+    --text-secondary: rgba(16, 24, 40, 0.68);
+    --text-tertiary:  rgba(16, 24, 40, 0.45);
+    --focus-text:     #101828;
+}
+
 /* ── Base ────────────────────────────────────────────────────────────────── */
 body {
     min-height: 100vh;
     /* Layered ambient depth — soft blue + green glows over a near-black base. */
     background:
-        radial-gradient(1200px 620px at 12% -8%,  rgba(10, 132, 255, 0.12), transparent 58%),
-        radial-gradient(1000px 520px at 112% 6%,  rgba(48, 209, 88, 0.07),  transparent 55%),
+        var(--bg-ambient-1),
+        var(--bg-ambient-2),
         var(--bg-base);
     background-attachment: fixed;
     color: var(--text-primary);
     font-family: -apple-system, "SF Pro Display", "SF Pro Text", BlinkMacSystemFont,
                  "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -63,7 +113,7 @@ body {
 .navbar { position: sticky; top: 0; z-index: 1030; }
 
 .navbar.bg-dark {
-    background: rgba(12, 12, 18, 0.62) !important;
+    background: var(--nav-surface) !important;
     backdrop-filter: saturate(180%) blur(22px);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     border-bottom: 1px solid var(--hairline) !important;
@@ -73,11 +123,126 @@ body {
 
 .navbar-brand.fw-bold {
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
     color: var(--text-primary);
 }
 
 .navbar .text-secondary { color: var(--text-tertiary) !important; }
+
+.brand-lockup {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.62rem;
+    min-width: 0;
+    text-decoration: none;
+}
+
+.brand-icon-wrap {
+    width: 34px;
+    height: 34px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 12px;
+    background: rgba(111, 214, 240, 0.08);
+    border: 1px solid var(--hairline);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 24px -14px rgba(10, 132, 255, 0.55);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.brand-icon {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.brand-icon-light { display: none; width: 26px; height: 26px; }
+.brand-wordmark { line-height: 1; }
+
+[data-bs-theme="light"] .brand-icon-wrap {
+    background: rgba(255, 255, 255, 0.62);
+    border-color: rgba(10, 132, 255, 0.16);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.85),
+        0 12px 28px -18px rgba(10, 23, 45, 0.35);
+}
+
+[data-bs-theme="light"] .brand-icon-dark { display: none; }
+[data-bs-theme="light"] .brand-icon-light { display: block; }
+
+.theme-toggle {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    line-height: 1;
+}
+
+.theme-toggle-track {
+    position: relative;
+    width: 64px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: var(--control-bg);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 8px 22px -18px rgba(0, 0, 0, 0.5);
+    transition: background 0.22s var(--ease), border-color 0.22s var(--ease), box-shadow 0.22s var(--ease);
+}
+
+.theme-toggle:hover .theme-toggle-track {
+    background: var(--control-hover);
+    border-color: var(--hairline-hover);
+}
+
+.theme-toggle:focus-visible .theme-toggle-track {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 3px;
+}
+
+.theme-icon {
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    transition: color 0.22s var(--ease), opacity 0.22s var(--ease);
+    z-index: 1;
+}
+
+.theme-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--surface-strong);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.55);
+    transition: transform 0.28s var(--spring), background 0.22s var(--ease), border-color 0.22s var(--ease);
+}
+
+.theme-toggle-thumb img {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+[data-bs-theme="dark"] .theme-icon-dark,
+[data-bs-theme="light"] .theme-icon-light {
+    color: var(--accent-cyan);
+}
+
+[data-bs-theme="light"] .theme-toggle-thumb {
+    transform: translateX(30px);
+    box-shadow: 0 8px 18px -12px rgba(15, 23, 42, 0.36);
+}
 
 /* ── Cards — glass material ──────────────────────────────────────────────── */
 .card {
@@ -95,15 +260,19 @@ body {
     border: 1px solid var(--hairline) !important;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        0 10px 30px -14px rgba(0, 0, 0, 0.7);
+        var(--shadow-card);
 }
 
 .card:hover {
     transform: translateY(-3px);
-    border-color: rgba(255, 255, 255, 0.14) !important;
+    border-color: var(--hairline-hover) !important;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.09),
-        0 22px 48px -18px rgba(0, 0, 0, 0.78);
+        var(--shadow-card-hover);
+}
+
+.card-body {
+    min-width: 0;
 }
 
 .card-header {
@@ -111,7 +280,7 @@ body {
     border-bottom: 1px solid var(--hairline-soft) !important;
     color: var(--text-primary);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     padding: 0.95rem 1.15rem;
 }
 
@@ -128,7 +297,7 @@ body {
 .card-body .fs-4.fw-bold {
     font-size: 1.65rem;
     font-weight: 600;
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
     line-height: 1.15;
     margin-top: 0.15rem;
 }
@@ -166,7 +335,7 @@ body {
 
 .table tbody tr:hover,
 table tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.05) !important;
+    background-color: var(--surface-hover) !important;
 }
 
 .table tbody tr:last-child td { border-bottom: 0 !important; }
@@ -180,7 +349,7 @@ table tbody tr:hover {
     border-radius: 50%;
     margin-right: 9px;
     vertical-align: middle;
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px var(--subtle-ring);
 }
 
 /* ── Status colors — Apple system palette ────────────────────────────────── */
@@ -193,7 +362,7 @@ table tbody tr:hover {
 .btn {
     border-radius: 980px;
     font-weight: 500;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     transition: transform 0.18s var(--spring), background-color 0.2s var(--ease),
                 border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), color 0.2s var(--ease);
 }
@@ -217,8 +386,9 @@ table tbody tr:hover {
     border-color: var(--hairline);
     color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.03);
+    background: var(--control-bg);
 }
-.btn-outline-secondary:hover { background: rgba(255, 255, 255, 0.1);  color: var(--text-primary); border-color: transparent; }
+.btn-outline-secondary:hover { background: var(--control-hover);  color: var(--text-primary); border-color: transparent; }
 .btn-outline-primary:hover   { background: var(--accent-blue);  color: #fff; border-color: transparent; }
 .btn-outline-success:hover   { background: var(--accent-green); color: #04210d; border-color: transparent; }
 .btn-outline-danger:hover    { background: var(--accent-red);   color: #fff; border-color: transparent; }
@@ -232,24 +402,24 @@ table tbody tr:hover {
     transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background-color 0.2s var(--ease);
 }
 .form-control:focus {
-    background: rgba(255, 255, 255, 0.09) !important;
+    background: var(--field-focus-bg) !important;
     border-color: var(--accent-blue) !important;
     box-shadow: 0 0 0 3.5px rgba(10, 132, 255, 0.28) !important;
-    color: #fff !important;
+    color: var(--focus-text) !important;
 }
 .form-control::placeholder { color: var(--text-tertiary) !important; }
 
 /* ── Modal — deep frosted sheet ──────────────────────────────────────────── */
 .modal-content.bg-dark {
-    background: rgba(22, 22, 28, 0.82) !important;
+    background: var(--modal-surface) !important;
     backdrop-filter: saturate(180%) blur(40px);
     -webkit-backdrop-filter: saturate(180%) blur(40px);
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 22px !important;
-    box-shadow: 0 40px 90px -24px rgba(0, 0, 0, 0.82);
+    box-shadow: 0 40px 90px -24px rgba(0, 0, 0, 0.28);
 }
 .modal-header.border-secondary { border-bottom: 1px solid var(--hairline) !important; }
-.modal-title { font-weight: 600; letter-spacing: -0.02em; }
+.modal-title { font-weight: 600; letter-spacing: 0; }
 
 /* ── Sparkline ───────────────────────────────────────────────────────────── */
 .trend-sparkline {
@@ -341,7 +511,7 @@ table tbody tr:hover {
 .stat-value {
     font-size: 1.45rem;
     font-weight: 600;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
@@ -366,7 +536,7 @@ table tbody tr:hover {
     border-radius: 50%;
     margin-right: 7px;
     vertical-align: middle;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px var(--subtle-ring);
 }
 
 /* ── Inline AI summary expand rows ─────────────────────────────────────── */
@@ -676,7 +846,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .sector-bar-track {
     flex: 1;
     height: 4px;
-    background: rgba(255,255,255,0.07);
+    background: var(--control-bg);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -741,7 +911,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .holding-mini-bar-track {
     width: 44px;
     height: 3px;
-    background: rgba(255,255,255,0.07);
+    background: var(--control-bg);
     border-radius: 3px;
     overflow: hidden;
     flex-shrink: 0;
@@ -854,7 +1024,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     gap: 5px;
     font-size: 0.78rem;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     line-height: 1;
 }
 
@@ -909,7 +1079,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     border: 1px solid rgba(100, 210, 255, 0.26) !important;
     color: #64d2ff !important;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     padding: 0.32rem 0.9rem !important;
     animation: intelBreath 4s ease-in-out infinite;
     transition: transform 0.22s var(--spring),
@@ -1084,7 +1254,7 @@ body.holdings-spotlight #holdings-card {
     font-weight: 700;
     color: #ff9f0a;
     margin-bottom: 0.1rem;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
 }
 
 .perf-callout-body {
@@ -1135,27 +1305,6 @@ body.holdings-spotlight #holdings-card {
 #realized-card  { animation-delay: 825ms; }
 #holdings-card  { animation-delay: 900ms; }
 
-/* ── Ambient floating orb behind content ─────────────────────────────────── */
-body::before {
-    content: '';
-    position: fixed;
-    top: -30%;
-    left: -15%;
-    width: 55vw;
-    height: 55vw;
-    background: radial-gradient(circle, rgba(10, 132, 255, 0.055) 0%, transparent 68%);
-    border-radius: 50%;
-    animation: orbFloat 28s ease-in-out infinite;
-    pointer-events: none;
-    z-index: -1;
-    will-change: transform;
-}
-@keyframes orbFloat {
-    0%, 100% { transform: translate(0, 0) scale(1);      }
-    33%       { transform: translate(6%, 9%) scale(1.08); }
-    66%       { transform: translate(-4%, 5%) scale(0.96); }
-}
-
 /* ── Tip trigger button ──────────────────────────────────────────────────── */
 .tip-trigger {
     display: inline-flex;
@@ -1193,14 +1342,14 @@ body::before {
     position: fixed;
     z-index: 9500;
     width: 226px;
-    background: rgba(20, 20, 28, 0.97);
+    background: var(--popover-surface);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 15px;
     padding: 0.82rem 1rem;
     box-shadow:
-        0 28px 64px -12px rgba(0, 0, 0, 0.78),
+        var(--shadow-float),
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
     pointer-events: none;
     opacity: 0;
@@ -1223,7 +1372,7 @@ body::before {
     font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-primary);
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     margin-bottom: 0.3rem;
     line-height: 1.3;
 }
@@ -1247,8 +1396,8 @@ body::before {
     display: inline-block;
     padding: 0.05rem 0.26rem;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.11);
+    background: var(--control-bg);
+    border: 1px solid var(--hairline);
     font-size: 0.55rem;
     color: var(--text-secondary);
     font-family: -apple-system, sans-serif;
@@ -1285,7 +1434,7 @@ body::before {
     align-items: center;
     gap: 0.48rem;
     padding: 0.5rem 1.05rem;
-    background: rgba(22, 22, 30, 0.95);
+    background: var(--toast-surface);
     backdrop-filter: blur(22px) saturate(180%);
     -webkit-backdrop-filter: blur(22px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.11);
@@ -1293,9 +1442,7 @@ body::before {
     font-size: 0.72rem;
     font-weight: 500;
     color: var(--text-primary);
-    box-shadow:
-        0 10px 36px -6px rgba(0, 0, 0, 0.75),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: var(--shadow-float), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     transition: transform 0.4s var(--spring), opacity 0.3s ease;
     opacity: 0;
     pointer-events: none;
@@ -1316,7 +1463,7 @@ body::before {
     position: fixed;
     inset: 0;
     z-index: 10500;
-    background: rgba(0, 0, 0, 0.62);
+    background: rgba(0, 0, 0, 0.42);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     display: flex;
@@ -1331,13 +1478,13 @@ body::before {
     pointer-events: all;
 }
 .kbd-panel {
-    background: rgba(20, 20, 28, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--popover-surface);
+    border: 1px solid var(--hairline);
     border-radius: 22px;
     padding: 1.5rem 1.8rem;
     min-width: 310px;
     box-shadow:
-        0 44px 88px -22px rgba(0, 0, 0, 0.85),
+        var(--shadow-float),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
     transform: scale(0.94) translateY(14px);
     transition: transform 0.32s var(--spring);
@@ -1367,8 +1514,8 @@ body::before {
     display: inline-block;
     padding: 0.14rem 0.44rem;
     border-radius: 5px;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.13);
+    background: var(--control-bg);
+    border: 1px solid var(--hairline);
     font-size: 0.6rem;
     color: var(--text-primary);
     font-family: -apple-system, sans-serif;
@@ -1388,9 +1535,20 @@ body::before {
     display: flex;
     gap: 0.65rem;
     padding: 1rem 1.15rem;
+    max-width: 100%;
+    min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+}
+
+#realized-card .card-body {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#realized-card table {
+    min-width: 540px;
 }
 .world-markets-strip::-webkit-scrollbar { display: none; }
 
@@ -1407,7 +1565,7 @@ body::before {
 .market-tile {
     flex-shrink: 0;
     width: 148px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--control-bg);
     border: 1px solid var(--hairline-soft);
     border-radius: 14px;
     padding: 0.78rem 0.9rem;
@@ -1416,8 +1574,8 @@ body::before {
     cursor: default;
 }
 .market-tile:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.13);
+    background: var(--control-hover);
+    border-color: var(--hairline-hover);
     transform: translateY(-3px);
     box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.6);
 }
@@ -1446,13 +1604,13 @@ body::before {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
 }
 .market-tile-price {
     font-size: 1rem;
     font-weight: 700;
     color: var(--text-primary);
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
     line-height: 1.1;
@@ -1509,7 +1667,7 @@ body::before {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     line-height: 1.2;
 }
 .target-upside {
@@ -1532,7 +1690,82 @@ body::before {
     border: 1px solid transparent;
 }
 .navbar-shortcut-hint:hover {
-    color: rgba(235,235,245,0.7);
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.08);
+    color: var(--text-secondary);
+    background: var(--control-hover);
+    border-color: var(--hairline);
+}
+
+[data-bs-theme="light"] .navbar,
+[data-bs-theme="light"] .navbar.bg-dark {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="light"] .text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+[data-bs-theme="light"] .text-white {
+    color: var(--text-primary) !important;
+}
+
+[data-bs-theme="light"] .border-secondary {
+    border-color: var(--hairline) !important;
+}
+
+[data-bs-theme="light"] .btn-close-white {
+    filter: none;
+}
+
+[data-bs-theme="light"] .navbar-shortcut-hint {
+    color: rgba(16, 24, 40, 0.42);
+}
+
+[data-bs-theme="light"] .navbar-shortcut-hint kbd {
+    color: var(--text-secondary) !important;
+    background: rgba(15, 23, 42, 0.045) !important;
+    border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+[data-bs-theme="light"] .table-dark {
+    --bs-table-color: var(--text-primary);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--hairline-soft);
+    --bs-table-hover-bg: var(--surface-hover);
+    --bs-table-hover-color: var(--text-primary);
+}
+
+[data-bs-theme="light"] .modal-backdrop {
+    --bs-backdrop-bg: #101828;
+    --bs-backdrop-opacity: 0.24;
+}
+
+[data-bs-theme="light"] .form-control.bg-dark {
+    background: var(--surface-strong) !important;
+}
+
+[data-bs-theme="light"] .market-tile.market-shimmer,
+[data-bs-theme="light"] .shimmer-line {
+    background: linear-gradient(90deg,
+        rgba(15,23,42,.05) 25%,
+        rgba(15,23,42,.1) 50%,
+        rgba(15,23,42,.05) 75%);
+    background-size: 200% 100%;
+}
+
+@media (max-width: 620px) {
+    .navbar .container-fluid {
+        gap: 0.75rem;
+    }
+
+    .brand-wordmark {
+        display: none;
+    }
+
+    .theme-toggle-track {
+        width: 58px;
+    }
+
+    [data-bs-theme="light"] .theme-toggle-thumb {
+        transform: translateX(24px);
+    }
 }
