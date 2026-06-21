@@ -35,6 +35,7 @@ const valueClass = (v) => {
 };
 const TREND_DAYS = 7;
 const THEME_KEY = "foliosense-theme";
+const TEXT_SIZE_KEY = "foliosense-text-size";
 const THEME_LOGOS = {
     dark: "/static/img/brand/folio-orbit-mark-dark.svg",
     light: "/static/img/brand/folio-orbit-mark-light.svg",
@@ -43,8 +44,13 @@ const THEME_LOGOS = {
 const currentTheme = () =>
     document.documentElement.dataset.bsTheme === "light" ? "light" : "dark";
 
+const currentTextSize = () =>
+    document.documentElement.dataset.textSize === "comfortable" ? "comfortable" : "standard";
+
 const cssVar = (name) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const uiScale = () => toNumber(cssVar("--ui-scale"), 1);
 
 function chartTheme() {
     const isLight = currentTheme() === "light";
@@ -118,7 +124,39 @@ function updateChartChrome(chart) {
     if (chart.options.scales?.x?.ticks) chart.options.scales.x.ticks.color = theme.tick;
     if (chart.options.scales?.y?.ticks) chart.options.scales.y.ticks.color = theme.tick;
     if (chart.options.scales?.y?.grid) chart.options.scales.y.grid.color = theme.grid;
+    const scale = uiScale();
+    if (chart.options.scales?.x?.ticks?.font) chart.options.scales.x.ticks.font.size = 10 * scale;
+    if (chart.options.scales?.y?.ticks?.font) chart.options.scales.y.ticks.font.size = 10 * scale;
     chart.update("none");
+}
+
+function applyTextSize(size, persist = false) {
+    const resolved = size === "comfortable" ? "comfortable" : "standard";
+    document.documentElement.dataset.textSize = resolved;
+    const toggle = document.getElementById("text-size-toggle");
+    if (toggle) {
+        const comfortable = resolved === "comfortable";
+        toggle.setAttribute("aria-pressed", String(comfortable));
+        toggle.setAttribute("aria-label", `Switch to ${comfortable ? "standard" : "comfortable"} text size`);
+        toggle.title = `Switch to ${comfortable ? "standard" : "comfortable"} text size`;
+    }
+    if (persist) {
+        try { localStorage.setItem(TEXT_SIZE_KEY, resolved); } catch (_) {}
+    }
+    refreshThemeAwareVisuals();
+}
+
+function initTextSizeToggle() {
+    let saved = null;
+    try { saved = localStorage.getItem(TEXT_SIZE_KEY); } catch (_) {}
+    applyTextSize(saved || currentTextSize(), false);
+
+    const toggle = document.getElementById("text-size-toggle");
+    if (!toggle) return;
+    toggle.addEventListener("click", () => {
+        const next = currentTextSize() === "comfortable" ? "standard" : "comfortable";
+        applyTextSize(next, true);
+    });
 }
 
 // Apple system colors (dark) — vibrant but restrained, matches the UI accents.
@@ -444,6 +482,7 @@ const centerTotalPlugin = {
         ctx.save();
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        const scale = uiScale();
 
         // Resolve what to display: hover takes priority over selection
         const displayLabel = hoveredCenterLabel || selectedAllocationTicker;
@@ -460,21 +499,21 @@ const centerTotalPlugin = {
         if (displayLabel) {
             // Show hovered / selected segment details
             ctx.fillStyle = cssVar("--text-secondary") || "rgba(235,235,245,0.85)";
-            ctx.font = "700 13px -apple-system, 'SF Pro Display', sans-serif";
-            ctx.fillText(displayLabel, x, y - 10);
+            ctx.font = `700 ${13 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
+            ctx.fillText(displayLabel, x, y - (10 * scale));
 
             ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.55)";
-            ctx.font = "500 10.5px -apple-system, 'SF Pro Text', sans-serif";
-            ctx.fillText(displayValue || "", x, y + 8);
+            ctx.font = `500 ${10.5 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
+            ctx.fillText(displayValue || "", x, y + (8 * scale));
         } else {
             // Show total
             ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
-            ctx.font = "600 11px -apple-system, 'SF Pro Text', sans-serif";
-            ctx.fillText("TOTAL", x, y - 14);
+            ctx.font = `600 ${11 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
+            ctx.fillText("TOTAL", x, y - (14 * scale));
 
             ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
-            ctx.font = "600 20px -apple-system, 'SF Pro Display', sans-serif";
-            ctx.fillText(formatCurrency(allocationTotal), x, y + 6);
+            ctx.font = `600 ${20 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
+            ctx.fillText(formatCurrency(allocationTotal), x, y + (6 * scale));
         }
         ctx.restore();
     },
@@ -600,6 +639,7 @@ function renderPnlChartMarketRef(history) {
     const isUp   = values[values.length - 1] >= 0;
     const line   = isUp ? "#3fb950" : "#f85149";
     const theme  = chartTheme();
+    const scale  = uiScale();
 
     const ctx = canvas.getContext("2d");
     pnlChart = new Chart(ctx, {
@@ -637,11 +677,11 @@ function renderPnlChartMarketRef(history) {
                 x: {
                     grid: { display: false },
                     ticks: { color: theme.tick, maxRotation: 0, autoSkip: true,
-                             maxTicksLimit: 6, font: { size: 10 } },
+                             maxTicksLimit: 6, font: { size: 10 * scale } },
                 },
                 y: {
                     grid: { color: theme.grid },
-                    ticks: { color: theme.tick, font: { size: 10 },
+                    ticks: { color: theme.tick, font: { size: 10 * scale },
                              callback: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` }
                 }
             }
@@ -658,6 +698,7 @@ function renderPnlChart(history) {
     const up = values.length < 2 || values[values.length - 1] >= values[0];
     const line = up ? "#30d158" : "#ff453a";
     const theme = chartTheme();
+    const scale = uiScale();
 
     const ctx = canvas.getContext("2d");
     const fill = ctx.createLinearGradient(0, 0, 0, canvas.height || 150);
@@ -706,11 +747,11 @@ function renderPnlChart(history) {
                 x: {
                     grid: { display: false },
                     ticks: { color: theme.tick, maxRotation: 0, autoSkip: true,
-                             maxTicksLimit: 6, font: { size: 10 } },
+                             maxTicksLimit: 6, font: { size: 10 * scale } },
                 },
                 y: {
                     grid: { color: theme.grid },
-                    ticks: { color: theme.tick, font: { size: 10 },
+                    ticks: { color: theme.tick, font: { size: 10 * scale },
                              callback: (v) => formatSignedCurrency(v) },
                 }
             }
@@ -1383,6 +1424,10 @@ document.addEventListener("keydown", (e) => {
         applyTheme(currentTheme() === "dark" ? "light" : "dark", true);
         return;
     }
+    if (e.key === "s" || e.key === "S") {
+        applyTextSize(currentTextSize() === "comfortable" ? "standard" : "comfortable", true);
+        return;
+    }
     if (e.key === "m" || e.key === "M") {
         const modal = document.getElementById("portfolioModal");
         if (modal) { loadManageHoldings(); new bootstrap.Modal(modal).show(); }
@@ -1393,6 +1438,7 @@ document.addEventListener("keydown", (e) => {
 
 async function initDashboard() {
     initThemeToggle();
+    initTextSizeToggle();
     await loadPortfolioValue();
     await loadPnl();
     await updateMarketStatus();

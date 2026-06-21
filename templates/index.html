@@ -8,9 +8,11 @@
     <script>
         (() => {
             try {
-                const saved = localStorage.getItem("foliosense-theme");
+                const savedTheme = localStorage.getItem("foliosense-theme");
+                const savedTextSize = localStorage.getItem("foliosense-text-size");
                 const prefersLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
-                document.documentElement.dataset.bsTheme = saved || (prefersLight ? "light" : "dark");
+                document.documentElement.dataset.bsTheme = savedTheme || (prefersLight ? "light" : "dark");
+                document.documentElement.dataset.textSize = savedTextSize === "comfortable" ? "comfortable" : "standard";
             } catch (_) {}
         })();
     </script>
@@ -18,7 +20,7 @@
     <link rel="apple-touch-icon" href="/static/img/brand/folio-orbit-icon-1024.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=14" rel="stylesheet">
+    <link href="/static/css/style.css?v=15" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -45,6 +47,15 @@
                         <i class="bi bi-sun-fill theme-icon theme-icon-light"></i>
                         <span class="theme-toggle-thumb">
                             <img id="theme-toggle-logo" src="/static/img/brand/folio-orbit-mark-dark.svg" alt="">
+                        </span>
+                    </span>
+                </button>
+                <button class="text-size-toggle" id="text-size-toggle" type="button" aria-label="Switch to comfortable text size" aria-pressed="false">
+                    <span class="text-size-toggle-track" aria-hidden="true">
+                        <span class="text-size-glyph text-size-glyph-small">A</span>
+                        <span class="text-size-glyph text-size-glyph-large">A</span>
+                        <span class="text-size-toggle-thumb">
+                            <i class="bi bi-type"></i>
                         </span>
                     </span>
                 </button>
@@ -474,7 +485,7 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=18"></script>
+    <script defer src="/static/js/dashboard.js?v=19"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>
@@ -485,6 +496,7 @@
             <div class="kbd-panel-title">Keyboard Shortcuts</div>
             <div class="kbd-row"><span class="kbd-desc">Refresh prices</span><kbd class="kbd-key">R</kbd></div>
             <div class="kbd-row"><span class="kbd-desc">Toggle theme</span><kbd class="kbd-key">T</kbd></div>
+            <div class="kbd-row"><span class="kbd-desc">Toggle text size</span><kbd class="kbd-key">S</kbd></div>
             <div class="kbd-row"><span class="kbd-desc">Open portfolio manager</span><kbd class="kbd-key">M</kbd></div>
             <div class="kbd-row"><span class="kbd-desc">Load Holding Intel (AI)</span><kbd class="kbd-key">I</kbd></div>
             <div class="kbd-row"><span class="kbd-desc">Show this panel</span><kbd class="kbd-key">?</kbd></div>
