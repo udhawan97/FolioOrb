@@ -62,14 +62,17 @@ function chartTheme() {
 
 function tooltipOptions() {
     const theme = chartTheme();
+    const isLight = currentTheme() === "light";
     return {
-        backgroundColor: theme.tooltipBg,
+        backgroundColor: isLight ? "rgba(255,255,255,0.90)" : "rgba(12,12,18,0.90)",
         titleColor: theme.tooltipTitle,
         bodyColor: theme.tooltipBody,
         borderColor: theme.tooltipBorder,
         borderWidth: 1,
         cornerRadius: 12,
         padding: 12,
+        caretSize: 5,
+        caretPadding: 6,
     };
 }
 
@@ -139,6 +142,10 @@ function updateChartChrome(chart) {
     const scale = uiScale();
     if (chart.options.scales?.x?.ticks?.font) chart.options.scales.x.ticks.font.size = 10 * scale;
     if (chart.options.scales?.y?.ticks?.font) chart.options.scales.y.ticks.font.size = 10 * scale;
+    // Sync allocation doughnut border to the current theme background on theme switch.
+    if (chart === allocationChart && chart.data?.datasets?.[0]) {
+        chart.data.datasets[0].borderColor = allocBorderColor();
+    }
     chart.update("none");
 }
 
@@ -172,21 +179,25 @@ function initTextSizeToggle() {
     });
 }
 
-// Apple system colors (dark) — vibrant but restrained, matches the UI accents.
+// Apple system colors at 0.88 opacity — semi-transparent for a glass/material depth effect.
 const CHART_COLORS = [
-    "#0a84ff", // blue
-    "#30d158", // green
-    "#5e5ce6", // indigo
-    "#ff9f0a", // orange
-    "#ff375f", // pink
-    "#64d2ff", // cyan
-    "#bf5af2", // purple
-    "#ffd60a", // yellow
-    "#66d4cf", // mint
-    "#ff453a", // red
+    "rgba(10, 132, 255, 0.88)",   // blue
+    "rgba(48, 209, 88, 0.88)",    // green
+    "rgba(94, 92, 230, 0.88)",    // indigo
+    "rgba(255, 159, 10, 0.88)",   // orange
+    "rgba(255, 55, 95, 0.88)",    // pink
+    "rgba(100, 210, 255, 0.88)",  // cyan
+    "rgba(191, 90, 242, 0.88)",   // purple
+    "rgba(255, 214, 10, 0.88)",   // yellow
+    "rgba(102, 212, 207, 0.88)",  // mint
+    "rgba(255, 69, 58, 0.88)",    // red
 ];
 // Wrap around the palette so portfolios with >10 holdings still get colors.
 const chartColor = (i) => CHART_COLORS[i % CHART_COLORS.length];
+
+// Background-matching border for clean segment separation — works in both themes.
+const allocBorderColor = () =>
+    currentTheme() === "dark" ? "#0a0a0f" : "#f2f2f7";
 
 // Human-readable labels for attribution types (badge text)
 const ATTRIBUTION_SHORT = {
@@ -411,6 +422,7 @@ function renderAllocation() {
         allocationChart.data.labels = labels;
         allocationChart.data.datasets[0].data = values;
         allocationChart.data.datasets[0].backgroundColor = colors;
+        allocationChart.data.datasets[0].borderColor = allocBorderColor();
         allocationChart.update();
     } else {
         const ctx = document.getElementById("allocation-chart").getContext("2d");
@@ -421,12 +433,12 @@ function renderAllocation() {
                 datasets: [{
                     data: values,
                     backgroundColor: colors,
-                    borderColor: "transparent",
-                    borderWidth: 0,
-                    borderRadius: 6,
-                    spacing: 3,
-                    hoverOffset: 10,
-                    hoverBorderColor: "rgba(255,255,255,0.18)",
+                    borderColor: allocBorderColor(),
+                    borderWidth: 1.5,
+                    borderRadius: 4,
+                    spacing: 2,
+                    hoverOffset: 6,
+                    hoverBorderColor: "rgba(255,255,255,0.30)",
                     hoverBorderWidth: 2,
                 }]
             },
@@ -505,28 +517,28 @@ const centerTotalPlugin = {
             if (sidx >= 0) {
                 const sv = toNumber(chart.data.datasets[0].data[sidx]);
                 const sp = allocationTotal > 0 ? (sv / allocationTotal * 100).toFixed(1) : "0.0";
-                displayValue = `${formatCurrency(sv)} · ${sp}%`;
+                displayValue = `${formatCompact(sv)} · ${sp}%`;
             }
         }
 
         if (displayLabel) {
-            // Show hovered / selected segment details
-            ctx.fillStyle = cssVar("--text-secondary") || "rgba(235,235,245,0.85)";
+            // Hovered / selected: ticker label in primary, value in tertiary
+            ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
             ctx.font = `700 ${13 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
             ctx.fillText(displayLabel, x, y - (10 * scale));
 
-            ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.55)";
-            ctx.font = `500 ${10.5 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
+            ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
+            ctx.font = `500 ${10 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
             ctx.fillText(displayValue || "", x, y + (8 * scale));
         } else {
-            // Show total
+            // Default: compact "TOTAL" label + compact value that fits the hole
             ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
-            ctx.font = `600 ${11 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
-            ctx.fillText("TOTAL", x, y - (14 * scale));
+            ctx.font = `600 ${9.5 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
+            ctx.fillText("TOTAL", x, y - (15 * scale));
 
             ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
-            ctx.font = `600 ${20 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
-            ctx.fillText(formatCurrency(allocationTotal), x, y + (6 * scale));
+            ctx.font = `700 ${20 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
+            ctx.fillText(formatCompact(allocationTotal), x, y + (5 * scale));
         }
         ctx.restore();
     },

@@ -36,8 +36,8 @@ html[data-text-size="comfortable"] {
 
     /* Surfaces */
     --bg-base:        #0a0a0f;
-    --surface:        rgba(255, 255, 255, 0.045);
-    --surface-strong: rgba(255, 255, 255, 0.07);
+    --surface:        rgba(255, 255, 255, 0.068);
+    --surface-strong: rgba(255, 255, 255, 0.10);
     --surface-hover:  rgba(255, 255, 255, 0.06);
     --hairline:       rgba(255, 255, 255, 0.08);
     --hairline-soft:  rgba(255, 255, 255, 0.05);
@@ -71,8 +71,8 @@ html[data-text-size="comfortable"] {
 
     /* Apple system grays — warm neutral, never cold blue-white */
     --bg-base:        #F2F2F7;          /* iOS secondarySystemBackground */
-    --surface:        rgba(255, 255, 255, 0.86);
-    --surface-strong: rgba(255, 255, 255, 0.97);
+    --surface:        rgba(255, 255, 255, 0.66);
+    --surface-strong: rgba(255, 255, 255, 0.86);
     --surface-hover:  rgba(0, 0, 0, 0.04);
     --hairline:       rgba(0, 0, 0, 0.08);    /* Apple standard separator */
     --hairline-soft:  rgba(0, 0, 0, 0.055);
@@ -412,6 +412,8 @@ body {
     animation: cardIn 0.55s var(--ease) both;
     transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease),
                 border-color 0.35s var(--ease);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
 }
 
 .card.bg-dark,
@@ -1885,6 +1887,16 @@ body.holdings-spotlight #holdings-card {
     height: 100px;
 }
 
+/* ── Allocation doughnut — glass depth treatment ─────────────────────────── */
+/* drop-shadow applies to rendered canvas content (the chart), not the box.   */
+#allocation-chart {
+    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, 0.22));
+    transition: filter 0.35s var(--ease);
+}
+[data-bs-theme="light"] #allocation-chart {
+    filter: drop-shadow(0 2px 14px rgba(0, 0, 0, 0.09));
+}
+
 /* ── Allocation table row selection ──────────────────────────────────────── */
 #allocation-table tr[data-ticker] {
     cursor: pointer;
@@ -2137,4 +2149,63 @@ body.holdings-spotlight #holdings-card {
     outline-offset: -2px;
     border-radius: 3px;
     color: var(--text-primary) !important;
+}
+
+/* ── Allocation chart card — slow breathing glow ─────────────────────────── */
+/* Cycles through a soft cyan halo that breathes in and out every 8s.         */
+/* Pauses cleanly on hover so the standard hover shadow takes over.           */
+@keyframes allocGlow {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.06),
+            var(--shadow-card);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.13),
+            0 0 0 1.5px rgba(100, 210, 255, 0.16),
+            0 0 44px -10px rgba(100, 210, 255, 0.32),
+            var(--shadow-card-hover);
+    }
+}
+
+@keyframes allocGlowLight {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.70),
+            var(--shadow-card);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.82),
+            0 0 0 1.5px rgba(10, 132, 255, 0.11),
+            0 0 36px -12px rgba(10, 132, 255, 0.20),
+            var(--shadow-card-hover);
+    }
+}
+
+.card:has(#allocation-chart) {
+    animation: cardIn 0.55s var(--ease) both, allocGlow 8s ease-in-out 0.6s infinite;
+}
+
+[data-bs-theme="light"] .card:has(#allocation-chart) {
+    animation: cardIn 0.55s var(--ease) both, allocGlowLight 8s ease-in-out 0.6s infinite;
+}
+
+/* Pause the glow when hovering so the standard card hover shadow wins cleanly */
+.card:has(#allocation-chart):hover {
+    animation: none;
+}
+
+/* ── Light-mode card: bump up the inset highlight for frosted contrast ─────── */
+[data-bs-theme="light"] .card.bg-dark,
+[data-bs-theme="light"] .card {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        var(--shadow-card);
+}
+[data-bs-theme="light"] .card:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.80),
+        var(--shadow-card-hover);
 }
