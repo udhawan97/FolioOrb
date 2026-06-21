@@ -897,3 +897,213 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .move-badge.filing-driven    { background: rgba(100,210,255, .14);  color: #64d2ff; }
 .move-badge.mixed            { background: rgba(191, 90, 242, .14); color: #bf5af2; }
 .move-badge.etf-index        { background: rgba(48, 209, 88,  .14); color: #30d158; }
+
+/* ── Holding Intel button — animated AI action ───────────────────────── */
+.btn-holding-intel {
+    position: relative;
+    overflow: hidden;
+    background: rgba(100, 210, 255, 0.07) !important;
+    border: 1px solid rgba(100, 210, 255, 0.26) !important;
+    color: #64d2ff !important;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    padding: 0.32rem 0.9rem !important;
+    animation: intelBreath 4s ease-in-out infinite;
+    transition: transform 0.22s var(--spring),
+                background 0.22s var(--ease),
+                border-color 0.22s var(--ease),
+                box-shadow 0.22s var(--ease),
+                color 0.18s var(--ease) !important;
+}
+
+/* Shimmer sweep — shoots across on hover */
+.btn-holding-intel::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: -80%;
+    width: 55%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(100, 210, 255, 0.18) 50%,
+        transparent
+    );
+    transform: skewX(-18deg);
+    pointer-events: none;
+    transition: left 0s;
+}
+.btn-holding-intel:hover::before {
+    left: 150%;
+    transition: left 0.58s ease;
+}
+
+/* Top-edge specular highlight — appears on hover */
+.btn-holding-intel::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100,210,255,0.55), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.28s ease;
+}
+.btn-holding-intel:hover::after { opacity: 1; }
+
+/* Ambient "breathing" glow — draws the eye without being loud */
+@keyframes intelBreath {
+    0%, 100% {
+        box-shadow: 0 0  6px -2px rgba(100,210,255,0.00),
+                    inset 0 1px 0  rgba(100,210,255,0.04);
+    }
+    50% {
+        box-shadow: 0 0 18px -2px rgba(100,210,255,0.22),
+                    0 0  0   1px rgba(100,210,255,0.07),
+                    inset 0 1px 0  rgba(100,210,255,0.10);
+    }
+}
+
+.btn-holding-intel:hover {
+    background: rgba(100, 210, 255, 0.16) !important;
+    border-color: rgba(100, 210, 255, 0.54) !important;
+    color: #b8f0ff !important;
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 0 34px -4px rgba(100,210,255,0.44),
+                0 0  0   1px rgba(100,210,255,0.22),
+                0 8px 22px -8px rgba(0,0,0,0.55) !important;
+    animation: none;
+}
+
+.btn-holding-intel:active {
+    transform: scale(0.94) translateY(0) !important;
+    box-shadow: 0 0 14px -4px rgba(100,210,255,0.28) !important;
+    transition: transform 0.09s ease, box-shadow 0.09s ease !important;
+}
+
+/* Icon: floats up and springs back on hover */
+.btn-holding-intel:hover .btn-intel-icon {
+    display: inline-block;
+    animation: intelIconFloat 0.48s var(--spring);
+}
+@keyframes intelIconFloat {
+    0%   { transform: translateY(0)    scale(1);    }
+    38%  { transform: translateY(-4px) scale(1.18); }
+    68%  { transform: translateY(1px)  scale(0.93); }
+    100% { transform: translateY(0)    scale(1);    }
+}
+
+/* "AI" pill badge */
+.btn-intel-badge {
+    display: inline-block;
+    font-size: 0.46rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.09rem 0.3rem;
+    border-radius: 5px;
+    background: rgba(100, 210, 255, 0.16);
+    color: #64d2ff;
+    vertical-align: middle;
+    margin-left: 4px;
+    position: relative;
+    top: -0.5px;
+    transition: background 0.22s ease, color 0.18s ease;
+}
+.btn-holding-intel:hover .btn-intel-badge {
+    background: rgba(100, 210, 255, 0.30);
+    color: #b8f0ff;
+}
+
+/* Loading / disabled state */
+.btn-holding-intel:disabled {
+    animation: none !important;
+    transform: none !important;
+    opacity: 0.7;
+    border-color: rgba(100,210,255,0.18) !important;
+}
+
+/* ── Holdings spotlight / focus effect ──────────────────────────────── */
+
+/* Smooth base transition for all main-content sections */
+#main-content > * {
+    transition: opacity 0.48s var(--ease), filter 0.48s var(--ease);
+    will-change: opacity, filter;
+}
+
+/* When hovering the holdings card, dim everything else */
+body.holdings-spotlight #main-content > *:not(#holdings-card) {
+    opacity: 0.16;
+    filter: saturate(0.25);
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Holdings card: elevate with a subtle cyan aura */
+body.holdings-spotlight #holdings-card {
+    border-color: rgba(100, 210, 255, 0.18) !important;
+    box-shadow:
+        0 0  0   1px rgba(100,210,255,0.10),
+        0 50px 90px -28px rgba(0,0,0,0.88),
+        inset 0 1px 0 rgba(100,210,255,0.07) !important;
+    transition: border-color 0.48s var(--ease),
+                box-shadow   0.48s var(--ease) !important;
+}
+
+/* ── Performance stale / no-data callout ────────────────────────────── */
+.perf-callout {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.58rem 0.82rem;
+    border-radius: 12px;
+    background: rgba(255, 159, 10, 0.07);
+    border: 1px solid rgba(255, 159, 10, 0.22);
+    margin-bottom: 0.75rem;
+    animation: calloutIn 0.38s var(--ease) both;
+}
+
+@keyframes calloutIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.perf-callout-icon {
+    font-size: 0.88rem;
+    color: #ff9f0a;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.perf-callout-text { flex: 1; min-width: 0; }
+
+.perf-callout-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #ff9f0a;
+    margin-bottom: 0.1rem;
+    letter-spacing: -0.01em;
+}
+
+.perf-callout-body {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.perf-callout-btn {
+    flex-shrink: 0;
+    font-size: 0.64rem;
+    font-weight: 600;
+    padding: 0.22rem 0.65rem !important;
+    border-radius: 980px;
+    background: rgba(255, 159, 10, 0.13) !important;
+    border: 1px solid rgba(255, 159, 10, 0.3) !important;
+    color: #ff9f0a !important;
+    white-space: nowrap;
+    transition: background 0.2s ease, color 0.18s ease, border-color 0.2s ease;
+}
+.perf-callout-btn:hover {
+    background: rgba(255, 159, 10, 0.26) !important;
+    border-color: rgba(255, 159, 10, 0.5) !important;
+    color: #ffc55a !important;
+}

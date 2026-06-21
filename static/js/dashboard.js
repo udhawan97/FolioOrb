@@ -350,11 +350,130 @@ async function loadPnl() {
         const res = await fetch("/api/portfolio/pnl");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        renderPnlChart(data.history || []);
+        const history = data.history || [];
+
+        // Decide if the user has meaningful portfolio data
+        const lastEntry = history[history.length - 1];
+        const hasUserData = history.length >= 2 && (lastEntry?.total_value ?? 0) > 0;
+        const lastDate = lastEntry ? new Date(lastEntry.date + "T12:00:00") : null;
+        const hoursOld = lastDate ? (Date.now() - lastDate.getTime()) / 3_600_000 : Infinity;
+        const isStale = hoursOld > 24;
+
+        if (!hasUserData) {
+            updatePerfCallout("nodata");
+            await loadMarketReferenceChart();
+        } else if (isStale) {
+            updatePerfCallout("stale", Math.floor(hoursOld / 24));
+            renderPnlChart(history);
+        } else {
+            hidePerfCallout();
+            renderPnlChart(history);
+        }
+
         renderRealizedTable(data.trades || []);
     } catch (err) {
         console.warn("Unable to load P&L:", err);
     }
+}
+
+function updatePerfCallout(type, daysDiff = 0) {
+    const el = document.getElementById("perf-stale-callout");
+    if (!el) return;
+    el.style.display = "";
+    const icon  = el.querySelector(".perf-callout-icon");
+    const title = el.querySelector(".perf-callout-title");
+    const body  = el.querySelector(".perf-callout-body");
+    if (type === "nodata") {
+        if (icon)  icon.className = "bi bi-bar-chart-line perf-callout-icon";
+        if (title) title.textContent = "No performance history yet";
+        if (body)  body.textContent = "Set your share counts to track portfolio return over time. Showing S&P 500 as reference.";
+    } else {
+        if (icon)  icon.className = "bi bi-clock-history perf-callout-icon";
+        if (title) title.textContent = `Last updated ${daysDiff} day${daysDiff !== 1 ? "s" : ""} ago`;
+        if (body)  body.textContent = "Visit the dashboard daily to keep your performance history current.";
+    }
+}
+
+function hidePerfCallout() {
+    const el = document.getElementById("perf-stale-callout");
+    if (el) el.style.display = "none";
+}
+
+async function loadMarketReferenceChart() {
+    try {
+        const params = new URLSearchParams({ tickers: "SPY", period: "1mo" });
+        const res = await fetch(`/api/stocks/history/batch?${params}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const hist = (data.data?.SPY || []).filter(h => h.close > 0);
+        if (hist.length < 2) return;
+        renderPnlChartMarketRef(hist);
+    } catch (e) { /* silent */ }
+}
+
+function renderPnlChartMarketRef(history) {
+    const canvas = document.getElementById("pnl-chart");
+    if (!canvas) return;
+    if (pnlChart) { pnlChart.destroy(); pnlChart = null; }
+
+    const start  = toNumber(history[0].close);
+    const labels = history.map(h => h.date);
+    const values = history.map(h => ((toNumber(h.close) - start) / start) * 100);
+    const isUp   = values[values.length - 1] >= 0;
+    const line   = isUp ? "#3fb950" : "#f85149";
+
+    const ctx = canvas.getContext("2d");
+    pnlChart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [{
+                label: "S&P 500",
+                data: values,
+                borderColor: line,
+                borderWidth: 1.5,
+                borderDash: [5, 4],
+                backgroundColor: "transparent",
+                fill: false,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: line,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: "rgba(28,28,34,0.92)",
+                    titleColor: "#f5f5f7",
+                    bodyColor: "rgba(235,235,245,0.85)",
+                    borderColor: "rgba(255,255,255,0.12)",
+                    borderWidth: 1,
+                    cornerRadius: 12,
+                    padding: 12,
+                    callbacks: {
+                        label: (item) => `S&P 500 (30d): ${item.raw >= 0 ? "+" : ""}${item.raw.toFixed(2)}%`,
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: "rgba(235,235,245,.42)", maxRotation: 0, autoSkip: true,
+                             maxTicksLimit: 6, font: { size: 10 } },
+                },
+                y: {
+                    grid: { color: "rgba(255,255,255,.06)" },
+                    ticks: { color: "rgba(235,235,245,.42)", font: { size: 10 },
+                             callback: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` }
+                }
+            }
+        }
+    });
 }
 
 function renderPnlChart(history) {
@@ -1020,6 +1139,18 @@ async function initDashboard() {
     // Fire without blocking — prices and P&L are already visible
     loadAnalystRecommendations();
     startCountdown();
+    initSpotlightEffect();
+}
+
+function initSpotlightEffect() {
+    const card = document.getElementById("holdings-card");
+    if (!card) return;
+    card.addEventListener("mouseenter", () => document.body.classList.add("holdings-spotlight"));
+    card.addEventListener("mouseleave", () => document.body.classList.remove("holdings-spotlight"));
+    // Deactivate when the portfolio modal opens so the overlay doesn't interfere
+    document.getElementById("portfolioModal")?.addEventListener("show.bs.modal", () => {
+        document.body.classList.remove("holdings-spotlight");
+    });
 }
 
 

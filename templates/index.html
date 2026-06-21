@@ -7,7 +7,7 @@
     <title>FolioSenseAI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=8" rel="stylesheet">
+    <link href="/static/css/style.css?v=9" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -31,7 +31,7 @@
         </div>
     </nav>
 
-    <div class="container-fluid py-3">
+    <div class="container-fluid py-3" id="main-content">
 
         <!-- ── Summary Cards ───────────────────────────────────────────── -->
         <div class="row g-3 mb-3">
@@ -211,6 +211,17 @@
                         <span>Performance History</span>
                     </div>
                     <div class="card-body">
+                        <div id="perf-stale-callout" class="perf-callout" style="display:none">
+                            <i class="bi bi-bar-chart-line perf-callout-icon"></i>
+                            <div class="perf-callout-text">
+                                <div class="perf-callout-title">No performance history yet</div>
+                                <div class="perf-callout-body">Set your share counts to track portfolio return over time. Showing S&amp;P 500 as reference.</div>
+                            </div>
+                            <button class="btn perf-callout-btn" data-bs-toggle="modal"
+                                    data-bs-target="#portfolioModal" onclick="loadManageHoldings()">
+                                Set up holdings
+                            </button>
+                        </div>
                         <canvas id="pnl-chart" height="150"></canvas>
                     </div>
                 </div>
@@ -242,16 +253,16 @@
         </div>
 
         <!-- ── Holdings Table ──────────────────────────────────────────── -->
-        <div class="card bg-dark border-secondary">
+        <div class="card bg-dark border-secondary" id="holdings-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-2">
                     <i class="bi bi-table" style="color:var(--text-tertiary);font-size:.9rem"></i>
                     <h5 class="mb-0">Holdings</h5>
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-outline-info me-2" onclick="loadHoldingIntelligence()"
+                    <button class="btn btn-sm btn-holding-intel me-2" onclick="loadHoldingIntelligence()"
                             title="Show what each holding covers and why it moved — holding-specific benchmarks, sectors, countries, and news">
-                        <i class="bi bi-layers"></i> Holding Intel
+                        <i class="bi bi-layers btn-intel-icon"></i> Holding Intel<span class="btn-intel-badge">AI</span>
                     </button>
                     <button class="btn btn-sm btn-outline-success" onclick="refreshData()">
                         <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -300,7 +311,7 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=12"></script>
+    <script defer src="/static/js/dashboard.js?v=14"></script>
 
     <!-- Portfolio Management Modal -->
     <div class="modal fade" id="portfolioModal" tabindex="-1">
