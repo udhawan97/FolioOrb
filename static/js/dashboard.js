@@ -49,22 +49,26 @@ const chartColor = (i) => CHART_COLORS[i % CHART_COLORS.length];
 const ATTRIBUTION_SHORT = {
     "market-driven":    "Market",
     "sector-driven":    "Sector",
+    "holdings-driven":  "Holdings",
+    "macro-driven":     "Macro",
     "company-specific": "Company",
     "earnings-driven":  "Earnings",
     "filing-driven":    "Filing",
     "mixed":            "Mixed",
-    "unclear":          "Unclear",
+    "unclear":          "No clear",
     "etf-index":        "Index",
 };
 
 const ATTRIBUTION_LABELS = {
     "market-driven":    "Market Driven",
     "sector-driven":    "Sector Driven",
+    "holdings-driven":  "Holdings Driven",
+    "macro-driven":     "Macro Driven",
     "company-specific": "Company Specific",
     "earnings-driven":  "Earnings Driven",
     "filing-driven":    "Filing Driven",
     "mixed":            "Mixed Factors",
-    "unclear":          "Unclear",
+    "unclear":          "No Clear Catalyst",
     "etf-index":        "Index / ETF",
 };
 
@@ -80,7 +84,7 @@ let cachedExplanations = {};   // ticker → explanation object (move data)
 let intelligenceLoaded = false;
 let intelligenceLoading = false;
 
-// Analyst Consensus state
+// Rating state: stock analyst ratings or ETF quality labels
 let cachedRecommendations = {};  // ticker → rec object from /api/ai/analyst-recommendations/all
 
 // Single source of truth for allocation ordering, shared by both tables and the chart.
@@ -659,6 +663,8 @@ function renderHoldingCoverage(section, data) {
     }
 
     const coverageClass = (data.coverage_type || "equity").replace(/[^a-z-]/g, "");
+    const rating = cachedRecommendations[data.ticker] || {};
+    const quality = rating.etf_quality || null;
 
     // Sector bars (top 5)
     const sectorBarsHtml = data.sectors && data.sectors.length
@@ -718,6 +724,17 @@ function renderHoldingCoverage(section, data) {
            </div>`
         : "";
 
+    const etfProfileHtml = quality && (data.coverage_type || "").startsWith("etf")
+        ? `<div class="intel-label" style="margin-top:.45rem"><i class="bi bi-sliders"></i> ETF Profile</div>
+           <div class="key-drivers">
+             <div class="key-driver-item"><span class="key-driver-dot"></span><span>ETF Quality: ${escapeHtml(quality.qualityLabel || "Insufficient Data")}</span></div>
+             <div class="key-driver-item"><span class="key-driver-dot"></span><span>Cost: ${escapeHtml(quality.costLabel || "Unknown")}</span></div>
+             <div class="key-driver-item"><span class="key-driver-dot"></span><span>Liquidity: ${escapeHtml(quality.liquidityLabel || "Unknown")}</span></div>
+             <div class="key-driver-item"><span class="key-driver-dot"></span><span>Diversification: ${escapeHtml(quality.diversificationLabel || "Unknown")}</span></div>
+             <div class="key-driver-item"><span class="key-driver-dot"></span><span>Category risk: ${escapeHtml(quality.categoryRiskLabel || "Unknown")}</span></div>
+           </div>`
+        : "";
+
     // Metadata footer
     const expRatio = data.expense_ratio_bps != null
         ? `<span class="expense-tag">${data.expense_ratio_bps}bps/yr</span>` : "";
@@ -736,6 +753,7 @@ function renderHoldingCoverage(section, data) {
             ${sectorBarsHtml}
             ${countryChipsHtml}
             ${topHoldingsHtml}
+            ${etfProfileHtml}
             ${keyDriversHtml}
             <div style="margin-top:.45rem">${expRatio}${dataQual}</div>
         </div>`;
@@ -828,13 +846,14 @@ function drawTrend(canvas, history = []) {
 }
 
 
-// ── Analyst Consensus ──────────────────────────────────────────────────────
+// ── Ratings ────────────────────────────────────────────────────────────────
 
 const REC_ICONS = {
     "buy":       "bi-arrow-up-circle-fill",
     "hold":      "bi-dash-circle-fill",
     "sell":      "bi-arrow-down-circle-fill",
-    "not-rated": "bi-question-circle",
+    "unavailable": "bi-question-circle",
+    "etf-quality": "bi-layers-fill",
 };
 
 function renderAnalystRecCell(rec) {
@@ -844,12 +863,12 @@ function renderAnalystRecCell(rec) {
             <div class="shimmer-line" style="width:64px;height:9px;border-radius:4px;margin:0 auto"></div>
         </div>`;
     }
-    const action = rec.action || "not-rated";
+    const action = rec.action || "unavailable";
     const icon = REC_ICONS[action] || "bi-question-circle";
     return `<div class="analyst-rec-wrap">
         <div class="analyst-rec-main analyst-rec-${escapeHtml(action)}">
             <i class="bi ${escapeHtml(icon)} analyst-rec-icon"></i>
-            <span class="analyst-rec-label">${escapeHtml(rec.label || "Not rated")}</span>
+            <span class="analyst-rec-label">${escapeHtml(rec.label || "Unavailable")}</span>
         </div>
         <div class="analyst-rec-subtext">${escapeHtml(rec.subtext || "")}</div>
     </div>`;
@@ -864,6 +883,12 @@ async function loadAnalystRecommendations() {
             cachedRecommendations[ticker] = rec;
             const cell = document.getElementById(`rec-cell-${ticker}`);
             if (cell) cell.innerHTML = renderAnalystRecCell(rec);
+            if (intelligenceLoaded && cachedIntelligence[ticker]) {
+                const row = document.querySelector(`tr[data-ticker="${ticker}"]`);
+                const expandRow = row?.nextElementSibling;
+                const coverageSection = expandRow?.querySelector(".intel-coverage-section");
+                if (coverageSection) renderHoldingCoverage(coverageSection, cachedIntelligence[ticker]);
+            }
         });
     } catch (err) {
         console.warn("Analyst recommendations unavailable:", err);

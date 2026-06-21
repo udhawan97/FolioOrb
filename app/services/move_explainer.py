@@ -11,6 +11,8 @@ from typing import Optional
 
 import yfinance as yf
 
+from app.services.security_type import SecurityType, classify_security
+
 logger = logging.getLogger(__name__)
 
 SECTOR_ETF_MAP: dict[str, str] = {
@@ -59,6 +61,7 @@ DRIVER_ICONS: dict[str, str] = {
     "volume": "bi-bar-chart-fill",
     "filing": "bi-file-earmark-text-fill",
     "etf-index": "bi-stack",
+    "holdings": "bi-list-task",
     "macro": "bi-graph-up-arrow",
     "unclear": "bi-question-circle",
 }
@@ -279,8 +282,8 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
     day_chg_pct = float(stock_data.get("day_change_pct") or 0)
     day_chg_dollar = float(stock_data.get("day_change") or 0)
     sector = str(stock_data.get("sector") or "N/A")
-    qt = str(stock_data.get("quote_type") or "EQUITY").upper()
-    is_etf = qt in ("ETF", "MUTUALFUND")
+    security_type = classify_security(ticker, stock_data)
+    is_etf = security_type == SecurityType.ETF
 
     bm = shared_benchmarks if shared_benchmarks else get_benchmark_data()
     spy_chg = float(bm.get("SPY", 0))
@@ -363,7 +366,7 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
                 icon=DRIVER_ICONS["etf-index"],
             ))
         else:
-            attribution_type, confidence = "mixed", "Medium"
+            attribution_type, confidence = "market-driven", "Medium"
             word = "outperformed" if alpha_btc > 0 else "underperformed"
             drivers.append(MoveDriver(
                 driver_type="etf-index",
@@ -429,7 +432,7 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
                 " of its underlying holdings."
             )
         else:
-            attribution_type, confidence = "sector-driven", "Medium"
+            attribution_type, confidence = "holdings-driven", "Medium"
             word = "outperformed" if alpha > 0 else "underperformed"
             drivers.append(MoveDriver(
                 driver_type="etf-index",
@@ -493,16 +496,16 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
                 icon=DRIVER_ICONS["etf-index"],
             ))
         else:
-            attribution_type, confidence = "sector-driven", "Medium"
+            attribution_type, confidence = "holdings-driven", "Medium"
             word = "outperformed" if alpha_ref > 0 else "underperformed"
             drivers.append(MoveDriver(
-                driver_type="etf-index",
+                driver_type="holdings",
                 description=(
                     f"{word.capitalize()} its benchmark by {abs(alpha_ref):.2f}%"
                     " — fund-specific holdings drove the gap"
                 ),
                 magnitude="moderate",
-                icon=DRIVER_ICONS["etf-index"],
+                icon=DRIVER_ICONS["holdings"],
             ))
 
         if not suppress_spy and abs(alpha_spy) > 0.3 and prim_bm != "SPY":

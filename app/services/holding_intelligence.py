@@ -496,6 +496,11 @@ def _try_yfinance_enrichment(ticker: str) -> tuple[list, list, list]:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def get_static_holding_metadata(ticker: str) -> dict:
+    """Return built-in metadata for a holding without live enrichment."""
+    return dict(_STATIC.get(ticker.upper(), {}))
+
+
 def get_holding_intelligence(
     ticker: str,
     stock_data: Optional[dict] = None,

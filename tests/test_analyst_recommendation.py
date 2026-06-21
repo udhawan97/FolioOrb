@@ -54,7 +54,7 @@ class TestBuildSubtext:
         assert _build_subtext(None, 20.0) == "PT +20%"
 
     def test_both_none(self):
-        assert _build_subtext(None, None) == "Consensus unavailable"
+        assert _build_subtext(None, None) == "Analyst rating unavailable"
 
     def test_singular_analyst(self):
         assert _build_subtext(1, None) == "1 analyst"
@@ -137,47 +137,50 @@ class TestMeanFallback:
         assert rec.action == "sell"
 
 
-# ── not-rated for ETFs / crypto / missing data ────────────────────────────────
+# ── ETF quality / unavailable fallbacks ───────────────────────────────────────
 
 class TestNotRatedFallbacks:
-    def test_etf_is_not_rated(self):
+    def test_etf_gets_quality_rating(self):
         info = _make_info(quoteType="ETF", recommendationKey="buy",
                           numberOfAnalystOpinions=5)
         with _patch_yf(info):
             rec = get_analyst_recommendation("VOO")
-        assert rec.action == "not-rated"
-        assert rec.label == "Not rated"
-        assert rec.subtext == "Consensus unavailable"
+        assert rec.action == "etf-quality"
+        assert rec.rating_type == "etf_quality"
+        assert rec.security_type == "ETF"
+        assert rec.label.startswith("ETF Quality:")
+        assert rec.label != "Unavailable"
 
     def test_mutualfund_is_not_rated(self):
         info = _make_info(quoteType="MUTUALFUND")
         with _patch_yf(info):
             rec = get_analyst_recommendation("VTSAX")
-        assert rec.action == "not-rated"
+        assert rec.action == "etf-quality"
 
     def test_cryptocurrency_is_not_rated(self):
         info = _make_info(quoteType="CRYPTOCURRENCY")
         with _patch_yf(info):
             rec = get_analyst_recommendation("BTC-USD")
-        assert rec.action == "not-rated"
+        assert rec.action == "unavailable"
 
     def test_missing_key_and_mean_is_not_rated(self):
         info = _make_info(recommendationKey=None, recommendationMean=None)
         with _patch_yf(info):
             rec = get_analyst_recommendation("NOW")
-        assert rec.action == "not-rated"
+        assert rec.action == "unavailable"
+        assert rec.label == "Unavailable"
 
     def test_yfinance_exception_returns_not_rated(self):
         with patch("app.services.analyst_recommendation.yf.Ticker",
                    side_effect=RuntimeError("network error")):
             rec = get_analyst_recommendation("NOW")
-        assert rec.action == "not-rated"
-        assert rec.subtext == "Consensus unavailable"
+        assert rec.action == "unavailable"
+        assert rec.subtext == "Analyst rating unavailable"
 
     def test_not_rated_helper(self):
         rec = _not_rated("XYZ")
         assert rec.ticker == "XYZ"
-        assert rec.action == "not-rated"
+        assert rec.action == "unavailable"
         assert rec.analyst_count is None
         assert rec.target_price is None
 
@@ -263,11 +266,11 @@ class TestRecToDict:
 
     def test_not_rated_dict_values(self):
         d = rec_to_dict(_not_rated("IBIT"))
-        assert d["action"] == "not-rated"
-        assert d["label"] == "Not rated"
+        assert d["action"] == "unavailable"
+        assert d["label"] == "Unavailable"
         assert d["analyst_count"] is None
         assert d["target_price"] is None
-        assert d["subtext"] == "Consensus unavailable"
+        assert d["subtext"] == "Analyst rating unavailable"
 
     def test_buy_dict_values(self):
         rec = AnalystRec(
@@ -307,3 +310,4 @@ class TestTickerNormalization:
         with _patch_yf(info):
             rec = get_analyst_recommendation("Voo")
         assert rec.ticker == "VOO"
+        assert rec.action == "etf-quality"

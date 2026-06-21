@@ -482,6 +482,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 }
 .attribution-badge.market-driven    { background: rgba(10, 132, 255, .18); color: #0a84ff; }
 .attribution-badge.sector-driven    { background: rgba(94, 92, 230, .18);  color: #5e5ce6; }
+.attribution-badge.holdings-driven  { background: rgba(48, 209, 88,  .18); color: #30d158; }
+.attribution-badge.macro-driven     { background: rgba(100,210,255, .18);  color: #64d2ff; }
 .attribution-badge.company-specific { background: rgba(255, 159, 10, .18); color: #ff9f0a; }
 .attribution-badge.earnings-driven  { background: rgba(255, 214, 10, .18); color: #e6c200; }
 .attribution-badge.filing-driven    { background: rgba(100,210,255, .18);  color: #64d2ff; }
@@ -829,7 +831,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .data-quality-tag.static { color: var(--text-tertiary); }
 .data-quality-tag.partial { color: #ff9f0a; }
 
-/* ── Analyst Consensus column ────────────────────────────────────────────── */
+/* ── Rating column ───────────────────────────────────────────────────────── */
 .analyst-rec-wrap {
     display: flex;
     flex-direction: column;
@@ -866,7 +868,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .analyst-rec-buy   { color: var(--accent-green); }
 .analyst-rec-hold  { color: var(--accent-yellow); }
 .analyst-rec-sell  { color: var(--accent-red); }
-.analyst-rec-not-rated { color: var(--text-tertiary); }
+.analyst-rec-unavailable { color: var(--text-tertiary); }
+.analyst-rec-etf-quality { color: var(--accent-cyan); }
 
 /* ── Compact attribution badge inside the holdings table "Today" cell ────── */
 .move-badge {
@@ -884,6 +887,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 }
 .move-badge.market-driven    { background: rgba(10, 132, 255, .14); color: #0a84ff; }
 .move-badge.sector-driven    { background: rgba(94, 92, 230, .14);  color: #5e5ce6; }
+.move-badge.holdings-driven  { background: rgba(48, 209, 88,  .14); color: #30d158; }
+.move-badge.macro-driven     { background: rgba(100,210,255, .14);  color: #64d2ff; }
 .move-badge.company-specific { background: rgba(255, 159, 10, .14); color: #ff9f0a; }
 .move-badge.earnings-driven  { background: rgba(255, 214, 10, .14); color: #e6c200; }
 .move-badge.filing-driven    { background: rgba(100,210,255, .14);  color: #64d2ff; }

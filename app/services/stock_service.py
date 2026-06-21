@@ -2,6 +2,8 @@ import logging
 from typing import Optional
 import yfinance as yf
 
+from app.services.security_type import classify_security
+
 logger = logging.getLogger(__name__)
 
 # Tickers fetched when no specific list is provided
@@ -51,6 +53,14 @@ def get_stock_data(ticker: str) -> dict:
             day_change = 0.0
             day_change_pct = 0.0
 
+        bid = info.get("bid")
+        ask = info.get("ask")
+        bid_ask_spread_pct = None
+        if bid is not None and ask is not None and current_price > 0:
+            bid_ask_spread_pct = round((float(ask) - float(bid)) / current_price, 5)
+
+        security_type = classify_security(ticker, info).value
+
         return {
             "ticker": ticker.upper(),
             "name": info.get("longName") or info.get("shortName") or ticker,
@@ -65,11 +75,22 @@ def get_stock_data(ticker: str) -> dict:
             "volume": info.get("volume") or info.get("regularMarketVolume") or 0,
             "average_volume": info.get("averageVolume") or info.get("averageVolume10days") or 0,
             "market_cap": info.get("marketCap") or 0,
+            "aum": info.get("totalAssets") or info.get("netAssets"),
+            "bid": bid,
+            "ask": ask,
+            "bid_ask_spread_pct": bid_ask_spread_pct,
+            "expense_ratio": (
+                info.get("annualReportExpenseRatio")
+                or info.get("expenseRatio")
+                or info.get("netExpenseRatio")
+            ),
+            "holdings_count": info.get("holdingsCount"),
             "pe_ratio": round(info.get("trailingPE") or 0, 2),
             "dividend_yield": round(info.get("dividendYield") or 0, 4),
             "currency": info.get("currency") or "USD",
             "sector": info.get("sector") or info.get("categoryName") or "N/A",
             "quote_type": info.get("quoteType") or "EQUITY",
+            "security_type": security_type,
             "error": None,
         }
 
