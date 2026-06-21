@@ -48,6 +48,8 @@ const chartColor = (i) => CHART_COLORS[i % CHART_COLORS.length];
 let allocationChart = null;  // Keep chart instance for updates
 let latestHoldings = [];     // Most recent holdings, for re-sorting without a refetch
 let latestTrendData = {};    // Cached sparkline data, so the Holdings table re-sorts without a refetch
+let cachedSummaries = {};    // ticker → summary text, persists across table re-renders
+let summariesLoaded = false; // true once the first fetch completes
 let allocSortDir = "desc";   // Allocation sort direction: "desc" | "asc"
 let allocationTotal = 0;     // Portfolio total, drawn in the doughnut's center
 
@@ -414,10 +416,11 @@ function updateHoldingsTable(holdings, trendData = {}) {
     tbody.innerHTML = "";
     holdings.forEach((h, i) => {
         const row = tbody.insertRow();
+        row.dataset.ticker = h.ticker;
         const up = h.day_change_pct >= 0;
         row.innerHTML = `
             <td class="fw-bold">
-                <span class="ticker-dot" style="background:${chartColor(i)}"></span>${h.ticker}
+                <span class="ticker-dot" style="background:${chartColor(i)}"></span>${h.ticker}<i class="bi bi-chevron-right row-chevron"></i>
             </td>
             <td class="d-none d-md-table-cell text-secondary small">${h.name.substring(0, 28)}</td>
             <td class="text-end">${formatCurrency(h.current_price)}</td>
@@ -430,6 +433,7 @@ function updateHoldingsTable(holdings, trendData = {}) {
             <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
             <td class="text-center d-none d-xl-table-cell trend-cell"></td>
         `;
+        row.addEventListener("click", () => toggleSummaryRow(row));
         const canvas = document.createElement("canvas");
         canvas.className = "trend-sparkline";
         canvas.width = 120;
@@ -437,6 +441,61 @@ function updateHoldingsTable(holdings, trendData = {}) {
         canvas.setAttribute("aria-label", `${h.ticker} ${TREND_DAYS}-day trend`);
         row.querySelector(".trend-cell").appendChild(canvas);
         drawTrend(canvas, trendData[h.ticker]);
+    });
+    // Re-attach summary rows if summaries are already loaded
+    if (summariesLoaded || Object.keys(cachedSummaries).length > 0) {
+        injectSummaryRows(tbody);
+    }
+}
+
+function toggleSummaryRow(mainRow) {
+    const expandRow = mainRow.nextElementSibling;
+    if (!expandRow || !expandRow.classList.contains("summary-expand-row")) return;
+    const body = expandRow.querySelector(".summary-body");
+    const isOpen = body.classList.toggle("open");
+    mainRow.classList.toggle("summary-open", isOpen);
+}
+
+function renderSummaryInner(inner, text, isLoading) {
+    if (isLoading) {
+        inner.innerHTML = `
+            <div class="summary-bullet"><span class="summary-dot" style="opacity:.25"></span><div class="shimmer-line" style="width:72%"></div></div>
+            <div class="summary-bullet"><span class="summary-dot" style="opacity:.25"></span><div class="shimmer-line" style="width:55%"></div></div>
+            <div class="summary-bullet"><span class="summary-dot" style="opacity:.25"></span><div class="shimmer-line" style="width:63%"></div></div>
+        `;
+        return;
+    }
+    const bullets = (text || "").split("\n").map(l => l.trim()).filter(l => l.startsWith("•")).map(l => l.replace(/^•\s*/, ""));
+    if (!bullets.length) {
+        inner.innerHTML = `<span style="font-size:.75rem;color:var(--text-tertiary)">Summary unavailable</span>`;
+        return;
+    }
+    inner.innerHTML = bullets.map(b =>
+        `<div class="summary-bullet"><span class="summary-dot"></span><span>${b}</span></div>`
+    ).join("");
+}
+
+function injectSummaryRows(tbody) {
+    Array.from(tbody.querySelectorAll("tr[data-ticker]")).forEach(mainRow => {
+        const ticker = mainRow.dataset.ticker;
+        const next = mainRow.nextElementSibling;
+        let expandRow = (next && next.classList.contains("summary-expand-row")) ? next : null;
+
+        if (!expandRow) {
+            expandRow = document.createElement("tr");
+            expandRow.className = "summary-expand-row";
+            const td = document.createElement("td");
+            td.colSpan = 7;
+            td.innerHTML = `<div class="summary-body"><div class="summary-inner"></div></div>`;
+            expandRow.appendChild(td);
+            mainRow.after(expandRow);
+        }
+
+        const body = expandRow.querySelector(".summary-body");
+        const inner = expandRow.querySelector(".summary-inner");
+        renderSummaryInner(inner, cachedSummaries[ticker], !summariesLoaded);
+        body.classList.add("open");
+        mainRow.classList.add("summary-open");
     });
 }
 
@@ -655,37 +714,43 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
  
  
 async function generateAllSummaries() {
-    const panel = document.getElementById("ai-summaries-panel");
-    const list  = document.getElementById("ai-summaries-list");
-    panel.style.display = "block";
-    list.innerHTML = `
-        <div class="text-center py-4" style="color:var(--text-tertiary)">
-            <div class="spinner-border spinner-border-sm me-2" style="color:#64d2ff"></div>
-            <span class="small">Generating AI summaries — up to 60 seconds for all holdings</span>
-        </div>`;
+    const tbody = document.getElementById("holdings-table");
+    const btn = document.querySelector('[onclick="generateAllSummaries()"]');
+
+    // Toggle all open/closed if already loaded
+    if (summariesLoaded) {
+        const allBodies = tbody.querySelectorAll(".summary-body");
+        const anyOpen = Array.from(allBodies).some(b => b.classList.contains("open"));
+        allBodies.forEach(b => b.classList.toggle("open", !anyOpen));
+        tbody.querySelectorAll("tr[data-ticker]").forEach(r => r.classList.toggle("summary-open", !anyOpen));
+        return;
+    }
+
+    // Show shimmer placeholders immediately
+    injectSummaryRows(tbody);
+    if (btn) { btn.innerHTML = '<div class="spinner-border spinner-border-sm me-1" style="color:#64d2ff"></div> Thinking…'; btn.disabled = true; }
 
     try {
         const res = await fetch("/api/ai/summaries/all");
         const data = await res.json();
-        list.innerHTML = "";
-
         Object.entries(data.summaries).forEach(([ticker, info]) => {
-            const div = document.createElement("div");
-            div.className = "ai-summary-item mb-2 p-3";
-            div.innerHTML = `
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="fw-bold" style="font-size:.82rem;letter-spacing:.01em;color:var(--text-primary)">${ticker}</span>
-                    ${info.from_cache
-                        ? '<span class="badge rounded-pill" style="background:rgba(255,255,255,.08);color:var(--text-tertiary);font-size:.6rem;font-weight:500">cached</span>'
-                        : '<span class="badge rounded-pill" style="background:rgba(100,210,255,.18);color:#64d2ff;font-size:.6rem;font-weight:500">fresh</span>'}
-                </div>
-                <p class="mb-0" style="font-size:.82rem;color:var(--text-secondary);line-height:1.6">${info.summary}</p>
-            `;
-            list.appendChild(div);
+            cachedSummaries[ticker] = info.summary;
         });
-
+        summariesLoaded = true;
+        // Update each expand row with real content
+        Array.from(tbody.querySelectorAll("tr[data-ticker]")).forEach(mainRow => {
+            const ticker = mainRow.dataset.ticker;
+            const expandRow = mainRow.nextElementSibling;
+            if (!expandRow || !expandRow.classList.contains("summary-expand-row")) return;
+            renderSummaryInner(expandRow.querySelector(".summary-inner"), cachedSummaries[ticker], false);
+        });
     } catch (err) {
-        list.innerHTML = `<div class="text-danger small">Error: ${err.message}</div>`;
+        summariesLoaded = true; // stop shimmer
+        Array.from(tbody.querySelectorAll(".summary-inner")).forEach(inner => {
+            inner.innerHTML = `<span style="font-size:.75rem;color:var(--accent-red)">Could not load summary</span>`;
+        });
+    } finally {
+        if (btn) { btn.innerHTML = '<i class="bi bi-stars"></i> AI Summaries'; btn.disabled = false; }
     }
 }
 

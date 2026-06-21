@@ -39,32 +39,28 @@ def generate_stock_summary(stock_data: dict) -> str:
         div_pct = round(stock_data.get("dividend_yield", 0) * 100, 2) or None
         mktcap  = stock_data.get("market_cap", 0)
         mktcap_str = f"${mktcap/1e9:.1f}B" if mktcap >= 1e9 else (f"${mktcap/1e6:.0f}M" if mktcap else "N/A")
-        volume  = stock_data.get("volume", 0)
 
-        prompt = f"""You are a Wall Street analyst briefing a sophisticated retail investor on a holding in their personal portfolio.
+        prompt = f"""Summarize this stock holding for someone who knows nothing about finance. Use plain, everyday language — no jargon.
 
-Write exactly 3 sentences. Each must reveal something a retail investor cannot easily find on Robinhood, Fidelity, or a basic Google search.
+Write exactly 3 bullet points. Each bullet must be SHORT (max 12 words). Start each line with "• ".
 
-DO NOT mention: today's price, today's % change, or anything visible at a glance on a brokerage screen.
+Cover these 3 things in order:
+1. What this company/fund does (one clear phrase)
+2. How it's positioned right now (use the 52-week range data to say if it's near highs, lows, or middle — keep it simple)
+3. One thing to watch out for or be aware of (a real risk, in plain terms)
 
-Focus on:
-- Hidden risks or structural edges specific to this holding (e.g. ETF concentration, earnings quality, competitive moat cracks)
-- What the valuation or 52-week positioning signals about market expectations — and where those expectations could be wrong
-- A specific tail-risk trigger (macro shift, regulatory event, earnings quality issue, index rebalance) that most retail investors aren't tracking
+No finance speak. No hedging. No filler words. Be direct.
 
-Be blunt and specific. Use numbers when possible. No hedging language.
-
-Holding: {stock_data.get("name", ticker)} ({ticker})
-Sector/Category: {stock_data.get("sector", "N/A")}
-P/E: {pe if pe else "N/A (likely ETF or no earnings)"}
-Dividend Yield: {f"{div_pct}%" if div_pct else "None"}
-Market Cap / AUM: {mktcap_str}
-52-Week Range: ${fwl:.2f}–${fwh:.2f} | Current ${price:.2f} = {f"{range_pct}% of range" if range_pct is not None else "N/A"}
-Volume: {volume:,}"""
+Stock: {stock_data.get("name", ticker)} ({ticker})
+Sector: {stock_data.get("sector", "N/A")}
+P/E Ratio: {pe if pe else "N/A"}
+Dividend: {f"{div_pct}%" if div_pct else "None"}
+Market Cap: {mktcap_str}
+52-Week Range: ${fwl:.2f} low — ${fwh:.2f} high | Now at ${price:.2f} ({f"{range_pct}% of range" if range_pct is not None else "N/A"})"""
 
         message = client.messages.create(
             model=MODEL,
-            max_tokens=220,  # 3 dense sentences ≈ 150-200 tokens; 220 gives headroom without waste
+            max_tokens=120,  # 3 short bullets ≈ 80-100 tokens
             messages=[{"role": "user", "content": prompt}],
         )
 
