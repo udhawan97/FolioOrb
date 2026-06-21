@@ -47,6 +47,8 @@ const cssVar = (name) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 const uiScale = () => toNumber(cssVar("--ui-scale"), 1);
+const prefersReducedMotion = () =>
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
 function chartTheme() {
     const isLight = currentTheme() === "light";
@@ -142,6 +144,9 @@ function updateChartChrome(chart) {
     const scale = uiScale();
     if (chart.options.scales?.x?.ticks?.font) chart.options.scales.x.ticks.font.size = 10 * scale;
     if (chart.options.scales?.y?.ticks?.font) chart.options.scales.y.ticks.font.size = 10 * scale;
+    if (chart === allocationChart && chart.data?.datasets?.[0]) {
+        chart.data.datasets[0].borderColor = allocBorderColor();
+    }
     chart.update("none");
 }
 
@@ -175,26 +180,36 @@ function initTextSizeToggle() {
     });
 }
 
-// Apple-inspired futuristic palette: clean system hues with a luminous edge.
-// Badges use these at near-full opacity; the doughnut gets a softer glass version below.
+function initPerformanceTabs() {
+    const perfTab = document.getElementById("performance-history-tab");
+    if (!perfTab) return;
+
+    perfTab.addEventListener("shown.bs.tab", () => {
+        if (!pnlChart) return;
+        pnlChart.resize();
+        pnlChart.update("none");
+    });
+}
+
+// Apple-inspired vivid palette: high-chroma hues with enough separation for quick scanning.
+// Badges use these at full opacity; the doughnut gets a slight glass softening below.
 const CHART_COLORS = [
-    "rgba(10, 132, 255, 0.96)",   // system blue
-    "rgba(100, 210, 255, 0.96)",  // electric cyan
-    "rgba(48, 209, 88, 0.96)",    // system green
-    "rgba(102, 212, 207, 0.96)",  // mint glass
-    "rgba(94, 92, 230, 0.96)",    // system indigo
-    "rgba(191, 90, 242, 0.96)",   // system purple
-    "rgba(255, 55, 95, 0.96)",    // system pink
-    "rgba(255, 159, 10, 0.96)",   // system orange
-    "rgba(255, 214, 10, 0.96)",   // system yellow
-    "rgba(50, 173, 230, 0.96)",   // vision blue
+    "rgba(0, 122, 255, 1)",       // system blue
+    "rgba(48, 209, 88, 1)",       // system green
+    "rgba(255, 149, 0, 1)",       // system orange
+    "rgba(191, 90, 242, 1)",      // system purple
+    "rgba(90, 200, 250, 1)",      // system cyan
+    "rgba(255, 45, 85, 1)",       // system pink
+    "rgba(255, 204, 0, 1)",       // system yellow
+    "rgba(88, 86, 214, 1)",       // system indigo
+    "rgba(0, 199, 190, 1)",       // system teal
+    "rgba(175, 82, 222, 1)",      // system violet
 ];
 // Wrap around the palette so portfolios with >10 holdings still get colors.
 const chartColor = (i) => CHART_COLORS[i % CHART_COLORS.length];
 
-// Glass-opacity version for doughnut segments; badges use chartColor (full opacity).
-// 0.86 keeps the palette vivid while preserving a little material depth.
-const allocColor = (i) => chartColor(i).replace(/[\d.]+\)$/, "0.86)");
+// Glass-opacity version for doughnut segments; keeps the palette vivid with material depth.
+const allocColor = (i) => chartColor(i).replace(/[\d.]+\)$/, "0.94)");
 const withAlpha = (rgba, alpha) => rgba.replace(/[\d.]+\)$/, `${alpha})`);
 
 // Background-matching border for clean segment separation — works in both themes.
@@ -239,6 +254,7 @@ let _hasLoadedOnce = false;  // True after first successful data load
 // Doughnut center hover / selection state
 let hoveredCenterLabel = null;
 let hoveredCenterValue = null;
+let hoveredCenterPct = null;
 let selectedAllocationTicker = null;  // persists after click
 
 // Holding Intelligence state (covers "What it covers" + "Why it moved")
@@ -249,6 +265,25 @@ let intelligenceLoading = false;
 
 // Rating state: stock analyst ratings or ETF quality labels
 let cachedRecommendations = {};  // ticker → rec object from /api/ai/analyst-recommendations/all
+let aiCheckInterval = null;
+
+const AI_CHECK_MESSAGES = [
+    "Reading positions",
+    "Matching benchmarks",
+    "Checking catalysts",
+    "Scoring context",
+    "Writing notes",
+];
+
+const INTEL_BUTTON_READY_HTML = `
+    <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
+    Holding Intel<span class="btn-intel-badge">AI</span>
+`;
+
+const INTEL_BUTTON_LOADING_HTML = `
+    <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
+    Analyzing<span class="btn-intel-badge">AI</span>
+`;
 
 // Single source of truth for allocation ordering, shared by both tables and the chart.
 function sortedByAllocation(holdings) {
@@ -296,6 +331,59 @@ function updateSortCarets() {
         el.className = `bi small ${holdingsSort.dir === "asc" ? "bi-caret-up-fill" : "bi-caret-down-fill"}`;
         el.style.visibility = active ? "visible" : "hidden";
     });
+}
+
+function setAgentLine(text) {
+    const line = document.getElementById("ai-agent-line");
+    if (line) line.textContent = text;
+}
+
+function renderAiScanTickers() {
+    const tickerRail = document.getElementById("ai-scan-tickers");
+    if (!tickerRail) return;
+
+    const tickers = latestHoldings
+        .map(h => h.ticker)
+        .filter(Boolean)
+        .slice(0, 9);
+
+    tickerRail.innerHTML = tickers.map((ticker, index) =>
+        `<span class="ai-scan-chip" style="--chip-index:${index}">${escapeHtml(ticker)}</span>`
+    ).join("");
+}
+
+function setAiChecking(active, message = "Reading positions") {
+    const card = document.getElementById("holdings-card");
+    const panel = document.getElementById("ai-scan-panel");
+    const subtitle = document.getElementById("ai-scan-subtitle");
+
+    if (aiCheckInterval) {
+        clearInterval(aiCheckInterval);
+        aiCheckInterval = null;
+    }
+
+    if (!card) return;
+
+    if (!active) {
+        card.classList.remove("is-ai-checking");
+        if (panel) panel.setAttribute("aria-hidden", "true");
+        setAgentLine(message);
+        return;
+    }
+
+    let messageIndex = 0;
+    card.classList.add("is-ai-checking");
+    if (panel) panel.setAttribute("aria-hidden", "false");
+    renderAiScanTickers();
+    setAgentLine(message);
+    if (subtitle) subtitle.textContent = "Reading prices, catalysts, and portfolio context.";
+
+    aiCheckInterval = window.setInterval(() => {
+        messageIndex = (messageIndex + 1) % AI_CHECK_MESSAGES.length;
+        const next = AI_CHECK_MESSAGES[messageIndex];
+        setAgentLine(next);
+        if (subtitle) subtitle.textContent = `${next} across ${latestHoldings.length || "your"} holdings.`;
+    }, 1250);
 }
 
 
@@ -417,7 +505,7 @@ function renderAllocation() {
     const labels = sorted.map(h => h.ticker);
     const values = sorted.map(h => h.current_value);
     const colors = sorted.map((_, i) => allocColor(i));
-    const glowBorders = colors.map(c => c.replace(/[\d.]+\)$/, "0.90)"));
+    const glowBorders = colors.map(c => withAlpha(c, 1));
 
     allocationTotal = values.reduce((sum, v) => sum + toNumber(v), 0);
 
@@ -426,7 +514,7 @@ function renderAllocation() {
         allocationChart.data.datasets[0].data = values;
         allocationChart.data.datasets[0].backgroundColor = colors;
         allocationChart.data.datasets[0].hoverBorderColor = glowBorders;
-        allocationChart.data.datasets[0].borderColor = "rgba(255,255,255,0.14)";
+        allocationChart.data.datasets[0].borderColor = allocBorderColor();
         allocationChart.update();
     } else {
         const ctx = document.getElementById("allocation-chart").getContext("2d");
@@ -437,13 +525,13 @@ function renderAllocation() {
                 datasets: [{
                     data: values,
                     backgroundColor: colors,
-                    borderColor: "rgba(255,255,255,0.22)",
-                    borderWidth: 2,
+                    borderColor: allocBorderColor(),
+                    borderWidth: 2.5,
                     borderRadius: 6,
-                    spacing: 3,
-                    hoverOffset: 18,
+                    spacing: 2.5,
+                    hoverOffset: 16,
                     hoverBorderColor: glowBorders,
-                    hoverBorderWidth: 2.5,
+                    hoverBorderWidth: 4,
                 }]
             },
             options: {
@@ -461,10 +549,12 @@ function renderAllocation() {
                         hoveredCenterLabel = allocationChart.data.labels[idx];
                         const val = toNumber(allocationChart.data.datasets[0].data[idx]);
                         const pct = allocationTotal > 0 ? (val / allocationTotal * 100).toFixed(1) : "0.0";
-                        hoveredCenterValue = `${formatCurrency(val)} · ${pct}%`;
+                        hoveredCenterValue = formatCurrency(val);
+                        hoveredCenterPct = `${pct}%`;
                     } else {
                         hoveredCenterLabel = null;
                         hoveredCenterValue = null;
+                        hoveredCenterPct = null;
                     }
                     allocationChart.draw();
                 },
@@ -511,12 +601,13 @@ function allocationCenterColor(chart) {
         : "rgba(100, 210, 255, 0.86)";
 }
 
-// Animated orbit around the center label, tinted by the active/selected holding.
+// Polished live center treatment, tinted by the active/selected holding.
 const centerHaloPlugin = {
     id: "centerHalo",
     afterInit(chart) {
         if (chart.config.type !== "doughnut") return;
         chart.$centerHaloStart = performance.now();
+        if (prefersReducedMotion()) return;
 
         const tick = () => {
             if (!chart.$centerHaloFrame) return;
@@ -539,44 +630,119 @@ const centerHaloPlugin = {
         const { ctx } = chart;
         const { x, y, innerRadius } = arc;
         const scale = uiScale();
-        const elapsed = ((performance.now() - (chart.$centerHaloStart || performance.now())) / 1000);
-        const pulse = (Math.sin(elapsed * 2.6) + 1) / 2;
-        const radius = Math.max(32 * scale, innerRadius * 0.54);
+        const reducedMotion = prefersReducedMotion();
+        const elapsed = reducedMotion
+            ? 0
+            : ((performance.now() - (chart.$centerHaloStart || performance.now())) / 1000);
+        const breath = reducedMotion ? 0.58 : (Math.sin(elapsed * 1.9) + 1) / 2;
+        const radius = Math.max(34 * scale, innerRadius * 0.54);
+        const outerRadius = radius + (6 + breath * 2.4) * scale;
+        const innerRadiusSoft = radius - 9 * scale;
         const color = allocationCenterColor(chart);
-        const angle = elapsed * 1.55;
+        const isLight = currentTheme() === "light";
+        const angle = -Math.PI / 2 + elapsed * 0.82;
+        const sweep = Math.PI * 0.54;
 
         ctx.save();
         ctx.lineCap = "round";
-        ctx.shadowBlur = 10 + pulse * 12;
-        ctx.shadowColor = withAlpha(color, 0.58);
-        ctx.strokeStyle = withAlpha(color, 0.28 + pulse * 0.18);
-        ctx.lineWidth = 1.35 * scale;
+        ctx.lineJoin = "round";
+
+        const ambient = ctx.createRadialGradient(x, y, 0, x, y, outerRadius + 18 * scale);
+        ambient.addColorStop(0, withAlpha(color, isLight ? 0.15 : 0.18));
+        ambient.addColorStop(0.55, withAlpha(color, isLight ? 0.055 : 0.085));
+        ambient.addColorStop(1, withAlpha(color, 0));
+        ctx.fillStyle = ambient;
         ctx.beginPath();
-        ctx.arc(x, y, radius + pulse * 2.2 * scale, 0, Math.PI * 2);
+        ctx.arc(x, y, outerRadius + 18 * scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        const glass = ctx.createRadialGradient(
+            x - radius * 0.3,
+            y - radius * 0.42,
+            radius * 0.16,
+            x,
+            y,
+            outerRadius
+        );
+        glass.addColorStop(0, isLight ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.105)");
+        glass.addColorStop(0.58, isLight ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.035)");
+        glass.addColorStop(1, isLight ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.012)");
+        ctx.fillStyle = glass;
+        ctx.beginPath();
+        ctx.arc(x, y, outerRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = isLight ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.13)";
+        ctx.lineWidth = 1 * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, outerRadius - 0.5 * scale, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.setLineDash([7 * scale, 11 * scale]);
-        ctx.lineDashOffset = -elapsed * 26 * scale;
-        ctx.strokeStyle = withAlpha(color, 0.66);
-        ctx.lineWidth = 1.6 * scale;
+        ctx.strokeStyle = withAlpha(color, isLight ? 0.24 : 0.30);
+        ctx.lineWidth = 1.15 * scale;
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.setLineDash([]);
-        ctx.fillStyle = withAlpha(color, 0.92);
+        ctx.shadowBlur = 14 + breath * 10;
+        ctx.shadowColor = withAlpha(color, isLight ? 0.32 : 0.50);
+        ctx.strokeStyle = withAlpha(color, 0.50 + breath * 0.18);
+        ctx.lineWidth = 2.2 * scale;
         ctx.beginPath();
-        ctx.arc(
-            x + Math.cos(angle) * radius,
-            y + Math.sin(angle) * radius,
-            2.4 * scale,
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
+        ctx.arc(x, y, radius, angle, angle + sweep);
+        ctx.stroke();
+
+        ctx.shadowBlur = 8 + breath * 6;
+        ctx.strokeStyle = withAlpha(color, 0.20 + breath * 0.16);
+        ctx.lineWidth = 1.25 * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, innerRadiusSoft, angle + Math.PI * 1.08, angle + Math.PI * 1.08 + sweep * 0.72);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = isLight ? "rgba(255,255,255,0.70)" : "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 0.8 * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 3.5 * scale, angle - 0.45, angle + 0.18);
+        ctx.stroke();
+
         ctx.restore();
     },
 };
+
+function centerHoldingName(ticker) {
+    if (!ticker) return "";
+    const holding = latestHoldings.find(h => h.ticker === ticker);
+    return holding?.name || ticker;
+}
+
+function shortCenterName(name, maxChars = 22) {
+    if (!name) return "";
+    const cleaned = String(name).replace(/\s+/g, " ").trim();
+    return cleaned.length > maxChars ? `${cleaned.slice(0, maxChars - 1)}…` : cleaned;
+}
+
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - Math.min(Math.max(t, 0), 1), 3);
+}
+
+function drawFittedCenterText(ctx, text, x, y, maxWidth, font) {
+    ctx.font = font;
+    if (ctx.measureText(text).width <= maxWidth) {
+        ctx.fillText(text, x, y);
+        return;
+    }
+
+    let lo = 3;
+    let hi = text.length;
+    while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        const candidate = `${text.slice(0, mid)}…`;
+        if (ctx.measureText(candidate).width <= maxWidth) lo = mid;
+        else hi = mid - 1;
+    }
+    ctx.fillText(`${text.slice(0, lo)}…`, x, y);
+}
 
 // Draws portfolio total (or hovered segment info) in the doughnut hole, Apple-style.
 const centerTotalPlugin = {
@@ -594,36 +760,87 @@ const centerTotalPlugin = {
         ctx.textBaseline = "middle";
         const scale = uiScale();
 
-        // Resolve what to display: hover takes priority over selection
+        // Resolve what to display: hover takes priority over selection.
         const displayLabel = hoveredCenterLabel || selectedAllocationTicker;
         let displayValue = hoveredCenterValue;
+        let displayPct = hoveredCenterPct;
         if (!hoveredCenterLabel && selectedAllocationTicker) {
             const sidx = chart.data.labels.indexOf(selectedAllocationTicker);
             if (sidx >= 0) {
                 const sv = toNumber(chart.data.datasets[0].data[sidx]);
                 const sp = allocationTotal > 0 ? (sv / allocationTotal * 100).toFixed(1) : "0.0";
-                displayValue = `${formatCompact(sv)} · ${sp}%`;
+                displayValue = formatCompact(sv);
+                displayPct = `${sp}%`;
             }
         }
 
+        const displayKey = displayLabel
+            ? `holding:${displayLabel}:${displayValue || ""}:${displayPct || ""}`
+            : `total:${allocationTotal}`;
+        if (chart.$centerTextKey !== displayKey) {
+            chart.$centerTextKey = displayKey;
+            chart.$centerTextChangedAt = performance.now();
+        }
+
+        const reducedMotion = prefersReducedMotion();
+        const elapsed = performance.now() - (chart.$centerTextChangedAt || performance.now());
+        const progress = reducedMotion ? 1 : easeOutCubic(elapsed / 360);
+        const textAlpha = 0.45 + progress * 0.55;
+        const yShift = (1 - progress) * 5 * scale;
+        const maxTextWidth = Math.max(58 * scale, (arc.innerRadius || 70) * 1.22);
+
+        ctx.globalAlpha = textAlpha;
         if (displayLabel) {
-            // Hovered / selected: ticker label in primary, value in tertiary
+            const holdingName = shortCenterName(centerHoldingName(displayLabel));
+
             ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
-            ctx.font = `700 ${13 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
-            ctx.fillText(displayLabel, x, y - (10 * scale));
+            drawFittedCenterText(
+                ctx,
+                displayLabel,
+                x,
+                y - (15 * scale) + yShift,
+                maxTextWidth,
+                `750 ${15.5 * scale}px -apple-system, 'SF Pro Display', sans-serif`
+            );
+
+            ctx.fillStyle = cssVar("--text-secondary") || "rgba(235,235,245,0.62)";
+            drawFittedCenterText(
+                ctx,
+                holdingName,
+                x,
+                y - (1 * scale) + yShift,
+                maxTextWidth,
+                `500 ${8.5 * scale}px -apple-system, 'SF Pro Text', sans-serif`
+            );
+
+            ctx.fillStyle = allocationCenterColor(chart);
+            drawFittedCenterText(
+                ctx,
+                displayPct || "",
+                x,
+                y + (14 * scale) + yShift,
+                maxTextWidth,
+                `720 ${13 * scale}px -apple-system, 'SF Pro Display', sans-serif`
+            );
 
             ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
-            ctx.font = `500 ${10 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
-            ctx.fillText(displayValue || "", x, y + (8 * scale));
+            drawFittedCenterText(
+                ctx,
+                displayValue || "",
+                x,
+                y + (27 * scale) + yShift,
+                maxTextWidth,
+                `500 ${8.2 * scale}px -apple-system, 'SF Pro Text', sans-serif`
+            );
         } else {
             // Default: compact "TOTAL" label + compact value that fits the hole
             ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
             ctx.font = `600 ${9.5 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
-            ctx.fillText("TOTAL", x, y - (15 * scale));
+            ctx.fillText("TOTAL", x, y - (15 * scale) + yShift);
 
             ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
             ctx.font = `700 ${20 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
-            ctx.fillText(formatCompact(allocationTotal), x, y + (5 * scale));
+            ctx.fillText(formatCompact(allocationTotal), x, y + (5 * scale) + yShift);
         }
         ctx.restore();
     },
@@ -947,6 +1164,7 @@ function updateHoldingsTable(holdings, trendData = {}) {
     holdings.forEach((h, i) => {
         const row = tbody.insertRow();
         row.dataset.ticker = h.ticker;
+        row.style.setProperty("--row-index", i);
         const up = h.day_change_pct >= 0;
         const exp = cachedExplanations[h.ticker];
         const badgeHtml = (intelligenceLoaded && exp)
@@ -956,10 +1174,14 @@ function updateHoldingsTable(holdings, trendData = {}) {
         const rec = cachedRecommendations[h.ticker];
 
         row.innerHTML = `
-            <td class="fw-bold">
-                <span class="ticker-dot" style="background:${chartColor(i)}"></span>${h.ticker}<i class="bi bi-chevron-right row-chevron"></i>
+            <td class="fw-bold holding-ticker-cell">
+                <span class="holding-ticker-wrap">
+                    <span class="ticker-dot" style="background:${chartColor(i)}"></span>
+                    <span class="holding-ticker-symbol">${h.ticker}</span>
+                    <i class="bi bi-chevron-right row-chevron"></i>
+                </span>
             </td>
-            <td class="d-none d-md-table-cell text-secondary small">${h.name.substring(0, 28)}</td>
+            <td class="d-none d-md-table-cell text-secondary small holding-name-cell">${h.name.substring(0, 34)}</td>
             <td class="text-end">${formatCurrency(h.current_price)}</td>
             <td class="text-end">
                 <div class="${colorClass(h.day_change_pct)}">
@@ -978,7 +1200,7 @@ function updateHoldingsTable(holdings, trendData = {}) {
         row.addEventListener("click", () => toggleSummaryRow(row));
         const canvas = document.createElement("canvas");
         canvas.className = "trend-sparkline";
-        canvas.width = 120;
+        canvas.width = 150;
         canvas.height = 32;
         canvas.setAttribute("aria-label", `${h.ticker} ${TREND_DAYS}-day trend`);
         row.querySelector(".trend-cell").appendChild(canvas);
@@ -1595,6 +1817,7 @@ document.addEventListener("keydown", (e) => {
 async function initDashboard() {
     initThemeToggle();
     initTextSizeToggle();
+    initPerformanceTabs();
     await loadPortfolioValue();
     await loadPnl();
     await updateMarketStatus();
@@ -1705,9 +1928,10 @@ async function loadHoldingIntelligence() {
     }
 
     intelligenceLoading = true;
+    setAiChecking(true, "Reading positions");
     injectSummaryRows(tbody);
     if (btn) {
-        btn.innerHTML = '<div class="spinner-border spinner-border-sm me-1" style="color:#64d2ff"></div> Analyzing…';
+        btn.innerHTML = INTEL_BUTTON_LOADING_HTML;
         btn.disabled = true;
     }
 
@@ -1734,6 +1958,7 @@ async function loadHoldingIntelligence() {
 
         intelligenceLoaded = Object.keys(cachedIntelligence).length > 0;
         intelligenceLoading = false;
+        setAiChecking(false, intelligenceLoaded ? "Insights ready" : "Watching holdings");
 
         // Render all expanded rows
         Array.from(tbody.querySelectorAll("tr[data-ticker]")).forEach(mainRow => {
@@ -1758,13 +1983,15 @@ async function loadHoldingIntelligence() {
     } catch (err) {
         intelligenceLoading = false;
         intelligenceLoaded = false;
+        setAiChecking(false, "Check paused");
         Array.from(tbody.querySelectorAll(".intel-coverage-section")).forEach(s => {
             s.innerHTML = `<div class="intel-coverage"><span style="font-size:.75rem;color:var(--accent-red)">Could not load coverage data</span></div>`;
         });
         Array.from(tbody.querySelectorAll(".intel-move-section")).forEach(renderMoveExplainerFallback);
     } finally {
+        if (intelligenceLoading) setAiChecking(false, "Watching holdings");
         if (btn) {
-            btn.innerHTML = '<i class="bi bi-layers"></i> Holding Intel';
+            btn.innerHTML = INTEL_BUTTON_READY_HTML;
             btn.disabled = false;
         }
     }
