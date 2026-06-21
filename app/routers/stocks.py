@@ -1,11 +1,28 @@
+import logging
 from datetime import datetime
 import pytz
+import yfinance as yf
 from fastapi import APIRouter, HTTPException, Query
 from app.services.stock_service import (
     get_stock_data,
     get_all_quotes,
     get_historical_prices,
 )
+
+logger = logging.getLogger(__name__)
+
+_WORLD_MARKETS = [
+    {"ticker": "^GSPC",  "name": "S&P 500",     "region": "US",      "flag": "🇺🇸"},
+    {"ticker": "^IXIC",  "name": "NASDAQ",       "region": "US",      "flag": "🇺🇸"},
+    {"ticker": "^DJI",   "name": "Dow Jones",    "region": "US",      "flag": "🇺🇸"},
+    {"ticker": "^FTSE",  "name": "FTSE 100",     "region": "Europe",  "flag": "🇬🇧"},
+    {"ticker": "^GDAXI", "name": "DAX",          "region": "Europe",  "flag": "🇩🇪"},
+    {"ticker": "^FCHI",  "name": "CAC 40",       "region": "Europe",  "flag": "🇫🇷"},
+    {"ticker": "^N225",  "name": "Nikkei 225",   "region": "Asia",    "flag": "🇯🇵"},
+    {"ticker": "^HSI",   "name": "Hang Seng",    "region": "Asia",    "flag": "🇭🇰"},
+    {"ticker": "^NSEI",  "name": "Nifty 50",     "region": "Asia",    "flag": "🇮🇳"},
+    {"ticker": "^AXJO",  "name": "ASX 200",      "region": "Pacific", "flag": "🇦🇺"},
+]
 
 # All routes in this file are grouped under the /api/stocks prefix
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
@@ -91,3 +108,32 @@ async def get_market_status():
         "eastern_time": now.strftime("%I:%M %p ET"),
         "next_open": next_open,
     }
+
+
+@router.get("/world-markets")
+async def get_world_markets():
+    """
+    Return current quotes for major world market indices.
+    Uses fast_info for speed (single lightweight request per ticker).
+    """
+    results = []
+    for market in _WORLD_MARKETS:
+        try:
+            fi = yf.Ticker(market["ticker"]).fast_info
+            price = float(getattr(fi, "last_price", None) or 0)
+            prev  = float(getattr(fi, "previous_close", None) or 0)
+            if price > 0 and prev > 0:
+                chg     = price - prev
+                chg_pct = chg / prev * 100
+            else:
+                chg = chg_pct = 0.0
+            results.append({
+                **market,
+                "price":          round(price, 2),
+                "day_change":     round(chg, 2),
+                "day_change_pct": round(chg_pct, 2),
+            })
+        except Exception as exc:
+            logger.warning("World market fetch failed for %s: %s", market["ticker"], exc)
+            results.append({**market, "price": 0, "day_change": 0, "day_change_pct": 0})
+    return {"markets": results}

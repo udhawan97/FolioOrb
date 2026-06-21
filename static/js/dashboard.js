@@ -86,9 +86,10 @@ let holdingsSort = { key: "allocation_pct", dir: "desc" };
 let allocationTotal = 0;     // Portfolio total, drawn in the doughnut's center
 let _hasLoadedOnce = false;  // True after first successful data load
 
-// Doughnut center hover state
+// Doughnut center hover / selection state
 let hoveredCenterLabel = null;
 let hoveredCenterValue = null;
+let selectedAllocationTicker = null;  // persists after click
 
 // Holding Intelligence state (covers "What it covers" + "Why it moved")
 let cachedIntelligence = {};   // ticker → intelligence object (coverage data)
@@ -207,13 +208,50 @@ async function loadPortfolioValue() {
 }
 
 
+function selectAllocationTicker(ticker) {
+    // Toggle deselection if same tile is clicked again
+    if (selectedAllocationTicker === ticker) ticker = null;
+    selectedAllocationTicker = ticker;
+
+    // Sync allocation breakdown table rows
+    const allocTable = document.getElementById("allocation-table");
+    if (allocTable) {
+        const hasSelection = !!ticker;
+        allocTable.classList.toggle("has-selection", hasSelection);
+        Array.from(allocTable.rows).forEach(row => {
+            row.classList.toggle("alloc-selected", !!ticker && row.dataset.ticker === ticker);
+        });
+    }
+
+    // Sync chart segment (set active element so the segment pops out)
+    if (allocationChart) {
+        if (ticker) {
+            const idx = allocationChart.data.labels.indexOf(ticker);
+            if (idx >= 0) {
+                allocationChart.setActiveElements([{ datasetIndex: 0, index: idx }]);
+                allocationChart.tooltip.setActiveElements(
+                    [{ datasetIndex: 0, index: idx }],
+                    { x: 0, y: 0 }
+                );
+            }
+        } else {
+            allocationChart.setActiveElements([]);
+            allocationChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+        }
+        allocationChart.update("none");
+    }
+}
+
 function renderAllocation() {
     const sorted = sortedByAllocation(latestHoldings);
 
     const allocTable = document.getElementById("allocation-table");
     allocTable.innerHTML = "";
+    if (selectedAllocationTicker) allocTable.classList.add("has-selection");
     sorted.forEach((h, i) => {
         const row = allocTable.insertRow();
+        row.dataset.ticker = h.ticker;
+        if (selectedAllocationTicker === h.ticker) row.classList.add("alloc-selected");
         row.innerHTML = `
             <td><span class="badge" style="background:${chartColor(i)}">&nbsp;</span>
                 ${h.ticker}</td>
@@ -221,6 +259,7 @@ function renderAllocation() {
             <td class="text-end">${formatCurrency(h.current_value)}</td>
             <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
         `;
+        row.addEventListener("click", () => selectAllocationTicker(h.ticker));
     });
 
     updateSortCarets();
@@ -273,6 +312,12 @@ function renderAllocation() {
                     }
                     allocationChart.draw();
                 },
+                onClick: (_event, elements) => {
+                    const ticker = elements.length > 0
+                        ? allocationChart.data.labels[elements[0].index]
+                        : null;
+                    selectAllocationTicker(ticker);
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -320,15 +365,27 @@ const centerTotalPlugin = {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        if (hoveredCenterLabel) {
-            // Show hovered segment details
+        // Resolve what to display: hover takes priority over selection
+        const displayLabel = hoveredCenterLabel || selectedAllocationTicker;
+        let displayValue = hoveredCenterValue;
+        if (!hoveredCenterLabel && selectedAllocationTicker) {
+            const sidx = chart.data.labels.indexOf(selectedAllocationTicker);
+            if (sidx >= 0) {
+                const sv = toNumber(chart.data.datasets[0].data[sidx]);
+                const sp = allocationTotal > 0 ? (sv / allocationTotal * 100).toFixed(1) : "0.0";
+                displayValue = `${formatCurrency(sv)} · ${sp}%`;
+            }
+        }
+
+        if (displayLabel) {
+            // Show hovered / selected segment details
             ctx.fillStyle = "rgba(235,235,245,0.85)";
             ctx.font = "700 13px -apple-system, 'SF Pro Display', sans-serif";
-            ctx.fillText(hoveredCenterLabel, x, y - 10);
+            ctx.fillText(displayLabel, x, y - 10);
 
             ctx.fillStyle = "rgba(235,235,245,0.55)";
             ctx.font = "500 10.5px -apple-system, 'SF Pro Text', sans-serif";
-            ctx.fillText(hoveredCenterValue || "", x, y + 8);
+            ctx.fillText(displayValue || "", x, y + 8);
         } else {
             // Show total
             ctx.fillStyle = "rgba(235,235,245,0.42)";
@@ -641,9 +698,6 @@ function updateHoldingsTable(holdings, trendData = {}) {
     const tbody = document.getElementById("holdings-table");
     tbody.innerHTML = "";
 
-    const missingCostBasis = holdings.some(h => !h.avg_cost || h.avg_cost === 0);
-    _updateHoldingsCostCallout(missingCostBasis);
-
     holdings.forEach((h, i) => {
         const row = tbody.insertRow();
         row.dataset.ticker = h.ticker;
@@ -654,13 +708,6 @@ function updateHoldingsTable(holdings, trendData = {}) {
             : `<div class="move-badge" id="move-badge-${h.ticker}"></div>`;
 
         const rec = cachedRecommendations[h.ticker];
-        const noCostBasis = !h.avg_cost || h.avg_cost === 0;
-        const totalPctCell = noCostBasis
-            ? `<td class="text-end" title="No cost basis — showing today's change">
-                   <span class="${colorClass(h.day_change_pct)}">${formatPct(h.day_change_pct)}</span>
-                   <span style="font-size:.6rem;color:var(--text-tertiary);margin-left:.2rem">today</span>
-               </td>`
-            : `<td class="text-end ${valueClass(h.total_return_pct)}">${formatOptionalPct(h.total_return_pct)}</td>`;
 
         row.innerHTML = `
             <td class="fw-bold">
@@ -678,7 +725,7 @@ function updateHoldingsTable(holdings, trendData = {}) {
             </td>
             <td class="text-end d-none d-md-table-cell">${formatCurrency(h.current_value)}</td>
             <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
-            ${totalPctCell}
+            <td class="text-end d-none d-sm-table-cell" id="target-cell-${h.ticker}">${renderTargetCell(rec)}</td>
             <td class="text-center d-none d-lg-table-cell" id="rec-cell-${h.ticker}">${renderAnalystRecCell(rec)}</td>
             <td class="text-center d-none d-xl-table-cell trend-cell"></td>
         `;
@@ -1139,6 +1186,21 @@ const REC_ICONS = {
     "etf-quality": "bi-layers-fill",
 };
 
+function renderTargetCell(rec) {
+    if (!rec) {
+        return `<div class="shimmer-line" style="width:56px;height:12px;border-radius:4px;margin:0 auto .25rem"></div>
+                <div class="shimmer-line" style="width:38px;height:9px;border-radius:4px;margin:0 auto"></div>`;
+    }
+    if (!rec.target_price) {
+        return `<span style="color:var(--text-tertiary);font-size:.72rem">—</span>`;
+    }
+    const upside = rec.target_upside_pct;
+    const sign = upside >= 0 ? "+" : "";
+    const color = upside >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+    return `<div class="target-price-value">${formatCurrency(rec.target_price)}</div>
+            <div class="target-upside" style="color:${color}">${sign}${upside.toFixed(1)}%</div>`;
+}
+
 function renderAnalystRecCell(rec) {
     if (!rec) {
         return `<div class="analyst-rec-wrap">
@@ -1166,6 +1228,8 @@ async function loadAnalystRecommendations() {
             cachedRecommendations[ticker] = rec;
             const cell = document.getElementById(`rec-cell-${ticker}`);
             if (cell) cell.innerHTML = renderAnalystRecCell(rec);
+            const targetCell = document.getElementById(`target-cell-${ticker}`);
+            if (targetCell) targetCell.innerHTML = renderTargetCell(rec);
             if (intelligenceLoaded && cachedIntelligence[ticker]) {
                 const row = document.querySelector(`tr[data-ticker="${ticker}"]`);
                 const expandRow = row?.nextElementSibling;
@@ -1245,10 +1309,80 @@ async function initDashboard() {
     await updateMarketStatus();
     // Fire without blocking — prices and P&L are already visible
     loadAnalystRecommendations();
+    loadWorldMarkets();
     startCountdown();
     initSpotlightEffect();
     initTips();
     initKeyboardHelp();
+}
+
+// ── World Markets ─────────────────────────────────────────────────────────────
+
+function _marketPrice(price) {
+    if (!price || price === 0) return "—";
+    // Omit decimals for large indices (Nikkei, Hang Seng, etc.)
+    const opts = price > 999
+        ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+        : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+    return new Intl.NumberFormat("en-US", opts).format(price);
+}
+
+const _REGION_ORDER = ["US", "Europe", "Asia", "Pacific"];
+
+async function loadWorldMarkets() {
+    try {
+        const res = await fetch("/api/stocks/world-markets");
+        if (!res.ok) return;
+        const { markets } = await res.json();
+        const strip = document.getElementById("world-markets-strip");
+        if (!strip) return;
+        strip.innerHTML = "";
+
+        // Group by region, preserve defined order
+        const byRegion = {};
+        markets.forEach(m => {
+            if (!byRegion[m.region]) byRegion[m.region] = [];
+            byRegion[m.region].push(m);
+        });
+
+        _REGION_ORDER.forEach((region, regionIdx) => {
+            const group = byRegion[region] || [];
+            if (!group.length) return;
+
+            if (regionIdx > 0) {
+                const div = document.createElement("div");
+                div.className = "market-region-divider";
+                strip.appendChild(div);
+            }
+
+            group.forEach(m => {
+                const up   = m.day_change_pct >= 0;
+                const cls  = up ? "text-success" : "text-danger";
+                const icon = up ? "bi-caret-up-fill" : "bi-caret-down-fill";
+                const sign = up ? "+" : "";
+
+                const tile = document.createElement("div");
+                tile.className = "market-tile";
+                tile.innerHTML = `
+                    <div class="market-tile-top">
+                        <span class="market-tile-flag">${m.flag}</span>
+                        <span class="market-tile-region">${m.region}</span>
+                    </div>
+                    <div class="market-tile-name">${escapeHtml(m.name)}</div>
+                    <div class="market-tile-price">${_marketPrice(m.price)}</div>
+                    <div class="market-tile-change ${cls}">
+                        <i class="bi ${icon}"></i>
+                        ${sign}${m.day_change_pct.toFixed(2)}%
+                    </div>
+                `;
+                strip.appendChild(tile);
+            });
+        });
+    } catch (err) {
+        console.warn("World markets unavailable:", err);
+        const strip = document.getElementById("world-markets-strip");
+        if (strip) strip.innerHTML = `<span style="padding:1rem;color:var(--text-tertiary);font-size:.8rem">Market data unavailable</span>`;
+    }
 }
 
 function initSpotlightEffect() {

@@ -7,7 +7,7 @@
     <title>FolioSenseAI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=11" rel="stylesheet">
+    <link href="/static/css/style.css?v=12" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -251,6 +251,36 @@
             </div>
         </div>
 
+        <!-- ── World Markets ───────────────────────────────────────────── -->
+        <div class="card bg-dark border-secondary mb-3" id="world-markets-card">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-globe2" style="color:var(--accent-cyan);font-size:.9rem"></i>
+                <span>World Markets</span>
+                <button class="tip-trigger ms-auto"
+                    data-tip-title="World Markets"
+                    data-tip-body="Live quotes for major global indices. Helps you understand the macro backdrop behind your portfolio moves."
+                    data-tip-hint="Updates with each page refresh"
+                    data-tip-icon="bi-globe2">
+                    <i class="bi bi-info-circle"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="world-markets-strip" id="world-markets-strip">
+                    <!-- shimmer tiles rendered by JS while loading -->
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                    <div class="market-tile market-shimmer"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- ── Performance / Cumulative P&L ───────────────────────────── -->
         <div class="row g-3 mb-3">
             <div class="col-12 col-md-5">
@@ -395,7 +425,7 @@
                                     onclick="toggleAllocationSort()" title="Sort by allocation">
                                     Alloc % <i id="holdings-alloc-caret" class="bi bi-caret-down-fill small"></i>
                                 </th>
-                                <th class="text-end">Total %</th>
+                                <th class="text-end d-none d-sm-table-cell">Target</th>
                                 <th class="text-center d-none d-lg-table-cell">Rating</th>
                                 <th class="text-center d-none d-xl-table-cell">7-Day Trend</th>
                             </tr>
@@ -414,7 +444,7 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=15"></script>
+    <script defer src="/static/js/dashboard.js?v=16"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>
