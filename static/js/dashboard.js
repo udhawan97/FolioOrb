@@ -1067,7 +1067,7 @@ async function loadHoldingIntelligence() {
             });
         }
 
-        intelligenceLoaded = Object.keys(cachedExplanations).length > 0;
+        intelligenceLoaded = Object.keys(cachedIntelligence).length > 0;
         intelligenceLoading = false;
 
         // Render all expanded rows
