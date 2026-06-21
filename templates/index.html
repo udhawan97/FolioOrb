@@ -20,7 +20,7 @@
     <link rel="apple-touch-icon" href="/static/img/brand/folio-orbit-icon-1024.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=24" rel="stylesheet">
+    <link href="/static/css/style.css?v=25" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -29,7 +29,7 @@
     <nav class="navbar navbar-dark bg-dark border-bottom border-secondary">
         <div class="container-fluid">
             <a class="navbar-brand brand-lockup fw-bold" href="/" aria-label="FolioSenseAI dashboard">
-                <span class="brand-icon-wrap" aria-hidden="true">
+                <span class="brand-icon-wrap brand-character" aria-hidden="true">
                     <img class="brand-icon brand-icon-dark" src="/static/img/brand/folio-orbit-icon.svg" alt="">
                     <img class="brand-icon brand-icon-light" src="/static/img/brand/folio-orbit-mark-light.svg" alt="">
                 </span>
@@ -319,7 +319,7 @@
             <div class="col-12 col-md-5">
                 <div class="card bg-dark border-secondary h-100">
                     <div class="card-header d-flex align-items-center gap-2">
-                        <i class="bi bi-graph-up-arrow" style="color:var(--accent-green);font-size:.9rem"></i>
+                        <i class="bi bi-graph-up-arrow" style="font-size:.9rem"></i>
                         <span>Total return</span>
                         <button class="tip-trigger ms-auto"
                             data-tip-title="Total Return"
@@ -351,63 +351,76 @@
                 </div>
             </div>
             <div class="col-12 col-md-7">
-                <div class="card bg-dark border-secondary h-100">
-                    <div class="card-header d-flex align-items-center gap-2">
-                        <i class="bi bi-activity" style="color:var(--text-tertiary);font-size:.9rem"></i>
-                        <span>Performance history</span>
+                <div class="card bg-dark border-secondary h-100" id="performance-card">
+                    <div class="card-header d-flex align-items-center gap-2 performance-card-header">
+                        <i class="bi bi-activity performance-card-icon"></i>
+                        <ul class="nav nav-tabs performance-tabs ms-1" id="performance-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="performance-history-tab"
+                                        data-bs-toggle="tab" data-bs-target="#performance-history-pane"
+                                        type="button" role="tab" aria-controls="performance-history-pane"
+                                        aria-selected="true">
+                                    Performance
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="realized-gains-tab"
+                                        data-bs-toggle="tab" data-bs-target="#realized-gains-pane"
+                                        type="button" role="tab" aria-controls="realized-gains-pane"
+                                        aria-selected="false">
+                                    Realized gains
+                                </button>
+                            </li>
+                        </ul>
                         <button class="tip-trigger ms-auto"
                             data-tip-title="Performance History"
-                            data-tip-body="Track your portfolio's total return over time. Visit daily to build history. Requires cost basis on all holdings."
+                            data-tip-body="Track your portfolio's total return over time. The Realized gains tab shows closed trades with sale price, average cost basis, and net P&L."
                             data-tip-hint="Visit daily to grow this chart"
                             data-tip-icon="bi-activity">
                             <i class="bi bi-info-circle"></i>
                         </button>
                     </div>
                     <div class="card-body">
-                        <div id="perf-stale-callout" class="perf-callout" style="display:none">
-                            <i class="bi bi-bar-chart-line perf-callout-icon"></i>
-                            <div class="perf-callout-text">
-                                <div class="perf-callout-title">No performance history yet</div>
-                                <div class="perf-callout-body">Set your share counts to track portfolio return over time. Showing S&amp;P 500 as reference.</div>
+                        <div class="tab-content performance-tab-content" id="performance-tab-content">
+                            <div class="tab-pane fade show active" id="performance-history-pane"
+                                 role="tabpanel" aria-labelledby="performance-history-tab" tabindex="0">
+                                <div id="perf-stale-callout" class="perf-callout" style="display:none">
+                                    <i class="bi bi-bar-chart-line perf-callout-icon"></i>
+                                    <div class="perf-callout-text">
+                                        <div class="perf-callout-title">No performance history yet</div>
+                                        <div class="perf-callout-body">Set your share counts to track portfolio return over time. Showing S&amp;P 500 as reference.</div>
+                                    </div>
+                                    <button class="btn perf-callout-btn" data-bs-toggle="modal"
+                                            data-bs-target="#portfolioModal" onclick="loadManageHoldings()">
+                                        Set up holdings
+                                    </button>
+                                </div>
+                                <div class="performance-chart-shell">
+                                    <canvas id="pnl-chart" height="150"></canvas>
+                                </div>
                             </div>
-                            <button class="btn perf-callout-btn" data-bs-toggle="modal"
-                                    data-bs-target="#portfolioModal" onclick="loadManageHoldings()">
-                                Set up holdings
-                            </button>
+                            <div class="tab-pane fade" id="realized-gains-pane"
+                                 role="tabpanel" aria-labelledby="realized-gains-tab" tabindex="0">
+                                <div class="realized-table-wrap">
+                                    <table class="table table-dark table-sm mb-0 realized-table">
+                                        <thead class="text-secondary small">
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Ticker</th>
+                                                <th class="text-end">Shares Sold</th>
+                                                <th class="text-end">Sale Price</th>
+                                                <th class="text-end">Avg Cost</th>
+                                                <th class="text-end">Realized P&amp;L</th>
+                                                <th class="text-end">Total %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="realized-table"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
-                        <canvas id="pnl-chart" height="150"></canvas>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- ── Realized Trades ─────────────────────────────────────────── -->
-        <div class="card bg-dark border-secondary mb-3" id="realized-card">
-            <div class="card-header d-flex align-items-center gap-2">
-                <i class="bi bi-receipt" style="color:var(--text-tertiary);font-size:.9rem"></i>
-                <span>Realized trades</span>
-                <button class="tip-trigger ms-auto"
-                    data-tip-title="Realized Trades"
-                    data-tip-body="Closed positions showing sale price, average cost basis, and net P&L. Appears when you reduce a holding."
-                    data-tip-icon="bi-receipt">
-                    <i class="bi bi-info-circle"></i>
-                </button>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-dark table-sm mb-0">
-                    <thead class="text-secondary small">
-                        <tr>
-                            <th>Date</th>
-                            <th>Ticker</th>
-                            <th class="text-end">Shares Sold</th>
-                            <th class="text-end">Sale Price</th>
-                            <th class="text-end">Avg Cost</th>
-                            <th class="text-end">Realized P&amp;L</th>
-                            <th class="text-end">Total %</th>
-                        </tr>
-                    </thead>
-                    <tbody id="realized-table"></tbody>
-                </table>
             </div>
         </div>
 
@@ -425,10 +438,20 @@
                         <i class="bi bi-info-circle"></i>
                     </button>
                 </div>
-                <div>
+                <div class="holdings-header-actions">
+                    <div class="ai-agent-status" id="ai-agent-status" aria-live="polite">
+                        <span class="ai-agent-avatar" aria-hidden="true">
+                            <img src="/static/img/brand/folio-orbit-icon.svg" alt="">
+                        </span>
+                        <span class="ai-agent-copy">
+                            <span class="ai-agent-kicker">FolioSense</span>
+                            <span class="ai-agent-line" id="ai-agent-line">Watching holdings</span>
+                        </span>
+                    </div>
                     <button class="btn btn-sm btn-holding-intel me-2" onclick="loadHoldingIntelligence()"
                             title="Show what each holding covers and why it moved — holding-specific benchmarks, sectors, countries, and news">
-                        <i class="bi bi-layers btn-intel-icon"></i> Holding Intel<span class="btn-intel-badge">AI</span>
+                        <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
+                        Holding Intel<span class="btn-intel-badge">AI</span>
                     </button>
                     <button class="btn btn-sm btn-outline-success" onclick="refreshData()">
                         <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -436,40 +459,67 @@
                 </div>
             </div>
             <div class="card-body p-0">
+                <div class="ai-scan-panel" id="ai-scan-panel" aria-hidden="true">
+                    <div class="ai-scan-orbit" aria-hidden="true">
+                        <span class="ai-scan-ring ai-scan-ring-one"></span>
+                        <span class="ai-scan-ring ai-scan-ring-two"></span>
+                        <img src="/static/img/brand/folio-orbit-icon.svg" alt="">
+                    </div>
+                    <div class="ai-scan-copy">
+                        <div class="ai-scan-title" id="ai-scan-title">AI checking holdings</div>
+                        <div class="ai-scan-subtitle" id="ai-scan-subtitle">Reading prices, catalysts, and portfolio context.</div>
+                        <div class="ai-scan-tickers" id="ai-scan-tickers"></div>
+                    </div>
+                    <div class="ai-scan-wave" aria-hidden="true"></div>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover mb-0">
+                    <table class="table table-dark table-hover mb-0 holdings-table">
                         <thead class="text-secondary small">
                             <tr>
-                                <th>Ticker</th>
-                                <th class="d-none d-md-table-cell">Name</th>
+                                <th><span class="holdings-th-label">Ticker</span></th>
+                                <th class="d-none d-md-table-cell"><span class="holdings-th-label">Name</span></th>
                                 <th class="text-end" role="button" id="holdings-price-sort"
                                     onclick="toggleHoldingsSort('current_price')" title="Sort by price">
-                                    Price <i id="holdings-price-caret" class="bi bi-caret-down-fill small"></i>
+                                    <span class="holdings-th-label justify-content-end">
+                                        Price <i id="holdings-price-caret" class="bi bi-caret-down-fill small"></i>
+                                    </span>
                                 </th>
                                 <th class="text-end" role="button" id="holdings-today-sort"
                                     onclick="toggleHoldingsSort('day_change_pct')" title="Sort by today's change">
-                                    Today <i id="holdings-today-caret" class="bi bi-caret-down-fill small"></i>
+                                    <span class="holdings-th-label justify-content-end">
+                                        Today <i id="holdings-today-caret" class="bi bi-caret-down-fill small"></i>
+                                    </span>
                                 </th>
                                 <th class="text-end d-none d-md-table-cell" role="button" id="holdings-value-sort"
                                     onclick="toggleHoldingsSort('current_value')" title="Sort by value">
-                                    Value <i id="holdings-value-caret" class="bi bi-caret-down-fill small"></i>
+                                    <span class="holdings-th-label justify-content-end">
+                                        Value <i id="holdings-value-caret" class="bi bi-caret-down-fill small"></i>
+                                    </span>
                                 </th>
                                 <th class="text-end" role="button" id="holdings-alloc-sort"
                                     onclick="toggleAllocationSort()" title="Sort by allocation">
-                                    Alloc % <i id="holdings-alloc-caret" class="bi bi-caret-down-fill small"></i>
+                                    <span class="holdings-th-label justify-content-end">
+                                        Alloc % <i id="holdings-alloc-caret" class="bi bi-caret-down-fill small"></i>
+                                    </span>
                                 </th>
                                 <th class="text-end d-none d-sm-table-cell">
-                                    Target / Signal
-                                    <button class="tip-trigger target-tip-trigger" type="button"
-                                        data-tip-title="Target / ETF Signal"
-                                        data-tip-body="For stocks, this shows the analyst consensus price target and implied upside when available. For ETFs, it shows a price-zone signal based on the ETF's own last year of prices. Bargain means near its low range, Fair means middle range, Elevated means getting expensive versus recent history, and Rich means near its highs."
-                                        data-tip-hint="Rows are tagged below as Stock target, ETF signal, or fallback data"
-                                        data-tip-icon="bi-bullseye">
-                                        <i class="bi bi-info-circle"></i>
-                                    </button>
+                                    <span class="holdings-th-label justify-content-end">
+                                        Trend Sense
+                                        <button class="tip-trigger target-tip-trigger" type="button"
+                                            data-tip-title="Trend Sense"
+                                            data-tip-body="For stocks, this shows the analyst consensus price target and implied upside when available. For ETFs, it shows a price-zone signal based on the ETF's own last year of prices. Bargain means near its low range, Fair means middle range, Elevated means getting expensive versus recent history, and Rich means near its highs."
+                                            data-tip-hint="Rows are tagged below as Stock target, ETF signal, or fallback data"
+                                            data-tip-icon="bi-bullseye">
+                                            <i class="bi bi-info-circle"></i>
+                                        </button>
+                                    </span>
                                 </th>
-                                <th class="text-center d-none d-lg-table-cell">Rating</th>
-                                <th class="text-center d-none d-xl-table-cell">7-Day Trend</th>
+                                <th class="text-center d-none d-lg-table-cell">
+                                    <span class="holdings-th-label justify-content-center">Rating</span>
+                                </th>
+                                <th class="text-center d-none d-xl-table-cell">
+                                    <span class="holdings-th-label justify-content-center">7-Day Trend</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="holdings-table">
@@ -486,7 +536,7 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=24"></script>
+    <script defer src="/static/js/dashboard.js?v=26"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>

@@ -23,6 +23,9 @@ html[data-text-size="comfortable"] {
     --accent-red:     #ff453a;
     --accent-cyan:    #64d2ff;
     --accent-yellow:  #ffd60a;
+    /* Brand palette — derived from folio-orbit-icon.svg */
+    --brand-cyan:       #6fd6f0;
+    --brand-periwinkle: #97acec;
     --font-display: -apple-system, "SF Pro Display", BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-text: -apple-system, "SF Pro Text", BlinkMacSystemFont, "Segoe UI", sans-serif;
 
@@ -53,8 +56,11 @@ html[data-text-size="comfortable"] {
     --shadow-card:    0 10px 30px -14px rgba(0, 0, 0, 0.7);
     --shadow-card-hover: 0 22px 48px -18px rgba(0, 0, 0, 0.78);
     --shadow-float:   0 28px 64px -12px rgba(0, 0, 0, 0.78);
-    --bg-ambient-1:   radial-gradient(1200px 620px at 12% -8%, rgba(10, 132, 255, 0.30), transparent 58%);
-    --bg-ambient-2:   radial-gradient(1000px 520px at 112% 6%, rgba(48, 209, 88, 0.18), transparent 55%);
+    /* Brand-driven ambient glows */
+    --bg-ambient-1:   radial-gradient(1200px 620px at 12% -8%, rgba(111, 214, 240, 0.18), transparent 58%);
+    --bg-ambient-2:   radial-gradient(1000px 520px at 112% 6%, rgba(151, 172, 236, 0.14), transparent 55%);
+    /* Brand cyan overrides Apple system cyan in dark mode */
+    --accent-cyan:    #6fd6f0;
 
     /* Text — mirrors Apple's label hierarchy */
     --text-primary:   #f5f5f7;
@@ -91,9 +97,11 @@ html[data-text-size="comfortable"] {
     --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.07), 0 16px 36px -12px rgba(0, 0, 0, 0.13);
     --shadow-float:   0 2px 6px rgba(0, 0, 0, 0.06), 0 18px 44px -12px rgba(0, 0, 0, 0.16);
 
-    /* Ambient: barely perceptible — warmth, not clinical blue */
-    --bg-ambient-1:   radial-gradient(1100px 560px at 8% -12%, rgba(10, 132, 255, 0.14), transparent 55%);
-    --bg-ambient-2:   radial-gradient(900px 480px at 112% 0%, rgba(255, 180, 100, 0.14), transparent 56%);
+    /* Brand-driven ambient glows */
+    --bg-ambient-1:   radial-gradient(1100px 560px at 8% -12%, rgba(111, 214, 240, 0.08), transparent 55%);
+    --bg-ambient-2:   radial-gradient(900px 480px at 112% 0%, rgba(151, 172, 236, 0.08), transparent 56%);
+    /* Darker brand-cyan for readable contrast on light backgrounds */
+    --accent-cyan:    #0e8fad;
 
     /* Apple label hierarchy — warm near-black, not cold navy */
     --text-primary:   #1C1C1E;          /* iOS/macOS primary label */
@@ -170,9 +178,40 @@ body {
     border: 1px solid var(--hairline);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 10px 24px -14px rgba(10, 132, 255, 0.55);
+        0 10px 24px -14px rgba(151, 172, 236, 0.50);
     overflow: hidden;
     flex-shrink: 0;
+}
+
+.brand-character {
+    position: relative;
+    overflow: visible;
+    animation: brandListen 4.8s ease-in-out infinite;
+}
+
+.brand-character::before,
+.brand-character::after {
+    content: "";
+    position: absolute;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.brand-character::before {
+    inset: -4px;
+    border: 1px solid rgba(111, 214, 240, 0.18);
+    opacity: 0;
+    transform: scale(0.92);
+    animation: brandSignal 4.8s ease-in-out infinite;
+}
+
+.brand-character::after {
+    right: 4px;
+    bottom: 4px;
+    width: 6px;
+    height: 6px;
+    background: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.12), 0 0 12px rgba(48, 209, 88, 0.65);
 }
 
 .brand-icon {
@@ -186,14 +225,30 @@ body {
 
 [data-bs-theme="light"] .brand-icon-wrap {
     background: rgba(255, 255, 255, 0.62);
-    border-color: rgba(10, 132, 255, 0.16);
+    border-color: rgba(151, 172, 236, 0.22);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.85),
         0 12px 28px -18px rgba(10, 23, 45, 0.35);
 }
 
+[data-bs-theme="light"] .brand-character::before {
+    border-color: rgba(151, 172, 236, 0.22);
+}
+
 [data-bs-theme="light"] .brand-icon-dark { display: none; }
 [data-bs-theme="light"] .brand-icon-light { display: block; }
+
+@keyframes brandListen {
+    0%, 100% { transform: translateY(0) scale(1); }
+    45% { transform: translateY(-1px) scale(1.02); }
+    58% { transform: translateY(0) scale(0.995); }
+}
+
+@keyframes brandSignal {
+    0%, 42%, 100% { opacity: 0; transform: scale(0.9); }
+    52% { opacity: 1; transform: scale(1.12); }
+    70% { opacity: 0; transform: scale(1.28); }
+}
 
 .theme-toggle,
 .text-size-toggle {
@@ -345,35 +400,35 @@ body {
     background: rgba(255, 255, 255, 0.045);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 10px 24px -18px rgba(100, 210, 255, 0.35);
+        0 10px 24px -18px rgba(111, 214, 240, 0.28);
 }
 
 [data-bs-theme="dark"] .theme-toggle-thumb,
 [data-bs-theme="dark"] .text-size-toggle-thumb {
     background: #111827;
-    border-color: rgba(100, 210, 255, 0.3);
+    border-color: rgba(111, 214, 240, 0.28);
 }
 
 [data-bs-theme="dark"] .theme-toggle-thumb {
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 0 0 1px rgba(100, 210, 255, 0.06),
-        0 10px 20px -12px rgba(100, 210, 255, 0.58);
+        0 0 0 1px rgba(111, 214, 240, 0.06),
+        0 10px 20px -12px rgba(111, 214, 240, 0.52);
 }
 
 [data-bs-theme="dark"] .text-size-toggle-thumb {
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 0 0 1px rgba(100, 210, 255, 0.05),
-        0 10px 20px -12px rgba(100, 210, 255, 0.42);
+        0 0 0 1px rgba(111, 214, 240, 0.05),
+        0 10px 20px -12px rgba(111, 214, 240, 0.38);
 }
 
 [data-bs-theme="dark"] .theme-toggle-thumb-icon-dark {
-    color: #64d2ff;
+    color: var(--accent-cyan);
 }
 
 [data-bs-theme="dark"] .text-size-toggle-thumb i {
-    color: #64d2ff;
+    color: var(--accent-cyan);
 }
 
 [data-bs-theme="light"] .theme-toggle-thumb,
@@ -431,7 +486,7 @@ body {
 [data-bs-theme="dark"] .card {
     background:
         radial-gradient(ellipse 100% 55% at 50% 0%,
-            rgba(100, 210, 255, 0.09) 0%,
+            rgba(111, 214, 240, 0.08) 0%,
             transparent 100%),
         var(--surface) !important;
 }
@@ -450,6 +505,10 @@ body {
 
 .card-body {
     min-width: 0;
+}
+
+#holdings-card .card-body {
+    position: relative;
 }
 
 .card-header {
@@ -517,6 +576,505 @@ table tbody tr:hover {
 }
 
 .table tbody tr:last-child td { border-bottom: 0 !important; }
+
+/* ── Holdings table rhythm ───────────────────────────────────────────────── */
+#holdings-card .table-responsive {
+    padding: 0 0.15rem 0.2rem;
+}
+
+.holdings-table {
+    table-layout: auto;
+    min-width: 1240px;
+}
+
+.holdings-table thead th {
+    height: 48px;
+    vertical-align: middle;
+    padding: 0.92rem 1.15rem;
+    line-height: 1;
+}
+
+.holdings-table tbody td {
+    padding: 0.94rem 1.15rem;
+    vertical-align: middle;
+}
+
+.holdings-table tbody tr[data-ticker] {
+    min-height: 68px;
+}
+
+.holdings-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.ai-agent-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.46rem;
+    min-width: 176px;
+    max-width: 236px;
+    padding: 0.26rem 0.62rem 0.26rem 0.32rem;
+    border: 1px solid rgba(111, 214, 240, 0.16);
+    border-radius: 999px;
+    background: rgba(111, 214, 240, 0.055);
+    color: var(--text-secondary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    overflow: hidden;
+    transition: background 0.24s var(--ease),
+                border-color 0.24s var(--ease),
+                box-shadow 0.24s var(--ease),
+                transform 0.24s var(--spring);
+}
+
+.ai-agent-avatar {
+    position: relative;
+    width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    box-shadow: 0 8px 18px -12px rgba(111, 214, 240, 0.75);
+}
+
+.ai-agent-avatar::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 11px;
+    border: 1px solid rgba(111, 214, 240, 0.22);
+    opacity: 0;
+    transform: scale(0.9);
+}
+
+.ai-agent-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+}
+
+.ai-agent-copy {
+    display: grid;
+    min-width: 0;
+    line-height: 1.05;
+}
+
+.ai-agent-kicker {
+    font-size: 0.49rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: var(--accent-cyan);
+    opacity: 0.82;
+}
+
+.ai-agent-line {
+    margin-top: 0.12rem;
+    font-size: 0.66rem;
+    font-weight: 650;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-bs-theme="light"] .ai-agent-status {
+    background: rgba(255, 255, 255, 0.58);
+    border-color: rgba(111, 214, 240, 0.22);
+}
+
+[data-bs-theme="light"] #holdings-card.is-ai-checking .ai-agent-status {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(111, 214, 240, 0.40);
+    box-shadow:
+        0 14px 34px -24px rgba(111, 214, 240, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+#holdings-card.is-ai-checking .ai-agent-status {
+    background: rgba(111, 214, 240, 0.105);
+    border-color: rgba(111, 214, 240, 0.38);
+    box-shadow:
+        0 0 28px -12px rgba(111, 214, 240, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+#holdings-card.is-ai-checking .ai-agent-avatar {
+    animation: aiAvatarThink 1.35s var(--spring) infinite;
+}
+
+#holdings-card.is-ai-checking .ai-agent-avatar::after {
+    animation: aiAvatarPing 1.35s ease-out infinite;
+}
+
+.ai-scan-panel {
+    position: absolute;
+    z-index: 7;
+    left: 0.9rem;
+    right: 0.9rem;
+    top: 0.85rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.88rem;
+    padding: 0.82rem 1rem;
+    border: 1px solid rgba(111, 214, 240, 0.24);
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, rgba(111, 214, 240, 0.14), rgba(151, 172, 236, 0.05)),
+        var(--popover-surface);
+    box-shadow:
+        0 22px 60px -22px rgba(0, 0, 0, 0.72),
+        0 0 42px -22px rgba(111, 214, 240, 0.85),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px) saturate(170%);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+    transition: opacity 0.26s var(--ease), transform 0.32s var(--spring);
+    overflow: hidden;
+}
+
+[data-bs-theme="light"] .ai-scan-panel {
+    background:
+        linear-gradient(135deg, rgba(111, 214, 240, 0.10), rgba(151, 172, 236, 0.04)),
+        rgba(255, 255, 255, 0.94);
+    border-color: rgba(111, 214, 240, 0.32);
+    box-shadow:
+        0 18px 48px -28px rgba(15, 23, 42, 0.24),
+        0 0 38px -24px rgba(111, 214, 240, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+#holdings-card.is-ai-checking .ai-scan-panel {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.ai-scan-orbit {
+    position: relative;
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    border-radius: 18px;
+    flex: 0 0 auto;
+}
+
+.ai-scan-orbit img {
+    width: 42px;
+    height: 42px;
+    display: block;
+    border-radius: 14px;
+    z-index: 2;
+    box-shadow: 0 14px 26px -16px rgba(111, 214, 240, 0.90);
+    animation: aiIconFloat 1.7s var(--spring) infinite;
+}
+
+.ai-scan-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    border: 1px solid rgba(111, 214, 240, 0.28);
+}
+
+.ai-scan-ring-one {
+    animation: aiScanOrbit 2.1s linear infinite;
+}
+
+.ai-scan-ring-two {
+    inset: 7px;
+    border-color: rgba(151, 172, 236, 0.28);
+    animation: aiScanOrbit 1.55s linear infinite reverse;
+}
+
+.ai-scan-copy {
+    min-width: 0;
+    position: relative;
+    z-index: 2;
+}
+
+.ai-scan-title {
+    font-size: 0.82rem;
+    font-weight: 750;
+    color: var(--text-primary);
+    letter-spacing: 0;
+    line-height: 1.15;
+}
+
+.ai-scan-subtitle {
+    margin-top: 0.18rem;
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+
+.ai-scan-tickers {
+    display: flex;
+    align-items: center;
+    gap: 0.32rem;
+    margin-top: 0.48rem;
+    min-height: 21px;
+    overflow: hidden;
+}
+
+.ai-scan-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.22rem;
+    padding: 0.13rem 0.42rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    color: var(--text-secondary);
+    font-size: 0.56rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    animation: aiChipRead 1.8s ease-in-out infinite;
+    animation-delay: calc(var(--chip-index, 0) * 95ms);
+}
+
+[data-bs-theme="light"] .ai-scan-chip {
+    background: rgba(111, 214, 240, 0.10);
+    border-color: rgba(111, 214, 240, 0.14);
+}
+
+.ai-scan-chip::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    opacity: 0.68;
+    box-shadow: 0 0 10px rgba(111, 214, 240, 0.62);
+}
+
+.ai-scan-wave {
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(
+        105deg,
+        transparent 0%,
+        transparent 35%,
+        rgba(111, 214, 240, 0.16) 48%,
+        rgba(255, 255, 255, 0.09) 50%,
+        rgba(111, 214, 240, 0.10) 53%,
+        transparent 66%,
+        transparent 100%
+    );
+    transform: translateX(-78%);
+    animation: aiScanSweep 1.65s ease-in-out infinite;
+}
+
+#holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] {
+    animation: aiRowScan 1.9s ease-in-out infinite;
+    animation-delay: calc((var(--row-index, 0)) * 65ms);
+}
+
+@keyframes aiAvatarThink {
+    0%, 100% { transform: translateY(0) scale(1); }
+    44% { transform: translateY(-2px) scale(1.05); }
+    68% { transform: translateY(0) scale(0.99); }
+}
+
+@keyframes aiAvatarPing {
+    0% { opacity: 0.8; transform: scale(0.88); }
+    80%, 100% { opacity: 0; transform: scale(1.38); }
+}
+
+@keyframes aiIconFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    44% { transform: translateY(-3px) rotate(-2deg); }
+    72% { transform: translateY(1px) rotate(1deg); }
+}
+
+@keyframes aiScanOrbit {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes aiScanSweep {
+    0% { transform: translateX(-82%); opacity: 0; }
+    18% { opacity: 1; }
+    72% { opacity: 1; }
+    100% { transform: translateX(82%); opacity: 0; }
+}
+
+@keyframes aiChipRead {
+    0%, 100% { color: var(--text-secondary); background: rgba(255, 255, 255, 0.06); }
+    45% { color: var(--text-primary); background: rgba(111, 214, 240, 0.16); }
+}
+
+@keyframes aiRowScan {
+    0%, 100% { background-color: transparent; }
+    46% { background-color: rgba(111, 214, 240, 0.055); }
+}
+
+.holdings-th-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    width: 100%;
+    min-height: 1rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.holdings-table thead .tip-trigger {
+    flex: 0 0 auto;
+    margin-left: 0.05rem;
+    transform: translateY(0);
+}
+
+.holdings-table th:nth-child(1),
+.holdings-table td:nth-child(1) { min-width: 92px; }
+
+.holdings-table th:nth-child(2),
+.holdings-table td:nth-child(2) { min-width: 190px; }
+
+.holdings-table th:nth-child(3),
+.holdings-table td:nth-child(3) { min-width: 96px; }
+
+.holdings-table th:nth-child(4),
+.holdings-table td:nth-child(4) { min-width: 104px; }
+
+.holdings-table th:nth-child(5),
+.holdings-table td:nth-child(5) { min-width: 112px; }
+
+.holdings-table th:nth-child(6),
+.holdings-table td:nth-child(6) { min-width: 88px; }
+
+.holdings-table th:nth-child(7),
+.holdings-table td:nth-child(7) { min-width: 184px; }
+
+.holdings-table th:nth-child(8),
+.holdings-table td:nth-child(8) { min-width: 226px; }
+
+.holdings-table th:nth-child(9),
+.holdings-table td:nth-child(9) { min-width: 148px; }
+
+.holding-ticker-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    min-width: 0;
+    line-height: 1;
+}
+
+.holding-ticker-symbol {
+    letter-spacing: 0.01em;
+}
+
+.holding-ticker-wrap .ticker-dot,
+.holding-ticker-wrap .row-chevron {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.holding-name-cell {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#holdings-table td:nth-child(3),
+#holdings-table td:nth-child(5),
+#holdings-table td:nth-child(6) {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+@media (max-width: 991.98px) {
+    .holdings-table {
+        min-width: 1040px;
+    }
+
+    .holdings-table thead th,
+    .holdings-table tbody td {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+
+    #holdings-card .card-header {
+        align-items: flex-start !important;
+        gap: 0.8rem;
+    }
+
+    .holdings-header-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .ai-agent-status {
+        order: -1;
+        min-width: 168px;
+        max-width: 210px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .holdings-table {
+        min-width: 960px;
+    }
+
+    .holdings-table thead th,
+    .holdings-table tbody td {
+        padding-left: 0.78rem;
+        padding-right: 0.78rem;
+    }
+
+    #holdings-card .card-header {
+        flex-direction: column;
+    }
+
+    .holdings-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .ai-agent-status {
+        width: 100%;
+        max-width: none;
+        flex-basis: 100%;
+    }
+
+    .ai-scan-panel {
+        left: 0.55rem;
+        right: 0.55rem;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 0.65rem;
+        padding: 0.72rem 0.78rem;
+    }
+
+    .ai-scan-orbit {
+        width: 44px;
+        height: 44px;
+    }
+
+    .ai-scan-orbit img {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+    }
+
+    .ai-scan-title {
+        font-size: 0.76rem;
+    }
+
+    .ai-scan-subtitle {
+        font-size: 0.62rem;
+    }
+
+    .ai-scan-tickers {
+        max-width: 100%;
+    }
+}
 
 /* Allocation legend swatches → tidy color dots */
 #allocation-table .badge {
@@ -603,7 +1161,7 @@ table tbody tr:hover {
 .trend-sparkline {
     display: block;
     height: 32px;
-    width: 120px;
+    width: 150px;
     margin: 0 auto;
 }
 
@@ -779,7 +1337,7 @@ table tbody tr:hover {
 }
 .summary-inner {
     padding: 0.5rem 1rem 0.65rem 2.55rem;
-    background: linear-gradient(180deg, rgba(100, 210, 255, 0.04) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgba(111, 214, 240, 0.04) 0%, transparent 100%);
     border-bottom: 1px solid var(--hairline-soft);
 }
 .summary-bullet {
@@ -900,10 +1458,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .attribution-badge.market-driven    { background: rgba(10, 132, 255, .18); color: #0a84ff; }
 .attribution-badge.sector-driven    { background: rgba(94, 92, 230, .18);  color: #5e5ce6; }
 .attribution-badge.holdings-driven  { background: rgba(48, 209, 88,  .18); color: #30d158; }
-.attribution-badge.macro-driven     { background: rgba(100,210,255, .18);  color: #64d2ff; }
+.attribution-badge.macro-driven     { background: rgba(111, 214, 240, .18);  color: var(--accent-cyan); }
 .attribution-badge.company-specific { background: rgba(255, 159, 10, .18); color: #ff9f0a; }
 .attribution-badge.earnings-driven  { background: rgba(255, 214, 10, .18); color: #e6c200; }
-.attribution-badge.filing-driven    { background: rgba(100,210,255, .18);  color: #64d2ff; }
+.attribution-badge.filing-driven    { background: rgba(111, 214, 240, .18);  color: var(--accent-cyan); }
 .attribution-badge.mixed            { background: rgba(191, 90, 242, .18); color: #bf5af2; }
 .attribution-badge.unclear          { background: rgba(235,235,245, .08);  color: var(--text-tertiary); }
 .attribution-badge.etf-index        { background: rgba(48, 209, 88,  .18); color: #30d158; }
@@ -952,7 +1510,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     color: var(--text-tertiary);
     transition: color 0.18s var(--ease);
 }
-.driver-icon.strong   { color: var(--accent-blue); }
+.driver-icon.strong   { color: var(--brand-periwinkle); }
 .driver-icon.moderate { color: var(--accent-cyan); opacity: 0.75; }
 
 /* Macro context pills row */
@@ -1009,7 +1567,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: start;
-    background: linear-gradient(180deg, rgba(100,210,255,0.03) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgba(111, 214, 240, 0.03) 0%, transparent 100%);
     border-bottom: 1px solid var(--hairline-soft);
 }
 @media (max-width: 768px) {
@@ -1056,7 +1614,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .coverage-type-badge.etf-broad         { background: rgba(10,132,255,.15);  color: #0a84ff; }
 .coverage-type-badge.etf-sector        { background: rgba(94,92,230,.15);   color: #5e5ce6; }
 .coverage-type-badge.etf-thematic      { background: rgba(191,90,242,.15);  color: #bf5af2; }
-.coverage-type-badge.etf-international { background: rgba(100,210,255,.15); color: #64d2ff; }
+.coverage-type-badge.etf-international { background: rgba(111, 214, 240, .15); color: var(--accent-cyan); }
 .coverage-type-badge.etf-crypto        { background: rgba(255,214,10,.15);  color: #e6c200; }
 
 /* Strategy text */
@@ -1094,7 +1652,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .sector-bar-fill {
     height: 100%;
     border-radius: 3px;
-    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+    background: linear-gradient(90deg, var(--brand-periwinkle), var(--brand-cyan));
     transition: width 0.6s var(--ease);
 }
 .sector-bar-pct {
@@ -1124,7 +1682,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
-.country-chip.primary { background: rgba(100,210,255,.12); color: var(--accent-cyan); }
+.country-chip.primary { background: rgba(111, 214, 240, .12); color: var(--accent-cyan); }
 
 /* Top holdings mini list */
 .top-holdings-list { margin-bottom: 0.5rem; }
@@ -1206,7 +1764,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: var(--accent-blue);
+    background: var(--brand-periwinkle);
     opacity: 0.6;
     margin-top: 0.48em;
 }
@@ -1257,6 +1815,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     gap: 3px;
     /* Fixed height prevents layout shift while the cell loads */
     min-height: 38px;
+    min-width: 210px;
 }
 
 .analyst-rec-main {
@@ -1267,6 +1826,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     font-weight: 600;
     letter-spacing: 0;
     line-height: 1;
+    white-space: nowrap;
 }
 
 .analyst-rec-icon {
@@ -1278,6 +1838,9 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     color: var(--text-tertiary);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
+    max-width: 230px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -1305,10 +1868,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .move-badge.market-driven    { background: rgba(10, 132, 255, .14); color: #0a84ff; }
 .move-badge.sector-driven    { background: rgba(94, 92, 230, .14);  color: #5e5ce6; }
 .move-badge.holdings-driven  { background: rgba(48, 209, 88,  .14); color: #30d158; }
-.move-badge.macro-driven     { background: rgba(100,210,255, .14);  color: #64d2ff; }
+.move-badge.macro-driven     { background: rgba(111, 214, 240, .14);  color: var(--accent-cyan); }
 .move-badge.company-specific { background: rgba(255, 159, 10, .14); color: #ff9f0a; }
 .move-badge.earnings-driven  { background: rgba(255, 214, 10, .14); color: #e6c200; }
-.move-badge.filing-driven    { background: rgba(100,210,255, .14);  color: #64d2ff; }
+.move-badge.filing-driven    { background: rgba(111, 214, 240, .14);  color: var(--accent-cyan); }
 .move-badge.mixed            { background: rgba(191, 90, 242, .14); color: #bf5af2; }
 .move-badge.etf-index        { background: rgba(48, 209, 88,  .14); color: #30d158; }
 
@@ -1316,9 +1879,12 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .btn-holding-intel {
     position: relative;
     overflow: hidden;
-    background: rgba(100, 210, 255, 0.07) !important;
-    border: 1px solid rgba(100, 210, 255, 0.26) !important;
-    color: #64d2ff !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.34rem;
+    background: rgba(111, 214, 240, 0.07) !important;
+    border: 1px solid rgba(111, 214, 240, 0.26) !important;
+    color: var(--accent-cyan) !important;
     font-weight: 600;
     letter-spacing: 0;
     padding: 0.32rem 0.9rem !important;
@@ -1330,6 +1896,14 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
                 color 0.18s var(--ease) !important;
 }
 
+.btn-intel-logo {
+    width: 17px;
+    height: 17px;
+    border-radius: 6px;
+    box-shadow: 0 7px 14px -10px rgba(111, 214, 240, 0.75);
+    flex: 0 0 auto;
+}
+
 /* Shimmer sweep — shoots across on hover */
 .btn-holding-intel::before {
     content: '';
@@ -1339,7 +1913,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     background: linear-gradient(
         90deg,
         transparent,
-        rgba(100, 210, 255, 0.18) 50%,
+        rgba(111, 214, 240, 0.18) 50%,
         transparent
     );
     transform: skewX(-18deg);
@@ -1357,7 +1931,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     position: absolute;
     top: 0; left: 20%; right: 20%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(100,210,255,0.55), transparent);
+    background: linear-gradient(90deg, transparent, rgba(111, 214, 240, 0.55), transparent);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.28s ease;
@@ -1367,30 +1941,30 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 /* Ambient "breathing" glow — draws the eye without being loud */
 @keyframes intelBreath {
     0%, 100% {
-        box-shadow: 0 0  6px -2px rgba(100,210,255,0.00),
-                    inset 0 1px 0  rgba(100,210,255,0.04);
+        box-shadow: 0 0  6px -2px rgba(111, 214, 240, 0.00),
+                    inset 0 1px 0  rgba(111, 214, 240, 0.04);
     }
     50% {
-        box-shadow: 0 0 18px -2px rgba(100,210,255,0.22),
-                    0 0  0   1px rgba(100,210,255,0.07),
-                    inset 0 1px 0  rgba(100,210,255,0.10);
+        box-shadow: 0 0 18px -2px rgba(111, 214, 240, 0.22),
+                    0 0  0   1px rgba(111, 214, 240, 0.07),
+                    inset 0 1px 0  rgba(111, 214, 240, 0.10);
     }
 }
 
 .btn-holding-intel:hover {
-    background: rgba(100, 210, 255, 0.16) !important;
-    border-color: rgba(100, 210, 255, 0.54) !important;
-    color: #b8f0ff !important;
+    background: rgba(111, 214, 240, 0.16) !important;
+    border-color: rgba(111, 214, 240, 0.54) !important;
+    color: #c8f2fb !important;
     transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 0 34px -4px rgba(100,210,255,0.44),
-                0 0  0   1px rgba(100,210,255,0.22),
+    box-shadow: 0 0 34px -4px rgba(111, 214, 240, 0.40),
+                0 0  0   1px rgba(111, 214, 240, 0.22),
                 0 8px 22px -8px rgba(0,0,0,0.55) !important;
     animation: none;
 }
 
 .btn-holding-intel:active {
     transform: scale(0.94) translateY(0) !important;
-    box-shadow: 0 0 14px -4px rgba(100,210,255,0.28) !important;
+    box-shadow: 0 0 14px -4px rgba(111, 214, 240, 0.26) !important;
     transition: transform 0.09s ease, box-shadow 0.09s ease !important;
 }
 
@@ -1415,8 +1989,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     text-transform: uppercase;
     padding: 0.09rem 0.3rem;
     border-radius: 5px;
-    background: rgba(100, 210, 255, 0.16);
-    color: #64d2ff;
+    background: rgba(111, 214, 240, 0.16);
+    color: var(--accent-cyan);
     vertical-align: middle;
     margin-left: 4px;
     position: relative;
@@ -1424,16 +1998,17 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     transition: background 0.22s ease, color 0.18s ease;
 }
 .btn-holding-intel:hover .btn-intel-badge {
-    background: rgba(100, 210, 255, 0.30);
-    color: #b8f0ff;
+    background: rgba(111, 214, 240, 0.30);
+    color: #c8f2fb;
 }
 
 /* Loading / disabled state */
 .btn-holding-intel:disabled {
     animation: none !important;
+
     transform: none !important;
-    opacity: 0.7;
-    border-color: rgba(100,210,255,0.18) !important;
+    opacity: 0.9;
+    border-color: rgba(111, 214, 240, 0.18) !important;
 }
 
 /* ── Holdings spotlight / focus effect ──────────────────────────────── */
@@ -1452,13 +2027,13 @@ body.holdings-spotlight #main-content > *:not(#holdings-card) {
     user-select: none;
 }
 
-/* Holdings card: elevate with a subtle cyan aura */
+/* Holdings card: elevate with a subtle brand-cyan aura */
 body.holdings-spotlight #holdings-card {
-    border-color: rgba(100, 210, 255, 0.18) !important;
+    border-color: rgba(111, 214, 240, 0.18) !important;
     box-shadow:
-        0 0  0   1px rgba(100,210,255,0.10),
+        0 0  0   1px rgba(111, 214, 240, 0.10),
         0 50px 90px -28px rgba(0,0,0,0.88),
-        inset 0 1px 0 rgba(100,210,255,0.07) !important;
+        inset 0 1px 0 rgba(111, 214, 240, 0.07) !important;
     transition: border-color 0.48s var(--ease),
                 box-shadow   0.48s var(--ease) !important;
 }
@@ -1566,8 +2141,8 @@ body.holdings-spotlight #holdings-card {
     line-height: 1;
 }
 .tip-trigger:hover {
-    color: var(--accent-blue);
-    background: rgba(10, 132, 255, 0.15);
+    color: var(--brand-periwinkle);
+    background: rgba(151, 172, 236, 0.14);
     transform: scale(1.15);
 }
 .tip-trigger:focus-visible {
@@ -1609,7 +2184,7 @@ body.holdings-spotlight #holdings-card {
     font-size: 0.88rem;
     margin-bottom: 0.38rem;
     display: block;
-    color: var(--accent-blue);
+    color: var(--brand-periwinkle);
     opacity: 0.9;
 }
 .tip-popover-title {
@@ -1660,7 +2235,7 @@ body.holdings-spotlight #holdings-card {
 
 /* ── Clickable stat cards ────────────────────────────────────────────────── */
 .stat-clickable { cursor: pointer; }
-.card.stat-clickable:hover .stat-value { color: var(--accent-blue) !important; }
+.card.stat-clickable:hover .stat-value { color: var(--brand-periwinkle) !important; }
 .card.stat-clickable:active {
     transform: scale(0.97) translateY(0px) !important;
     transition: transform 0.1s ease !important;
@@ -1675,7 +2250,7 @@ body.holdings-spotlight #holdings-card {
     background: var(--surface-hover);
 }
 .summary-segment.stat-clickable:hover .stat-value {
-    color: var(--accent-blue) !important;
+    color: var(--brand-periwinkle) !important;
 }
 .summary-segment.stat-clickable:active {
     background: var(--surface-strong);
@@ -1801,12 +2376,71 @@ body.holdings-spotlight #holdings-card {
     -webkit-overflow-scrolling: touch;
 }
 
-#realized-card .card-body {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+.performance-card-header {
+    min-height: 52px;
 }
 
-#realized-card table {
+.performance-card-icon {
+    color: var(--text-tertiary);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.performance-tabs {
+    border-bottom: 0;
+    gap: 0.22rem;
+    min-width: 0;
+    padding: 0.16rem;
+    border-radius: 999px;
+    background: var(--control-bg);
+    border: 1px solid var(--hairline-soft);
+}
+
+.performance-tabs .nav-link {
+    border: 0;
+    border-radius: 999px;
+    color: var(--text-tertiary);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.38rem 0.66rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+    transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.performance-tabs .nav-link:hover {
+    color: var(--text-secondary);
+    background: var(--control-hover);
+}
+
+.performance-tabs .nav-link.active {
+    color: var(--text-primary);
+    background: var(--surface-strong);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.performance-tab-content {
+    min-height: 190px;
+}
+
+.performance-chart-shell {
+    position: relative;
+    min-height: 190px;
+}
+
+.performance-chart-shell canvas {
+    width: 100% !important;
+    height: 190px !important;
+}
+
+.realized-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: -1rem;
+}
+
+.realized-table {
     min-width: 540px;
 }
 .world-markets-strip::-webkit-scrollbar { display: none; }
@@ -1910,11 +2544,17 @@ body.holdings-spotlight #holdings-card {
 
 /* drop-shadow applies to rendered canvas content (the chart), not the box.   */
 #allocation-chart {
-    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, 0.22));
+    filter:
+        saturate(1.16)
+        contrast(1.04)
+        drop-shadow(0 4px 22px rgba(0, 0, 0, 0.26));
     transition: filter 0.35s var(--ease);
 }
 [data-bs-theme="light"] #allocation-chart {
-    filter: drop-shadow(0 2px 14px rgba(0, 0, 0, 0.09));
+    filter:
+        saturate(1.12)
+        contrast(1.03)
+        drop-shadow(0 3px 16px rgba(0, 0, 0, 0.12));
 }
 
 /* ── Allocation table row selection ──────────────────────────────────────── */
@@ -1923,12 +2563,12 @@ body.holdings-spotlight #holdings-card {
     transition: background 0.18s ease;
 }
 #allocation-table tr.alloc-selected td {
-    background: rgba(10, 132, 255, 0.10) !important;
-    border-color: rgba(10, 132, 255, 0.08) !important;
+    background: rgba(111, 214, 240, 0.09) !important;
+    border-color: rgba(111, 214, 240, 0.08) !important;
 }
 #allocation-table tr.alloc-selected td:first-child .badge {
-    box-shadow: 0 0 0 2.5px rgba(10, 132, 255, 0.55),
-                0 0 0 5px rgba(10, 132, 255, 0.18);
+    box-shadow: 0 0 0 2.5px rgba(111, 214, 240, 0.50),
+                0 0 0 5px rgba(111, 214, 240, 0.16);
 }
 /* Dim un-selected rows when something is selected */
 #allocation-table.has-selection tr[data-ticker]:not(.alloc-selected) td {
@@ -1981,7 +2621,7 @@ body.holdings-spotlight #holdings-card {
     color: var(--accent-blue);
 }
 .target-kind-etf {
-    background: rgba(100, 210, 255, 0.13);
+    background: rgba(111, 214, 240, 0.13);
     color: var(--accent-cyan);
 }
 .target-kind-fallback {
@@ -2204,6 +2844,24 @@ body.holdings-spotlight #holdings-card {
     color: var(--text-primary) !important;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .brand-character,
+    .brand-character::before,
+    #holdings-card.is-ai-checking .ai-agent-avatar,
+    #holdings-card.is-ai-checking .ai-agent-avatar::after,
+    .ai-scan-orbit img,
+    .ai-scan-ring,
+    .ai-scan-wave,
+    .ai-scan-chip,
+    #holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] {
+        animation: none !important;
+    }
+
+    .ai-scan-wave {
+        display: none;
+    }
+}
+
 /* ── Allocation chart card — breathing glow ──────────────────────────────── */
 /* Uses animation-play-state: paused on hover (NOT animation: none) so that   */
 /* the cardIn fill-mode is preserved and no blink occurs on mouse-enter.      */
@@ -2217,8 +2875,8 @@ body.holdings-spotlight #holdings-card {
     50% {
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.16),
-            0 0 0 2px rgba(100, 210, 255, 0.28),
-            0 0 60px -8px rgba(100, 210, 255, 0.50),
+            0 0 0 2px rgba(111, 214, 240, 0.24),
+            0 0 60px -8px rgba(111, 214, 240, 0.44),
             var(--shadow-card-hover);
     }
 }
@@ -2232,8 +2890,8 @@ body.holdings-spotlight #holdings-card {
     50% {
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.88),
-            0 0 0 2px rgba(10, 132, 255, 0.18),
-            0 0 48px -10px rgba(10, 132, 255, 0.32),
+            0 0 0 2px rgba(151, 172, 236, 0.16),
+            0 0 48px -10px rgba(151, 172, 236, 0.28),
             var(--shadow-card-hover);
     }
 }
