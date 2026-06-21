@@ -84,6 +84,11 @@ let latestTrendData = {};    // Cached sparkline data, so the Holdings table re-
 let allocSortDir = "desc";   // Allocation sort direction: "desc" | "asc"
 let holdingsSort = { key: "allocation_pct", dir: "desc" };
 let allocationTotal = 0;     // Portfolio total, drawn in the doughnut's center
+let _hasLoadedOnce = false;  // True after first successful data load
+
+// Doughnut center hover state
+let hoveredCenterLabel = null;
+let hoveredCenterValue = null;
 
 // Holding Intelligence state (covers "What it covers" + "Why it moved")
 let cachedIntelligence = {};   // ticker → intelligence object (coverage data)
@@ -149,6 +154,13 @@ async function loadPortfolioValue() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
+        // Flash on refresh (not on first load)
+        if (_hasLoadedOnce) {
+            ["total-value", "daily-pnl", "best-performer", "worst-performer", "largest-holding"].forEach(id => {
+                flashValue(document.getElementById(id));
+            });
+        }
+
         // Update summary cards
         document.getElementById("total-value").textContent =
             formatCompact(data.total_value);
@@ -166,24 +178,28 @@ async function loadPortfolioValue() {
         renderAllocation();
 
         if (data.best_performer) {
-            document.getElementById("best-performer").innerHTML =
-                `${data.best_performer.ticker} <span style="font-size:.85em;opacity:.8">${formatPct(data.best_performer.day_change_pct)}</span>`;
+            const el = document.getElementById("best-performer");
+            el.dataset.ticker = data.best_performer.ticker;
+            el.innerHTML = `${data.best_performer.ticker} <span style="font-size:.85em;opacity:.8">${formatPct(data.best_performer.day_change_pct)}</span>`;
         }
         if (data.worst_performer) {
-            document.getElementById("worst-performer").innerHTML =
-                `${data.worst_performer.ticker} <span style="font-size:.85em;opacity:.8">${formatPct(data.worst_performer.day_change_pct)}</span>`;
+            const el = document.getElementById("worst-performer");
+            el.dataset.ticker = data.worst_performer.ticker;
+            el.innerHTML = `${data.worst_performer.ticker} <span style="font-size:.85em;opacity:.8">${formatPct(data.worst_performer.day_change_pct)}</span>`;
         }
         if (data.holdings.length) {
             const largest = data.holdings.reduce((a, b) =>
                 a.current_value > b.current_value ? a : b);
-            document.getElementById("largest-holding").innerHTML =
-                `${largest.ticker} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
+            const el = document.getElementById("largest-holding");
+            el.dataset.ticker = largest.ticker;
+            el.innerHTML = `${largest.ticker} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
         }
 
         latestTrendData = await loadTrendData(data.holdings.map(h => h.ticker));
         renderHoldings();
         document.getElementById("last-updated").textContent =
             `Updated: ${new Date().toLocaleTimeString()}`;
+        _hasLoadedOnce = true;
 
     } catch (err) {
         console.error("Error loading portfolio value:", err);
@@ -244,6 +260,19 @@ function renderAllocation() {
                 layout: { padding: 6 },
                 animation: { animateRotate: true, animateScale: true, duration: 900,
                              easing: "easeOutQuart" },
+                onHover: (event, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        hoveredCenterLabel = allocationChart.data.labels[idx];
+                        const val = toNumber(allocationChart.data.datasets[0].data[idx]);
+                        const pct = allocationTotal > 0 ? (val / allocationTotal * 100).toFixed(1) : "0.0";
+                        hoveredCenterValue = `${formatCurrency(val)} · ${pct}%`;
+                    } else {
+                        hoveredCenterLabel = null;
+                        hoveredCenterValue = null;
+                    }
+                    allocationChart.draw();
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -276,7 +305,7 @@ function renderAllocation() {
     }
 }
 
-// Draws "Total" + the portfolio value in the doughnut's hole, Apple-style.
+// Draws portfolio total (or hovered segment info) in the doughnut hole, Apple-style.
 const centerTotalPlugin = {
     id: "centerTotal",
     afterDraw(chart) {
@@ -291,13 +320,25 @@ const centerTotalPlugin = {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        ctx.fillStyle = "rgba(235,235,245,0.45)";
-        ctx.font = "600 11px -apple-system, 'SF Pro Text', sans-serif";
-        ctx.fillText("TOTAL", x, y - 14);
+        if (hoveredCenterLabel) {
+            // Show hovered segment details
+            ctx.fillStyle = "rgba(235,235,245,0.85)";
+            ctx.font = "700 13px -apple-system, 'SF Pro Display', sans-serif";
+            ctx.fillText(hoveredCenterLabel, x, y - 10);
 
-        ctx.fillStyle = "#f5f5f7";
-        ctx.font = "600 20px -apple-system, 'SF Pro Display', sans-serif";
-        ctx.fillText(formatCurrency(allocationTotal), x, y + 6);
+            ctx.fillStyle = "rgba(235,235,245,0.55)";
+            ctx.font = "500 10.5px -apple-system, 'SF Pro Text', sans-serif";
+            ctx.fillText(hoveredCenterValue || "", x, y + 8);
+        } else {
+            // Show total
+            ctx.fillStyle = "rgba(235,235,245,0.42)";
+            ctx.font = "600 11px -apple-system, 'SF Pro Text', sans-serif";
+            ctx.fillText("TOTAL", x, y - 14);
+
+            ctx.fillStyle = "#f5f5f7";
+            ctx.font = "600 20px -apple-system, 'SF Pro Display', sans-serif";
+            ctx.fillText(formatCurrency(allocationTotal), x, y + 6);
+        }
         ctx.restore();
     },
 };
@@ -1037,7 +1078,7 @@ function drawTrend(canvas, history = []) {
     ctx.clearRect(0, 0, width, height);
 
     if (closes.length < 2) {
-        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(padding, height / 2);
@@ -1050,24 +1091,41 @@ function drawTrend(canvas, history = []) {
     const max = Math.max(...closes);
     const range = max - min || 1;
     const isPositive = closes[closes.length - 1] >= closes[0];
+    const lineColor = isPositive ? "#3fb950" : "#f85149";
 
-    ctx.strokeStyle = isPositive ? "#3fb950" : "#f85149";
-    ctx.lineWidth = 2;
+    const points = closes.map((close, index) => ({
+        x: padding + (index * (width - padding * 2)) / (closes.length - 1),
+        y: height - padding - ((close - min) / range) * (height - padding * 2),
+    }));
+
+    // Fill gradient beneath the line
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, height);
+    fillGrad.addColorStop(0, isPositive ? "rgba(48,209,88,0.28)" : "rgba(255,69,58,0.28)");
+    fillGrad.addColorStop(1, "rgba(0,0,0,0)");
+
+    ctx.beginPath();
+    points.forEach(({ x, y }, i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+    ctx.lineTo(points[points.length - 1].x, height);
+    ctx.lineTo(points[0].x, height);
+    ctx.closePath();
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    // Line stroke
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 1.8;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
-
-    closes.forEach((close, index) => {
-        const x = padding + (index * (width - padding * 2)) / (closes.length - 1);
-        const y = height - padding - ((close - min) / range) * (height - padding * 2);
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    });
-
+    points.forEach(({ x, y }, i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
     ctx.stroke();
+
+    // Terminal dot at end of sparkline
+    const last = points[points.length - 1];
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = lineColor;
+    ctx.fill();
 }
 
 
@@ -1169,7 +1227,16 @@ function startCountdown() {
 document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
-    if (e.key === "r" || e.key === "R") refreshData();
+
+    if (e.key === "Escape") { hideKeyboardHelp(); return; }
+    if (e.key === "?")      { showKeyboardHelp(); return; }
+    if (e.key === "r" || e.key === "R") { refreshData(); return; }
+    if (e.key === "m" || e.key === "M") {
+        const modal = document.getElementById("portfolioModal");
+        if (modal) { loadManageHoldings(); new bootstrap.Modal(modal).show(); }
+        return;
+    }
+    if (e.key === "i" || e.key === "I") { loadHoldingIntelligence(); return; }
 });
 
 async function initDashboard() {
@@ -1180,6 +1247,8 @@ async function initDashboard() {
     loadAnalystRecommendations();
     startCountdown();
     initSpotlightEffect();
+    initTips();
+    initKeyboardHelp();
 }
 
 function initSpotlightEffect() {
@@ -1383,10 +1452,142 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
 
 
 function showToast(message, type = "success") {
+    document.querySelectorAll(".toast-apple").forEach(t => t.remove());
+    const icons = {
+        success: "bi-check-circle-fill",
+        warning: "bi-exclamation-triangle-fill",
+        danger:  "bi-x-circle-fill",
+        info:    "bi-info-circle-fill",
+    };
     const toast = document.createElement("div");
-    toast.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3`;
-    toast.style.zIndex = "9999";
-    toast.textContent = message;
+    toast.className = `toast-apple toast-${type}`;
+    toast.innerHTML = `<i class="bi ${icons[type] || icons.info} toast-icon"></i><span>${escapeHtml(message)}</span>`;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    void toast.offsetWidth;
+    toast.classList.add("toast-show");
+    setTimeout(() => {
+        toast.classList.remove("toast-show");
+        setTimeout(() => toast.remove(), 420);
+    }, 2800);
+}
+
+// Flash a DOM element's content (used on data refresh)
+function flashValue(el) {
+    if (!el) return;
+    el.classList.remove("value-updating");
+    void el.offsetWidth;
+    el.classList.add("value-updating");
+    el.addEventListener("animationend", () => el.classList.remove("value-updating"), { once: true });
+}
+
+// Scroll to and briefly highlight a holding row
+function highlightHolding(ticker) {
+    if (!ticker || ticker === "--") return;
+    const row = document.querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
+    if (!row) return;
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    const tds = Array.from(row.querySelectorAll("td"));
+    tds.forEach(td => {
+        td.style.transition = "background-color 0.32s ease";
+        td.style.backgroundColor = "rgba(10, 132, 255, 0.16)";
+    });
+    setTimeout(() => {
+        tds.forEach(td => { td.style.backgroundColor = "rgba(10, 132, 255, 0.06)"; });
+    }, 350);
+    setTimeout(() => {
+        tds.forEach(td => { td.style.backgroundColor = ""; td.style.transition = ""; });
+    }, 1700);
+}
+
+// Called by stat cards — reads ticker from the element's data attribute
+function highlightHoldingFromCard(elId) {
+    const ticker = document.getElementById(elId)?.dataset?.ticker;
+    if (ticker) highlightHolding(ticker);
+}
+
+// Open portfolio manager from the Holdings count card click
+function openManageFromCard() {
+    const modal = document.getElementById("portfolioModal");
+    if (modal) {
+        loadManageHoldings();
+        new bootstrap.Modal(modal).show();
+    }
+}
+
+// ── Keyboard shortcut overlay ──────────────────────────────────────────────
+
+function showKeyboardHelp() {
+    const overlay = document.getElementById("kbd-overlay");
+    if (!overlay) return;
+    overlay.classList.add("kbd-visible");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function hideKeyboardHelp() {
+    const overlay = document.getElementById("kbd-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("kbd-visible");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+function initKeyboardHelp() {
+    const overlay = document.getElementById("kbd-overlay");
+    if (!overlay) return;
+    overlay.addEventListener("click", hideKeyboardHelp);
+    overlay.querySelector(".kbd-panel")?.addEventListener("click", e => e.stopPropagation());
+}
+
+// ── Section tip popover system ─────────────────────────────────────────────
+
+function initTips() {
+    const popover = document.getElementById("tip-popover");
+    if (!popover) return;
+
+    let hideTimeout = null;
+
+    document.querySelectorAll(".tip-trigger").forEach(trigger => {
+        trigger.addEventListener("mouseenter", () => {
+            clearTimeout(hideTimeout);
+            const title = trigger.dataset.tipTitle || "";
+            const body  = trigger.dataset.tipBody  || "";
+            const hint  = trigger.dataset.tipHint  || "";
+            const icon  = trigger.dataset.tipIcon  || "bi-info-circle-fill";
+
+            popover.innerHTML = `
+                <i class="bi ${escapeHtml(icon)} tip-popover-icon" aria-hidden="true"></i>
+                <div class="tip-popover-title">${escapeHtml(title)}</div>
+                <div class="tip-popover-body">${escapeHtml(body)}</div>
+                ${hint ? `<div class="tip-popover-hint"><i class="bi bi-hand-index-thumb" style="font-size:.6rem"></i> ${escapeHtml(hint)}</div>` : ""}
+            `;
+
+            // Position below trigger, viewport-clamped
+            const rect   = trigger.getBoundingClientRect();
+            const popW   = 226;
+            const popH   = popover.offsetHeight || 110;
+            let left     = rect.left + rect.width / 2 - popW / 2;
+            let top      = rect.bottom + 8;
+            left = Math.max(10, Math.min(left, window.innerWidth - popW - 10));
+            if (top + popH > window.innerHeight - 14) top = rect.top - popH - 8;
+
+            popover.style.left = `${left}px`;
+            popover.style.top  = `${top}px`;
+            popover.setAttribute("aria-hidden", "false");
+            void popover.offsetWidth;
+            popover.classList.add("tip-visible");
+        });
+
+        trigger.addEventListener("mouseleave", () => {
+            hideTimeout = setTimeout(() => {
+                popover.classList.remove("tip-visible");
+                popover.setAttribute("aria-hidden", "true");
+            }, 160);
+        });
+
+        // Keyboard: show on focus, hide on blur
+        trigger.addEventListener("focus",  () => trigger.dispatchEvent(new MouseEvent("mouseenter")));
+        trigger.addEventListener("blur",   () => trigger.dispatchEvent(new MouseEvent("mouseleave")));
+
+        // Prevent card click when clicking the trigger icon
+        trigger.addEventListener("click", e => e.stopPropagation());
+    });
 }

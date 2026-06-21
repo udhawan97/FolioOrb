@@ -7,7 +7,7 @@
     <title>FolioSenseAI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=9" rel="stylesheet">
+    <link href="/static/css/style.css?v=10" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -22,6 +22,9 @@
             <div class="d-flex align-items-center gap-3">
                 <span class="text-secondary small" id="last-updated">Loading...</span>
                 <span class="text-secondary small" id="countdown"></span>
+                <span class="navbar-shortcut-hint d-none d-md-inline" onclick="showKeyboardHelp()" title="Keyboard shortcuts">
+                    Press <kbd style="font-family:-apple-system,sans-serif;font-size:.56rem;padding:.03rem .22rem;border-radius:3px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)">?</kbd> for shortcuts
+                </span>
                 <button class="btn btn-sm btn-outline-secondary"
                         data-bs-toggle="modal" data-bs-target="#portfolioModal"
                         onclick="loadManageHoldings()">
@@ -42,7 +45,15 @@
                             <i class="bi bi-wallet2"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Total Value</div>
+                            <div class="stat-label">Total Value
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Portfolio Value"
+                                    data-tip-body="Combined market value of all your positions, refreshed every 5 minutes."
+                                    data-tip-hint="Press R to refresh now"
+                                    data-tip-icon="bi-wallet2">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value" id="total-value">--</div>
                         </div>
                     </div>
@@ -55,20 +66,37 @@
                             <i class="bi bi-graph-up-arrow"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Today's P&amp;L</div>
+                            <div class="stat-label">Today's P&amp;L
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Today's P&amp;L"
+                                    data-tip-body="Dollar and percentage change across all positions since yesterday's close."
+                                    data-tip-hint="Green = portfolio gained today"
+                                    data-tip-icon="bi-graph-up-arrow">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value" id="daily-pnl">--</div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="card bg-dark border-secondary h-100">
+                <div class="card bg-dark border-secondary h-100 stat-clickable" id="holdings-count-card"
+                     onclick="openManageFromCard()" title="Click to manage holdings">
                     <div class="card-body d-flex align-items-center gap-3">
                         <div class="stat-icon" style="background:rgba(94,92,230,.13);color:#5e5ce6">
                             <i class="bi bi-briefcase-fill"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Holdings</div>
+                            <div class="stat-label">Holdings
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Active Holdings"
+                                    data-tip-body="Number of positions in your portfolio. Click this card to open the portfolio manager."
+                                    data-tip-hint="Click card to manage"
+                                    data-tip-icon="bi-briefcase-fill">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value" id="holding-count">10</div>
                         </div>
                     </div>
@@ -81,7 +109,14 @@
                             <i class="bi bi-circle-fill" id="market-dot" style="font-size:.55rem"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Market</div>
+                            <div class="stat-label">Market
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Market Status"
+                                    data-tip-body="NYSE trading hours: 9:30 AM – 4:00 PM ET on weekdays. The dot pulses when markets are open."
+                                    data-tip-icon="bi-building">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value text-success" id="market-status">Open</div>
                         </div>
                     </div>
@@ -96,6 +131,13 @@
                     <div class="card-header d-flex align-items-center gap-2">
                         <i class="bi bi-pie-chart-fill" style="color:#0a84ff;font-size:.9rem"></i>
                         <span>Portfolio Allocation</span>
+                        <button class="tip-trigger ms-auto"
+                            data-tip-title="Portfolio Allocation"
+                            data-tip-body="Each segment represents one holding's share of total portfolio value. Hover segments for details."
+                            data-tip-hint="Hover chart segments to explore"
+                            data-tip-icon="bi-pie-chart-fill">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
                     </div>
                     <div class="card-body d-flex justify-content-center align-items-center">
                         <div style="max-width:280px;width:100%">
@@ -109,6 +151,13 @@
                     <div class="card-header d-flex align-items-center gap-2">
                         <i class="bi bi-bar-chart-steps" style="color:var(--text-tertiary);font-size:.9rem"></i>
                         <span>Allocation Breakdown</span>
+                        <button class="tip-trigger ms-auto"
+                            data-tip-title="Allocation Breakdown"
+                            data-tip-body="Sortable table showing each holding's shares, current value, and % of portfolio."
+                            data-tip-hint="Click ↑↓ column headers to sort"
+                            data-tip-icon="bi-bar-chart-steps">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-dark table-sm mb-0">
@@ -135,39 +184,66 @@
         <!-- ── Best / Worst / Largest ──────────────────────────────────── -->
         <div class="row g-3 mb-3">
             <div class="col-12 col-md-4">
-                <div class="card bg-dark border-secondary h-100">
+                <div class="card bg-dark border-secondary h-100 stat-clickable" id="best-card"
+                     onclick="highlightHoldingFromCard('best-performer')" title="Click to jump to this holding">
                     <div class="card-body d-flex align-items-center gap-3">
                         <div class="stat-icon" style="background:rgba(255,214,10,.13);color:#ffd60a">
                             <i class="bi bi-trophy-fill"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Best Today</div>
+                            <div class="stat-label">Best Today
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Best Performer"
+                                    data-tip-body="Top gainer today by percentage change. Click this card to jump to that holding in the table."
+                                    data-tip-hint="Click card to highlight in table"
+                                    data-tip-icon="bi-trophy-fill">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value text-success" id="best-performer">--</div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-12 col-md-4">
-                <div class="card bg-dark border-secondary h-100">
+                <div class="card bg-dark border-secondary h-100 stat-clickable" id="worst-card"
+                     onclick="highlightHoldingFromCard('worst-performer')" title="Click to jump to this holding">
                     <div class="card-body d-flex align-items-center gap-3">
                         <div class="stat-icon" style="background:rgba(255,69,58,.13);color:#ff453a">
                             <i class="bi bi-arrow-down-circle-fill"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Worst Today</div>
+                            <div class="stat-label">Worst Today
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Worst Performer"
+                                    data-tip-body="Biggest decliner today by percentage change. Click to jump to that holding in the table."
+                                    data-tip-hint="Click card to highlight in table"
+                                    data-tip-icon="bi-arrow-down-circle-fill">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value text-danger" id="worst-performer">--</div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-12 col-md-4">
-                <div class="card bg-dark border-secondary h-100">
+                <div class="card bg-dark border-secondary h-100 stat-clickable" id="largest-card"
+                     onclick="highlightHoldingFromCard('largest-holding')" title="Click to jump to this holding">
                     <div class="card-body d-flex align-items-center gap-3">
                         <div class="stat-icon" style="background:rgba(100,210,255,.13);color:#64d2ff">
                             <i class="bi bi-layers-fill"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Largest Holding</div>
+                            <div class="stat-label">Largest Holding
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Largest Position"
+                                    data-tip-body="The holding with the highest current market value. Click to jump to it in the holdings table."
+                                    data-tip-hint="Click card to highlight in table"
+                                    data-tip-icon="bi-layers-fill">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="stat-value text-info" id="largest-holding">--</div>
                         </div>
                     </div>
@@ -182,6 +258,13 @@
                     <div class="card-header d-flex align-items-center gap-2">
                         <i class="bi bi-graph-up-arrow" style="color:var(--accent-green);font-size:.9rem"></i>
                         <span>Total Return</span>
+                        <button class="tip-trigger ms-auto"
+                            data-tip-title="Total Return"
+                            data-tip-body="All-time P&amp;L based on your average cost basis. Unrealized = positions still held. Realized = closed trades."
+                            data-tip-hint="Add cost basis via Manage ⚙"
+                            data-tip-icon="bi-graph-up-arrow">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
                     </div>
                     <div class="card-body">
                         <div class="fs-2 fw-bold" id="total-return">--</div>
@@ -209,6 +292,13 @@
                     <div class="card-header d-flex align-items-center gap-2">
                         <i class="bi bi-activity" style="color:var(--text-tertiary);font-size:.9rem"></i>
                         <span>Performance History</span>
+                        <button class="tip-trigger ms-auto"
+                            data-tip-title="Performance History"
+                            data-tip-body="Track your portfolio's total return over time. Visit daily to build history. Requires cost basis on all holdings."
+                            data-tip-hint="Visit daily to grow this chart"
+                            data-tip-icon="bi-activity">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
                     </div>
                     <div class="card-body">
                         <div id="perf-stale-callout" class="perf-callout" style="display:none">
@@ -233,6 +323,12 @@
             <div class="card-header d-flex align-items-center gap-2">
                 <i class="bi bi-receipt" style="color:var(--text-tertiary);font-size:.9rem"></i>
                 <span>Realized Trades</span>
+                <button class="tip-trigger ms-auto"
+                    data-tip-title="Realized Trades"
+                    data-tip-body="Closed positions showing sale price, average cost basis, and net P&L. Appears when you reduce a holding."
+                    data-tip-icon="bi-receipt">
+                    <i class="bi bi-info-circle"></i>
+                </button>
             </div>
             <div class="card-body p-0">
                 <table class="table table-dark table-sm mb-0">
@@ -258,6 +354,13 @@
                 <div class="d-flex align-items-center gap-2">
                     <i class="bi bi-table" style="color:var(--text-tertiary);font-size:.9rem"></i>
                     <h5 class="mb-0">Holdings</h5>
+                    <button class="tip-trigger"
+                        data-tip-title="Holdings Table"
+                        data-tip-body="Click any row to expand AI-powered analysis. Sort by any column header. Press I to load Holding Intel for all."
+                        data-tip-hint="Press ? to see all shortcuts"
+                        data-tip-icon="bi-table">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
                 </div>
                 <div>
                     <button class="btn btn-sm btn-holding-intel me-2" onclick="loadHoldingIntelligence()"
@@ -311,7 +414,23 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=14"></script>
+    <script defer src="/static/js/dashboard.js?v=15"></script>
+
+    <!-- Tip Popover (singleton) -->
+    <div id="tip-popover" role="tooltip" aria-hidden="true"></div>
+
+    <!-- Keyboard Shortcut Overlay -->
+    <div id="kbd-overlay" role="dialog" aria-label="Keyboard shortcuts" aria-hidden="true">
+        <div class="kbd-panel">
+            <div class="kbd-panel-title">Keyboard Shortcuts</div>
+            <div class="kbd-row"><span class="kbd-desc">Refresh prices</span><kbd class="kbd-key">R</kbd></div>
+            <div class="kbd-row"><span class="kbd-desc">Open portfolio manager</span><kbd class="kbd-key">M</kbd></div>
+            <div class="kbd-row"><span class="kbd-desc">Load Holding Intel (AI)</span><kbd class="kbd-key">I</kbd></div>
+            <div class="kbd-row"><span class="kbd-desc">Show this panel</span><kbd class="kbd-key">?</kbd></div>
+            <div class="kbd-row"><span class="kbd-desc">Close / Dismiss</span><kbd class="kbd-key">Esc</kbd></div>
+            <div class="kbd-close-hint">Press <kbd class="kbd-key" style="font-size:.55rem">Esc</kbd> or click outside to close</div>
+        </div>
+    </div>
 
     <!-- Portfolio Management Modal -->
     <div class="modal fade" id="portfolioModal" tabindex="-1">
