@@ -1,9 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles   # ← NEW
-from fastapi.responses import FileResponse    # ← NEW
-from app.routers import stocks, portfolio
+from fastapi.staticfiles import StaticFiles  
+from fastapi.responses import FileResponse    
+from app.routers import stocks, portfolio, ai
 from app.database import engine
 from app import models
 
@@ -29,6 +29,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Register the route groups defined in our router files
 app.include_router(stocks.router)
 app.include_router(portfolio.router)
+app.include_router(ai.router)
+
 
 
 @app.get("/")

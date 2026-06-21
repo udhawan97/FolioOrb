@@ -630,6 +630,42 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
 });
  
  
+async function generateAllSummaries() {
+    const panel = document.getElementById("ai-summaries-panel");
+    const list  = document.getElementById("ai-summaries-list");
+    panel.style.display = "block";
+    list.innerHTML = `
+        <div class="text-center text-secondary py-3">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            Generating AI summaries... (takes 30–60 seconds for all 10 holdings)
+        </div>`;
+
+    try {
+        const res = await fetch("/api/ai/summaries/all");
+        const data = await res.json();
+        list.innerHTML = "";
+
+        Object.entries(data.summaries).forEach(([ticker, info]) => {
+            const div = document.createElement("div");
+            div.className = "mb-2 p-3 rounded border border-secondary bg-dark d-flex align-items-start";
+            div.innerHTML = `
+                <span class="badge bg-secondary me-3 mt-1" style="min-width:50px">${ticker}</span>
+                <div>
+                    <span class="text-light small">${info.summary}</span>
+                    ${info.from_cache
+                        ? '<span class="badge bg-dark border border-secondary ms-2 small">cached</span>'
+                        : '<span class="badge bg-info bg-opacity-25 ms-2 small">fresh</span>'}
+                </div>
+            `;
+            list.appendChild(div);
+        });
+
+    } catch (err) {
+        list.innerHTML = `<div class="text-danger small">Error: ${err.message}</div>`;
+    }
+}
+
+
 // Simple toast notification
 function showToast(message, type = "success") {
     const toast = document.createElement("div");

@@ -31,27 +31,40 @@ def generate_stock_summary(stock_data: dict) -> str:
     ticker = stock_data.get("ticker", "Unknown")
 
     try:
-        # Build the prompt with real data
-        # The more context we give Claude, the more relevant the summary
-        prompt = f"""You are a financial analyst providing brief portfolio updates.
- 
-Generate exactly 4 sentences about this holding for a personal portfolio dashboard.
-First sentence: What is the current market sentiment for this stock today (up/down, % change, price change)?
-Second sentence: Any large inflows/outflows, news, or sector trends that might be impacting it today?
-Third sentence: How does this holding compare to its sector peers in terms of performance?
-Fourth sentence: What are the key factors driving the stock's movement today?
-Keep it professional but accessible. Do not use jargon.
- 
+        price   = stock_data.get("current_price", 0)
+        fwh     = stock_data.get("fifty_two_week_high", 0)
+        fwl     = stock_data.get("fifty_two_week_low", 0)
+        range_pct = round((price - fwl) / (fwh - fwl) * 100) if (fwh - fwl) > 0 else None
+        pe      = stock_data.get("pe_ratio") or None
+        div_pct = round(stock_data.get("dividend_yield", 0) * 100, 2) or None
+        mktcap  = stock_data.get("market_cap", 0)
+        mktcap_str = f"${mktcap/1e9:.1f}B" if mktcap >= 1e9 else (f"${mktcap/1e6:.0f}M" if mktcap else "N/A")
+        volume  = stock_data.get("volume", 0)
+
+        prompt = f"""You are a Wall Street analyst briefing a sophisticated retail investor on a holding in their personal portfolio.
+
+Write exactly 3 sentences. Each must reveal something a retail investor cannot easily find on Robinhood, Fidelity, or a basic Google search.
+
+DO NOT mention: today's price, today's % change, or anything visible at a glance on a brokerage screen.
+
+Focus on:
+- Hidden risks or structural edges specific to this holding (e.g. ETF concentration, earnings quality, competitive moat cracks)
+- What the valuation or 52-week positioning signals about market expectations — and where those expectations could be wrong
+- A specific tail-risk trigger (macro shift, regulatory event, earnings quality issue, index rebalance) that most retail investors aren't tracking
+
+Be blunt and specific. Use numbers when possible. No hedging language.
+
 Holding: {stock_data.get("name", ticker)} ({ticker})
-Current Price: ${stock_data.get("current_price", 0):.2f}
-Today's Change: {stock_data.get("day_change_pct", 0):+.2f}% (${stock_data.get("day_change", 0):+.2f})
-Day Range: ${stock_data.get("day_low", 0):.2f} – ${stock_data.get("day_high", 0):.2f}
-52-Week Range: ${stock_data.get("fifty_two_week_low", 0):.2f} – ${stock_data.get("fifty_two_week_high", 0):.2f}
-Sector: {stock_data.get("sector", "N/A")}"""
+Sector/Category: {stock_data.get("sector", "N/A")}
+P/E: {pe if pe else "N/A (likely ETF or no earnings)"}
+Dividend Yield: {f"{div_pct}%" if div_pct else "None"}
+Market Cap / AUM: {mktcap_str}
+52-Week Range: ${fwl:.2f}–${fwh:.2f} | Current ${price:.2f} = {f"{range_pct}% of range" if range_pct is not None else "N/A"}
+Volume: {volume:,}"""
 
         message = client.messages.create(
             model=MODEL,
-            max_tokens=150,  # 2 sentences ≈ 80-120 tokens
+            max_tokens=220,  # 3 dense sentences ≈ 150-200 tokens; 220 gives headroom without waste
             messages=[{"role": "user", "content": prompt}],
         )
 
