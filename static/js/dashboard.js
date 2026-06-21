@@ -613,8 +613,25 @@ function renderMoveExplainerShimmer(section) {
         </div>`;
 }
 
+function renderMoveExplainerFallback(section) {
+    section.innerHTML = `
+        <div class="intel-move">
+            <div class="intel-label">
+                <i class="bi bi-lightning-charge-fill" style="color:var(--accent-yellow)"></i>
+                Why it moved
+            </div>
+            <div class="move-explainer-header">
+                <span class="attribution-badge unclear">Market Trends</span>
+                <span class="confidence-badge Low">Unavailable</span>
+            </div>
+            <p class="move-explanation-text">
+                Market trend details are temporarily unavailable for this holding.
+            </p>
+        </div>`;
+}
+
 function renderMoveExplainer(section, data) {
-    if (!data) { section.innerHTML = ""; return; }
+    if (!data) { renderMoveExplainerFallback(section); return; }
 
     const attrType   = data.attribution_type || "unclear";
     const confidence = data.confidence || "Low";
@@ -1078,6 +1095,7 @@ async function loadHoldingIntelligence() {
         Array.from(tbody.querySelectorAll(".intel-coverage-section")).forEach(s => {
             s.innerHTML = `<div class="intel-coverage"><span style="font-size:.75rem;color:var(--accent-red)">Could not load coverage data</span></div>`;
         });
+        Array.from(tbody.querySelectorAll(".intel-move-section")).forEach(renderMoveExplainerFallback);
     } finally {
         if (btn) {
             btn.innerHTML = '<i class="bi bi-layers"></i> Holding Intel';
