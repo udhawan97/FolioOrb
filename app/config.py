@@ -19,7 +19,11 @@ class Settings:
     # When DEBUG=True, SQLAlchemy prints every SQL query to the console
     DEBUG: bool = os.getenv("DEBUG", "True") == "True"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production")
-    APP_NAME: str = "Stock Portfolio Dashboard"
+    APP_NAME: str = "FolioSenseAI"
+    APP_DESCRIPTION: str = (
+        "FolioSenseAI helps explain portfolio movement by surfacing market context, "
+        "news, and AI-generated insights for holdings."
+    )
     # Default stock tickers pre-loaded when seeding the portfolio for the first time
     DEFAULT_HOLDINGS: list[str] = [
         "NOW", "QTUM", "VOO", "CGDV", "IBIT",

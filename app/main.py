@@ -16,7 +16,12 @@ async def lifespan(_app: FastAPI):
     yield  # The app runs while we're "inside" this yield
 
 # Create the FastAPI application instance
-app = FastAPI(title="Stock Portfolio Dashboard", version="0.4.0", lifespan=lifespan)
+app = FastAPI(
+    title="FolioSenseAI",
+    description="FolioSenseAI helps explain portfolio movement by surfacing market context, news, and AI-generated insights for holdings.",
+    version="0.4.0",
+    lifespan=lifespan,
+)
 
 # Allow requests from any origin — required so browsers can call our API
 app.add_middleware(CORSMiddleware, allow_origins=["*"],

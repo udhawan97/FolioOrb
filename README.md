@@ -1,59 +1,46 @@
-# Stock Analysis App 📈
+# FolioSenseAI
 
-An AI-powered personal stock portfolio dashboard with live market data, interactive charts, and Claude AI-generated insights — built with Python and FastAPI.
+FolioSenseAI helps explain portfolio movement by surfacing market context, news, and AI-generated insights for holdings.
 
 ## Live Demo
 
-> Deploy link will go here after deployment to Render.
+> Deploy link will go here after deployment.
 
 ---
 
 ## What It Does
 
-This dashboard tracks a personal portfolio of 10 holdings in real time. Every price is fetched live from Yahoo Finance. Every summary is written by Claude AI based on actual market data — not pre-written templates.
+FolioSenseAI tracks a personal portfolio in real time, pulls market data from Yahoo Finance, and uses AI-generated context to help explain what may be moving each holding.
 
-**Portfolio tracked:** NOW · QTUM · VOO · CGDV · IBIT · VT · ITA · IEMG · SETM · WSML
+**Default holdings:** NOW · QTUM · VOO · CGDV · IBIT · VT · ITA · IEMG · SETM · WSML
 
 ### Dashboard
 
 - Live prices and daily gain/loss for all holdings
 - Total portfolio value and daily P&L
-- Color-coded performance (green up, red down)
-- 5-day sparkline chart per holding
+- Color-coded performance
+- Allocation, return, and performance-history views
 - Market open/closed indicator with auto-refresh countdown
-- Fully responsive — works on mobile
+- Responsive dashboard UI
 
-### Portfolio Analytics
+### Portfolio Intelligence
 
-- Doughnut chart showing allocation by holding
-- Unrealized gain/loss per position (when average cost is set)
-- Best and worst performer cards
-- Portfolio value breakdown with allocation percentages
-
-### AI Insights (Powered by Claude)
-
-- **Per-holding summaries** — Claude generates a 2-sentence update for each stock, grounded in real price data. Example:
-  > *"VOO gained 0.61% today to $547.23, reflecting broad strength in large-cap U.S. equities. As an S&P 500 index fund, it remains the portfolio's largest and most diversified core holding."*
-
-- **Portfolio-level insight** — A 3-4 sentence analysis of the full portfolio, noting diversification themes, concentration risks, and notable movers. Example:
-  > *"Your portfolio gained $142 (0.58%) today, led by IBIT (+1.24%) and QTUM (+0.89%). The portfolio balances U.S. equity exposure through VOO and CGDV with international diversification via VT and IEMG, while alternative growth comes from bitcoin (IBIT), quantum computing (QTUM), and aerospace (ITA)."*
-
-- **Smart caching** — AI summaries are cached and only regenerated when price moves more than 0.5%, keeping API costs near zero.
+- Holding-level movement explanations with market, sector, macro, news, and company context
+- Portfolio-level AI analysis for diversification themes, concentration risks, and notable movers
+- Holding coverage details for ETFs, sectors, regions, themes, and benchmarks
+- Analyst recommendations for stocks and ETF quality labels where available
 
 ### Portfolio Management
 
-- Add or remove holdings from the dashboard UI — no code needed
+- Add or remove holdings from the dashboard UI
 - Update share counts and average cost basis
-- Soft-delete preserves historical data
+- Soft-delete holdings while preserving historical trade data
 
-### Security
+---
 
-- Password-protected login with bcrypt hashing
-- Session cookies (httponly, samesite=strict)
-- Rate-limited login endpoint (5 attempts/minute)
-- Security headers on every response (X-Frame-Options, CSP, HSTS)
-- Input validation and SQL injection protection via SQLAlchemy ORM
-- Secrets managed via environment variables — never in code
+## Why FolioSenseAI?
+
+FolioSenseAI turns portfolio noise into understandable signals. Instead of only showing what a holding is, it helps explain why it may be moving by connecting price action, market news, and AI-generated context.
 
 ---
 
@@ -61,59 +48,46 @@ This dashboard tracks a personal portfolio of 10 holdings in real time. Every pr
 
 | Layer | Technology |
 |-------|------------|
-| Backend | Python 3.12, FastAPI, Uvicorn |
-| Database | SQLite, SQLAlchemy 2.0 ORM |
+| Backend | Python, FastAPI, Uvicorn |
+| Database | SQLite, SQLAlchemy ORM |
 | AI | Anthropic Claude |
-| Stock Data | yfinance (Yahoo Finance) |
-| Frontend | Bootstrap 5.3, Chart.js 4, Vanilla JS |
-| Auth | Passlib (bcrypt), cookie sessions |
-| Deployment | Render |
-
-**Why these choices:**
-- **FastAPI** over Flask — async support, auto-generated `/docs` interface, Pydantic validation
-- **SQLite** — zero setup, single file, sufficient for personal use
-- **Claude Haiku** — fastest and cheapest Claude model; ~$0.002 per full portfolio refresh
-- **yfinance** — no API key required, generous rate limits for personal use
-- **Bootstrap 5** — professional dark theme with zero configuration
+| Market Data | yfinance |
+| Frontend | Bootstrap 5, Chart.js, Vanilla JS |
 
 ---
 
 ## Project Structure
 
-```
-stock-analysis-app/
+```text
+FolioSenseAI/
 ├── app/
-│   ├── main.py              # FastAPI app, middleware, startup
-│   ├── config.py            # Settings from environment variables
-│   ├── database.py          # SQLAlchemy engine and session
-│   ├── models.py            # Database table definitions
-│   ├── schemas.py           # Pydantic request/response validation
+│   ├── main.py                 # FastAPI app, middleware, startup
+│   ├── config.py               # Settings from environment variables
+│   ├── database.py             # SQLAlchemy engine and session
+│   ├── models.py               # Database table definitions
+│   ├── schemas.py              # Pydantic request/response validation
 │   ├── routers/
-│   │   ├── stocks.py        # GET /api/stocks/* — live price endpoints
-│   │   ├── portfolio.py     # CRUD /api/portfolio/* — holdings management
-│   │   ├── ai.py            # GET /api/ai/* — Claude summary endpoints
-│   │   └── auth.py          # POST /login, GET /logout
+│   │   ├── stocks.py           # Live price and market-status endpoints
+│   │   ├── portfolio.py        # Portfolio and holdings endpoints
+│   │   └── ai.py               # AI insight endpoints
 │   └── services/
-│       ├── stock_service.py # yfinance integration + async fetching
-│       ├── ai_service.py    # Claude API calls + prompt engineering
-│       └── auth_service.py  # Password hashing, session management
+│       ├── stock_service.py
+│       ├── ai_service.py
+│       ├── move_explainer.py
+│       ├── holding_intelligence.py
+│       ├── analyst_recommendation.py
+│       ├── etf_quality.py
+│       └── security_type.py
 ├── static/
-│   ├── css/style.css        # Custom styles on top of Bootstrap
-│   └── js/dashboard.js      # Fetch API calls, Chart.js, UI logic
+│   ├── css/style.css
+│   └── js/dashboard.js
 ├── templates/
-│   ├── index.html           # Main dashboard
-│   └── login.html           # Login page
+│   └── index.html
 ├── tests/
-│   ├── test_stock_service.py
-│   ├── test_ai_service.py
-│   └── test_portfolio_router.py
-├── database/                # SQLite .db file lives here (gitignored)
-├── .env.example             # Template — copy to .env and fill in values
-├── .gitignore
+├── database/
+├── .env.example
 ├── requirements.txt
-├── Procfile                 # Render deployment
-├── render.yaml              # Render service configuration
-└── run.py                   # Development server entry point
+└── run.py
 ```
 
 ---
@@ -122,15 +96,15 @@ stock-analysis-app/
 
 ### Prerequisites
 
-- Python 3.12
+- Python 3.11 or newer
 - Git
-- An Anthropic API key (get one free at [console.anthropic.com](https://console.anthropic.com))
+- An Anthropic API key for AI features
 
 ### 1. Clone and install
 
 ```bash
-git clone git@github.com:udhawan97/stock-analysis-app.git
-cd stock-analysis-app
+git clone git@github.com:udhawan97/FolioSenseAI.git
+cd FolioSenseAI
 
 python3 -m venv venv
 source venv/bin/activate
@@ -146,18 +120,11 @@ cp .env.example .env
 
 Open `.env` and fill in your values:
 
-```
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-DASHBOARD_PASSWORD_HASH=your-bcrypt-hash
-SESSION_SECRET_KEY=your-random-secret
+```text
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+APP_SECRET_KEY=generate_a_random_string_here
 DEBUG=True
 DATABASE_URL=sqlite:///./database/portfolio.db
-```
-
-To generate your password hash:
-
-```bash
-python3 -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('your_password'))"
 ```
 
 ### 3. Run the app
@@ -166,20 +133,20 @@ python3 -c "from passlib.context import CryptContext; print(CryptContext(schemes
 python run.py
 ```
 
-Open [http://localhost:8000](http://localhost:8000) — you will be redirected to the login page.
+Open [http://localhost:8000](http://localhost:8000).
 
 - API documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Health check: [http://localhost:8000/health](http://localhost:8000/health)
 
 ### 4. Seed your portfolio
 
-On first run, call the seed endpoint to create the default portfolio with all 10 holdings:
+On first run, call the seed endpoint to create the default portfolio:
 
 ```bash
 curl -X POST http://localhost:8000/api/portfolio/seed
 ```
 
-Then update your share counts via the **Manage** button on the dashboard.
+Then update share counts and average costs from the **Manage** button on the dashboard.
 
 ---
 
@@ -195,9 +162,15 @@ Then update your share counts via the **Manage** button on the dashboard.
 | POST | `/api/portfolio/holdings` | Add a holding |
 | PUT | `/api/portfolio/holdings/{id}` | Update shares/cost |
 | DELETE | `/api/portfolio/holdings/{id}` | Remove a holding |
+| GET | `/api/portfolio/value` | Portfolio value, allocation, and daily P&L |
+| GET | `/api/portfolio/pnl` | Historical return and realized P&L data |
 | GET | `/api/ai/summary/{ticker}` | AI summary for one holding |
 | GET | `/api/ai/summaries/all` | AI summaries for all holdings |
 | GET | `/api/ai/portfolio-insight` | Portfolio-level AI analysis |
+| GET | `/api/ai/explain-move/{ticker}` | Movement explanation for one holding |
+| GET | `/api/ai/explain-moves/all` | Movement explanations for all holdings |
+| GET | `/api/ai/holding-intelligence/all` | Holding coverage and benchmark context |
+| GET | `/api/ai/analyst-recommendations/all` | Analyst recommendations and ETF quality labels |
 | GET | `/api/ai/cache/stats` | Cache stats and estimated cost |
 | DELETE | `/api/ai/cache/clear` | Clear cached summaries |
 
@@ -206,21 +179,22 @@ Then update your share counts via the **Manage** button on the dashboard.
 ## Running Tests
 
 ```bash
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
 
-Tests use mocked external services — no real API calls are made during testing.
+Tests use mocked external services where practical.
 
 ---
 
-## Deployment (Render)
+## Deployment Notes
 
-1. Push to GitHub
-2. Create a new Web Service on [render.com](https://render.com) — connect this repo
-3. Add environment variables in the Render dashboard (same keys as `.env`, without `DEBUG=True`)
-4. Render auto-deploys on every push to `main`
+The current repository does not include a deployment manifest such as `render.yaml`, `vercel.json`, `netlify.toml`, a `Dockerfile`, or a `Procfile`. For deployment, create the service using the Python/FastAPI start command appropriate for your host, then set the same environment variables used in `.env`.
 
-Free tier note: the service sleeps after 15 minutes of inactivity and takes ~30 seconds to wake up on the next request.
+For Uvicorn-based hosts, the app import path is:
+
+```text
+app.main:app
+```
 
 ---
 
@@ -228,19 +202,18 @@ Free tier note: the service sleeps after 15 minutes of inactivity and takes ~30 
 
 | Service | Cost |
 |---------|------|
-| yfinance (stock data) | Free |
-| SQLite (database) | Free |
-| Render (hosting) | Free tier |
-| Claude Haiku (AI) | ~$0.002 per full portfolio refresh |
-| **Total (typical month)** | **~$0.50–$2.00** |
+| yfinance market data | Free |
+| SQLite database | Free |
+| Anthropic Claude | Depends on usage |
+| Hosting | Depends on provider |
 
 ---
 
 ## Roadmap
 
 - [ ] Real-time WebSocket price updates
-- [ ] Transaction history (buy/sell tracking)
-- [ ] Price alerts via email
+- [ ] Transaction history views
+- [ ] Price alerts
 - [ ] PostgreSQL for persistent cloud storage
 - [ ] AI-powered rebalancing suggestions
 - [ ] Export portfolio to CSV
@@ -250,7 +223,3 @@ Free tier note: the service sleeps after 15 minutes of inactivity and takes ~30 
 ## License
 
 Personal project. Not intended for redistribution or financial advice.
-
----
-
-*Built as a learning project following a structured 4-week full-stack AI development curriculum.*
