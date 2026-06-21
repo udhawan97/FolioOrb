@@ -150,6 +150,7 @@ class TestNotRatedFallbacks:
         assert rec.security_type == "ETF"
         assert rec.label.startswith("ETF Quality:")
         assert rec.label != "Unavailable"
+        assert rec.price_signal is not None
 
     def test_mutualfund_is_not_rated(self):
         info = _make_info(quoteType="MUTUALFUND")
@@ -259,7 +260,7 @@ class TestRecToDict:
         required = [
             "ticker", "action", "label", "analyst_count",
             "recommendation_mean", "target_price", "target_upside_pct",
-            "subtext", "source",
+            "subtext", "source", "price_signal",
         ]
         for key in required:
             assert key in d, f"rec_to_dict missing key: {key}"

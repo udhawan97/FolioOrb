@@ -460,12 +460,14 @@
                                     Alloc % <i id="holdings-alloc-caret" class="bi bi-caret-down-fill small"></i>
                                 </th>
                                 <th class="text-end d-none d-sm-table-cell">
-                                    Target
-                                    <i class="bi bi-info-circle"
-                                       style="font-size:.58rem;opacity:.45;vertical-align:middle;cursor:help"
-                                       data-bs-toggle="tooltip"
-                                       data-bs-placement="top"
-                                       title="Stocks: analyst consensus price target &amp; estimated upside. ETFs &amp; others: Free Cash Flow Yield — how much cash a holding generates relative to its market value. Higher FCF yield = more cash per dollar invested."></i>
+                                    Signal
+                                    <button class="tip-trigger target-tip-trigger" type="button"
+                                        data-tip-title="Price Signal"
+                                        data-tip-body="For ETFs, this compares today's price with that ETF's own last year of prices. Bargain means near its low range, Fair means middle range, Elevated means getting expensive versus recent history, and Rich means near its highs. The 200D line shows whether price is above or below its longer trend."
+                                        data-tip-hint="Lower zone = cheaper vs history; Rich = strong but pricey"
+                                        data-tip-icon="bi-bullseye">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
                                 </th>
                                 <th class="text-center d-none d-lg-table-cell">Rating</th>
                                 <th class="text-center d-none d-xl-table-cell">7-Day Trend</th>

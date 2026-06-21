@@ -1304,6 +1304,20 @@ function renderTargetCell(rec) {
         return `<div class="shimmer-line" style="width:56px;height:12px;border-radius:4px;margin:0 auto .25rem"></div>
                 <div class="shimmer-line" style="width:38px;height:9px;border-radius:4px;margin:0 auto"></div>`;
     }
+    // ETFs do not have useful analyst price targets. Show their price zone instead.
+    if (rec.rating_type === "etf_quality" && rec.price_signal) {
+        const signal = rec.price_signal;
+        const label = signal.priceZoneLabel || "Unavailable";
+        if (label !== "Unavailable" && signal.percentile != null) {
+            const zoneClass = label.toLowerCase();
+            const trend = signal.vs200dPct;
+            const trendText = trend == null
+                ? escapeHtml(signal.basis || "Price zone")
+                : `${trend >= 0 ? "+" : ""}${Number(trend).toFixed(1)}% vs 200D`;
+            return `<div class="target-price-value price-zone-${escapeHtml(zoneClass)}">${escapeHtml(label)} · ${Number(signal.percentile).toFixed(0)}%</div>
+                    <div class="target-upside" style="color:var(--text-tertiary)">${escapeHtml(trendText)}</div>`;
+        }
+    }
     // Stocks with analyst consensus price target
     if (rec.target_price) {
         const upside = rec.target_upside_pct;
@@ -1449,10 +1463,6 @@ async function initDashboard() {
     initSpotlightEffect();
     initTips();
     initKeyboardHelp();
-    // Bootstrap tooltips (used for column header hints)
-    document.querySelectorAll("[data-bs-toggle='tooltip']").forEach(el => {
-        new bootstrap.Tooltip(el, { trigger: "hover focus" });
-    });
 }
 
 // ── World Markets ─────────────────────────────────────────────────────────────

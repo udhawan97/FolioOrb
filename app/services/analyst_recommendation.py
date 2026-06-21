@@ -13,6 +13,7 @@ from typing import Optional
 
 import yfinance as yf
 
+from app.services.etf_price_signal import fetch_etf_price_signal
 from app.services.etf_quality import calculate_etf_quality_score
 from app.services.holding_intelligence import get_static_holding_metadata
 from app.services.security_type import SecurityType, classify_security
@@ -55,6 +56,7 @@ class AnalystRec:  # pylint: disable=too-many-instance-attributes
     security_type: str = "STOCK"
     rating_type: str = "analyst"
     etf_quality: Optional[dict] = None
+    price_signal: Optional[dict] = None
 
 
 def _normalize_expense_ratio(value) -> Optional[float]:
@@ -99,7 +101,7 @@ def _not_rated(ticker: str, info: Optional[dict] = None) -> AnalystRec:
     )
 
 
-def _etf_quality_rec(ticker: str, info: dict) -> AnalystRec:
+def _etf_quality_rec(ticker: str, info: dict, stock) -> AnalystRec:
     static = get_static_holding_metadata(ticker)
     data = {
         **static,
@@ -119,6 +121,7 @@ def _etf_quality_rec(ticker: str, info: dict) -> AnalystRec:
         ),
     }
     quality = calculate_etf_quality_score(data)
+    price_signal = fetch_etf_price_signal(ticker, data, stock)
     label = f"ETF Quality: {quality['qualityLabel']}"
     subparts = []
     if quality["costLabel"] != "Unknown":
@@ -141,6 +144,7 @@ def _etf_quality_rec(ticker: str, info: dict) -> AnalystRec:
         security_type="ETF",
         rating_type="etf_quality",
         etf_quality=quality,
+        price_signal=price_signal,
     )
 
 
@@ -167,11 +171,12 @@ def _fetch_from_yfinance(ticker: str) -> AnalystRec:
     Pull analyst consensus from Yahoo Finance.
     Returns ETF quality for ETFs and unavailable for missing stock analyst data.
     """
-    info = yf.Ticker(ticker).info
+    stock = yf.Ticker(ticker)
+    info = stock.info
 
     security_type = classify_security(ticker, info)
     if security_type == SecurityType.ETF:
-        return _etf_quality_rec(ticker, info)
+        return _etf_quality_rec(ticker, info, stock)
 
     quote_type = str(info.get("quoteType") or "").lower()
     if quote_type in _NO_ANALYST_COVERAGE_TYPES or security_type in {
@@ -248,4 +253,5 @@ def rec_to_dict(rec: AnalystRec) -> dict:
         "security_type": rec.security_type,
         "rating_type": rec.rating_type,
         "etf_quality": rec.etf_quality,
+        "price_signal": rec.price_signal,
     }

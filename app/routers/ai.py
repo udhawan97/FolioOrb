@@ -367,10 +367,12 @@ async def get_all_analyst_recommendations(db: Session = Depends(get_db)):
                 "recommendation_mean": None,
                 "target_price": None,
                 "target_upside_pct": None,
+                "fcf_yield": None,
                 "subtext": "Analyst rating unavailable",
                 "source": "yfinance",
                 "security_type": "UNKNOWN",
                 "rating_type": "analyst",
                 "etf_quality": None,
+                "price_signal": None,
             }
     return {"recommendations": results, "count": len(results)}
