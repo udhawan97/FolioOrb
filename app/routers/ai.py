@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import AISummary
+from app.models import AISummary, Holding
 from app.services.ai_service import MODEL, generate_stock_summary
 from app.services.move_explainer import (
     HoldingMoveSummary,
@@ -31,6 +31,18 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 CACHE_TTL = timedelta(hours=24)
 PRICE_DRIFT_THRESHOLD = 0.05  # expire cache when price moves >5% from when it was generated
+
+
+def _active_portfolio_tickers(db: Session, portfolio_id: int = 1) -> list[str]:
+    tickers = [
+        row[0]
+        for row in (
+            db.query(Holding.ticker)
+            .filter(Holding.portfolio_id == portfolio_id, Holding.is_active.is_(True))
+            .all()
+        )
+    ]
+    return [str(t).upper() for t in tickers] or DEFAULT_HOLDINGS
 
 
 def _cache_is_fresh(cached: AISummary, current_price: float | None = None) -> bool:
@@ -235,7 +247,7 @@ async def get_move_explanation(ticker: str):
 
 
 @router.get("/move-explanations/all")
-async def get_all_move_explanations():
+async def get_all_move_explanations(db: Session = Depends(get_db)):
     """
     Explain today's move for all portfolio holdings.
     Fetches SPY/QQQ benchmark data once, then processes each holding in turn.
@@ -244,7 +256,7 @@ async def get_all_move_explanations():
     """
     benchmarks = get_benchmark_data()
     benchmark_cache: dict = {}  # shared cache for per-holding primary benchmarks
-    quotes = {q["ticker"]: q for q in get_all_quotes()}
+    quotes = {q["ticker"]: q for q in get_all_quotes(_active_portfolio_tickers(db))}
     results: dict[str, dict] = {}
 
     for ticker, stock_data in quotes.items():
@@ -282,12 +294,12 @@ async def get_holding_intelligence_single(ticker: str):
 
 
 @router.get("/intelligence/all/batch")
-async def get_all_intelligence():
+async def get_all_intelligence(db: Session = Depends(get_db)):
     """
     Return holding intelligence for all portfolio holdings.
     Combines structured coverage data (sectors, countries, benchmarks) for every holding.
     """
-    quotes = {q["ticker"]: q for q in get_all_quotes()}
+    quotes = {q["ticker"]: q for q in get_all_quotes(_active_portfolio_tickers(db))}
     results: dict[str, dict] = {}
     for ticker, stock_data in quotes.items():
         try:
@@ -327,7 +339,7 @@ async def get_all_intelligence():
 async def get_analyst_recommendation_single(ticker: str):
     """
     Return analyst consensus for a single ticker.
-    ETFs and crypto funds return action=not-rated with subtext "Consensus unavailable".
+    ETFs return ETF quality instead of a stock analyst rating.
     """
     ticker = ticker.upper()
     rec = get_analyst_recommendation(ticker)
@@ -335,13 +347,13 @@ async def get_analyst_recommendation_single(ticker: str):
 
 
 @router.get("/analyst-recommendations/all")
-async def get_all_analyst_recommendations():
+async def get_all_analyst_recommendations(db: Session = Depends(get_db)):
     """
     Return analyst consensus for all portfolio holdings.
-    Iterates DEFAULT_HOLDINGS; ETFs resolve to not-rated without external calls.
+    Iterates active portfolio holdings; ETFs resolve to ETF quality.
     """
     results: dict[str, dict] = {}
-    for ticker in DEFAULT_HOLDINGS:
+    for ticker in _active_portfolio_tickers(db):
         try:
             rec = get_analyst_recommendation(ticker)
             results[ticker] = rec_to_dict(rec)
@@ -349,13 +361,16 @@ async def get_all_analyst_recommendations():
             logger.error("Analyst rec failed for %s: %s", ticker, e)
             results[ticker] = {
                 "ticker": ticker,
-                "action": "not-rated",
-                "label": "Not rated",
+                "action": "unavailable",
+                "label": "Unavailable",
                 "analyst_count": None,
                 "recommendation_mean": None,
                 "target_price": None,
                 "target_upside_pct": None,
-                "subtext": "Consensus unavailable",
+                "subtext": "Analyst rating unavailable",
                 "source": "yfinance",
+                "security_type": "UNKNOWN",
+                "rating_type": "analyst",
+                "etf_quality": None,
             }
     return {"recommendations": results, "count": len(results)}

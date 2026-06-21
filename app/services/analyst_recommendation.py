@@ -13,10 +13,14 @@ from typing import Optional
 
 import yfinance as yf
 
+from app.services.etf_quality import calculate_etf_quality_score
+from app.services.holding_intelligence import get_static_holding_metadata
+from app.services.security_type import SecurityType, classify_security
+
 logger = logging.getLogger(__name__)
 
-# Quote types that carry no analyst coverage — treat as not-rated
-_NO_COVERAGE_TYPES = {"etf", "mutualfund", "cryptocurrency", "fund"}
+# Quote types that carry no stock analyst coverage.
+_NO_ANALYST_COVERAGE_TYPES = {"cryptocurrency", "crypto", "fund"}
 
 _REC_KEY_TO_ACTION: dict[str, str] = {
     "strong_buy":  "buy",
@@ -31,34 +35,80 @@ _ACTION_LABEL: dict[str, str] = {
     "buy":       "Buy",
     "hold":      "Hold",
     "sell":      "Sell",
-    "not-rated": "Not rated",
+    "unavailable": "Unavailable",
+    "etf-quality": "ETF Quality",
 }
 
 
 @dataclass
 class AnalystRec:
     ticker: str
-    action: str                      # buy | hold | sell | not-rated
-    label: str                       # Buy | Hold | Sell | Not rated
+    action: str                      # buy | hold | sell | unavailable | etf-quality
+    label: str                       # Buy | Hold | Sell | Unavailable | ETF Quality: ...
     analyst_count: Optional[int]
     recommendation_mean: Optional[float]
     target_price: Optional[float]
     target_upside_pct: Optional[float]
     subtext: str                     # e.g. "18 analysts · PT +12%"
     source: str
+    security_type: str = "STOCK"
+    rating_type: str = "analyst"
+    etf_quality: Optional[dict] = None
 
 
 def _not_rated(ticker: str) -> AnalystRec:
+    """Backward-compatible helper name for an unavailable analyst rating."""
     return AnalystRec(
         ticker=ticker,
-        action="not-rated",
-        label="Not rated",
+        action="unavailable",
+        label="Unavailable",
         analyst_count=None,
         recommendation_mean=None,
         target_price=None,
         target_upside_pct=None,
-        subtext="Consensus unavailable",
+        subtext="Analyst rating unavailable",
         source="yfinance",
+    )
+
+
+def _etf_quality_rec(ticker: str, info: dict) -> AnalystRec:
+    static = get_static_holding_metadata(ticker)
+    data = {
+        **static,
+        **info,
+        "ticker": ticker,
+        "expense_ratio": (
+            info.get("annualReportExpenseRatio")
+            or info.get("expenseRatio")
+            or info.get("netExpenseRatio")
+            or static.get("expense_ratio")
+        ),
+        "aum": info.get("totalAssets") or info.get("netAssets"),
+        "average_volume": info.get("averageVolume") or info.get("averageVolume10days"),
+        "current_price": info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice"),
+    }
+    quality = calculate_etf_quality_score(data)
+    label = f"ETF Quality: {quality['qualityLabel']}"
+    subparts = []
+    if quality["costLabel"] != "Unknown":
+        subparts.append(f"{quality['costLabel']} cost")
+    if quality["liquidityLabel"] != "Unknown":
+        subparts.append(f"{quality['liquidityLabel']} liquidity")
+    if quality["categoryRiskLabel"] != "Unknown":
+        subparts.append(f"{quality['categoryRiskLabel']} risk")
+    return AnalystRec(
+        ticker=ticker,
+        action="etf-quality",
+        label=label,
+        analyst_count=None,
+        recommendation_mean=None,
+        target_price=None,
+        target_upside_pct=None,
+        subtext=" · ".join(subparts) if subparts else "Insufficient ETF data",
+        source="etf-quality",
+        security_type="ETF",
+        rating_type="etf_quality",
+        etf_quality=quality,
     )
 
 
@@ -69,7 +119,7 @@ def _build_subtext(count: Optional[int], upside_pct: Optional[float]) -> str:
     if upside_pct is not None:
         sign = "+" if upside_pct >= 0 else ""
         parts.append(f"PT {sign}{upside_pct:.0f}%")
-    return " · ".join(parts) if parts else "Consensus unavailable"
+    return " · ".join(parts) if parts else "Analyst rating unavailable"
 
 
 def _action_from_mean(mean: float) -> str:
@@ -83,12 +133,20 @@ def _action_from_mean(mean: float) -> str:
 def _fetch_from_yfinance(ticker: str) -> AnalystRec:
     """
     Pull analyst consensus from Yahoo Finance.
-    Returns not-rated for ETFs, crypto, and any missing data.
+    Returns ETF quality for ETFs and unavailable for missing stock analyst data.
     """
     info = yf.Ticker(ticker).info
 
+    security_type = classify_security(ticker, info)
+    if security_type == SecurityType.ETF:
+        return _etf_quality_rec(ticker, info)
+
     quote_type = str(info.get("quoteType") or "").lower()
-    if quote_type in _NO_COVERAGE_TYPES:
+    if quote_type in _NO_ANALYST_COVERAGE_TYPES or security_type in {
+        SecurityType.CRYPTO,
+        SecurityType.CASH,
+        SecurityType.UNKNOWN,
+    }:
         return _not_rated(ticker)
 
     # Determine action from recommendationKey (preferred) or mean score (fallback)
@@ -131,7 +189,7 @@ def _fetch_from_yfinance(ticker: str) -> AnalystRec:
 def get_analyst_recommendation(ticker: str) -> AnalystRec:
     """
     Return analyst consensus for a single ticker.
-    Always returns a result — falls back to not-rated on any error.
+    Always returns a result — falls back to unavailable on any error.
     """
     ticker = ticker.upper()
     try:
@@ -153,4 +211,7 @@ def rec_to_dict(rec: AnalystRec) -> dict:
         "target_upside_pct": rec.target_upside_pct,
         "subtext": rec.subtext,
         "source": rec.source,
+        "security_type": rec.security_type,
+        "rating_type": rec.rating_type,
+        "etf_quality": rec.etf_quality,
     }
