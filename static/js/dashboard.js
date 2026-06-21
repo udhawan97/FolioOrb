@@ -36,10 +36,6 @@ const valueClass = (v) => {
 const TREND_DAYS = 7;
 const THEME_KEY = "foliosense-theme";
 const TEXT_SIZE_KEY = "foliosense-text-size";
-const THEME_LOGOS = {
-    dark: "/static/img/brand/folio-orbit-mark-dark.svg",
-    light: "/static/img/brand/folio-orbit-mark-light.svg",
-};
 
 const currentTheme = () =>
     document.documentElement.dataset.bsTheme === "light" ? "light" : "dark";
@@ -79,16 +75,23 @@ function tooltipOptions() {
 
 function applyTheme(theme, persist = false) {
     const resolved = theme === "light" ? "light" : "dark";
+    const isDark = resolved === "dark";
     document.documentElement.dataset.bsTheme = resolved;
     const toggle = document.getElementById("theme-toggle");
     if (toggle) {
-        const isDark = resolved === "dark";
         toggle.setAttribute("aria-pressed", String(isDark));
         toggle.setAttribute("aria-label", `Switch to ${isDark ? "light" : "dark"} mode`);
         toggle.title = `Switch to ${isDark ? "light" : "dark"} mode`;
     }
-    const toggleLogo = document.getElementById("theme-toggle-logo");
-    if (toggleLogo) toggleLogo.src = THEME_LOGOS[resolved];
+    const toggleIcon = document.getElementById("theme-toggle-icon");
+    if (toggleIcon) {
+        toggleIcon.className = [
+            "bi",
+            isDark ? "bi-moon-stars-fill" : "bi-sun-fill",
+            "theme-toggle-thumb-icon",
+            isDark ? "theme-toggle-thumb-icon-dark" : "theme-toggle-thumb-icon-light",
+        ].join(" ");
+    }
     if (persist) {
         try { localStorage.setItem(THEME_KEY, resolved); } catch (_) {}
     }
