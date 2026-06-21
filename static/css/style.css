@@ -257,15 +257,18 @@ table tbody tr:hover {
 }
 
 /* ── Sortable allocation headers ─────────────────────────────────────────── */
-#alloc-sort, #holdings-alloc-sort {
+#alloc-sort, #holdings-price-sort, #holdings-today-sort, #holdings-value-sort, #holdings-alloc-sort {
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
     transition: color 0.18s var(--ease);
 }
-#alloc-sort:hover, #holdings-alloc-sort:hover { color: var(--text-primary) !important; }
-#alloc-sort-caret, #holdings-alloc-caret { opacity: 0.65; transition: opacity 0.18s var(--ease); }
+#alloc-sort:hover, #holdings-price-sort:hover, #holdings-today-sort:hover, #holdings-value-sort:hover, #holdings-alloc-sort:hover { color: var(--text-primary) !important; }
+#alloc-sort-caret, #holdings-price-caret, #holdings-today-caret, #holdings-value-caret, #holdings-alloc-caret { opacity: 0.65; transition: opacity 0.18s var(--ease); }
 #alloc-sort:hover #alloc-sort-caret,
+#holdings-price-sort:hover #holdings-price-caret,
+#holdings-today-sort:hover #holdings-today-caret,
+#holdings-value-sort:hover #holdings-value-caret,
 #holdings-alloc-sort:hover #holdings-alloc-caret { opacity: 1; }
 
 /* ── Spinner ─────────────────────────────────────────────────────────────── */

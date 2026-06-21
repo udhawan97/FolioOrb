@@ -41,7 +41,7 @@ _ACTION_LABEL: dict[str, str] = {
 
 
 @dataclass
-class AnalystRec:
+class AnalystRec:  # pylint: disable=too-many-instance-attributes
     ticker: str
     action: str                      # buy | hold | sell | unavailable | etf-quality
     label: str                       # Buy | Hold | Sell | Unavailable | ETF Quality: ...
@@ -85,7 +85,9 @@ def _etf_quality_rec(ticker: str, info: dict) -> AnalystRec:
         ),
         "aum": info.get("totalAssets") or info.get("netAssets"),
         "average_volume": info.get("averageVolume") or info.get("averageVolume10days"),
-        "current_price": info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice"),
+        "current_price": (
+            info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice")
+        ),
     }
     quality = calculate_etf_quality_score(data)
     label = f"ETF Quality: {quality['qualityLabel']}"

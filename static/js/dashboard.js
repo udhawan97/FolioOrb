@@ -25,8 +25,14 @@ const formatPct = (n) => {
     const value = toNumber(n);
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 };
+const isFiniteNumber = (n) => n !== null && n !== "" && Number.isFinite(Number(n));
+const formatOptionalPct = (n) => isFiniteNumber(n) ? formatPct(Number(n)) : "—";
 const formatAllocationPct = (n) => `${toNumber(n).toFixed(1)}%`;
 const colorClass = (v) => v >= 0 ? "text-success" : "text-danger";
+const valueClass = (v) => {
+    if (!isFiniteNumber(v) || Number(v) === 0) return "text-secondary";
+    return Number(v) > 0 ? "text-success" : "text-danger";
+};
 const TREND_DAYS = 7;
 
 // Apple system colors (dark) — vibrant but restrained, matches the UI accents.
@@ -76,6 +82,7 @@ let allocationChart = null;  // Keep chart instance for updates
 let latestHoldings = [];     // Most recent holdings, for re-sorting without a refetch
 let latestTrendData = {};    // Cached sparkline data, so the Holdings table re-sorts without a refetch
 let allocSortDir = "desc";   // Allocation sort direction: "desc" | "asc"
+let holdingsSort = { key: "allocation_pct", dir: "desc" };
 let allocationTotal = 0;     // Portfolio total, drawn in the doughnut's center
 
 // Holding Intelligence state (covers "What it covers" + "Why it moved")
@@ -95,12 +102,43 @@ function sortedByAllocation(holdings) {
     );
 }
 
-// Keep every "sort by allocation" caret pointing the same way.
+function sortedHoldings(holdings) {
+    const dir = holdingsSort.dir === "asc" ? 1 : -1;
+    return holdings
+        .map((holding, index) => ({ holding, index }))
+        .sort((a, b) => {
+            const av = Number(a.holding[holdingsSort.key]);
+            const bv = Number(b.holding[holdingsSort.key]);
+            const aOk = Number.isFinite(av);
+            const bOk = Number.isFinite(bv);
+            if (!aOk && !bOk) return a.index - b.index;
+            if (!aOk) return 1;
+            if (!bOk) return -1;
+            const diff = av - bv;
+            return diff === 0 ? a.index - b.index : dir * diff;
+        })
+        .map(item => item.holding);
+}
+
+// Keep sortable header carets in sync with their current sort state.
 function updateSortCarets() {
-    const cls = `bi small ${allocSortDir === "asc" ? "bi-caret-up-fill" : "bi-caret-down-fill"}`;
-    ["alloc-sort-caret", "holdings-alloc-caret"].forEach(id => {
+    const allocEl = document.getElementById("alloc-sort-caret");
+    if (allocEl) {
+        allocEl.className = `bi small ${allocSortDir === "asc" ? "bi-caret-up-fill" : "bi-caret-down-fill"}`;
+    }
+
+    const caretIds = {
+        current_price: "holdings-price-caret",
+        day_change_pct: "holdings-today-caret",
+        current_value: "holdings-value-caret",
+        allocation_pct: "holdings-alloc-caret",
+    };
+    Object.entries(caretIds).forEach(([key, id]) => {
         const el = document.getElementById(id);
-        if (el) el.className = cls;
+        if (!el) return;
+        const active = holdingsSort.key === key;
+        el.className = `bi small ${holdingsSort.dir === "asc" ? "bi-caret-up-fill" : "bi-caret-down-fill"}`;
+        el.style.visibility = active ? "visible" : "hidden";
     });
 }
 
@@ -265,12 +303,21 @@ const centerTotalPlugin = {
 };
 
 function renderHoldings() {
-    updateHoldingsTable(sortedByAllocation(latestHoldings), latestTrendData);
+    updateHoldingsTable(sortedHoldings(latestHoldings), latestTrendData);
     updateSortCarets();
+}
+
+function toggleHoldingsSort(key) {
+    holdingsSort = {
+        key,
+        dir: holdingsSort.key === key && holdingsSort.dir === "asc" ? "desc" : "asc",
+    };
+    renderHoldings();
 }
 
 function toggleAllocationSort() {
     allocSortDir = allocSortDir === "asc" ? "desc" : "asc";
+    holdingsSort = { key: "allocation_pct", dir: allocSortDir };
     renderAllocation();
     renderHoldings();
 }
@@ -390,7 +437,7 @@ function renderRealizedTable(trades) {
     tbody.innerHTML = "";
 
     if (!trades.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-secondary py-4">
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-secondary py-4">
             No realized trades yet — they appear here when you reduce a holding.</td></tr>`;
         return;
     }
@@ -405,6 +452,7 @@ function renderRealizedTable(trades) {
             <td class="text-end">${formatCurrency(t.sale_price)}</td>
             <td class="text-end">${formatCurrency(t.avg_cost)}</td>
             <td class="text-end ${colorClass(t.realized_gain)}">${formatSignedCurrency(t.realized_gain)}</td>
+            <td class="text-end ${valueClass(t.total_return_pct)}">${formatOptionalPct(t.total_return_pct)}</td>
         `;
     });
 }
@@ -458,6 +506,7 @@ function updateHoldingsTable(holdings, trendData = {}) {
             </td>
             <td class="text-end d-none d-md-table-cell">${formatCurrency(h.current_value)}</td>
             <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
+            <td class="text-end ${valueClass(h.total_return_pct)}">${formatOptionalPct(h.total_return_pct)}</td>
             <td class="text-center d-none d-lg-table-cell" id="rec-cell-${h.ticker}">${renderAnalystRecCell(rec)}</td>
             <td class="text-center d-none d-xl-table-cell trend-cell"></td>
         `;
@@ -769,7 +818,7 @@ function injectSummaryRows(tbody) {
             expandRow = document.createElement("tr");
             expandRow.className = "summary-expand-row";
             const td = document.createElement("td");
-            td.colSpan = 8;
+            td.colSpan = 9;
             td.innerHTML = `<div class="summary-body"><div class="intel-grid">
                 <div class="intel-coverage-section"></div>
                 <div class="intel-move-section"></div>

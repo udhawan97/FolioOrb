@@ -61,18 +61,14 @@ def classify_security(
 
     if symbol in _CASH_TICKERS or "cash" in joined or "money market" in joined:
         return SecurityType.CASH
-    if quote_type in {"cryptocurrency", "crypto"} or asset_type == "crypto":
+    if (quote_type in {"cryptocurrency", "crypto"} or asset_type == "crypto"
+            or symbol.endswith(_CRYPTO_SUFFIXES)):
         return SecurityType.CRYPTO
-    if symbol.endswith(_CRYPTO_SUFFIXES):
-        return SecurityType.CRYPTO
-    if quote_type in {"etf", "mutualfund"} or instrument_type == "etf":
+    if (quote_type in {"etf", "mutualfund"} or instrument_type == "etf"
+            or any(hint in joined for hint in _ETF_HINTS)
+            or symbol in COMMON_ETF_TICKERS):
         return SecurityType.ETF
-    if any(hint in joined for hint in _ETF_HINTS):
-        return SecurityType.ETF
-    if symbol in COMMON_ETF_TICKERS:
-        return SecurityType.ETF
-    if quote_type in {"equity", "stock"} or asset_type in {"equity", "stock"}:
-        return SecurityType.STOCK
-    if exchange and symbol:
+    if (quote_type in {"equity", "stock"} or asset_type in {"equity", "stock"}
+            or (exchange and symbol)):
         return SecurityType.STOCK
     return SecurityType.UNKNOWN

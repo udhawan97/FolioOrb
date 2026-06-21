@@ -44,9 +44,24 @@ _PROFILE_OVERRIDES: dict[str, dict[str, Any]] = {
     "URA": {"category": "thematic", "concentration_level": "high"},
     "NUKZ": {"category": "thematic", "concentration_level": "high"},
     "JEPQ": {"category": "options-income", "concentration_level": "medium", "options_income": True},
-    "IBIT": {"category": "crypto", "concentration_level": "high", "crypto_linked": True, "holdings_count": 1},
-    "BTGD": {"category": "crypto", "concentration_level": "high", "crypto_linked": True, "holdings_count": 1},
+    "IBIT": {
+        "category": "crypto", "concentration_level": "high",
+        "crypto_linked": True, "holdings_count": 1,
+    },
+    "BTGD": {
+        "category": "crypto", "concentration_level": "high",
+        "crypto_linked": True, "holdings_count": 1,
+    },
 }
+
+_CONCENTRATION_LABEL: dict[str, str] = {
+    "very-low": "Broad", "low": "Broad",
+    "medium": "Moderate", "high": "Concentrated",
+}
+
+_DIVERSIFICATION_SCORE: dict[str, int] = {"Broad": 15, "Moderate": 8, "Concentrated": 2}
+
+_CATEGORY_RISK_PENALTY: dict[str, int] = {"Speculative": 25, "High": 12, "Moderate": 5}
 
 
 def _first_number(data: Mapping[str, Any], *keys: str) -> float | None:
@@ -97,12 +112,8 @@ def _liquidity_label(avg_volume: float | None, aum: float | None, spread: float 
 
 
 def _diversification_label(concentration: str, holdings_count: float | None) -> str:
-    if concentration in {"very-low", "low"}:
-        return "Broad"
-    if concentration == "medium":
-        return "Moderate"
-    if concentration == "high":
-        return "Concentrated"
+    if concentration in _CONCENTRATION_LABEL:
+        return _CONCENTRATION_LABEL[concentration]
     if holdings_count is None:
         return "Unknown"
     if holdings_count >= 300:
@@ -124,6 +135,80 @@ def _category_risk_label(data: Mapping[str, Any], category: str, concentration: 
     return "Low" if category else "Unknown"
 
 
+def _top10_from_holdings(
+    top_holdings: list,
+    top10_weight: float | None,
+) -> float | None:
+    if top10_weight is not None or not isinstance(top_holdings, list) or not top_holdings:
+        return top10_weight
+    weights = []
+    for holding in top_holdings[:10]:
+        if isinstance(holding, Mapping):
+            weight = _first_number(holding, "weight", "holdingPercent")
+            if weight is not None:
+                weights.append(weight * 100 if weight <= 1 else weight)
+    return sum(weights) if weights else None
+
+
+def _list_missing_fields(  # pylint: disable=too-many-positional-arguments
+    expense_ratio: float | None,
+    aum: float | None,
+    spread: float | None,
+    avg_volume: float | None,
+    holdings_count: float | None,
+    top10_weight: float | None,
+    tracking: float | None,
+) -> list[str]:
+    checks = [
+        (expense_ratio, "expenseRatio"),
+        (aum, "aum"),
+        (spread, "bidAskSpread"),
+        (avg_volume, "averageVolume"),
+        (holdings_count, "holdingsCount"),
+        (top10_weight, "top10HoldingsWeight"),
+        (tracking, "trackingDifference"),
+    ]
+    return [name for value, name in checks if value is None]
+
+
+def _quality_score_and_label(  # pylint: disable=too-many-positional-arguments
+    expense_ratio: float | None,
+    aum: float | None,
+    spread: float | None,
+    avg_volume: float | None,
+    diversification: str,
+    top10_weight: float | None,
+    tracking: float | None,
+    category_risk: str,
+) -> tuple[int, str]:
+    score = 40
+    if expense_ratio is not None:
+        score += 20 if expense_ratio <= 0.0015 else 14 if expense_ratio <= 0.006 else 6
+    if aum is not None:
+        score += 15 if aum >= 10_000_000_000 else 10 if aum >= 1_000_000_000 else 4
+    if spread is not None:
+        score += 10 if spread <= 0.001 else 6 if spread <= 0.004 else 1
+    if avg_volume is not None:
+        score += 10 if avg_volume >= 1_000_000 else 6 if avg_volume >= 100_000 else 2
+    score += _DIVERSIFICATION_SCORE.get(diversification, 0)
+    if top10_weight is not None:
+        score += 8 if top10_weight <= 35 else 4 if top10_weight <= 55 else 0
+    if tracking is not None:
+        score += 7 if abs(tracking) <= 0.001 else 3 if abs(tracking) <= 0.005 else 0
+    score -= _CATEGORY_RISK_PENALTY.get(category_risk, 0)
+    score = max(0, min(100, round(score)))
+    label = next(
+        (lbl for threshold, lbl in [(80, "Strong"), (65, "Good"), (45, "Fair")]
+         if score >= threshold),
+        "Speculative",
+    )
+    if category_risk == "Speculative":
+        label = "Speculative"
+    elif category_risk == "High" and label == "Strong":
+        label = "Good"
+    return score, label
+
+
 def calculate_etf_quality_score(etf_data: Mapping[str, Any]) -> dict[str, Any]:
     """Return ETF quality labels, score, explanation bullets, and missing fields."""
     ticker = str(etf_data.get("ticker") or "").upper()
@@ -143,53 +228,23 @@ def calculate_etf_quality_score(etf_data: Mapping[str, Any]) -> dict[str, Any]:
     tracking = _first_number(data, "trackingDifference", "trackingError", "tracking_error")
     category = _first_text(data, "category", "categoryName", "coverage_type").lower()
     concentration = _first_text(data, "concentration_level").lower()
-
     top_holdings = data.get("top_holdings") or data.get("holdings") or []
-    if top10_weight is None and isinstance(top_holdings, list) and top_holdings:
-        weights = []
-        for holding in top_holdings[:10]:
-            if isinstance(holding, Mapping):
-                weight = _first_number(holding, "weight", "holdingPercent")
-                if weight is not None:
-                    weights.append(weight * 100 if weight <= 1 else weight)
-        if weights:
-            top10_weight = sum(weights)
+    top10_weight = _top10_from_holdings(top_holdings, top10_weight)
 
     meaningful = [
-        expense_ratio is not None,
-        aum is not None,
-        spread is not None,
-        avg_volume is not None,
-        holdings_count is not None,
-        top10_weight is not None,
-        tracking is not None,
-        bool(category),
-        bool(concentration),
+        expense_ratio is not None, aum is not None, spread is not None,
+        avg_volume is not None, holdings_count is not None, top10_weight is not None,
+        tracking is not None, bool(category), bool(concentration),
     ]
-    missing_fields = []
-    if expense_ratio is None:
-        missing_fields.append("expenseRatio")
-    if aum is None:
-        missing_fields.append("aum")
-    if spread is None:
-        missing_fields.append("bidAskSpread")
-    if avg_volume is None:
-        missing_fields.append("averageVolume")
-    if holdings_count is None:
-        missing_fields.append("holdingsCount")
-    if top10_weight is None:
-        missing_fields.append("top10HoldingsWeight")
-    if tracking is None:
-        missing_fields.append("trackingDifference")
+    missing_fields = _list_missing_fields(
+        expense_ratio, aum, spread, avg_volume, holdings_count, top10_weight, tracking
+    )
 
     cost = _cost_label(expense_ratio)
     liquidity = _liquidity_label(avg_volume, aum, spread)
     diversification = _diversification_label(concentration, holdings_count)
     concentration_risk = {
-        "very-low": "Low",
-        "low": "Low",
-        "medium": "Medium",
-        "high": "High",
+        "very-low": "Low", "low": "Low", "medium": "Medium", "high": "High",
     }.get(concentration, "Unknown")
     category_risk = _category_risk_label(data, category, concentration)
 
@@ -206,52 +261,20 @@ def calculate_etf_quality_score(etf_data: Mapping[str, Any]) -> dict[str, Any]:
             "missingFields": missing_fields,
         }
 
-    score = 40
-    if expense_ratio is not None:
-        score += 20 if expense_ratio <= 0.0015 else 14 if expense_ratio <= 0.006 else 6
-    if aum is not None:
-        score += 15 if aum >= 10_000_000_000 else 10 if aum >= 1_000_000_000 else 4
-    if spread is not None:
-        score += 10 if spread <= 0.001 else 6 if spread <= 0.004 else 1
-    if avg_volume is not None:
-        score += 10 if avg_volume >= 1_000_000 else 6 if avg_volume >= 100_000 else 2
-    if diversification == "Broad":
-        score += 15
-    elif diversification == "Moderate":
-        score += 8
-    elif diversification == "Concentrated":
-        score += 2
-    if top10_weight is not None:
-        score += 8 if top10_weight <= 35 else 4 if top10_weight <= 55 else 0
-    if tracking is not None:
-        score += 7 if abs(tracking) <= 0.001 else 3 if abs(tracking) <= 0.005 else 0
-
-    if category_risk == "Speculative":
-        score -= 25
-    elif category_risk == "High":
-        score -= 12
-    elif category_risk == "Moderate":
-        score -= 5
-    score = max(0, min(100, round(score)))
-
-    if score >= 80:
-        label = "Strong"
-    elif score >= 65:
-        label = "Good"
-    elif score >= 45:
-        label = "Fair"
-    else:
-        label = "Speculative"
-    if category_risk == "Speculative":
-        label = "Speculative"
-    elif category_risk == "High" and label == "Strong":
-        label = "Good"
+    score, label = _quality_score_and_label(
+        expense_ratio, aum, spread, avg_volume,
+        diversification, top10_weight, tracking, category_risk,
+    )
 
     bullets = [
-        f"Cost is {cost.lower()}." if cost != "Unknown" else "Expense ratio is unavailable.",
-        f"Liquidity is {liquidity.lower()}." if liquidity != "Unknown" else "Liquidity data is incomplete.",
-        f"Diversification is {diversification.lower()}." if diversification != "Unknown" else "Diversification data is incomplete.",
-        f"Category risk is {category_risk.lower()}." if category_risk != "Unknown" else "Category risk is unclear.",
+        f"Cost is {cost.lower()}." if cost != "Unknown"
+        else "Expense ratio is unavailable.",
+        f"Liquidity is {liquidity.lower()}." if liquidity != "Unknown"
+        else "Liquidity data is incomplete.",
+        f"Diversification is {diversification.lower()}." if diversification != "Unknown"
+        else "Diversification data is incomplete.",
+        f"Category risk is {category_risk.lower()}." if category_risk != "Unknown"
+        else "Category risk is unclear.",
     ]
 
     return {

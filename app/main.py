@@ -18,7 +18,10 @@ async def lifespan(_app: FastAPI):
 # Create the FastAPI application instance
 app = FastAPI(
     title="FolioSenseAI",
-    description="FolioSenseAI helps explain portfolio movement by surfacing market context, news, and AI-generated insights for holdings.",
+    description=(
+        "FolioSenseAI helps explain portfolio movement by surfacing "
+        "market context, news, and AI-generated insights for holdings."
+    ),
     version="0.4.0",
     lifespan=lifespan,
 )

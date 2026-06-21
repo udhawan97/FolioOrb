@@ -32,6 +32,7 @@ def _compute_portfolio(portfolio_id, db):
     cost_map = {h.ticker: (h.avg_cost or 0.0) for h in holdings}
 
     quotes = get_all_quotes(list(shares_map.keys()))
+    realized_stats = _realized_stats_by_ticker(portfolio_id, db)
 
     result = []
     total_value = 0.0
@@ -51,6 +52,14 @@ def _compute_portfolio(portfolio_id, db):
         unrealized_gain_pct = (
             (unrealized_gain / cost_basis * 100) if cost_basis > 0 else 0.0
         )
+        realized = realized_stats.get(ticker, {})
+        combined_cost_basis = cost_basis + realized.get("cost_basis", 0.0)
+        combined_gain = unrealized_gain + realized.get("realized_gain", 0.0)
+        total_return_pct = (
+            (combined_gain / combined_cost_basis * 100)
+            if combined_cost_basis > 0
+            else None
+        )
 
         total_value += current_value
         total_daily_change += daily_value_change
@@ -66,6 +75,9 @@ def _compute_portfolio(portfolio_id, db):
             "cost_basis": round(cost_basis, 2),
             "unrealized_gain": round(unrealized_gain, 2),
             "unrealized_gain_pct": round(unrealized_gain_pct, 2),
+            "total_return_pct": (
+                round(total_return_pct, 2) if total_return_pct is not None else None
+            ),
             "day_change_pct": q["day_change_pct"],
             "daily_value_change": round(daily_value_change, 2),
             "allocation_pct": 0,
@@ -88,6 +100,52 @@ def _cumulative_realized(portfolio_id, db):
         .scalar()
     )
     return round(total or 0.0, 2)
+
+
+def _realized_stats_by_ticker(portfolio_id, db):
+    """Quantity-weighted realized sale stats keyed by ticker."""
+    trades = (
+        db.query(RealizedTrade)
+        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .all()
+    )
+
+    stats = {}
+    for trade in trades:
+        ticker = trade.ticker
+        shares = trade.shares_sold or 0.0
+        item = stats.setdefault(
+            ticker,
+            {
+                "shares_sold": 0.0,
+                "sale_proceeds": 0.0,
+                "cost_basis": 0.0,
+                "realized_gain": 0.0,
+            },
+        )
+        item["shares_sold"] += shares
+        item["sale_proceeds"] += shares * (trade.sale_price or 0.0)
+        item["cost_basis"] += shares * (trade.avg_cost or 0.0)
+        item["realized_gain"] += trade.realized_gain or 0.0
+
+    for item in stats.values():
+        item["avg_sell_price"] = (
+            item["sale_proceeds"] / item["shares_sold"]
+            if item["shares_sold"] > 0
+            else None
+        )
+        item["avg_cost"] = (
+            item["cost_basis"] / item["shares_sold"]
+            if item["shares_sold"] > 0
+            else None
+        )
+        item["total_return_pct"] = (
+            (item["realized_gain"] / item["cost_basis"]) * 100
+            if item["cost_basis"] > 0
+            else None
+        )
+
+    return stats
 
 
 def _record_reduction(holding, old_shares, new_shares, db):
@@ -363,6 +421,7 @@ async def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
     no live quotes — so it's cheap to call after a holdings edit.
     """
     realized = _cumulative_realized(portfolio_id, db)
+    realized_stats = _realized_stats_by_ticker(portfolio_id, db)
 
     trades = (
         db.query(RealizedTrade)
@@ -387,6 +446,11 @@ async def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
                 "sale_price": t.sale_price,
                 "avg_cost": t.avg_cost,
                 "realized_gain": t.realized_gain,
+                "total_return_pct": (
+                    round(realized_stats[t.ticker]["total_return_pct"], 2)
+                    if realized_stats.get(t.ticker, {}).get("total_return_pct") is not None
+                    else None
+                ),
                 "date": t.created_at.isoformat() if t.created_at else None,
             }
             for t in trades
