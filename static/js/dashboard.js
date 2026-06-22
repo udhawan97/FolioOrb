@@ -2086,10 +2086,11 @@ function renderContributionBreakdown(breakdown, etfDayChangePct) {
         const chgStr = `${chgSign}${h.day_change_pct.toFixed(2)}%`;
         const ppSign  = h.contribution_pp >= 0 ? "+" : "";
         const ppStr   = `${ppSign}${h.contribution_pp.toFixed(2)}%`;
+        const dirIcon = isPos ? "bi-caret-up-fill" : "bi-caret-down-fill";
         return `
         <div class="contrib-row" style="--contrib-delay:${i * 0.06}s">
             <span class="contrib-ticker">${escapeHtml(h.ticker)}</span>
-            <span class="contrib-chg ${isPos ? "positive" : "negative"}">${escapeHtml(chgStr)}</span>
+            <span class="contrib-chg ${isPos ? "positive" : "negative"}"><i class="bi ${dirIcon} contrib-dir-icon"></i>${escapeHtml(chgStr)}</span>
             <div class="contrib-bar-track">
                 <div class="contrib-bar-fill ${isPos ? "pos" : "neg"}" style="--contrib-bar:${barPct / 100}"></div>
             </div>
@@ -2103,8 +2104,17 @@ function renderContributionBreakdown(breakdown, etfDayChangePct) {
 
     let summaryLine = `Top holdings contributed <strong class="${totalTone}">${escapeHtml(totalStr)}</strong> to today's move`;
     if (isFiniteNumber(etfDayChangePct) && Math.abs(etfDayChangePct) > 0.01) {
+        const sameSide = (totalPp >= 0) === (etfDayChangePct >= 0);
         const pct = Math.round(Math.abs(totalPp) / Math.abs(etfDayChangePct) * 100);
-        summaryLine += ` (${pct}% explained by top ${breakdown.length})`;
+        if (!sameSide) {
+            // Top holdings moved against the ETF's net direction — other holdings dominated
+            summaryLine += ` — other holdings drove the net move`;
+        } else if (pct > 100) {
+            // Top holdings over-explain the ETF's move; other holdings partially offset
+            summaryLine += ` — offset by other holdings (top ${breakdown.length} over-explain net move)`;
+        } else {
+            summaryLine += ` (${pct}% of net move from top ${breakdown.length})`;
+        }
     }
 
     return `
@@ -2113,10 +2123,10 @@ function renderContributionBreakdown(breakdown, etfDayChangePct) {
         </div>
         <div class="contrib-breakdown">
             <div class="contrib-header">
-                <span class="contrib-col-ticker">Holding</span>
-                <span class="contrib-col-chg">Move</span>
+                <span class="contrib-col-ticker"><i class="bi bi-tag-fill"></i> Holding</span>
+                <span class="contrib-col-chg"><i class="bi bi-arrow-up-down"></i> Move</span>
                 <span class="contrib-col-bar"></span>
-                <span class="contrib-col-pp">Impact</span>
+                <span class="contrib-col-pp"><i class="bi bi-bullseye"></i> Impact</span>
             </div>
             ${rows}
             <div class="contrib-summary">${summaryLine}</div>
@@ -3205,10 +3215,19 @@ function initTips() {
     if (!popover) return;
 
     let hideTimeout = null;
+    let activeTrigger = null;
+
+    const hideTip = () => {
+        clearTimeout(hideTimeout);
+        activeTrigger = null;
+        popover.classList.remove("tip-visible");
+        popover.setAttribute("aria-hidden", "true");
+    };
 
     document.querySelectorAll(".tip-trigger").forEach(trigger => {
         trigger.addEventListener("mouseenter", () => {
             clearTimeout(hideTimeout);
+            activeTrigger = trigger;
             const title   = trigger.dataset.tipTitle   || "";
             const body    = trigger.dataset.tipBody    || "";
             const hint    = trigger.dataset.tipHint    || "";
@@ -3247,7 +3266,7 @@ function initTips() {
 
             // Position below trigger, viewport-clamped
             const rect = trigger.getBoundingClientRect();
-            const popW = variant === "ai" ? 260 : 252;
+            const popW = Math.min(popover.offsetWidth || (variant === "ai" ? 304 : 252), window.innerWidth - 20);
             const popH = popover.offsetHeight || 120;
             let left   = rect.left + rect.width / 2 - popW / 2;
             let top    = rect.bottom + 10;
@@ -3263,8 +3282,7 @@ function initTips() {
 
         trigger.addEventListener("mouseleave", () => {
             hideTimeout = setTimeout(() => {
-                popover.classList.remove("tip-visible");
-                popover.setAttribute("aria-hidden", "true");
+                hideTip();
             }, 160);
         });
 
@@ -3274,6 +3292,15 @@ function initTips() {
 
         // Prevent card click when clicking the trigger icon
         trigger.addEventListener("click", e => e.stopPropagation());
+    });
+
+    window.addEventListener("scroll", hideTip, { passive: true, capture: true });
+    window.addEventListener("resize", hideTip, { passive: true });
+    document.addEventListener("click", event => {
+        if (activeTrigger && !activeTrigger.contains(event.target)) hideTip();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") hideTip();
     });
 }
 

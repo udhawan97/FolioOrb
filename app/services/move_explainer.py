@@ -190,17 +190,31 @@ def compute_contribution_breakdown(
             pass  # use what we have; missing tickers get 0.0 below
 
     results = []
+    total_weight = 0.0
     for h in top_holdings:
         t = h["ticker"]
         w = float(h.get("weight") or 0)
+        if not (0 <= w <= 100):
+            logger.warning("Skipping %s: weight %s out of valid range [0, 100]", t, w)
+            continue
         chg = changes.get(t, 0.0)
+        if not (-100 <= chg <= 100):
+            logger.warning("Skipping %s: day_change_pct %s out of valid range", t, chg)
+            continue
+        contribution_pp = round(w / 100.0 * chg, 4)
+        total_weight += w
         results.append({
             "ticker": t,
             "name": h.get("name", t),
             "weight": w,
             "day_change_pct": round(chg, 2),
-            "contribution_pp": round(w / 100.0 * chg, 4),
+            "contribution_pp": contribution_pp,
         })
+
+    if total_weight > 100.0 + 1e-6:
+        logger.warning(
+            "Holdings weights sum to %.2f%% — may indicate duplicate or bad data", total_weight
+        )
 
     results.sort(key=lambda x: abs(x["contribution_pp"]), reverse=True)
     return results
