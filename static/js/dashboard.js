@@ -2348,6 +2348,15 @@ function renderTargetKind(kind, icon, label) {
             </div>`;
 }
 
+function renderTargetTrendLine(label, value) {
+    if (!isFiniteNumber(value)) return "";
+    const tone = signalTone(value);
+    return `<div class="target-trend-line ${tone}">
+                <span>${escapeHtml(label)}</span>
+                <strong>${escapeHtml(formatSignalPct(value))}</strong>
+            </div>`;
+}
+
 function renderTargetCell(rec) {
     if (!rec) {
         return `<div class="shimmer-line" style="width:56px;height:12px;border-radius:4px;margin:0 auto .25rem"></div>
@@ -2361,12 +2370,21 @@ function renderTargetCell(rec) {
             const zoneClass = label.toLowerCase();
             const trend30 = firstFiniteValue(signal.vs30dChangePct, signal.vs30dPct);
             const trend200 = firstFiniteValue(signal.vs200dChangePct, signal.vs200dPct);
-            const trendText = trend30 == null && trend200 == null
-                ? escapeHtml(signal.basis || "Price zone")
-                : `30D ${formatSignalPct(trend30)} · 200D ${formatSignalPct(trend200)}`;
-            return `<div class="target-price-value price-zone-${escapeHtml(zoneClass)}">${escapeHtml(label)} · ${Number(signal.percentile).toFixed(0)}%</div>
-                    <div class="target-upside" style="color:var(--text-tertiary)">${escapeHtml(trendText)}</div>
-                    ${renderTargetKind("etf", "bi-activity", "ETF signal")}`;
+            const trendRows = [
+                renderTargetTrendLine("30D", trend30),
+                renderTargetTrendLine("200D", trend200),
+            ].join("");
+            const trendHtml = trendRows
+                ? `<div class="target-trend-list" aria-label="ETF price trend">${trendRows}</div>`
+                : `<div class="target-upside" style="color:var(--text-tertiary)">${escapeHtml(signal.basis || "Price zone")}</div>`;
+            return `<div class="target-signal-stack">
+                        <div class="target-price-value target-zone-value price-zone-${escapeHtml(zoneClass)}">
+                            <span>${escapeHtml(label)}</span>
+                            <span>${Number(signal.percentile).toFixed(0)}%</span>
+                        </div>
+                        ${trendHtml}
+                        ${renderTargetKind("etf", "bi-activity", "ETF signal")}
+                    </div>`;
         }
     }
     // Stocks with analyst consensus price target

@@ -248,7 +248,7 @@ html[data-text-size="comfortable"] {
     transition: border-color 0.5s ease, box-shadow 0.5s ease;
 }
 
-/* ── Intel-grid aurora — the expanded row feels alive ────────────────────── */
+/* ── Intel-grid aurora — static tint while AI-checking (was background-position anim) */
 #holdings-card.is-ai-checking .intel-grid {
     background: linear-gradient(
         135deg,
@@ -256,13 +256,6 @@ html[data-text-size="comfortable"] {
         rgba(151, 172, 236, 0.13) 50%,
         rgba(111, 214, 240, 0.08) 100%
     );
-    background-size: 200% 200%;
-    animation: intel-aurora 4.5s ease-in-out infinite;
-}
-@keyframes intel-aurora {
-    0%   { background-position: 0%   0%;   }
-    50%  { background-position: 100% 100%; }
-    100% { background-position: 0%   0%;   }
 }
 
 /* Everything above the orbs */
@@ -298,11 +291,11 @@ body::before {
         linear-gradient(115deg, transparent 0%, rgba(111, 214, 240, 0.055) 28%, transparent 48%),
         linear-gradient(245deg, transparent 10%, rgba(122, 241, 205, 0.035) 38%, transparent 58%),
         linear-gradient(180deg, transparent 0%, rgba(151, 172, 236, 0.045) 52%, transparent 100%);
-    background-size: 180% 180%, 210% 210%, 160% 160%;
     -webkit-mask-image: linear-gradient(180deg, black 0%, rgba(0, 0, 0, 0.74) 52%, transparent 100%);
     mask-image: linear-gradient(180deg, black 0%, rgba(0, 0, 0, 0.74) 52%, transparent 100%);
     opacity: 0.82;
-    animation: dashboard-ambient-flow 22s ease-in-out infinite alternate;
+    /* background-position animation replaced with opacity-only — no repaint on body ::before */
+    animation: dashboard-ambient-glow 22s ease-in-out infinite alternate;
 }
 
 [data-bs-theme="light"] body::before {
@@ -313,9 +306,9 @@ body::before {
     opacity: 0.72;
 }
 
-@keyframes dashboard-ambient-flow {
-    from { background-position: 0% 24%, 100% 12%, 40% 0%; }
-    to   { background-position: 100% 76%, 0% 88%, 60% 100%; }
+@keyframes dashboard-ambient-glow {
+    from { opacity: 0.72; }
+    to   { opacity: 0.90; }
 }
 
 ::selection { background: rgba(10, 132, 255, 0.32); color: #fff; }
@@ -826,8 +819,7 @@ body > .navbar {
 }
 
 #holdings-card.is-ai-checking .card-body::before {
-    opacity: 0.52;
-    animation: holdings-backplane-flow 4.8s ease-in-out infinite;
+    animation: holdings-backplane-glow 4.8s ease-in-out infinite;
 }
 
 [data-bs-theme="light"] #holdings-card .card-body::before {
@@ -836,9 +828,10 @@ body > .navbar {
         radial-gradient(ellipse 70% 44% at 72% 0%, rgba(151, 172, 236, 0.09), transparent 64%);
 }
 
-@keyframes holdings-backplane-flow {
-    0%, 100% { background-position: -60% 0, 0 0; }
-    50%      { background-position: 160% 0, 0 0; }
+/* Replaced background-position pan with opacity pulse — compositor-only, no repaint */
+@keyframes holdings-backplane-glow {
+    0%, 100% { opacity: 0.30; }
+    50%      { opacity: 0.52; }
 }
 
 .card-header {
@@ -854,18 +847,14 @@ body > .navbar {
 .card-header > .bi:first-child,
 .card-header .d-flex > .bi:first-child,
 .performance-card-icon {
+    filter: drop-shadow(0 0 5px rgba(111, 214, 240, 0.22));
     animation: headerGlyphSignal 5.4s ease-in-out infinite;
 }
 
+/* filter removed from keyframes — static drop-shadow on element, only opacity animates */
 @keyframes headerGlyphSignal {
-    0%, 100% {
-        opacity: 0.68;
-        filter: drop-shadow(0 0 0 rgba(111, 214, 240, 0));
-    }
-    48% {
-        opacity: 1;
-        filter: drop-shadow(0 0 8px rgba(111, 214, 240, 0.36));
-    }
+    0%, 100% { opacity: 0.68; }
+    48%      { opacity: 1; }
 }
 
 /* ── Metric cards — micro-label + hero numbers ───────────────────────────── */
@@ -961,7 +950,7 @@ table tbody tr:hover {
 
 .holdings-table tbody tr[data-ticker] {
     min-height: 68px;
-    will-change: background-color, filter;
+    will-change: background-color;
 }
 
 
@@ -1672,23 +1661,10 @@ table tbody tr:hover {
     }
 }
 
+/* box-shadow removed from aiAgentReadyBreathe — static on element; only transform animates */
 @keyframes aiAgentReadyBreathe {
-    0%, 100% {
-        transform: translateY(0) scale(1);
-        box-shadow:
-            0 18px 48px -26px rgba(111, 214, 240, 0.78),
-            0 0 0 1px rgba(111, 214, 240, 0.04),
-            inset 0 1px 0 rgba(255, 255, 255, 0.14),
-            inset 0 -16px 28px rgba(111, 214, 240, 0.055);
-    }
-    52% {
-        transform: translateY(-1px) scale(1.008);
-        box-shadow:
-            0 22px 58px -24px rgba(111, 214, 240, 1),
-            0 0 0 1px rgba(122, 241, 205, 0.09),
-            inset 0 1px 0 rgba(255, 255, 255, 0.18),
-            inset 0 -18px 32px rgba(111, 214, 240, 0.08);
-    }
+    0%, 100% { transform: translateY(0) scale(1); }
+    52%      { transform: translateY(-1px) scale(1.008); }
 }
 
 @keyframes aiAgentReadyRing {
@@ -1724,19 +1700,11 @@ table tbody tr:hover {
     }
 }
 
+/* filter removed from aiAgentReadyPips — static on element; only transform animates */
 @keyframes aiAgentReadyPips {
-    0%, 100% {
-        transform: translate3d(0, 0, 0) scale(1);
-        filter: brightness(1);
-    }
-    45% {
-        transform: translate3d(-1px, -1px, 0) scale(1.3);
-        filter: brightness(1.28);
-    }
-    68% {
-        transform: translate3d(0.5px, 0.5px, 0) scale(0.92);
-        filter: brightness(0.96);
-    }
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    45%      { transform: translate3d(-1px, -1px, 0) scale(1.3); }
+    68%      { transform: translate3d(0.5px, 0.5px, 0) scale(0.92); }
 }
 
 @keyframes aiIconFloat {
@@ -2278,19 +2246,15 @@ table tbody tr:hover {
 }
 
 /* ── Market status — pulsing dot when open ──────────────────────────────── */
-.market-open i { animation: marketPulse 2.4s ease-in-out infinite; }
+.market-open i {
+    filter: drop-shadow(0 0 3px rgba(111, 214, 240, 0.7));
+    animation: marketPulse 2.4s ease-in-out infinite;
+}
 
+/* filter removed from keyframes — static on element; only opacity animates */
 @keyframes marketPulse {
-    0%, 100% {
-        opacity: 1;
-        transform: scale(1);
-        filter: drop-shadow(0 0 0 rgba(111, 214, 240, 0));
-    }
-    50% {
-        opacity: 1;
-        transform: scale(1);
-        filter: drop-shadow(0 0 3px rgba(111, 214, 240, 0.9));
-    }
+    0%, 100% { opacity: 0.68; }
+    50%      { opacity: 1; }
 }
 
 /* ── Ticker dot (colored circle in holdings table) ──────────────────────── */
@@ -2312,7 +2276,7 @@ table tbody tr:hover {
     border-top: 0 !important;
     border-bottom: 0 !important;
     overflow: hidden;
-    contain: layout style;
+    contain: layout paint style;
 }
 .summary-body {
     max-height: 0;
@@ -2320,6 +2284,7 @@ table tbody tr:hover {
     transition: max-height 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
     opacity: 0;
     will-change: max-height;
+    contain: layout paint style;
 }
 .summary-body.open {
     opacity: 1;
@@ -2405,7 +2370,7 @@ table tbody tr:hover {
 tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .summary-open .row-chevron { transform: rotate(90deg); opacity: 0.75 !important; }
 
-/* ── Intel-ready: futuristic reveal indicators ──────────────────────────── */
+/* ── Intel-ready: static tint (background-position sweep → opacity pulse on tr) */
 .holdings-table tbody tr[data-ticker].has-intel-ready td {
     background-image: linear-gradient(
         90deg,
@@ -2415,9 +2380,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         rgba(111, 214, 240, 0.04) 62%,
         transparent 100%
     );
-    background-size: 300% 100%;
-    animation: intel-ready-sweep 3.6s ease-in-out infinite;
-    animation-delay: calc(var(--row-index, 0) * 130ms);
 }
 [data-bs-theme="light"] .holdings-table tbody tr[data-ticker].has-intel-ready td {
     background-image: linear-gradient(
@@ -2429,11 +2391,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         transparent 100%
     );
 }
-@keyframes intel-ready-sweep {
-    0%   { background-position: 200% 0; }
-    45%  { background-position: 50% 0; }
-    100% { background-position: -100% 0; }
-}
+/* intel-ready-sweep deleted — background-position pan caused per-cell repaint */
 .has-intel-ready .row-chevron {
     opacity: 1 !important;
     color: var(--accent-cyan) !important;
@@ -2931,8 +2889,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         inset 0 1px 0 rgba(255, 255, 255, 0.090),
         inset 0 -1px 0 rgba(111, 214, 240, 0.070),
         0 20px 42px -34px rgba(111, 214, 240, 0.88);
-    animation: fundScaleIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both 0.18s,
-               fundSpotlightBreath 4.5s ease-in-out 1.5s infinite;
+    animation: fundScaleIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both 0.18s;
 }
 
 .fund-scale-spotlight::before {
@@ -3009,7 +2966,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     text-shadow: 0 0 22px rgba(111, 214, 240, 0.34);
-    animation: fundValueGlow 3.8s ease-in-out 2.2s infinite;
 }
 
 .fund-scale-detail {
@@ -3095,9 +3051,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         inset 0 1px 0 rgba(255, 255, 255, 0.070),
         inset 0 -1px 0 rgba(111, 214, 240, 0.040),
         0 16px 34px -30px rgba(0, 0, 0, 0.95);
-    animation: pulseCardIn 0.42s var(--ease) both,
-               cardGlowBreath 3.8s ease-in-out infinite;
-    animation-delay: calc(var(--pulse-index) * 70ms), calc(1.2s + var(--pulse-index) * 500ms);
+    animation: pulseCardIn 0.42s var(--ease) both;
+    animation-delay: calc(var(--pulse-index) * 70ms);
 }
 
 .market-pulse-card::before {
@@ -3160,9 +3115,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.10),
         0 0 18px -10px var(--pulse-color);
-    animation: iconGlowBreath 2.6s ease-in-out infinite,
-               iconFloat 3.4s ease-in-out infinite;
-    animation-delay: calc(var(--pulse-index) * 250ms), calc(var(--pulse-index) * 450ms);
+    animation: iconFloat 3.4s ease-in-out infinite;
+    animation-delay: calc(var(--pulse-index) * 450ms);
 }
 
 .pulse-copy {
@@ -3191,8 +3145,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     text-overflow: ellipsis;
     white-space: nowrap;
     text-shadow: 0 0 14px color-mix(in srgb, var(--pulse-color) 40%, transparent);
-    animation: pulseValueGlow 3.2s ease-in-out infinite;
-    animation-delay: calc(var(--pulse-index) * 350ms);
 }
 
 .pulse-detail {
@@ -3241,19 +3193,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     to   { transform: scaleX(1); opacity: 0.62; }
 }
 
+/* box-shadow removed — static on element; only compositor-safe transform animates */
 @keyframes fundEmblemPulse {
-    0%, 100% {
-        transform: translateY(0);
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.10),
-            0 0 18px -11px rgba(111, 214, 240, 0.82);
-    }
-    50% {
-        transform: translateY(-1px);
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.12),
-            0 0 26px -9px rgba(111, 214, 240, 1);
-    }
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-1px); }
 }
 
 @keyframes fundTrendChipIn {
@@ -3261,22 +3204,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     to   { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes fundSpotlightBreath {
-    0%, 100% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.090),
-            inset 0 -1px 0 rgba(111, 214, 240, 0.070),
-            0 20px 42px -34px rgba(111, 214, 240, 0.88);
-    }
-    50% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.15),
-            inset 0 -1px 0 rgba(111, 214, 240, 0.20),
-            0 0 0 1px rgba(111, 214, 240, 0.18),
-            0 0 52px -16px rgba(111, 214, 240, 0.32),
-            0 20px 56px -26px rgba(111, 214, 240, 1);
-    }
-}
+/* fundSpotlightBreath deleted — box-shadow is now static on .fund-scale-spotlight */
 
 @keyframes fundSheenLoop {
     0%, 14% { transform: translateX(-115%); opacity: 0; }
@@ -3291,27 +3219,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     100% { opacity: 0.62; transform: scaleX(1); }
 }
 
-@keyframes fundValueGlow {
-    0%, 100% { text-shadow: 0 0 22px rgba(111, 214, 240, 0.34); }
-    50%      { text-shadow: 0 0 36px rgba(111, 214, 240, 0.78), 0 0 10px rgba(255, 255, 255, 0.14); }
-}
-
-@keyframes cardGlowBreath {
-    0%, 100% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.070),
-            inset 0 -1px 0 rgba(111, 214, 240, 0.040),
-            0 16px 34px -30px rgba(0, 0, 0, 0.95);
-    }
-    50% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.12),
-            inset 0 -1px 0 color-mix(in srgb, var(--pulse-color) 35%, transparent),
-            0 0 0 1px color-mix(in srgb, var(--pulse-color) 16%, transparent),
-            0 0 44px -18px color-mix(in srgb, var(--pulse-color) 65%, transparent),
-            0 16px 34px -20px rgba(0, 0, 0, 0.65);
-    }
-}
+/* fundValueGlow deleted — text-shadow is now static on .fund-scale-value */
+/* cardGlowBreath deleted — box-shadow is now static on .market-pulse-card */
 
 @keyframes continuousScan {
     0%, 18% { transform: translateX(-115%); opacity: 0; }
@@ -3326,29 +3235,14 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     100% { opacity: 0.55; transform: scaleX(0.62); }
 }
 
-@keyframes iconGlowBreath {
-    0%, 100% {
-        box-shadow:
-            inset 0 1px 0 rgba(255,255,255,0.10),
-            0 0 18px -10px var(--pulse-color);
-    }
-    50% {
-        box-shadow:
-            inset 0 1px 0 rgba(255,255,255,0.16),
-            0 0 30px -5px var(--pulse-color),
-            0 0 12px -2px color-mix(in srgb, var(--pulse-color) 55%, transparent);
-    }
-}
+/* iconGlowBreath deleted — box-shadow is now static on .pulse-icon */
 
 @keyframes iconFloat {
     0%, 100% { transform: translateY(0); }
     50%      { transform: translateY(-2.5px); }
 }
 
-@keyframes pulseValueGlow {
-    0%, 100% { text-shadow: 0 0 14px color-mix(in srgb, var(--pulse-color) 40%, transparent); }
-    50%      { text-shadow: 0 0 22px color-mix(in srgb, var(--pulse-color) 80%, transparent), 0 0 6px rgba(255,255,255,0.10); }
-}
+/* pulseValueGlow deleted — text-shadow is now static on .pulse-copy strong */
 
 @media (max-width: 900px) {
     .market-pulse-strip {
@@ -3393,6 +3287,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     position: relative;
     overflow: hidden;
     isolation: isolate;
+    contain: layout paint style;
     background:
         radial-gradient(900px 420px at 78% -20%, rgba(111, 214, 240, 0.11), transparent 66%),
         radial-gradient(780px 460px at -8% 112%, rgba(151, 172, 236, 0.080), transparent 70%),
@@ -3883,9 +3778,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 @keyframes swatchGlow {
     0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--sector-color) 18%, transparent); }
 }
-@keyframes driverIconGlow {
-    0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
-}
+/* driverIconGlow deleted — was dead code (never referenced in animation:); static filter on .driver-icon.strong/.moderate */
 @keyframes badgeShimmer {
     from { transform: translateX(-120%); opacity: 0; }
     42%  { opacity: 0.8; }
@@ -4173,7 +4066,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         0 14px 32px -18px rgba(111, 214, 240, 0.90),
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
     isolation: isolate;
-    animation: intelPulse 3.8s ease-in-out infinite;
     transition: transform 0.22s var(--spring),
                 background 0.22s var(--ease),
                 border-color 0.22s var(--ease),
@@ -4292,21 +4184,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     z-index: 0;
 }
 
-@keyframes intelPulse {
-    0%, 100% {
-        box-shadow:
-            0 0 0 1px rgba(111, 214, 240, 0.10),
-            0 14px 32px -18px rgba(111, 214, 240, 0.88),
-            inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    }
-    50% {
-        box-shadow:
-            0 0 0 1px rgba(191, 90, 242, 0.18),
-            0 18px 38px -16px rgba(111, 214, 240, 0.95),
-            0 0 24px -10px rgba(191, 90, 242, 0.55),
-            inset 0 1px 0 rgba(255, 255, 255, 0.16);
-    }
-}
+/* intelPulse deleted — box-shadow is now static on .btn-holding-intel */
 
 @keyframes intelSweep {
     0%   { opacity: 0; transform: translateX(-115%); }
@@ -5409,10 +5287,9 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     inset: 0;
     background:
         linear-gradient(90deg, transparent 0%, rgba(111, 214, 240, 0.08) 50%, transparent 100%);
-    background-size: 220% 100%;
-    opacity: 0.26;
     pointer-events: none;
-    animation: chartPanelSweep 8s ease-in-out infinite;
+    /* background-position sweep → static tint; opacity animates instead */
+    animation: chartPanelGlow 8s ease-in-out infinite;
 }
 
 .performance-chart-shell canvas {
@@ -5623,10 +5500,11 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     height: 100% !important;
 }
 
-@keyframes chartPanelSweep {
-    0%, 26%   { background-position: -120% 0; opacity: 0; }
-    42%       { opacity: 0.32; }
-    68%, 100% { background-position: 140% 0; opacity: 0; }
+/* chartPanelSweep deleted — replaced with opacity-only animation */
+@keyframes chartPanelGlow {
+    0%, 100% { opacity: 0; }
+    42%      { opacity: 0.26; }
+    68%      { opacity: 0.10; }
 }
 
 @keyframes allocHaloBreath {
@@ -5766,8 +5644,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     transition: background 0.18s ease;
 }
 #allocation-table tr[data-ticker] td:first-child .badge {
-    animation: allocationBadgePulse 5.2s ease-in-out infinite;
-    animation-delay: calc(var(--row-index, 0) * 160ms);
+    /* allocationBadgePulse removed — box-shadow animation causes repaint; static shadow below */
+    box-shadow: 0 0 6px -4px rgba(111, 214, 240, 0.60);
 }
 #allocation-table tr[data-ticker] td:last-child {
     position: relative;
@@ -5805,10 +5683,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     opacity: 0.75;
 }
 
-@keyframes allocationBadgePulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(111, 214, 240, 0); }
-    50%      { box-shadow: 0 0 14px -7px rgba(111, 214, 240, 0.92); }
-}
+/* allocationBadgePulse deleted — box-shadow animation; replaced with static shadow on badge */
 
 @keyframes allocationRowMeter {
     0%, 58% {
@@ -5833,6 +5708,39 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     letter-spacing: 0;
     line-height: 1.3;
 }
+.target-signal-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 6.8rem;
+    max-width: 100%;
+    text-align: center;
+    vertical-align: middle;
+}
+.target-zone-value {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.28rem;
+    width: max-content;
+    max-width: 100%;
+    font-size: 0.84rem;
+    font-weight: 750;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+.target-zone-value span + span::before {
+    content: "";
+    display: inline-block;
+    width: 0.16rem;
+    height: 0.16rem;
+    margin-right: 0.28rem;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.46;
+    vertical-align: 0.12em;
+}
 .target-upside {
     font-size: 0.62rem;
     font-weight: 600;
@@ -5840,6 +5748,40 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     margin-top: 0.2rem;
     line-height: 1;
 }
+.target-trend-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.08rem;
+    width: 4.9rem;
+    margin-top: 0.24rem;
+}
+.target-trend-line {
+    --target-trend-color: var(--text-tertiary);
+    display: grid;
+    grid-template-columns: 2rem 2.7rem;
+    align-items: center;
+    justify-content: center;
+    column-gap: 0.22rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.015em;
+}
+.target-trend-line span {
+    color: var(--text-tertiary);
+    text-align: right;
+    text-transform: uppercase;
+}
+.target-trend-line strong {
+    color: var(--target-trend-color);
+    font-weight: 800;
+    text-align: left;
+}
+.target-trend-line.positive { --target-trend-color: var(--accent-green); }
+.target-trend-line.negative { --target-trend-color: var(--accent-red); }
+.target-trend-line.neutral { --target-trend-color: var(--text-tertiary); }
 .target-kind {
     display: inline-flex;
     align-items: center;
@@ -5902,13 +5844,13 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     inset: 0;
     border-radius: inherit;
     background: linear-gradient(90deg, transparent 0%, rgba(100,210,255,0.03) 50%, transparent 100%);
-    background-size: 200% 100%;
+    /* background-position sweep → opacity pulse; no repaint */
     animation: hud-scan 4s linear infinite;
     pointer-events: none;
 }
 @keyframes hud-scan {
-    0%   { background-position: -100% 0; }
-    100% { background-position: 200% 0; }
+    0%, 100% { opacity: 0; }
+    50%      { opacity: 1; }
 }
 
 .hud-pulse-dot {
@@ -5921,9 +5863,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     flex-shrink: 0;
     animation: hud-dot-pulse 2.8s ease-in-out infinite;
 }
+/* box-shadow removed from hud-dot-pulse keyframe — static on element; only opacity animates */
 @keyframes hud-dot-pulse {
-    0%, 100% { opacity: 1;   box-shadow: 0 0 4px 1px rgba(90,200,250,0.55); }
-    50%       { opacity: 0.4; box-shadow: 0 0 2px 0px rgba(90,200,250,0.2); }
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
 }
 
 .hud-status-updated {
@@ -6432,10 +6375,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     z-index: 1;
 }
 
-.summary-panel .stat-value {
-    animation: summaryValueGlow 6.2s ease-in-out infinite;
-    animation-delay: calc(var(--summary-index, 0) * 480ms);
-}
+/* .summary-panel .stat-value — summaryValueGlow removed; text-shadow animation caused repaint */
 
 /* Mobile 2×2: bottom border on row 1, right border on left column */
 @media (max-width: 767.98px) {
@@ -6595,52 +6535,23 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     }
 }
 
-/* ── Allocation chart card — breathing glow ──────────────────────────────── */
-/* Uses animation-play-state: paused on hover (NOT animation: none) so that   */
-/* the cardIn fill-mode is preserved and no blink occurs on mouse-enter.      */
-/* !important on hover box-shadow overrides the frozen animation value.       */
-@keyframes allocGlow {
-    0%, 100% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.06),
-            var(--shadow-card);
-    }
-    50% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.16),
-            0 0 0 2px rgba(111, 214, 240, 0.24),
-            0 0 60px -8px rgba(111, 214, 240, 0.44),
-            var(--shadow-card-hover);
-    }
-}
-
-@keyframes allocGlowLight {
-    0%, 100% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.72),
-            var(--shadow-card);
-    }
-    50% {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.88),
-            0 0 0 2px rgba(151, 172, 236, 0.16),
-            0 0 48px -10px rgba(151, 172, 236, 0.28),
-            var(--shadow-card-hover);
-    }
-}
-
+/* ── Allocation chart card — static glow (box-shadow animation removed to prevent repaint) */
+/* allocGlow/allocGlowLight deleted; static shadow from 0%/100% values kept below.         */
 .card:has(#allocation-chart) {
-    animation: cardIn 0.55s var(--ease) both, allocGlow 5s ease-in-out 0.6s infinite;
+    animation: cardIn 0.55s var(--ease) both;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        var(--shadow-card);
 }
 
 [data-bs-theme="light"] .card:has(#allocation-chart) {
-    animation: cardIn 0.55s var(--ease) both, allocGlowLight 5s ease-in-out 0.6s infinite;
+    animation: cardIn 0.55s var(--ease) both;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.72),
+        var(--shadow-card);
 }
 
-/* Pause only the glow (index 1); keep cardIn (index 0) in its filled state. */
-/* !important lets the hover box-shadow beat the frozen animation value.       */
 .card:has(#allocation-chart):hover {
-    animation-play-state: running, paused;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.09),
         var(--shadow-card-hover) !important;
