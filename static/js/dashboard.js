@@ -276,13 +276,29 @@ const AI_CHECK_MESSAGES = [
 ];
 
 const INTEL_BUTTON_READY_HTML = `
-    <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
-    Holding Intel<span class="btn-intel-badge">AI</span>
+    <span class="btn-intel-frame">
+        <span class="btn-intel-glyph">
+            <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
+        </span>
+        <span class="btn-intel-text">
+            <span class="btn-intel-command">AI Scan</span>
+            <span class="btn-intel-signal">Live context</span>
+        </span>
+        <span class="btn-intel-badge">AI</span>
+    </span>
 `;
 
 const INTEL_BUTTON_LOADING_HTML = `
-    <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
-    Analyzing<span class="btn-intel-badge">AI</span>
+    <span class="btn-intel-frame">
+        <span class="btn-intel-glyph">
+            <img class="btn-intel-logo btn-intel-icon" src="/static/img/brand/folio-orbit-icon.svg" alt="">
+        </span>
+        <span class="btn-intel-text">
+            <span class="btn-intel-command">Scanning</span>
+            <span class="btn-intel-signal">Benchmarks + news</span>
+        </span>
+        <span class="btn-intel-badge">AI</span>
+    </span>
 `;
 
 // Single source of truth for allocation ordering, shared by both tables and the chart.
@@ -480,6 +496,24 @@ function selectAllocationTicker(ticker) {
     }
 }
 
+function allocationTooltipLines(ticker, value) {
+    const holding = latestHoldings.find(h => h.ticker === ticker);
+    const holdingsCount = latestHoldings.length;
+    if (!holding || !holdingsCount) return [];
+
+    const rank = sortedByAllocation(latestHoldings)
+        .findIndex(h => h.ticker === ticker) + 1;
+    const equalWeightValue = allocationTotal / holdingsCount;
+    const equalWeightDrift = toNumber(value) - equalWeightValue;
+    const impactToday = toNumber(holding.daily_value_change);
+
+    return [
+        `Rank #${rank} of ${holdingsCount}`,
+        `${equalWeightDrift >= 0 ? "Over" : "Under"} equal-wt by ${formatCompact(Math.abs(equalWeightDrift))}`,
+        `1-day impact ${formatSignedCurrency(impactToday)}`,
+    ];
+}
+
 function renderAllocation() {
     const sorted = sortedByAllocation(latestHoldings);
 
@@ -555,6 +589,13 @@ function renderAllocation() {
                         hoveredCenterLabel = null;
                         hoveredCenterValue = null;
                         hoveredCenterPct = null;
+                        if (!selectedAllocationTicker) {
+                            allocationChart.setActiveElements([]);
+                            allocationChart.tooltip.setActiveElements(
+                                [],
+                                { x: event?.x ?? 0, y: event?.y ?? 0 }
+                            );
+                        }
                     }
                     allocationChart.draw();
                 },
@@ -578,7 +619,11 @@ function renderAllocation() {
                             label: (item) => {
                                 const sum = allocationTotal || 1;
                                 const pct = (toNumber(item.raw) / sum) * 100;
-                                return `${formatCurrency(item.raw)}  ·  ${pct.toFixed(1)}%`;
+                                const ticker = item.label;
+                                return [
+                                    `${formatCurrency(item.raw)}  ·  ${pct.toFixed(1)}%`,
+                                    ...allocationTooltipLines(ticker, item.raw),
+                                ];
                             },
                             labelPointStyle: () => ({ pointStyle: "circle" }),
                         }
@@ -850,7 +895,7 @@ const centerTotalPlugin = {
 // Double-draw trick: outer diffuse pass then a tighter inner pass for depth.
 const segmentGlowPlugin = {
     id: "segmentGlow",
-    afterDraw(chart) {
+    beforeDatasetsDraw(chart) {
         if (chart.config.type !== "doughnut") return;
         const active = chart.getActiveElements();
         if (!active.length) return;
@@ -1825,7 +1870,6 @@ async function initDashboard() {
     loadAnalystRecommendations();
     loadWorldMarkets();
     startCountdown();
-    initSpotlightEffect();
     initTips();
     initKeyboardHelp();
 }
@@ -1898,18 +1942,6 @@ async function loadWorldMarkets() {
         if (strip) strip.innerHTML = `<span style="padding:1rem;color:var(--text-tertiary);font-size:.8rem">Market data unavailable</span>`;
     }
 }
-
-function initSpotlightEffect() {
-    const card = document.getElementById("holdings-card");
-    if (!card) return;
-    card.addEventListener("mouseenter", () => document.body.classList.add("holdings-spotlight"));
-    card.addEventListener("mouseleave", () => document.body.classList.remove("holdings-spotlight"));
-    // Deactivate when the portfolio modal opens so the overlay doesn't interfere
-    document.getElementById("portfolioModal")?.addEventListener("show.bs.modal", () => {
-        document.body.classList.remove("holdings-spotlight");
-    });
-}
-
 
 // ── Holding Intelligence ────────────────────────────────────────────────────
 
