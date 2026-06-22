@@ -387,7 +387,10 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
         if has_news:
             drivers.append(MoveDriver(
                 driver_type="news",
-                description=f"Crypto news activity detected — {len(news)} item{'s' if len(news) > 1 else ''} in circulation",
+                description=(
+                    f"Crypto news activity detected — "
+                    f"{len(news)} item{'s' if len(news) > 1 else ''} in circulation"
+                ),
                 magnitude="moderate",
                 icon=DRIVER_ICONS["news"],
             ))
@@ -527,7 +530,10 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
         if has_news:
             drivers.append(MoveDriver(
                 driver_type="news",
-                description=f"News activity detected — {len(news)} relevant item{'s' if len(news) > 1 else ''} in circulation",
+                description=(
+                    f"News activity detected — "
+                    f"{len(news)} relevant item{'s' if len(news) > 1 else ''} in circulation"
+                ),
                 magnitude="moderate",
                 icon=DRIVER_ICONS["news"],
             ))
@@ -622,7 +628,10 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
         if has_news:
             drivers.append(MoveDriver(
                 driver_type="news",
-                description=f"News activity detected — {len(news)} recent article{'s' if len(news) > 1 else ''} in circulation",
+                description=(
+                    f"News activity detected — "
+                    f"{len(news)} recent article{'s' if len(news) > 1 else ''} in circulation"
+                ),
                 magnitude="moderate",
                 icon=DRIVER_ICONS["news"],
             ))
@@ -672,7 +681,10 @@ def explain_move(  # pylint: disable=too-many-branches,too-many-statements
             explanation = (
                 f"{ticker} moved {day_chg_pct:+.2f}% today. Multiple factors may be at play — "
                 f"{ref_name_for_alpha} ({ref_chg_for_alpha:+.2f}%)"
-                + (f", {sector_etf} sector ETF ({sector_chg:+.2f}%)" if sector_chg is not None and sector_etf else "")
+                + (
+                    f", {sector_etf} sector ETF ({sector_chg:+.2f}%)"
+                    if sector_chg is not None and sector_etf else ""
+                )
                 + ", and possibly company-specific activity."
             )
 
