@@ -464,8 +464,14 @@ async function loadPortfolioValue() {
 
         latestTrendData = await loadTrendData(data.holdings.map(h => h.ticker));
         renderHoldings();
-        document.getElementById("last-updated").textContent =
-            `Updated: ${new Date().toLocaleTimeString()}`;
+        const updatedEl = document.getElementById("last-updated");
+        if (updatedEl) updatedEl.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        const pill = document.getElementById("hud-status-pill");
+        if (pill) {
+            pill.classList.remove("is-refreshed");
+            void pill.offsetWidth;
+            pill.classList.add("is-refreshed");
+        }
         _hasLoadedOnce = true;
 
     } catch (err) {
@@ -1335,7 +1341,7 @@ function updateHoldingsTable(holdings, trendData = {}) {
         const exp = cachedExplanations[h.ticker];
         const badgeHtml = exp
             ? `<div class="move-badge ${exp.attribution_type}" title="${exp.confidence} confidence">${ATTRIBUTION_SHORT[exp.attribution_type] || "?"}</div>`
-            : `<div class="move-badge"></div>`;
+            : ``;
 
         const rec = cachedRecommendations[h.ticker];
 
@@ -2176,7 +2182,11 @@ function startCountdown() {
     const interval = setInterval(() => {
         refreshCountdown--;
         const el = document.getElementById("countdown");
-        if (el) el.textContent = `Next refresh in ${refreshCountdown}s`;
+        if (el) {
+            const soon = refreshCountdown <= 30;
+            el.textContent = soon ? `${refreshCountdown}s` : `↻ ${refreshCountdown}s`;
+            el.classList.toggle("is-soon", soon);
+        }
         if (refreshCountdown <= 0) {
             clearInterval(interval);
             loadPortfolioValue().then(() => {

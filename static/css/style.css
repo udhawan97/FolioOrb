@@ -663,7 +663,7 @@ table tbody tr:hover {
 }
 
 .holdings-table tbody td {
-    padding: 0.94rem 1.15rem;
+    padding: 1.1rem 1.15rem;
     vertical-align: middle;
 }
 
@@ -3609,13 +3609,13 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
     letter-spacing: 0;
-    line-height: 1.2;
+    line-height: 1.3;
 }
 .target-upside {
     font-size: 0.62rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    margin-top: 0.06rem;
+    margin-top: 0.2rem;
     line-height: 1;
 }
 .target-kind {
@@ -3623,8 +3623,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     align-items: center;
     justify-content: flex-end;
     gap: 0.22rem;
-    margin-top: 0.22rem;
-    padding: 0.04rem 0.32rem;
+    margin-top: 0.38rem;
+    padding: 0.12rem 0.38rem;
     border-radius: 999px;
     font-size: 0.52rem;
     font-weight: 700;
@@ -3655,6 +3655,121 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .price-zone-fair { color: var(--accent-cyan); }
 .price-zone-elevated { color: var(--accent-yellow); }
 .price-zone-rich { color: var(--accent-red); }
+
+/* ── HUD status pill (Updated · Next refresh) ───────────────────────────── */
+.hud-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    padding: 0.18rem 0.55rem 0.18rem 0.42rem;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.09);
+    font-size: 0.6rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+    color: rgba(235,235,245,0.42);
+    white-space: nowrap;
+    transition: border-color 0.3s ease, background 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.hud-status-pill::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent 0%, rgba(100,210,255,0.03) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: hud-scan 4s linear infinite;
+    pointer-events: none;
+}
+@keyframes hud-scan {
+    0%   { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.hud-pulse-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-cyan, #5ac8fa);
+    box-shadow: 0 0 5px 1px rgba(90,200,250,0.6);
+    flex-shrink: 0;
+    animation: hud-dot-pulse 2.8s ease-in-out infinite;
+}
+@keyframes hud-dot-pulse {
+    0%, 100% { opacity: 1;   box-shadow: 0 0 4px 1px rgba(90,200,250,0.55); }
+    50%       { opacity: 0.4; box-shadow: 0 0 2px 0px rgba(90,200,250,0.2); }
+}
+
+.hud-status-updated {
+    color: rgba(235,235,245,0.5);
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+}
+.hud-status-divider {
+    color: rgba(235,235,245,0.2);
+    font-size: 0.55rem;
+}
+.hud-status-countdown {
+    color: rgba(90,200,250,0.65);
+    font-size: 0.58rem;
+    letter-spacing: 0.03em;
+    transition: color 0.5s ease;
+}
+.hud-status-countdown.is-soon {
+    color: rgba(255,159,10,0.8);
+    animation: hud-countdown-tick 1s ease-in-out infinite;
+}
+@keyframes hud-countdown-tick {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+}
+
+/* hover lift */
+.hud-status-pill:hover {
+    background: rgba(90,200,250,0.07);
+    border-color: rgba(90,200,250,0.22);
+    cursor: default;
+}
+.hud-status-pill:hover .hud-pulse-dot {
+    animation-duration: 1s;
+    box-shadow: 0 0 8px 2px rgba(90,200,250,0.75);
+}
+.hud-status-pill:hover::before {
+    animation-duration: 1.4s;
+}
+
+/* flash on data refresh */
+@keyframes hud-flash {
+    0%   { background: rgba(90,200,250,0.18); border-color: rgba(90,200,250,0.4); }
+    100% { background: rgba(255,255,255,0.045); border-color: rgba(255,255,255,0.09); }
+}
+.hud-status-pill.is-refreshed {
+    animation: hud-flash 0.8s ease-out forwards;
+}
+
+[data-bs-theme="light"] .hud-status-pill {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.10);
+    color: rgba(60,60,67,0.5);
+}
+[data-bs-theme="light"] .hud-status-updated { color: rgba(60,60,67,0.55); }
+[data-bs-theme="light"] .hud-status-divider  { color: rgba(60,60,67,0.25); }
+[data-bs-theme="light"] .hud-status-countdown { color: rgba(0,122,255,0.65); }
+[data-bs-theme="light"] .hud-pulse-dot {
+    background: var(--accent-blue, #007aff);
+    box-shadow: 0 0 5px 1px rgba(0,122,255,0.45);
+}
+@keyframes hud-flash-light {
+    0%   { background: rgba(0,122,255,0.12); border-color: rgba(0,122,255,0.3); }
+    100% { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.10); }
+}
+[data-bs-theme="light"] .hud-status-pill.is-refreshed {
+    animation: hud-flash-light 0.8s ease-out forwards;
+}
 
 /* ── Navbar shortcut hint ────────────────────────────────────────────────── */
 .navbar-shortcut-hint {

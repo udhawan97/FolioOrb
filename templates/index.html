@@ -41,8 +41,12 @@
                 </span>
             </a>
             <div class="d-flex align-items-center gap-3">
-                <span class="text-secondary small" id="last-updated">Loading...</span>
-                <span class="text-secondary small" id="countdown"></span>
+                <div class="hud-status-pill" id="hud-status-pill" title="Last updated / next refresh">
+                    <span class="hud-pulse-dot" aria-hidden="true"></span>
+                    <span class="hud-status-updated" id="last-updated">—</span>
+                    <span class="hud-status-divider" aria-hidden="true">·</span>
+                    <span class="hud-status-countdown" id="countdown" aria-live="polite"></span>
+                </div>
                 <span class="navbar-shortcut-hint d-none d-md-inline" onclick="showKeyboardHelp()" title="Keyboard shortcuts">
                     Press <kbd style="font-family:-apple-system,sans-serif;font-size:.56rem;padding:.03rem .22rem;border-radius:3px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)">?</kbd> for shortcuts
                 </span>
