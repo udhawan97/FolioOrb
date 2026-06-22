@@ -151,7 +151,7 @@ html[data-text-size="comfortable"] {
     pointer-events: none;
     z-index: 0;
     border-radius: 50%;
-    filter: blur(80px);
+    filter: blur(40px);
     will-change: transform;
 }
 
@@ -930,6 +930,8 @@ table tbody tr:hover {
     z-index: 2;
     padding: 0 0.15rem 0.2rem;
     transition: opacity 0.18s var(--ease);
+    content-visibility: auto;
+    contain-intrinsic-size: 0 400px;
 }
 
 #holdings-card.is-ai-checking .table-responsive {
@@ -962,33 +964,6 @@ table tbody tr:hover {
     will-change: background-color, filter;
 }
 
-#holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] td {
-    background-image:
-        linear-gradient(100deg, transparent 0%, rgba(111, 214, 240, 0.09) 42%, rgba(255, 255, 255, 0.06) 50%, rgba(111, 214, 240, 0.05) 58%, transparent 74%);
-    animation: holdings-cell-trace 2.2s ease-in-out infinite;
-    animation-delay: calc(var(--row-index, 0) * 72ms);
-}
-
-#holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker],
-#holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] td {
-    animation: none;
-    background-image: none;
-}
-
-[data-bs-theme="light"] #holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] td {
-    background-image:
-        linear-gradient(100deg, transparent 0%, rgba(10, 120, 180, 0.055) 42%, rgba(255, 255, 255, 0.28) 50%, rgba(10, 120, 180, 0.04) 58%, transparent 74%);
-}
-
-[data-bs-theme="light"] #holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] td {
-    background-image: none;
-}
-
-@keyframes holdings-cell-trace {
-    0%, 18%  { background-position: -140% 0; }
-    64%      { background-position: 120% 0; }
-    100%     { background-position: 120% 0; }
-}
 
 .holdings-header-actions {
     display: flex;
@@ -2394,20 +2369,10 @@ table tbody tr:hover {
 /* Respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
-        animation-duration: 0.001ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.001ms !important;
+        animation: none !important;
+        transition: none !important;
     }
     .card.stat-clickable:hover { transform: none; }
-    .orbit-loader,
-    .orbit-loader::before,
-    .orbit-loader::after,
-    .value-updating,
-    .btn-refresh-data.is-refreshing i,
-    .alloc-popover {
-        animation-duration: 0.001ms !important;
-        transition-duration: 0.001ms !important;
-    }
 }
 
 /* ── Stat icon circles ───────────────────────────────────────────────────── */

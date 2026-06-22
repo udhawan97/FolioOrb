@@ -3205,10 +3205,13 @@ function initTips() {
 
 /* ── Holdings table canvas — active only during AI scan ─────────────────── */
 const HoldingsBg = (() => {
-    const MIN_DOTS  = 26;
-    const MAX_DOTS  = 58;
-    const CONN_DIST = 128;
+    const MIN_DOTS      = 18;
+    const MAX_DOTS      = 36;
+    const CONN_DIST     = 128;
+    const CONN_DIST_SQ  = CONN_DIST * CONN_DIST;
     let canvas, ctx, W = 0, H = 0, dpr = 1, dots = [], raf, running = false, tick = 0;
+    let frameCount = 0, washGrad = null, lastTheme = null, inView = true, observer = null;
+    let resizeTimer = null;
 
     function targetDotCount() {
         const area = Math.max(W * H, 1);
@@ -3229,6 +3232,17 @@ const HoldingsBg = (() => {
         };
     }
 
+    function buildGradients() {
+        const dark = document.documentElement.dataset.bsTheme !== "light";
+        lastTheme = dark;
+        const cyan  = dark ? "111,214,240" : "10,120,180";
+        const green = dark ? "122,241,205"  : "20,135,92";
+        washGrad = ctx.createLinearGradient(0, 0, W, H);
+        washGrad.addColorStop(0,    `rgba(${cyan},${dark ? 0.075 : 0.045})`);
+        washGrad.addColorStop(0.55, "rgba(151,172,236,0.035)");
+        washGrad.addColorStop(1,    `rgba(${green},${dark ? 0.045 : 0.025})`);
+    }
+
     function resize() {
         const card = canvas.closest(".card-body") || canvas.parentElement;
         const rect = card.getBoundingClientRect();
@@ -3246,6 +3260,8 @@ const HoldingsBg = (() => {
         canvas.style.height = `${H}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+        buildGradients();
+
         const count = targetDotCount();
         if (!dots.length) {
             dots = Array.from({ length: count }, mkDot);
@@ -3258,19 +3274,27 @@ const HoldingsBg = (() => {
 
     function frame() {
         if (!running) return;
-        resize();
-        tick += 0.012;
-        ctx.clearRect(0, 0, W, H);
+
+        // ~30fps: skip every other RAF tick
+        frameCount++;
+        if (frameCount % 2 !== 0) {
+            raf = requestAnimationFrame(frame);
+            return;
+        }
+
+        // Pause rendering when tab hidden or card out of view
+        if (document.hidden || !inView) {
+            return; // loop will resume via visibilitychange / IntersectionObserver
+        }
+
+        tick += 0.024; // doubled vs original because we render every other frame
 
         const dark = document.documentElement.dataset.bsTheme !== "light";
+        if (dark !== lastTheme) buildGradients(); // rebuild only on theme switch
         const cyan = dark ? "111,214,240" : "10,120,180";
-        const green = dark ? "122,241,205" : "20,135,92";
 
-        const wash = ctx.createLinearGradient(0, 0, W, H);
-        wash.addColorStop(0, `rgba(${cyan},${dark ? 0.075 : 0.045})`);
-        wash.addColorStop(0.55, "rgba(151,172,236,0.035)");
-        wash.addColorStop(1, `rgba(${green},${dark ? 0.045 : 0.025})`);
-        ctx.fillStyle = wash;
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = washGrad;
         ctx.fillRect(0, 0, W, H);
 
         for (const d of dots) {
@@ -3282,18 +3306,16 @@ const HoldingsBg = (() => {
             if (d.y > H+10) d.y = -10;
         }
 
-        // connections with glow
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = `rgba(${cyan},0.45)`;
+        // connections — squared-distance check avoids Math.sqrt, no shadowBlur
+        ctx.lineWidth = 0.8;
         for (let i = 0; i < dots.length; i++) {
             for (let j = i + 1; j < dots.length; j++) {
                 const dx = dots[i].x - dots[j].x;
                 const dy = dots[i].y - dots[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < CONN_DIST) {
-                    const a = (dark ? 0.34 : 0.20) * (1 - dist / CONN_DIST);
+                const distSq = dx * dx + dy * dy;
+                if (distSq < CONN_DIST_SQ) {
+                    const a = (dark ? 0.34 : 0.20) * (1 - Math.sqrt(distSq) / CONN_DIST);
                     ctx.strokeStyle = `rgba(${cyan},${a.toFixed(3)})`;
-                    ctx.lineWidth = 0.8;
                     ctx.beginPath();
                     ctx.moveTo(dots[i].x, dots[i].y);
                     ctx.lineTo(dots[j].x, dots[j].y);
@@ -3302,11 +3324,9 @@ const HoldingsBg = (() => {
             }
         }
 
-        // nodes with stronger glow
-        ctx.shadowBlur = 10;
+        // nodes — no shadowBlur
         for (const d of dots) {
             const pulse = 0.78 + Math.sin(tick * 2.4 + d.phase) * 0.22;
-            ctx.shadowColor = `rgba(${cyan},${(d.op * 0.9).toFixed(3)})`;
             ctx.beginPath();
             ctx.arc(d.x, d.y, d.r * pulse, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(${cyan},${(dark ? d.op * 0.9 : d.op * 0.62).toFixed(3)})`;
@@ -3315,15 +3335,20 @@ const HoldingsBg = (() => {
 
         const sweepX = (Math.sin(tick * 0.9) * 0.5 + 0.5) * W;
         const sweep = ctx.createLinearGradient(sweepX - 160, 0, sweepX + 160, H);
-        sweep.addColorStop(0, "rgba(255,255,255,0)");
+        sweep.addColorStop(0,   "rgba(255,255,255,0)");
         sweep.addColorStop(0.5, `rgba(${cyan},${dark ? 0.10 : 0.055})`);
-        sweep.addColorStop(1, "rgba(255,255,255,0)");
+        sweep.addColorStop(1,   "rgba(255,255,255,0)");
         ctx.fillStyle = sweep;
         ctx.fillRect(0, 0, W, H);
 
-        ctx.shadowBlur = 0;
-
         raf = requestAnimationFrame(frame);
+    }
+
+    function resume() {
+        if (running && !document.hidden && inView) {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(frame);
+        }
     }
 
     return {
@@ -3331,13 +3356,26 @@ const HoldingsBg = (() => {
             canvas = document.getElementById("holdings-bg-canvas");
             if (!canvas) return;
             ctx = canvas.getContext("2d");
-            window.addEventListener("resize", () => { if (running) resize(); });
+
+            window.addEventListener("resize", () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => { if (running) resize(); }, 200);
+            });
+
+            document.addEventListener("visibilitychange", resume);
+
+            observer = new IntersectionObserver(entries => {
+                inView = entries[0].isIntersecting;
+                resume();
+            }, { threshold: 0 });
+            observer.observe(canvas.closest(".card") || canvas.parentElement);
         },
         start() {
             if (!canvas || prefersReducedMotion()) return;
             resize();
             dots = Array.from({ length: targetDotCount() }, mkDot);
             tick = 0;
+            frameCount = 0;
             running = true;
             cancelAnimationFrame(raf);
             raf = requestAnimationFrame(frame);
