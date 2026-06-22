@@ -271,7 +271,7 @@ let hoveredCenterValue = null;
 let hoveredCenterPct = null;
 let selectedAllocationTicker = null;  // persists after click
 
-// Holding Intelligence state (covers "What it covers" + "Why it moved")
+// Holding Intelligence state (covers "What It Covers" + "Why it moved")
 let cachedIntelligence = {};   // ticker → intelligence object (coverage data)
 let cachedExplanations = {};   // ticker → explanation object (move data)
 let intelligenceLoaded = false;
@@ -441,14 +441,15 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     renderAiScanTickers();
     setAgentLine(message);
     claudeMessageIndex = 0;
+    const CLAUDE_FLIRT_BEAT = 2;
+    const CLAUDE_HOLD_TICKS = 4; // keep Claude message visible for 4 ticks (~5s)
+    let claudeHoldRemaining = CLAUDE_HOLD_TICKS; // protect the first message too
     if (subtitle) {
         subtitle.textContent = CLAUDE_FUNNY_MESSAGES[0];
         subtitle.classList.add("ai-scan-subtitle--highlight");
         subtitle.classList.add("ai-scan-subtitle--pop");
         subtitle.addEventListener("animationend", () => subtitle.classList.remove("ai-scan-subtitle--pop"), { once: true });
     }
-
-    const CLAUDE_FLIRT_BEAT = 2;
     aiCheckInterval = window.setInterval(() => {
         messageIndex = (messageIndex + 1) % AI_CHECK_MESSAGES.length;
         const next = AI_CHECK_MESSAGES[messageIndex];
@@ -457,15 +458,19 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
             const isClaudeBeat = messageIndex === CLAUDE_FLIRT_BEAT;
             if (isClaudeBeat) {
                 claudeMessageIndex = (claudeMessageIndex + 1) % CLAUDE_FUNNY_MESSAGES.length;
+                claudeHoldRemaining = CLAUDE_HOLD_TICKS;
                 subtitle.textContent = CLAUDE_FUNNY_MESSAGES[claudeMessageIndex];
                 subtitle.classList.remove("ai-scan-subtitle--pop");
-                void subtitle.offsetWidth; // force reflow to restart animation
+                void subtitle.offsetWidth;
                 subtitle.classList.add("ai-scan-subtitle--pop");
                 subtitle.addEventListener("animationend", () => subtitle.classList.remove("ai-scan-subtitle--pop"), { once: true });
+            } else if (claudeHoldRemaining > 0) {
+                claudeHoldRemaining--;
+                // leave subtitle text and highlight intact while holding
             } else {
                 subtitle.textContent = `${next} across ${latestHoldings.length || "your"} holdings.`;
             }
-            subtitle.classList.toggle("ai-scan-subtitle--highlight", isClaudeBeat);
+            subtitle.classList.toggle("ai-scan-subtitle--highlight", isClaudeBeat || claudeHoldRemaining > 0);
         }
     }, 1250);
 }
@@ -1526,7 +1531,7 @@ function renderSummaryInner(inner, text, isLoading) {
 function renderCoverageShimmer(section) {
     section.innerHTML = `
         <div class="intel-coverage">
-            <div class="intel-label"><i class="bi bi-layers"></i> What it covers</div>
+            <div class="intel-label"><i class="bi bi-layers"></i> What It Covers</div>
             <div class="shimmer-line" style="width:80px;height:18px;border-radius:20px;margin-bottom:.5rem"></div>
             <div class="shimmer-line" style="width:95%;height:10px;margin-bottom:.25rem"></div>
             <div class="shimmer-line" style="width:78%;height:10px;margin-bottom:.6rem"></div>
@@ -1565,7 +1570,7 @@ function renderMoveExplainerFallback(section) {
         <div class="intel-move">
             <div class="intel-label">
                 <i class="bi bi-lightning-charge-fill" style="color:var(--accent-yellow)"></i>
-                Why it moved
+                Why It Moved
             </div>
             <p class="move-explanation-text" style="color:var(--text-tertiary);font-size:.75rem;margin-top:.2rem">
                 <i class="bi bi-wifi-off" style="opacity:.5;margin-right:.3rem"></i>
@@ -1576,10 +1581,11 @@ function renderMoveExplainerFallback(section) {
 
 function renderKeyDriversSpecRows(keyDrivers = []) {
     if (!keyDrivers.length) return "";
+    const driverRanks = ["Primary", "Secondary", "Supporting", "Ancillary"];
     return `<div class="intel-label"><i class="bi bi-bullseye"></i> Key Drivers</div>
        <div class="intel-spec-rows key-drivers">
          ${keyDrivers.slice(0, 4).map((d, i) =>
-           `<div class="intel-spec-row"><span>Driver ${i + 1}</span><strong>${escapeHtml(d)}</strong></div>`
+           `<div class="intel-spec-row"><span>${driverRanks[i] || `Driver ${i + 1}`}</span><strong>${escapeHtml(d)}</strong></div>`
          ).join("")}
        </div>`;
 }
@@ -1656,7 +1662,7 @@ function renderMoveExplainer(section, data, coverageData = null) {
         <div class="intel-move">
             <div class="intel-label">
                 <i class="bi bi-lightning-charge-fill" style="color:var(--accent-yellow)"></i>
-                Why it moved
+                Why It Moved
             </div>
             <div class="move-explainer-header">
                 <div class="move-hero">
@@ -1674,7 +1680,7 @@ function renderMoveExplainer(section, data, coverageData = null) {
     if (heroEl) animateMoveHeroNumber(heroEl, heroEl.textContent);
 }
 
-// ── Holding Coverage ("What it covers") ──────────────────────────────────────
+// ── Holding Coverage ("What It Covers") ──────────────────────────────────────
 
 function formatFactWeight(value, decimals = 1) {
     if (!isFiniteNumber(value)) return "";
@@ -1890,11 +1896,11 @@ const MOVE_ATTR_TONES = {
 function buildMoveStatItems(data) {
     const items = [];
 
-    // 1. Buy/Sell Pressure — price direction + volume conviction
+    // 1. Flow Signal — price direction + volume conviction
     const dayChange = isFiniteNumber(data.day_change_pct) ? Number(data.day_change_pct) : null;
     const volRatio  = isFiniteNumber(data.volume_vs_avg)  ? Number(data.volume_vs_avg)  : null;
     const pressureType  = dayChange === null ? "neutral" : dayChange >= 0 ? "positive" : "negative";
-    const pressureLabel = dayChange === null ? "Flow unavailable" : dayChange >= 0 ? "Buyers leading" : "Sellers leading";
+    const pressureLabel = dayChange === null ? "Flow Unclear" : dayChange >= 0 ? "Buyers in Control" : "Sellers in Control";
     const pressureDetail = dayChange === null
         ? "No live price move"
         : `${formatPct(dayChange)}${volRatio !== null ? ` · ${volRatio.toFixed(1)}x vol` : ""}`;
@@ -1903,7 +1909,7 @@ function buildMoveStatItems(data) {
         icon: pressureType === "positive" ? "bi-arrow-up-right-circle-fill"
             : pressureType === "negative" ? "bi-arrow-down-right-circle-fill"
             : "bi-circle-half",
-        label: "Buy/Sell read",
+        label: "Flow Signal",
         value: pressureLabel,
         detail: pressureDetail,
         tone: pressureType,
@@ -1915,25 +1921,25 @@ function buildMoveStatItems(data) {
         : volRatio >= 1.5 ? "cyan"
         : "blue";
     const surgeLabel = volRatio === null ? "Unavailable"
-        : volRatio >= 3   ? "Heavy surge"
-        : volRatio >= 2   ? "High volume"
-        : volRatio >= 1.5 ? "Above average"
-        : volRatio >= 0.8 ? "Normal volume"
-        : "Thin volume";
+        : volRatio >= 3   ? "Heavy Activity"
+        : volRatio >= 2   ? "High Activity"
+        : volRatio >= 1.5 ? "Above Average"
+        : volRatio >= 0.8 ? "Steady Volume"
+        : "Thin Activity";
 
     items.push({
         icon: "bi-activity",
-        label: "Volume surge",
+        label: "Volume Signal",
         value: volRatio !== null ? `${volRatio.toFixed(1)}× avg` : "Unavailable",
         detail: surgeLabel,
         tone: surgeTone,
     });
 
-    // 3. Catalyst type — attribution signal used by sell-side analysts to classify moves
+    // 3. Move Catalyst — attribution signal used by sell-side analysts to classify moves
     const attrType = data.attribution_type || "unclear";
     items.push({
         icon: MOVE_ATTR_ICONS[attrType] || "bi-question-circle",
-        label: "Catalyst type",
+        label: "Move Catalyst",
         value: ATTRIBUTION_SHORT[attrType] || "Unknown",
         detail: data.confidence ? `${data.confidence} confidence` : "Assessing…",
         tone: MOVE_ATTR_TONES[attrType] || "neutral",
@@ -2055,7 +2061,7 @@ function renderHoldingCoverage(section, data) {
 
     section.innerHTML = `
         <div class="intel-coverage">
-            <div class="intel-label"><i class="bi bi-layers"></i> What it covers</div>
+            <div class="intel-label"><i class="bi bi-layers"></i> What It Covers</div>
             <span class="coverage-type-badge ${escapeHtml(coverageClass)}">${escapeHtml(data.coverage_label || data.coverage_type)}</span>
             ${data.theme ? `<div class="intel-theme">${escapeHtml(data.theme)}</div>` : ""}
             <div class="intel-strategy">${escapeHtml(data.strategy || "")}</div>
