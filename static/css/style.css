@@ -1489,11 +1489,12 @@ table tbody tr:hover {
     padding: 0 !important;
     border-top: 0 !important;
     border-bottom: 0 !important;
+    overflow: hidden;
 }
 .summary-body {
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.42s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease;
+    transition: max-height 0.48s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease;
     opacity: 0;
 }
 .summary-body.open {
@@ -1584,6 +1585,15 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .summary-body.open {
     max-height: 1180px !important;
     opacity: 1;
+}
+
+/* Slide-in animation for the intel panel when it first opens */
+.summary-body .intel-grid {
+    transform: translateY(-5px);
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.04s;
+}
+.summary-body.open .intel-grid {
+    transform: translateY(0);
 }
 
 /* ── Move Explainer card ─────────────────────────────────────────────────── */
@@ -1966,6 +1976,9 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     gap: 0.42rem;
     margin: 0.72rem 0 0.82rem;
 }
+.move-stat-strip {
+    margin-top: 0.82rem;
+}
 
 .market-pulse-card {
     position: relative;
@@ -2125,12 +2138,59 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .intel-grid {
     position: relative;
     overflow: hidden;
+    isolation: isolate;
     background:
-        linear-gradient(180deg, rgba(111, 214, 240, 0.055), rgba(151, 172, 236, 0.018) 48%, transparent),
+        linear-gradient(180deg, rgba(111, 214, 240, 0.038), rgba(151, 172, 236, 0.012) 48%, transparent),
         color-mix(in srgb, var(--surface) 76%, transparent);
     border-top: 1px solid var(--hairline-soft);
     border-bottom: 1px solid var(--hairline-soft);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+/* Animated AI aurora — drifting plasma glow behind both columns */
+.intel-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(125deg,
+            rgba(111, 214, 240, 0.11) 0%,
+            rgba(151, 172, 236, 0.07) 38%,
+            rgba(191, 90, 242, 0.045) 68%,
+            transparent 100%);
+    background-size: 280% 280%;
+    animation: intelAurora 10s ease-in-out infinite;
+    pointer-events: none;
+}
+
+/* One-shot horizontal scan when panel opens */
+.summary-body.open .intel-grid::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(111, 214, 240, 0.7) 40%, rgba(151, 172, 236, 0.5) 60%, transparent 100%);
+    z-index: 2;
+    pointer-events: none;
+    animation: intelScanReveal 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes intelAurora {
+    0%   { background-position: 0% 0%;    opacity: 0.55; }
+    25%  { background-position: 100% 20%; opacity: 0.9;  }
+    50%  { background-position: 80% 100%; opacity: 0.65; }
+    75%  { background-position: 5% 85%;  opacity: 0.85; }
+    100% { background-position: 0% 0%;    opacity: 0.55; }
+}
+
+@keyframes intelScanReveal {
+    0%   { transform: translateY(0);    opacity: 0; }
+    15%  { opacity: 1; }
+    85%  { opacity: 0.8; }
+    100% { transform: translateY(680px); opacity: 0; }
 }
 
 .intel-coverage,
@@ -3819,6 +3879,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 	    .orbit-loader,
 	    .orbit-loader::before,
 	    .orbit-loader::after,
+	    .market-pulse-card,
+	    .market-pulse-card::before,
+	    .market-pulse-card::after,
+	    .pulse-icon,
 	    .value-updating,
 	    .btn-refresh-data.is-refreshing i,
 	    #holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] {

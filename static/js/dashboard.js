@@ -1333,9 +1333,9 @@ function updateHoldingsTable(holdings, trendData = {}) {
         row.style.setProperty("--row-index", i);
         const up = h.day_change_pct >= 0;
         const exp = cachedExplanations[h.ticker];
-        const badgeHtml = (intelligenceLoaded && exp)
+        const badgeHtml = exp
             ? `<div class="move-badge ${exp.attribution_type}" title="${exp.confidence} confidence">${ATTRIBUTION_SHORT[exp.attribution_type] || "?"}</div>`
-            : `<div class="move-badge" id="move-badge-${h.ticker}"></div>`;
+            : `<div class="move-badge"></div>`;
 
         const rec = cachedRecommendations[h.ticker];
 
@@ -1524,11 +1524,8 @@ function renderKeyDriversSpecRows(keyDrivers = []) {
 function renderMoveExplainer(section, data, coverageData = null) {
     if (!data) { renderMoveExplainerFallback(section); return; }
 
-    const attrType   = data.attribution_type || "unclear";
-    const confidence = data.confidence || "Low";
-    const drivers    = data.drivers || [];
-    const news       = data.news || [];
-    const macro      = data.macro_context;
+    const drivers = data.drivers || [];
+    const macro   = data.macro_context;
     const isPos      = (data.day_change_pct || 0) >= 0;
 
     // Build context pills — use holding-specific benchmark first, then SPY/QQQ if relevant
@@ -1571,24 +1568,7 @@ function renderMoveExplainer(section, data, coverageData = null) {
           ).join("")}</div>`
         : "";
     const keyDriversHtml = renderKeyDriversSpecRows(coverageData?.key_drivers || []);
-
-    const newsHtml = news.length
-        ? `<div class="evidence-section">
-            <div class="expand-section-label evidence-label">
-                <i class="bi bi-newspaper"></i> Recent News
-            </div>
-            ${news.map(n => `
-                <div class="news-item">
-                    <i class="bi bi-link-45deg" style="color:var(--accent-cyan);opacity:.6;font-size:.65rem;flex-shrink:0;margin-top:.15em"></i>
-                    <div>
-                        ${n.url
-                            ? `<a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title)}</a>`
-                            : `<span style="color:var(--text-secondary)">${escapeHtml(n.title)}</span>`}
-                        ${n.source ? `<span class="news-source"> · ${escapeHtml(n.source)}</span>` : ""}
-                    </div>
-                </div>`).join("")}
-           </div>`
-        : "";
+    const moveStatStripHtml = renderMoveStatStrip(data);
 
     section.innerHTML = `
         <div class="intel-move">
@@ -1601,16 +1581,12 @@ function renderMoveExplainer(section, data, coverageData = null) {
                     <span class="move-hero-number ${isPos ? "positive" : "negative"}">${formatPct(data.day_change_pct)}</span>
                     <span class="move-hero-sub">${formatSignedCurrency(data.day_change_dollar || 0)}/share</span>
                 </div>
-                <div class="move-context-chips">
-                    <span class="attribution-badge ${escapeHtml(attrType)}">${escapeHtml(ATTRIBUTION_LABELS[attrType] || attrType)}</span>
-                    <span class="confidence-badge ${escapeHtml(confidence)}">${escapeHtml(confidence)} confidence</span>
-                </div>
             </div>
             <p class="move-explanation-text">${escapeHtml(data.explanation_text || "")}</p>
             ${driversHtml ? `<div class="move-drivers">${driversHtml}</div>` : ""}
             ${macroPillsHtml}
             ${keyDriversHtml}
-            ${newsHtml}
+            ${moveStatStripHtml}
         </div>`;
 }
 
@@ -1658,14 +1634,6 @@ function buildMarketPulseItems(data) {
     const volume = isFiniteNumber(data.volume) ? Number(data.volume) : null;
     const avgVolume = isFiniteNumber(data.average_volume) ? Number(data.average_volume) : null;
     const volumeRatio = volume !== null && avgVolume && avgVolume > 0 ? volume / avgVolume : null;
-    const dayChange = isFiniteNumber(data.day_change_pct) ? Number(data.day_change_pct) : null;
-    const pressureType = dayChange === null ? "neutral" : dayChange >= 0 ? "positive" : "negative";
-    const pressureLabel = dayChange === null
-        ? "Flow unavailable"
-        : dayChange >= 0 ? "Buyers leading" : "Sellers leading";
-    const pressureDetail = dayChange === null
-        ? "No live price move"
-        : `${formatPct(dayChange)} today${volumeRatio !== null ? ` on ${volumeRatio.toFixed(1)}x volume` : ""}`;
 
     items.push({
         icon: "bi-receipt-cutoff",
@@ -1683,15 +1651,125 @@ function buildMarketPulseItems(data) {
         tone: volumeRatio !== null && volumeRatio >= 1.5 ? "gold" : "blue",
     });
 
+    // Bid-ask spread — institutional liquidity quality signal used by Goldman/JPMorgan trading desks
+    const spreadPct = isFiniteNumber(data.bid_ask_spread_pct) ? Number(data.bid_ask_spread_pct) : null;
+    const spreadLabel = spreadPct === null ? "Unavailable"
+        : spreadPct < 0.05 ? "Premium liquidity"
+        : spreadPct < 0.15 ? "Tight spread"
+        : spreadPct < 0.5  ? "Normal spread"
+        : "Wide spread";
+    const spreadTone = spreadPct === null ? "neutral"
+        : spreadPct < 0.05 ? "positive"
+        : spreadPct < 0.15 ? "cyan"
+        : spreadPct < 0.5  ? "blue"
+        : "negative";
+
     items.push({
-        icon: pressureType === "positive" ? "bi-arrow-up-right-circle-fill" : pressureType === "negative" ? "bi-arrow-down-right-circle-fill" : "bi-circle-half",
-        label: "Buy/Sell pressure",
+        icon: "bi-arrows-collapse",
+        label: "Bid-ask spread",
+        value: spreadPct !== null ? `${spreadPct.toFixed(3)}%` : "Unavailable",
+        detail: spreadLabel,
+        tone: spreadTone,
+    });
+
+    return items;
+}
+
+const MOVE_ATTR_ICONS = {
+    "market-driven":    "bi-globe",
+    "sector-driven":    "bi-pie-chart-fill",
+    "holdings-driven":  "bi-stack",
+    "macro-driven":     "bi-bank",
+    "company-specific": "bi-building",
+    "earnings-driven":  "bi-graph-up-arrow",
+    "filing-driven":    "bi-file-earmark-text",
+    "mixed":            "bi-layers-fill",
+    "etf-index":        "bi-bar-chart-steps",
+    "unclear":          "bi-question-circle",
+};
+const MOVE_ATTR_TONES = {
+    "market-driven":    "blue",
+    "sector-driven":    "cyan",
+    "holdings-driven":  "positive",
+    "macro-driven":     "cyan",
+    "company-specific": "gold",
+    "earnings-driven":  "gold",
+    "filing-driven":    "cyan",
+    "mixed":            "neutral",
+    "etf-index":        "positive",
+    "unclear":          "neutral",
+};
+
+function buildMoveStatItems(data) {
+    const items = [];
+
+    // 1. Buy/Sell Pressure — price direction + volume conviction
+    const dayChange = isFiniteNumber(data.day_change_pct) ? Number(data.day_change_pct) : null;
+    const volRatio  = isFiniteNumber(data.volume_vs_avg)  ? Number(data.volume_vs_avg)  : null;
+    const pressureType  = dayChange === null ? "neutral" : dayChange >= 0 ? "positive" : "negative";
+    const pressureLabel = dayChange === null ? "Flow unavailable" : dayChange >= 0 ? "Buyers leading" : "Sellers leading";
+    const pressureDetail = dayChange === null
+        ? "No live price move"
+        : `${formatPct(dayChange)}${volRatio !== null ? ` · ${volRatio.toFixed(1)}x vol` : ""}`;
+
+    items.push({
+        icon: pressureType === "positive" ? "bi-arrow-up-right-circle-fill"
+            : pressureType === "negative" ? "bi-arrow-down-right-circle-fill"
+            : "bi-circle-half",
+        label: "Buy/Sell read",
         value: pressureLabel,
         detail: pressureDetail,
         tone: pressureType,
     });
 
+    // 2. Volume Surge — institutional conviction signal (used by every Goldman equity desk)
+    const surgeTone = volRatio === null ? "neutral"
+        : volRatio >= 2.5 ? "gold"
+        : volRatio >= 1.5 ? "cyan"
+        : "blue";
+    const surgeLabel = volRatio === null ? "Unavailable"
+        : volRatio >= 3   ? "Heavy surge"
+        : volRatio >= 2   ? "High volume"
+        : volRatio >= 1.5 ? "Above average"
+        : volRatio >= 0.8 ? "Normal volume"
+        : "Thin volume";
+
+    items.push({
+        icon: "bi-activity",
+        label: "Volume surge",
+        value: volRatio !== null ? `${volRatio.toFixed(1)}× avg` : "Unavailable",
+        detail: surgeLabel,
+        tone: surgeTone,
+    });
+
+    // 3. Catalyst type — attribution signal used by sell-side analysts to classify moves
+    const attrType = data.attribution_type || "unclear";
+    items.push({
+        icon: MOVE_ATTR_ICONS[attrType] || "bi-question-circle",
+        label: "Catalyst type",
+        value: ATTRIBUTION_SHORT[attrType] || "Unknown",
+        detail: data.confidence ? `${data.confidence} confidence` : "Assessing…",
+        tone: MOVE_ATTR_TONES[attrType] || "neutral",
+    });
+
     return items;
+}
+
+function renderMoveStatStrip(data) {
+    if (!data) return "";
+    const items = buildMoveStatItems(data);
+    return `
+        <div class="market-pulse-strip move-stat-strip" aria-label="AI move stats">
+            ${items.map((item, index) => `
+                <div class="market-pulse-card ${escapeHtml(item.tone)}" style="--pulse-index:${index}">
+                    <i class="bi ${escapeHtml(item.icon)} pulse-icon" aria-hidden="true"></i>
+                    <span class="pulse-copy">
+                        <span class="pulse-label">${escapeHtml(item.label)}</span>
+                        <strong>${escapeHtml(item.value)}</strong>
+                        <span class="pulse-detail">${escapeHtml(item.detail)}</span>
+                    </span>
+                </div>`).join("")}
+        </div>`;
 }
 
 function renderMarketPulseStrip(data) {
@@ -2278,14 +2356,7 @@ async function loadHoldingIntelligence() {
             if (moveSection)     renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
         });
 
-        // Update compact badges in the holdings table
-        Object.entries(cachedExplanations).forEach(([ticker, exp]) => {
-            const badge = document.getElementById(`move-badge-${ticker}`);
-            if (!badge) return;
-            badge.textContent = ATTRIBUTION_SHORT[exp.attribution_type] || "?";
-            badge.className = `move-badge ${exp.attribution_type}`;
-            badge.title = `${exp.confidence} confidence`;
-        });
+        renderHoldings();
 
     } catch (err) {
         intelligenceLoading = false;
