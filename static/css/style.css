@@ -1239,24 +1239,24 @@ table tbody tr:hover {
 }
 
 /* ── AI Research Bay — full-height holdings overlay ─────────────────────── */
+/*    Apple-quality redesign: clean materials, spring motion, restrained palette */
 .ai-scan-panel {
     position: absolute;
     z-index: 8;
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding: 1.6rem 2rem 1.4rem 1.8rem;
-    background:
-        linear-gradient(170deg, rgba(3, 8, 20, 0.985) 0%, rgba(5, 12, 28, 0.975) 55%, rgba(3, 10, 24, 0.985) 100%);
-    backdrop-filter: blur(10px) saturate(130%);
-    -webkit-backdrop-filter: blur(10px) saturate(130%);
+    justify-content: center;
+    padding: 2rem 2.5rem 2rem 2.2rem;
+    background: rgba(16, 16, 18, 0.97);
+    backdrop-filter: blur(32px) saturate(200%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%);
     pointer-events: none;
     opacity: 0;
-    transform: scaleX(0.985);
-    transform-origin: left center;
+    transform: translateY(8px);
     transition:
-        opacity 0.22s var(--ease),
-        transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+        opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
     overflow: hidden;
     contain: paint;
     isolation: isolate;
@@ -1264,271 +1264,109 @@ table tbody tr:hover {
 }
 
 [data-bs-theme="light"] .ai-scan-panel {
-    background:
-        linear-gradient(170deg, rgba(248, 250, 255, 0.985) 0%, rgba(240, 245, 255, 0.975) 55%, rgba(246, 249, 255, 0.985) 100%);
+    background: rgba(250, 250, 252, 0.97);
 }
 
 #holdings-card.is-ai-checking .ai-scan-panel {
     opacity: 1;
-    transform: scaleX(1);
+    transform: translateY(0);
 }
 
-/* ── Background layers ───────────────────────────────────────────────────── */
-.ai-scan-bg-grid {
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(111, 214, 240, 0.14) 1px, transparent 1px);
-    background-size: 28px 28px;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 0;
-    animation: scan-grid-in 0.8s var(--ease) 0.4s both;
-    will-change: opacity;
+/* ── Retired decorative layers — hidden, not removed (JS may reference) ──── */
+.ai-scan-bg-grid,
+.ai-scan-scanlines,
+.ai-scan-beam,
+.ai-scan-radar,
+.ai-scan-corners,
+.ai-scan-corner,
+.ai-scan-wave {
+    display: none;
 }
 
-[data-bs-theme="light"] .ai-scan-bg-grid {
-    background-image: radial-gradient(circle, rgba(10, 120, 180, 0.12) 1px, transparent 1px);
-}
-
-@keyframes scan-grid-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* ── Scanlines overlay ───────────────────────────────────────────────────── */
-.ai-scan-scanlines {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0, 0, 0, 0.055) 3px,
-        rgba(0, 0, 0, 0.055) 4px
-    );
-    opacity: 0.5;
-}
-
-[data-bs-theme="light"] .ai-scan-scanlines {
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0, 0, 50, 0.03) 3px,
-        rgba(0, 0, 50, 0.03) 4px
-    );
-}
-
-/* ── HUD corner brackets ─────────────────────────────────────────────────── */
-.ai-scan-corners {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    pointer-events: none;
-}
-
-.ai-scan-corner {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    opacity: 0;
-    animation: scan-corner-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
-}
-
-.ai-scan-corner-tl { top: 10px;    left: 10px;    border-top: 1.5px solid rgba(111,214,240,0.8); border-left:  1.5px solid rgba(111,214,240,0.8); box-shadow: -2px -2px 8px rgba(111,214,240,0.2); }
-.ai-scan-corner-tr { top: 10px;    right: 10px;   border-top: 1.5px solid rgba(111,214,240,0.8); border-right: 1.5px solid rgba(111,214,240,0.8); box-shadow:  2px -2px 8px rgba(111,214,240,0.2); }
-.ai-scan-corner-bl { bottom: 10px; left: 10px;    border-bottom: 1.5px solid rgba(111,214,240,0.8); border-left:  1.5px solid rgba(111,214,240,0.8); box-shadow: -2px  2px 8px rgba(111,214,240,0.2); }
-.ai-scan-corner-br { bottom: 10px; right: 10px;   border-bottom: 1.5px solid rgba(111,214,240,0.8); border-right: 1.5px solid rgba(111,214,240,0.8); box-shadow:  2px  2px 8px rgba(111,214,240,0.2); }
-
-.ai-scan-corner-tl,
-.ai-scan-corner-br { animation-delay: 0.28s; }
-.ai-scan-corner-tr,
-.ai-scan-corner-bl { animation-delay: 0.40s; }
-
-@keyframes scan-corner-in {
-    from { opacity: 0; transform: scale(0.6); }
-    to   { opacity: 1; transform: scale(1); }
-}
-
-[data-bs-theme="light"] .ai-scan-corner {
-    border-color: rgba(10, 120, 180, 0.55) !important;
-}
-
-/* Rotating radar sweep */
-.ai-scan-radar {
-    position: absolute;
-    width: max(120%, 600px);
-    aspect-ratio: 1;
-    top: 50%;
-    left: -120px;
-    transform: translateY(-50%);
-    background: conic-gradient(
-        from 0deg,
-        transparent 290deg,
-        rgba(111, 214, 240, 0.05) 325deg,
-        rgba(111, 214, 240, 0.13) 340deg,
-        rgba(111, 214, 240, 0.05) 355deg,
-        transparent 360deg
-    );
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-    animation: scan-radar-spin 5s linear infinite;
-    animation-delay: 0.55s;
-    opacity: 0;
-    transition: opacity 0.6s var(--ease);
-    will-change: transform, opacity;
-}
-
-#holdings-card.is-ai-checking .ai-scan-radar {
-    opacity: 1;
-}
-
-@keyframes scan-radar-spin {
-    to { transform: translateY(-50%) rotate(360deg); }
-}
-
-/* Horizontal sweep beam */
-.ai-scan-beam {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 1.5px;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(111, 214, 240, 0.25) 5%,
-        rgba(170, 228, 250, 0.85) 30%,
-        rgba(220, 248, 255, 1)   46%,
-        rgba(255, 255, 255, 1)   50%,
-        rgba(220, 248, 255, 1)   54%,
-        rgba(170, 228, 250, 0.85) 70%,
-        rgba(111, 214, 240, 0.25) 95%,
-        transparent 100%
-    );
-    filter: blur(0.3px) drop-shadow(0 0 8px rgba(111,214,240,1));
-    pointer-events: none;
-    z-index: 4;
-    top: 0;
-    animation: scan-beam-drop 3.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    animation-delay: 0.7s;
-    opacity: 0;
-    will-change: transform, opacity;
-}
-
-.ai-scan-beam::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: -2px;
-    height: 6px;
-    background: linear-gradient(
-        90deg,
-        transparent 5%,
-        rgba(111,214,240,0.2) 28%,
-        rgba(200,242,255,0.55) 50%,
-        rgba(111,214,240,0.2) 72%,
-        transparent 95%
-    );
-    filter: blur(4px);
-}
-
-.ai-scan-beam::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 200px;
-    background: linear-gradient(
-        180deg,
-        rgba(111, 214, 240, 0.14) 0%,
-        rgba(111, 214, 240, 0.05) 35%,
-        transparent 100%
-    );
-}
-
-[data-bs-theme="light"] .ai-scan-beam {
-    background: linear-gradient(90deg, transparent 0%, rgba(10,120,180,0.3) 35%, rgba(10,120,180,0.85) 50%, rgba(10,120,180,0.3) 65%, transparent 100%);
-    filter: blur(0.3px) drop-shadow(0 0 6px rgba(10,120,180,0.8));
-}
-
-@keyframes scan-beam-drop {
-    0%   { transform: translate3d(0, -12px, 0); opacity: 0; }
-    4%   { opacity: 1; }
-    86%  { opacity: 0.7; }
-    100% { transform: translate3d(0, var(--scan-travel, 760px), 0); opacity: 0; }
-}
+/* Keep radar opacity rule inert */
+#holdings-card.is-ai-checking .ai-scan-radar { opacity: 0; }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .ai-scan-head {
     display: flex;
     align-items: center;
-    gap: 1.1rem;
-    margin-bottom: 1.6rem;
+    gap: 1rem;
+    margin-bottom: 1.4rem;
     position: relative;
     z-index: 2;
-    animation: scan-head-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+    animation: apple-scan-head-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) 0.02s both;
 }
 
-@keyframes scan-head-in {
-    from { opacity: 0; transform: translateX(-16px); }
-    to   { opacity: 1; transform: translateX(0); }
+@keyframes apple-scan-head-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Icon container ──────────────────────────────────────────────────────── */
 .ai-scan-orbit {
     position: relative;
-    width: 64px;
-    height: 64px;
+    width: 54px;
+    height: 54px;
     display: grid;
     place-items: center;
     flex: 0 0 auto;
 }
 
 .ai-scan-orbit img {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     display: block;
-    border-radius: 14px;
+    border-radius: 10px;
     z-index: 2;
     position: relative;
-    box-shadow:
-        0 0 20px rgba(111, 214, 240, 0.5),
-        0 14px 26px -16px rgba(111, 214, 240, 0.90);
-    animation: aiIconFloat 1.9s var(--spring) infinite;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+    animation: apple-icon-breathe 2.2s ease-in-out infinite;
 }
 
+@keyframes apple-icon-breathe {
+    0%, 100% { opacity: 0.9;  transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.035); }
+}
+
+/* Two staggered radial pulse rings — minimal, clean */
 .ai-scan-ring {
     position: absolute;
-    inset: 0;
     border-radius: 50%;
-    border: 1px solid rgba(111, 214, 240, 0.45);
-    box-shadow: 0 0 6px rgba(111, 214, 240, 0.15);
+    border: 1px solid rgba(10, 132, 255, 0);
+    animation: apple-ring-expand 1.8s ease-out infinite;
 }
 
 .ai-scan-ring-one {
-    animation: aiScanOrbit 2.4s linear infinite;
-    border-style: dashed;
-    border-color: rgba(111, 214, 240, 0.5);
+    inset: -3px;
+    animation-delay: 0s;
 }
 
 .ai-scan-ring-two {
-    inset: 8px;
-    border-color: rgba(151, 172, 236, 0.4);
-    box-shadow: 0 0 8px rgba(151, 172, 236, 0.2);
-    animation: aiScanOrbit 1.7s linear infinite reverse;
+    inset: -3px;
+    animation-delay: 0.9s;
 }
 
 .ai-scan-ring-three {
-    inset: -12px;
-    border-color: rgba(111, 214, 240, 0.18);
-    border-style: dashed;
-    animation: aiScanOrbit 3.8s linear infinite;
+    display: none;
 }
 
+@keyframes apple-ring-expand {
+    0%   { opacity: 0;    transform: scale(0.78); border-color: rgba(10, 132, 255, 0); }
+    12%  { opacity: 0.55; border-color: rgba(10, 132, 255, 0.55); }
+    100% { opacity: 0;    transform: scale(1.65); border-color: rgba(10, 132, 255, 0); }
+}
+
+[data-bs-theme="light"] .ai-scan-ring {
+    animation-name: apple-ring-expand-light;
+}
+
+@keyframes apple-ring-expand-light {
+    0%   { opacity: 0;    transform: scale(0.78); border-color: rgba(0, 102, 204, 0); }
+    12%  { opacity: 0.45; border-color: rgba(0, 102, 204, 0.45); }
+    100% { opacity: 0;    transform: scale(1.65); border-color: rgba(0, 102, 204, 0); }
+}
+
+/* ── Copy block ──────────────────────────────────────────────────────────── */
 .ai-scan-copy {
     min-width: 0;
     position: relative;
@@ -1536,80 +1374,99 @@ table tbody tr:hover {
 }
 
 .ai-scan-title {
-    font-size: 1rem;
-    font-weight: 750;
-    background: linear-gradient(120deg, #f5f5f7 0%, rgba(111, 214, 240, 0.95) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.01em;
-    line-height: 1.15;
-    background-size: 200% 100%;
-    animation: scan-title-shimmer 3.5s ease-in-out infinite;
+    font-size: 0.9375rem;
+    font-weight: 590;
+    color: #F5F5F7;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
+    font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+    /* reset any gradient/clip left by prior rules */
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: unset;
+    background-clip: unset;
+    animation: none;
 }
 
 [data-bs-theme="light"] .ai-scan-title {
-    background: linear-gradient(120deg, #1c1c1e 0%, #0a78b4 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-@keyframes scan-title-shimmer {
-    0%, 100% { background-position: 0% 50%; }
-    50%       { background-position: 100% 50%; }
+    color: #1c1c1e;
+    background: none;
+    -webkit-text-fill-color: unset;
 }
 
 .ai-scan-subtitle {
-    margin-top: 0.22rem;
-    font-size: 0.68rem;
-    color: var(--text-secondary);
+    margin-top: 0.18rem;
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: rgba(235, 235, 245, 0.48);
     line-height: 1.4;
-    animation: scan-sub-fade 0.28s var(--ease) both;
-    transition: color 0.2s ease;
+    letter-spacing: -0.01em;
+    font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+    animation: apple-scan-sub-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.08s both;
+    transition: color 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    /* reset gradient */
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: unset;
+    background-clip: unset;
+    background-size: unset;
+    filter: none;
 }
 
 .ai-scan-subtitle--highlight {
-    font-size: 0.8rem;
-    font-weight: 680;
-    background: linear-gradient(100deg, #e8f4ff 0%, rgba(111, 214, 240, 1) 45%, rgba(180, 160, 255, 0.95) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    background-size: 220% 100%;
-    animation: scan-sub-fade 0.28s var(--ease) both, scan-title-shimmer 2.8s ease-in-out infinite;
-    letter-spacing: 0.008em;
-    filter: drop-shadow(0 0 8px rgba(111, 214, 240, 0.45));
+    color: #0A84FF;
+    font-weight: 500;
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: unset;
+    background-clip: unset;
+    background-size: unset;
+    filter: none;
+    font-size: 0.72rem;
+    letter-spacing: -0.01em;
 }
 
-.ai-scan-subtitle--pop {
-    animation: claude-msg-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+[data-bs-theme="light"] .ai-scan-subtitle {
+    color: rgba(60, 60, 67, 0.5);
+    -webkit-text-fill-color: unset;
 }
 
 [data-bs-theme="light"] .ai-scan-subtitle--highlight {
-    background: linear-gradient(100deg, #0a3a6e 0%, #0a78b4 50%, #5040aa 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #0066CC;
+    -webkit-text-fill-color: unset;
+    background: none;
 }
 
+.ai-scan-subtitle--pop {
+    animation: apple-scan-subtitle-pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+}
+
+@keyframes apple-scan-sub-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes apple-scan-subtitle-pop {
+    0%   { opacity: 0; transform: translateY(5px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* Keep legacy keyframes so any residual references don't break */
 @keyframes scan-sub-fade {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-
+@keyframes scan-title-shimmer { 0%,100%{} }
 @keyframes claude-msg-pop {
-    0%   { opacity: 0; transform: translateY(5px) scale(0.94); }
-    55%  { opacity: 1; transform: translateY(-2px) scale(1.04); }
-    75%  { transform: translateY(0px) scale(0.99); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+    0%   { opacity: 0; transform: translateY(5px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0)   scale(1); }
 }
 
 /* ── Research rows ───────────────────────────────────────────────────────── */
 .ai-scan-tickers {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.5rem;
     position: relative;
     z-index: 2;
     flex: 1;
@@ -1618,257 +1475,169 @@ table tbody tr:hover {
 
 .ai-scan-row {
     display: grid;
-    grid-template-columns: 10px 56px 1fr auto;
+    grid-template-columns: 7px 50px 1fr auto;
     align-items: center;
-    gap: 1rem;
+    gap: 0.9rem;
     opacity: 0;
-    animation: scan-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--row-index, 0) * 75ms + 280ms);
+    animation: apple-scan-row-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--row-index, 0) * 28ms + 70ms);
     will-change: transform, opacity;
     position: relative;
 }
 
-@keyframes scan-row-in {
-    from { opacity: 0; transform: translateX(-22px); filter: blur(3px); }
-    to   { opacity: 1; transform: translateX(0);     filter: blur(0px); }
+@keyframes apple-scan-row-in {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Status dot with broadcasting rings ──────────────────────────────────── */
+/* ── Status dot — minimal, no broadcast rings ────────────────────────────── */
 .ai-scan-row-dot {
     position: relative;
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: rgba(111, 214, 240, 0.95);
-    box-shadow:
-        0 0 0 2px rgba(111, 214, 240, 0.12),
-        0 0 10px rgba(111, 214, 240, 0.9),
-        0 0 22px rgba(111, 214, 240, 0.35);
+    background: #0A84FF;
     flex-shrink: 0;
-    animation: scan-dot-pulse 2s ease-in-out infinite;
-    animation-delay: calc(var(--row-index, 0) * 160ms);
-    will-change: transform, box-shadow;
+    box-shadow: none;
+    animation: apple-dot-breathe 1.8s ease-in-out infinite;
+    animation-delay: calc(var(--row-index, 0) * 90ms);
+    will-change: opacity, transform;
 }
 
 .ai-scan-row-dot::before,
-.ai-scan-row-dot::after {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: 50%;
-    border: 1px solid rgba(111, 214, 240, 0.65);
-    animation: dot-broadcast 2.4s ease-out infinite;
-    opacity: 0;
-    pointer-events: none;
-}
+.ai-scan-row-dot::after { display: none; }
 
-.ai-scan-row-dot::after {
-    animation-delay: 1.2s;
-    border-color: rgba(111, 214, 240, 0.32);
+@keyframes apple-dot-breathe {
+    0%, 100% { opacity: 0.45; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.18); }
 }
 
 [data-bs-theme="light"] .ai-scan-row-dot {
-    background: rgba(10, 120, 180, 0.9);
-    box-shadow: 0 0 10px rgba(10, 120, 180, 0.8), 0 0 22px rgba(10, 120, 180, 0.3);
-}
-
-[data-bs-theme="light"] .ai-scan-row-dot::before { border-color: rgba(10, 120, 180, 0.5); }
-[data-bs-theme="light"] .ai-scan-row-dot::after  { border-color: rgba(10, 120, 180, 0.25); }
-
-@keyframes dot-broadcast {
-    0%   { transform: scale(1);   opacity: 0.75; }
-    100% { transform: scale(4.5); opacity: 0; }
-}
-
-@keyframes scan-dot-pulse {
-    0%, 100% {
-        opacity: 0.72;
-        transform: scale(1);
-        box-shadow: 0 0 6px rgba(111,214,240,0.7), 0 0 14px rgba(111,214,240,0.22);
-    }
-    50% {
-        opacity: 1;
-        transform: scale(1.28);
-        box-shadow: 0 0 14px rgba(111,214,240,1), 0 0 28px rgba(111,214,240,0.48), 0 0 42px rgba(111,214,240,0.15);
-    }
+    background: #0066CC;
+    box-shadow: none;
 }
 
 /* ── Ticker label ─────────────────────────────────────────────────────────── */
 .ai-scan-row-ticker {
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    color: rgba(200, 235, 255, 0.92);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    color: rgba(235, 235, 245, 0.68);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    text-shadow: 0 0 14px rgba(111, 214, 240, 0.42);
+    text-shadow: none;
+    font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
 }
 
 [data-bs-theme="light"] .ai-scan-row-ticker {
-    color: #1c1c1e;
+    color: rgba(60, 60, 67, 0.72);
     text-shadow: none;
 }
 
-/* ── Progress track (segmented measurement scale) ────────────────────────── */
+/* ── Progress track ──────────────────────────────────────────────────────── */
 .ai-scan-row-bar {
-    height: 3px;
-    background:
-        repeating-linear-gradient(
-            90deg,
-            rgba(111, 214, 240, 0.07) 0px,
-            rgba(111, 214, 240, 0.07) 1px,
-            transparent 1px,
-            transparent 14px
-        ),
-        rgba(111, 214, 240, 0.055);
+    height: 2.5px;
+    background: rgba(235, 235, 245, 0.07);
     border-radius: 999px;
     overflow: hidden;
     position: relative;
-    box-shadow:
-        0 0 0 1px rgba(111, 214, 240, 0.09),
-        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: none;
 }
 
 [data-bs-theme="light"] .ai-scan-row-bar {
-    background:
-        repeating-linear-gradient(90deg, rgba(10,120,180,0.07) 0px, rgba(10,120,180,0.07) 1px, transparent 1px, transparent 14px),
-        rgba(10, 120, 180, 0.1);
+    background: rgba(60, 60, 67, 0.1);
 }
 
-/* ── Progress fill — dual-layer: static head + animated shimmer ──────────── */
+/* ── Progress fill — smooth indeterminate, single clean color ────────────── */
 .ai-scan-row-fill {
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 100%;
-    transform: scaleX(0.04);
-    transform-origin: left center;
-    background:
-        linear-gradient(90deg,
-            transparent 0%,
-            transparent 68%,
-            rgba(220, 248, 255, 0.45) 82%,
-            rgba(255, 255, 255, 0.78) 91%,
-            rgba(180, 235, 255, 0.35) 100%
-        ),
-        linear-gradient(90deg,
-            rgba(35, 130, 195, 0.48) 0%,
-            rgba(85, 188, 228, 0.88) 18%,
-            rgba(158, 222, 248, 1)   38%,
-            rgba(215, 246, 255, 1)   50%,
-            rgba(158, 222, 248, 1)   62%,
-            rgba(85, 188, 228, 0.88) 82%,
-            rgba(35, 130, 195, 0.48) 100%
-        );
-    background-size: 100% 100%, 300% 100%;
+    width: 42%;
     border-radius: 999px;
-    box-shadow:
-        0 0 18px rgba(111, 214, 240, 0.78),
-        0 0 5px  rgba(220, 248, 255, 0.95),
-        0 0 32px rgba(111, 214, 240, 0.28);
-    animation:
-        scan-bar-progress 2.8s ease-in-out infinite,
-        scan-bar-shimmer  0.9s linear infinite;
-    animation-delay:
-        calc(var(--row-phase, 0) * -2.8s),
-        calc(var(--row-index, 0) * 80ms + 350ms);
-    will-change: transform, background-position;
+    transform: translate3d(-120%, 0, 0);
+    background: linear-gradient(90deg,
+        rgba(10, 132, 255, 0)    0%,
+        rgba(10, 132, 255, 0.78) 18%,
+        rgba(94, 186, 255, 1)    55%,
+        rgba(10, 132, 255, 0.78) 82%,
+        rgba(10, 132, 255, 0)    100%
+    );
+    background-size: 100% 100%;
+    box-shadow: none;
+    animation: apple-bar-run 1.15s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+    animation-delay: calc(var(--row-phase, 0) * -1.15s);
+    will-change: transform;
 }
 
 [data-bs-theme="light"] .ai-scan-row-fill {
-    background:
-        linear-gradient(90deg, transparent 68%, rgba(10,120,180,0.35) 84%, rgba(30,160,240,0.75) 92%, rgba(10,100,160,0.3) 100%),
-        linear-gradient(90deg, rgba(10,120,180,0.4), rgba(30,160,240,0.95), rgba(10,120,180,0.4));
-    background-size: 100% 100%, 300% 100%;
-    box-shadow: 0 0 12px rgba(10,120,180,0.5);
+    background: linear-gradient(90deg,
+        rgba(0, 102, 204, 0)    0%,
+        rgba(0, 102, 204, 0.78) 18%,
+        rgba(60, 150, 240, 1)   55%,
+        rgba(0, 102, 204, 0.78) 82%,
+        rgba(0, 102, 204, 0)    100%
+    );
+    background-size: 100% 100%;
+    box-shadow: none;
 }
 
-@keyframes scan-bar-progress {
-    0%   { transform: scaleX(0.04); }
-    18%  { transform: scaleX(0.42); }
-    42%  { transform: scaleX(0.76); }
-    60%  { transform: scaleX(0.92); }
-    72%  { transform: scaleX(0.83); }
-    85%  { transform: scaleX(0.56); }
-    94%  { transform: scaleX(0.20); }
-    100% { transform: scaleX(0.04); }
+@keyframes apple-bar-run {
+    0%   { transform: translate3d(-120%, 0, 0); }
+    100% { transform: translate3d(260%, 0, 0); }
 }
 
-@keyframes scan-bar-shimmer {
-    0%   { background-position: 0% 0%, 280% 0; }
-    100% { background-position: 0% 0%, -280% 0; }
+@keyframes apple-bar-sheen {
+    0%   { background-position: 180% 0; }
+    100% { background-position: -80% 0; }
 }
 
-/* ── Status label with blinking terminal cursor ──────────────────────────── */
+/* ── Status label — quiet, lowercase, no terminal cursor ─────────────────── */
 .ai-scan-row-label {
-    font-size: 0.5rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: rgba(111, 214, 240, 0.65);
+    font-size: 0.535rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: rgba(235, 235, 245, 0.3);
     white-space: nowrap;
     opacity: 0;
-    animation: scan-label-in 0.32s var(--ease) both;
-    animation-delay: calc(var(--row-index, 0) * 75ms + 680ms);
+    animation: apple-scan-row-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--row-index, 0) * 28ms + 160ms);
+    font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
     position: relative;
 }
 
-.ai-scan-row-label::after {
-    content: '_';
-    animation: cursor-blink 0.85s step-end infinite;
-    animation-delay: calc(var(--row-index, 0) * 0.18s);
-    opacity: 1;
-    margin-left: 0.5px;
-}
+/* No terminal cursor, no decorative pseudo-elements */
+.ai-scan-row-label::after { display: none; }
+.ai-scan-row-label::before { display: none; }
 
 [data-bs-theme="light"] .ai-scan-row-label {
-    color: rgba(10, 120, 180, 0.65);
+    color: rgba(60, 60, 67, 0.38);
 }
 
+/* Keep these so no JS/CSS refs break */
+@keyframes scan-row-in {
+    from { opacity: 0; transform: translateX(-22px); filter: blur(3px); }
+    to   { opacity: 1; transform: translateX(0);     filter: blur(0px); }
+}
 @keyframes scan-label-in {
     from { opacity: 0; transform: translateX(6px); }
     to   { opacity: 1; transform: translateX(0); }
 }
-
-@keyframes cursor-blink {
-    0%, 49% { opacity: 1; }
-    50%, 100% { opacity: 0; }
-}
-
-/* ── Sweep wave ──────────────────────────────────────────────────────────── */
-.ai-scan-wave {
-    position: absolute;
-    inset: -1px;
-    background: linear-gradient(
-        105deg,
-        transparent 0%,
-        transparent 30%,
-        rgba(111, 214, 240, 0.09) 46%,
-        rgba(255, 255, 255, 0.06) 50%,
-        rgba(111, 214, 240, 0.06) 54%,
-        transparent 68%,
-        transparent 100%
-    );
-    transform: translateX(-82%);
-    animation: aiScanSweep 2s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 1;
-    will-change: transform;
-}
-
-[data-bs-theme="light"] .ai-scan-wave {
-    background: linear-gradient(
-        105deg,
-        transparent 0%,
-        transparent 30%,
-        rgba(10, 120, 180, 0.07) 46%,
-        rgba(255, 255, 255, 0.12) 50%,
-        rgba(10, 120, 180, 0.05) 54%,
-        transparent 68%,
-        transparent 100%
-    );
-}
+@keyframes cursor-blink { 0%,49%{opacity:1;} 50%,100%{opacity:0;} }
+@keyframes scan-bar-progress { 0%{} 100%{} }
+@keyframes scan-bar-shimmer  { 0%{} 100%{} }
+@keyframes scan-corner-in    { from{opacity:0;} to{opacity:1;} }
+@keyframes scan-head-in      { from{opacity:0;} to{opacity:1;} }
+@keyframes scan-grid-in      { from{opacity:0;} to{opacity:1;} }
+@keyframes dot-broadcast     { 0%{} 100%{} }
+@keyframes scan-dot-pulse    { 0%{} 100%{} }
+@keyframes aiScanOrbit       { to{transform:rotate(360deg);} }
+@keyframes aiIconFloat       { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-2px);} }
+@keyframes aiScanSweep       { 0%{} 100%{} }
+@keyframes scan-radar-spin   { to{transform:translateY(-50%) rotate(360deg);} }
+@keyframes scan-beam-drop    { 0%{} 100%{} }
 
 #holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] {
     animation: none;
@@ -2270,6 +2039,63 @@ table tbody tr:hover {
 }
 .modal-header.border-secondary { border-bottom: 1px solid var(--hairline) !important; }
 .modal-title { font-weight: 600; letter-spacing: 0; }
+
+.portfolio-manager-dialog {
+    --bs-modal-margin: 1rem;
+}
+
+.portfolio-manager-dialog .modal-content {
+    max-height: calc(100dvh - 2rem);
+}
+
+.portfolio-manager-dialog .modal-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+}
+
+.manage-holdings-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.portfolio-manager-table {
+    min-width: 520px;
+    margin-bottom: 0;
+}
+
+.portfolio-manager-table input.form-control {
+    max-width: 100%;
+}
+
+.portfolio-manager-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(18, 18, 24, 0.96);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+[data-bs-theme="light"] .portfolio-manager-table thead th {
+    background: rgba(255, 255, 255, 0.96);
+}
+
+@media (max-width: 575.98px) {
+    .portfolio-manager-dialog {
+        --bs-modal-margin: 0.5rem;
+    }
+
+    .portfolio-manager-dialog .modal-content {
+        max-height: calc(100dvh - 1rem);
+    }
+
+    .portfolio-manager-table {
+        min-width: 460px;
+    }
+}
 
 /* ── Sparkline ───────────────────────────────────────────────────────────── */
 .trend-sparkline {

@@ -485,7 +485,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     setAgentLine(message);
     claudeMessageIndex = 0;
     const CLAUDE_FLIRT_BEAT = 2;
-    const CLAUDE_HOLD_TICKS = 4; // keep Claude message visible for 4 ticks (~5s)
+    const CLAUDE_HOLD_TICKS = 5; // keep Claude message visible for about 4s
     let claudeHoldRemaining = CLAUDE_HOLD_TICKS; // protect the first message too
     if (subtitle) {
         subtitle.textContent = CLAUDE_FUNNY_MESSAGES[0];
@@ -515,7 +515,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
             }
             subtitle.classList.toggle("ai-scan-subtitle--highlight", isClaudeBeat || claudeHoldRemaining > 0);
         }
-    }, 1250);
+    }, 800);
 }
 
 
