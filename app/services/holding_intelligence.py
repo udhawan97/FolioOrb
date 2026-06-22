@@ -329,7 +329,13 @@ _STATIC: dict[str, dict] = {
             {"name": "Europe",        "weight": 10.4},
             {"name": "Other",         "weight": 6.4},
         ],
-        "top_holdings": [],  # Active fund — holdings change, not publishing static list
+        "top_holdings": [
+            {"ticker": "ABBV", "name": "AbbVie",           "weight": 3.5},
+            {"ticker": "XOM",  "name": "Exxon Mobil",       "weight": 2.8},
+            {"ticker": "JPM",  "name": "JPMorgan Chase",    "weight": 2.6},
+            {"ticker": "JNJ",  "name": "Johnson & Johnson", "weight": 2.4},
+            {"ticker": "CVX",  "name": "Chevron",            "weight": 2.2},
+        ],
         "benchmark_tickers": ["SCHD", "DVY"],
         "benchmark_labels": {"SCHD": "Dividend ETF (SCHD)", "DVY": "Dividend ETF (DVY)"},
         "peer_tickers": ["DVY", "SCHD", "VYM", "HDV"],
@@ -365,7 +371,13 @@ _STATIC: dict[str, dict] = {
             {"name": "South Africa", "weight": 5.6},
             {"name": "Other",        "weight": 21.4},
         ],
-        "top_holdings": [],
+        "top_holdings": [
+            {"ticker": "ALB",  "name": "Albemarle",         "weight": 9.2},
+            {"ticker": "SQM",  "name": "SQM",               "weight": 6.8},
+            {"ticker": "MP",   "name": "MP Materials",       "weight": 5.1},
+            {"ticker": "FCX",  "name": "Freeport-McMoRan",  "weight": 4.6},
+            {"ticker": "LAC",  "name": "Lithium Americas",  "weight": 3.4},
+        ],
         "benchmark_tickers": ["LIT", "COPX", "XME"],
         "benchmark_labels": {
             "LIT":  "Lithium & Battery (LIT)",

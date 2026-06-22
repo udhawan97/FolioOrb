@@ -1729,7 +1729,9 @@ function renderMoveExplainer(section, data, coverageData = null) {
     const moveStatStripHtml = renderMoveStatStrip(data);
     const contributionHtml = renderContributionBreakdown(
         coverageData?.contribution_breakdown,
-        data.day_change_pct
+        data.day_change_pct,
+        coverageData?.ticker,
+        coverageData?.coverage_type
     );
 
     section.innerHTML = `
@@ -2073,8 +2075,24 @@ function buildMoveStatItems(data) {
     return items;
 }
 
-function renderContributionBreakdown(breakdown, etfDayChangePct) {
-    if (!breakdown || !breakdown.length) return "";
+function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverageType) {
+    if (!breakdown || !breakdown.length) {
+        // For ETFs only: show a retry placeholder instead of nothing
+        if (coverageType && coverageType !== "equity" && ticker) {
+            return `
+                <div class="intel-label" style="margin-top:.6rem">
+                    <i class="bi bi-distribute-vertical"></i> Holdings Contribution
+                </div>
+                <div class="contrib-empty">
+                    <i class="bi bi-slash-circle contrib-empty-icon"></i>
+                    <span class="contrib-empty-text">Holdings data unavailable</span>
+                    <button class="contrib-retry-btn" onclick="reloadContributionForTicker('${escapeHtml(ticker)}')">
+                        <i class="bi bi-arrow-clockwise"></i> Reload
+                    </button>
+                </div>`;
+        }
+        return "";
+    }
 
     const maxAbs = Math.max(...breakdown.map(h => Math.abs(h.contribution_pp)), 0.0001);
     const totalPp = breakdown.reduce((s, h) => s + h.contribution_pp, 0);
@@ -2867,6 +2885,16 @@ function fallbackIntelligenceForTicker(ticker) {
             market_pulse: { loaded: false, missing: ["market_data"] },
         },
     };
+}
+
+function reloadContributionForTicker(ticker) {
+    // Reset retry state so the ticker is eligible for a fresh fetch,
+    // then trigger a single-ticker intelligence re-fetch. The existing
+    // fetchSingleIntelligenceWithRetry machinery updates cachedIntelligence
+    // and calls renderHoldings() on completion, which re-renders the panel.
+    delete intelligenceRetryState[ticker];
+    intelligenceExhaustedTickers.delete(ticker);
+    fetchSingleIntelligenceWithRetry(ticker);
 }
 
 async function fetchSingleIntelligenceWithRetry(ticker) {

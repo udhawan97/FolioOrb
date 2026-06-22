@@ -6755,6 +6755,48 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     opacity: 0.9;
 }
 
+/* Empty / retry state */
+.contrib-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0 0.2rem;
+}
+.contrib-empty-icon {
+    font-size: 0.72rem;
+    opacity: 0.35;
+    flex-shrink: 0;
+}
+.contrib-empty-text {
+    font-size: 0.65rem;
+    color: var(--text-tertiary);
+    flex: 1;
+}
+.contrib-retry-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.22rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--accent-cyan);
+    background: rgba(111, 214, 240, 0.08);
+    border: 1px solid rgba(111, 214, 240, 0.18);
+    border-radius: 20px;
+    padding: 0.18rem 0.55rem;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.contrib-retry-btn:hover {
+    background: rgba(111, 214, 240, 0.15);
+    border-color: rgba(111, 214, 240, 0.32);
+}
+.contrib-retry-btn .bi {
+    font-size: 0.68rem;
+}
+
 .contrib-col-ticker i,
 .contrib-col-chg i,
 .contrib-col-pp i {
