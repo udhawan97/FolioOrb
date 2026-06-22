@@ -3006,24 +3006,25 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     --fund-trend-color: var(--accent-cyan);
     position: relative;
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-    gap: 0.62rem;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 0.72rem;
     align-items: center;
-    min-height: 84px;
+    min-height: 96px;
     margin: 0.82rem 0 0.86rem;
-    padding: 0.74rem 0.78rem;
+    padding: 0.88rem 1rem;
     overflow: hidden;
-    border: 1px solid rgba(111, 214, 240, 0.24);
-    border-radius: 8px;
+    border: 1px solid rgba(111, 214, 240, 0.30);
+    border-radius: 10px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.082), rgba(255, 255, 255, 0.030)),
-        linear-gradient(135deg, rgba(111, 214, 240, 0.16), rgba(151, 172, 236, 0.090) 54%, rgba(48, 209, 88, 0.065)),
-        rgba(4, 9, 16, 0.92);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.028)),
+        linear-gradient(135deg, rgba(111, 214, 240, 0.20), rgba(151, 172, 236, 0.10) 54%, rgba(48, 209, 88, 0.075)),
+        rgba(4, 9, 16, 0.94);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.090),
         inset 0 -1px 0 rgba(111, 214, 240, 0.070),
         0 20px 42px -34px rgba(111, 214, 240, 0.88);
-    animation: fundScaleIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both 0.18s;
+    animation: fundScaleIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both 0.18s,
+               fundSpotlightBreath 4.5s ease-in-out 1.5s infinite;
 }
 
 .fund-scale-spotlight::before {
@@ -3031,41 +3032,44 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.14) 45%, rgba(111, 214, 240, 0.14) 52%, transparent 72%);
+        linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.16) 45%, rgba(111, 214, 240, 0.18) 52%, transparent 72%);
     transform: translateX(-115%);
     pointer-events: none;
-    animation: fundScaleSheen 1.08s cubic-bezier(0.22, 1, 0.36, 1) 0.34s both;
+    animation: fundScaleSheen 1.08s cubic-bezier(0.22, 1, 0.36, 1) 0.34s both,
+               fundSheenLoop 8s ease-in-out 3s infinite;
 }
 
 .fund-scale-spotlight::after {
     content: "";
     position: absolute;
-    left: 0.78rem;
-    right: 0.78rem;
+    left: 1rem;
+    right: 1rem;
     bottom: 0;
     height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent-cyan), var(--accent-green), transparent);
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), var(--accent-green), var(--accent-cyan), transparent);
     opacity: 0.62;
     transform-origin: left;
-    animation: fundScaleMeter 1.35s ease both 0.36s;
+    animation: fundScaleMeter 1.35s ease both 0.36s,
+               fundMeterPulse 3.8s ease-in-out 2s infinite;
 }
 
 .fund-scale-emblem {
     position: relative;
     z-index: 1;
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
     display: inline-grid;
     place-items: center;
-    border-radius: 8px;
+    border-radius: 10px;
     color: var(--accent-cyan);
-    border: 1px solid rgba(111, 214, 240, 0.28);
+    border: 1px solid rgba(111, 214, 240, 0.34);
     background:
-        linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.035)),
-        rgba(111, 214, 240, 0.12);
+        linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04)),
+        rgba(111, 214, 240, 0.15);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
         0 0 22px -10px rgba(111, 214, 240, 0.98);
+    font-size: 1.1rem;
     animation: fundEmblemPulse 2.7s ease-in-out infinite;
 }
 
@@ -3091,12 +3095,13 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 
 .fund-scale-value {
     color: rgba(245, 250, 255, 0.97);
-    font-size: 1.32rem;
+    font-size: 1.42rem;
     line-height: 1;
     font-weight: 820;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     text-shadow: 0 0 22px rgba(111, 214, 240, 0.34);
+    animation: fundValueGlow 3.8s ease-in-out 2.2s infinite;
 }
 
 .fund-scale-detail {
@@ -3166,49 +3171,53 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .market-pulse-card {
     position: relative;
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 0.44rem;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 0.52rem;
     align-items: center;
-    min-height: 66px;
-    padding: 0.52rem 0.56rem;
+    min-height: 76px;
+    padding: 0.66rem 0.72rem;
     overflow: hidden;
-    border: 1px solid rgba(111, 214, 240, 0.14);
-    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--pulse-color) 22%, rgba(111, 214, 240, 0.10));
+    border-radius: 10px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.030)),
-        linear-gradient(135deg, color-mix(in srgb, var(--pulse-color) 15%, transparent), rgba(7, 11, 19, 0.84) 66%),
-        rgba(5, 8, 14, 0.88);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.078), rgba(255, 255, 255, 0.022)),
+        linear-gradient(135deg, color-mix(in srgb, var(--pulse-color) 18%, transparent), rgba(7, 11, 19, 0.84) 66%),
+        rgba(5, 8, 14, 0.90);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.070),
         inset 0 -1px 0 rgba(111, 214, 240, 0.040),
         0 16px 34px -30px rgba(0, 0, 0, 0.95);
-    animation: pulseCardIn 0.42s var(--ease) both;
-    animation-delay: calc(var(--pulse-index) * 70ms);
+    animation: pulseCardIn 0.42s var(--ease) both,
+               cardGlowBreath 3.8s ease-in-out infinite;
+    animation-delay: calc(var(--pulse-index) * 70ms), calc(1.2s + var(--pulse-index) * 500ms);
 }
 
 .market-pulse-card::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(110deg, transparent 0%, color-mix(in srgb, var(--pulse-color) 18%, transparent) 46%, transparent 72%);
+    background: linear-gradient(110deg, transparent 0%, color-mix(in srgb, var(--pulse-color) 22%, transparent) 46%, transparent 72%);
     transform: translateX(-115%);
     opacity: 0;
-    animation: pulseScan 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-    animation-delay: calc(0.18s + var(--pulse-index) * 90ms);
+    animation: pulseScan 0.8s cubic-bezier(0.22, 1, 0.36, 1) both,
+               continuousScan 5.5s ease-in-out infinite;
+    animation-delay: calc(0.18s + var(--pulse-index) * 90ms), calc(2.8s + var(--pulse-index) * 700ms);
     pointer-events: none;
 }
 
 .market-pulse-card::after {
     content: "";
     position: absolute;
-    left: 0.58rem;
-    right: 0.58rem;
+    left: 0.72rem;
+    right: 0.72rem;
     bottom: 0;
     height: 2px;
-    background: linear-gradient(90deg, transparent, var(--pulse-color), transparent);
+    background: linear-gradient(90deg, transparent, var(--pulse-color), color-mix(in srgb, var(--pulse-color) 60%, white), transparent);
     opacity: 0.55;
     transform: scaleX(0.62);
     transform-origin: left;
+    animation: meterBarPulse 3s ease-in-out infinite;
+    animation-delay: calc(var(--pulse-index) * 400ms);
 }
 
 .market-pulse-card.cyan,
@@ -3221,18 +3230,23 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .pulse-icon {
     position: relative;
     z-index: 1;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     display: inline-grid;
     place-items: center;
-    border-radius: 7px;
+    border-radius: 8px;
+    font-size: 0.9rem;
     color: var(--pulse-color);
+    border: 1px solid color-mix(in srgb, var(--pulse-color) 26%, transparent);
     background:
-        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
-        color-mix(in srgb, var(--pulse-color) 14%, transparent);
+        linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)),
+        color-mix(in srgb, var(--pulse-color) 16%, transparent);
     box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
+        inset 0 1px 0 rgba(255,255,255,0.10),
         0 0 18px -10px var(--pulse-color);
+    animation: iconGlowBreath 2.6s ease-in-out infinite,
+               iconFloat 3.4s ease-in-out infinite;
+    animation-delay: calc(var(--pulse-index) * 250ms), calc(var(--pulse-index) * 450ms);
 }
 
 .pulse-copy {
@@ -3254,12 +3268,15 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 
 .pulse-copy strong {
     margin-top: 0.12rem;
-    color: rgba(245, 250, 255, 0.92);
-    font-size: 0.76rem;
-    font-weight: 780;
+    color: rgba(245, 250, 255, 0.95);
+    font-size: 0.82rem;
+    font-weight: 800;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--pulse-color) 40%, transparent);
+    animation: pulseValueGlow 3.2s ease-in-out infinite;
+    animation-delay: calc(var(--pulse-index) * 350ms);
 }
 
 .pulse-detail {
@@ -3326,6 +3343,95 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 @keyframes fundTrendChipIn {
     from { opacity: 0; transform: translateX(5px); }
     to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fundSpotlightBreath {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.090),
+            inset 0 -1px 0 rgba(111, 214, 240, 0.070),
+            0 20px 42px -34px rgba(111, 214, 240, 0.88);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.15),
+            inset 0 -1px 0 rgba(111, 214, 240, 0.20),
+            0 0 0 1px rgba(111, 214, 240, 0.18),
+            0 0 52px -16px rgba(111, 214, 240, 0.32),
+            0 20px 56px -26px rgba(111, 214, 240, 1);
+    }
+}
+
+@keyframes fundSheenLoop {
+    0%, 14% { transform: translateX(-115%); opacity: 0; }
+    26%     { opacity: 0.85; }
+    40%, 100% { transform: translateX(115%); opacity: 0; }
+}
+
+@keyframes fundMeterPulse {
+    0%   { opacity: 0.62; transform: scaleX(1); }
+    45%  { opacity: 0.90; transform: scaleX(1); }
+    72%  { opacity: 0.28; transform: scaleX(0.60); }
+    100% { opacity: 0.62; transform: scaleX(1); }
+}
+
+@keyframes fundValueGlow {
+    0%, 100% { text-shadow: 0 0 22px rgba(111, 214, 240, 0.34); }
+    50%      { text-shadow: 0 0 36px rgba(111, 214, 240, 0.78), 0 0 10px rgba(255, 255, 255, 0.14); }
+}
+
+@keyframes cardGlowBreath {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.070),
+            inset 0 -1px 0 rgba(111, 214, 240, 0.040),
+            0 16px 34px -30px rgba(0, 0, 0, 0.95);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.12),
+            inset 0 -1px 0 color-mix(in srgb, var(--pulse-color) 35%, transparent),
+            0 0 0 1px color-mix(in srgb, var(--pulse-color) 16%, transparent),
+            0 0 44px -18px color-mix(in srgb, var(--pulse-color) 65%, transparent),
+            0 16px 34px -20px rgba(0, 0, 0, 0.65);
+    }
+}
+
+@keyframes continuousScan {
+    0%, 18% { transform: translateX(-115%); opacity: 0; }
+    28%     { opacity: 0.75; }
+    40%, 100% { transform: translateX(115%); opacity: 0; }
+}
+
+@keyframes meterBarPulse {
+    0%   { opacity: 0.55; transform: scaleX(0.62); }
+    38%  { opacity: 0.92; transform: scaleX(0.96); }
+    68%  { opacity: 0.68; transform: scaleX(0.74); }
+    100% { opacity: 0.55; transform: scaleX(0.62); }
+}
+
+@keyframes iconGlowBreath {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.10),
+            0 0 18px -10px var(--pulse-color);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.16),
+            0 0 30px -5px var(--pulse-color),
+            0 0 12px -2px color-mix(in srgb, var(--pulse-color) 55%, transparent);
+    }
+}
+
+@keyframes iconFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-2.5px); }
+}
+
+@keyframes pulseValueGlow {
+    0%, 100% { text-shadow: 0 0 14px color-mix(in srgb, var(--pulse-color) 40%, transparent); }
+    50%      { text-shadow: 0 0 22px color-mix(in srgb, var(--pulse-color) 80%, transparent), 0 0 6px rgba(255,255,255,0.10); }
 }
 
 @media (max-width: 900px) {
@@ -6227,6 +6333,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     .fund-scale-spotlight::before,
     .fund-scale-spotlight::after,
     .fund-scale-emblem,
+    .fund-scale-value,
     .fund-trend-chip,
 	    .orbit-loader,
 	    .orbit-loader::before,
@@ -6235,6 +6342,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 	    .market-pulse-card::before,
 	    .market-pulse-card::after,
 	    .pulse-icon,
+	    .pulse-copy strong,
 	    .value-updating,
 	    .btn-refresh-data.is-refreshing i,
 	    #holdings-card.is-ai-checking .holdings-table tbody tr[data-ticker] {
