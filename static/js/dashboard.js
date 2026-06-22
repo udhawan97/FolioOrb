@@ -276,6 +276,9 @@ let cachedIntelligence = {};   // ticker → intelligence object (coverage data)
 let cachedExplanations = {};   // ticker → explanation object (move data)
 let intelligenceLoaded = false;
 let intelligenceLoading = false;
+let intelligenceRetryState = {}; // ticker → number of retry attempts
+let intelligenceRetryingTickers = new Set();
+let intelligenceExhaustedTickers = new Set();
 
 // Rating state: stock analyst ratings or ETF quality labels
 let cachedRecommendations = {};  // ticker → rec object from /api/ai/analyst-recommendations/all
@@ -322,6 +325,45 @@ const INTEL_BUTTON_LOADING_HTML = `
         <span class="btn-intel-badge">AI</span>
     </span>
 `;
+
+const INTELLIGENCE_MAX_RETRIES = 3;
+const INTELLIGENCE_RETRY_BASE_DELAY_MS = 900;
+
+function holdingTickers() {
+    return latestHoldings.map(h => h.ticker).filter(Boolean);
+}
+
+function delay(ms) {
+    return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+function marketPulseLoaded(data) {
+    if (!data) return false;
+    const status = data.load_status?.market_pulse;
+    if (status && typeof status.loaded === "boolean") return status.loaded;
+    return buildMarketPulseItems(data).every(item => item.value && item.value !== "Unavailable");
+}
+
+function holdingIntelSettled(ticker) {
+    return !!cachedIntelligence[ticker] && (
+        marketPulseLoaded(cachedIntelligence[ticker]) ||
+        intelligenceExhaustedTickers.has(ticker)
+    );
+}
+
+function allHoldingIntelSettled() {
+    const tickers = holdingTickers();
+    return tickers.length > 0 && tickers.every(holdingIntelSettled);
+}
+
+function incompleteIntelligenceTickers() {
+    return holdingTickers().filter(ticker => !holdingIntelSettled(ticker));
+}
+
+function updateIntelligenceLoadedState() {
+    intelligenceLoaded = allHoldingIntelSettled();
+    return intelligenceLoaded;
+}
 
 // Single source of truth for allocation ordering, shared by both tables and the chart.
 function sortedByAllocation(holdings) {
@@ -2136,6 +2178,12 @@ function renderHoldingCoverage(section, data) {
     const marketPulseHtml = renderMarketPulseStrip(data);
     const fundScaleHtml = renderFundScaleSpotlight(data, priceSignal);
     const fact = buildHoldingFact(data);
+    const missingPulse = data.load_status?.market_pulse?.missing || [];
+    const pulseStatusHtml = !marketPulseLoaded(data) && intelligenceExhaustedTickers.has(data.ticker)
+        ? `<span class="fact-tag intel-refresh-note"><i class="bi bi-arrow-repeat"></i>Some live metrics are still unavailable. Tap Holding Intel again; Claude can be selective and may need one more look for the full picture.</span>`
+        : missingPulse.length && intelligenceRetryingTickers.has(data.ticker)
+            ? `<span class="fact-tag intel-refresh-note"><i class="bi bi-arrow-repeat"></i>Refreshing ${escapeHtml(missingPulse.join(", "))}</span>`
+            : "";
     const factTag = fact && !fundScaleHtml
         ? `<span class="fact-tag"><i class="bi bi-stars"></i>${escapeHtml(fact)}</span>` : "";
 
@@ -2151,7 +2199,7 @@ function renderHoldingCoverage(section, data) {
             ${etfProfileHtml}
             ${fundScaleHtml}
             ${marketPulseHtml}
-            <div class="intel-meta-row">${factTag}</div>
+            <div class="intel-meta-row">${factTag}${pulseStatusHtml}</div>
         </div>`;
 }
 
@@ -2192,15 +2240,26 @@ function injectSummaryRows(tbody) {
 
         if (!coverageSection || !moveSection) return;
 
-        if (intelligenceLoading && !intelligenceLoaded) {
+        const tickerRetrying = intelligenceRetryingTickers.has(ticker);
+        const hasCoverage = !!cachedIntelligence[ticker];
+        const isCoveragePending = tickerRetrying || (intelligenceLoading && !hasCoverage);
+
+        if (isCoveragePending) {
             renderCoverageShimmer(coverageSection);
-            renderMoveExplainerShimmer(moveSection);
+            if (cachedExplanations[ticker]) {
+                renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
+            } else {
+                renderMoveExplainerShimmer(moveSection);
+            }
         } else if (intelligenceLoaded) {
+            renderHoldingCoverage(coverageSection, cachedIntelligence[ticker]);
+            renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
+        } else if (hasCoverage) {
             renderHoldingCoverage(coverageSection, cachedIntelligence[ticker]);
             renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
         }
 
-        if (intelligenceLoaded) {
+        if (holdingIntelSettled(ticker)) {
             mainRow.classList.add("has-intel-ready");
         }
     });
@@ -2672,12 +2731,115 @@ async function loadWorldMarkets() {
 
 // ── Holding Intelligence ────────────────────────────────────────────────────
 
+function fallbackIntelligenceForTicker(ticker) {
+    const holding = latestHoldings.find(h => h.ticker === ticker) || {};
+    return {
+        ticker,
+        coverage_type: "equity",
+        coverage_label: "Holding",
+        strategy: holding.name
+            ? `${holding.name} market data is temporarily unavailable. Tap Holding Intel again; Claude can be selective and may need one more look for the full picture.`
+            : "Market data is temporarily unavailable. Tap Holding Intel again; Claude can be selective and may need one more look for the full picture.",
+        asset_class: "equities",
+        theme: null,
+        sectors: [],
+        countries: [],
+        top_holdings: [],
+        benchmark_tickers: ["SPY"],
+        benchmark_labels: { SPY: "S&P 500" },
+        peer_tickers: [],
+        key_drivers: [],
+        concentration_level: "medium",
+        concentration_label: "",
+        expense_ratio: null,
+        expense_ratio_bps: null,
+        day_change_pct: holding.day_change_pct ?? null,
+        volume: null,
+        average_volume: null,
+        bid: null,
+        ask: null,
+        bid_ask_spread_pct: null,
+        market_cap: null,
+        enterprise_value: null,
+        total_revenue: null,
+        ebitda: null,
+        free_cashflow: null,
+        fcf_yield: null,
+        pe_ratio: null,
+        forward_pe: null,
+        price_to_sales: null,
+        enterprise_to_revenue: null,
+        enterprise_to_ebitda: null,
+        revenue_growth: null,
+        gross_margin: null,
+        operating_margin: null,
+        profit_margin: null,
+        dividend_yield: null,
+        aum: null,
+        data_quality: "unavailable",
+        data_sources: [],
+        load_status: {
+            coverage: false,
+            market_pulse: { loaded: false, missing: ["market_data"] },
+        },
+    };
+}
+
+async function fetchSingleIntelligenceWithRetry(ticker) {
+    const currentAttempt = (intelligenceRetryState[ticker] || 0) + 1;
+    intelligenceRetryState[ticker] = currentAttempt;
+    intelligenceRetryingTickers.add(ticker);
+    renderHoldings();
+
+    try {
+        await delay(INTELLIGENCE_RETRY_BASE_DELAY_MS * currentAttempt);
+        const params = new URLSearchParams({ retry: String(Date.now()) });
+        const res = await fetch(`/api/ai/intelligence/${encodeURIComponent(ticker)}?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const intel = await res.json();
+        cachedIntelligence[ticker] = intel;
+        if (marketPulseLoaded(intel)) {
+            intelligenceExhaustedTickers.delete(ticker);
+        } else if (currentAttempt >= INTELLIGENCE_MAX_RETRIES) {
+            intelligenceExhaustedTickers.add(ticker);
+        }
+    } catch (err) {
+        console.warn(`Intelligence retry failed for ${ticker}:`, err);
+        if (currentAttempt >= INTELLIGENCE_MAX_RETRIES) {
+            if (!cachedIntelligence[ticker]) cachedIntelligence[ticker] = fallbackIntelligenceForTicker(ticker);
+            intelligenceExhaustedTickers.add(ticker);
+        }
+    } finally {
+        intelligenceRetryingTickers.delete(ticker);
+        updateIntelligenceLoadedState();
+        renderHoldings();
+    }
+}
+
+async function verifyAndRefreshIncompleteIntelligence() {
+    let pending = incompleteIntelligenceTickers()
+        .filter(ticker => (intelligenceRetryState[ticker] || 0) < INTELLIGENCE_MAX_RETRIES);
+
+    while (pending.length) {
+        setAgentLine(`Refreshing ${pending.length} missing metric${pending.length === 1 ? "" : "s"}`);
+        await Promise.allSettled(pending.map(fetchSingleIntelligenceWithRetry));
+        pending = incompleteIntelligenceTickers()
+            .filter(ticker => (intelligenceRetryState[ticker] || 0) < INTELLIGENCE_MAX_RETRIES);
+    }
+
+    incompleteIntelligenceTickers().forEach(ticker => {
+        if (!cachedIntelligence[ticker]) cachedIntelligence[ticker] = fallbackIntelligenceForTicker(ticker);
+        intelligenceExhaustedTickers.add(ticker);
+    });
+    return updateIntelligenceLoadedState();
+}
+
 async function loadHoldingIntelligence() {
     const tbody = document.getElementById("holdings-table");
     const btn = document.querySelector('[onclick="loadHoldingIntelligence()"]');
 
     const hasMoveExplanations = Object.keys(cachedExplanations).length > 0;
-    if (intelligenceLoaded && hasMoveExplanations) {
+    if (intelligenceLoaded && hasMoveExplanations && intelligenceRetryingTickers.size === 0) {
         // Toggle expand rows open/closed on repeated click
         const allBodies = tbody.querySelectorAll(".summary-body");
         const anyOpen = Array.from(allBodies).some(b => b.classList.contains("open"));
@@ -2690,6 +2852,9 @@ async function loadHoldingIntelligence() {
     }
 
     intelligenceLoading = true;
+    intelligenceRetryState = {};
+    intelligenceRetryingTickers = new Set();
+    intelligenceExhaustedTickers = new Set();
     setAiChecking(true, "Reading positions");
     injectSummaryRows(tbody);
     if (btn) {
@@ -2709,6 +2874,9 @@ async function loadHoldingIntelligence() {
             Object.entries(intelData.intelligence || {}).forEach(([ticker, intel]) => {
                 cachedIntelligence[ticker] = intel;
             });
+            (intelData.incomplete_tickers || []).forEach(ticker => {
+                if (!intelligenceRetryState[ticker]) intelligenceRetryState[ticker] = 0;
+            });
         }
 
         if (moveRes.ok) {
@@ -2718,7 +2886,8 @@ async function loadHoldingIntelligence() {
             });
         }
 
-        intelligenceLoaded = Object.keys(cachedIntelligence).length > 0;
+        await verifyAndRefreshIncompleteIntelligence();
+        intelligenceLoaded = updateIntelligenceLoadedState();
         intelligenceLoading = false;
         setAiChecking(false, intelligenceLoaded ? "Insights ready" : "Watching holdings", intelligenceLoaded);
 
@@ -2746,11 +2915,13 @@ async function loadHoldingIntelligence() {
 
     } catch (err) {
         intelligenceLoading = false;
-        intelligenceLoaded = false;
-        setAiChecking(false, "Check paused", false);
-        Array.from(tbody.querySelectorAll(".intel-coverage-section")).forEach(s => {
-            s.innerHTML = `<div class="intel-coverage"><span style="font-size:.75rem;color:var(--accent-red)">Could not load coverage data</span></div>`;
+        holdingTickers().forEach(ticker => {
+            if (!cachedIntelligence[ticker]) cachedIntelligence[ticker] = fallbackIntelligenceForTicker(ticker);
+            intelligenceExhaustedTickers.add(ticker);
         });
+        intelligenceLoaded = updateIntelligenceLoadedState();
+        setAiChecking(false, "Check paused", false);
+        injectSummaryRows(tbody);
         Array.from(tbody.querySelectorAll(".intel-move-section")).forEach(renderMoveExplainerFallback);
     } finally {
         if (intelligenceLoading) setAiChecking(false, "Watching holdings", false);

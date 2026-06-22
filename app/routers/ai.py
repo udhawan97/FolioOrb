@@ -36,6 +36,73 @@ HAIKU_45_OUTPUT_USD_PER_MILLION = 5.00
 ESTIMATED_PROMPT_TOKENS_PER_SUMMARY = 210
 
 
+def _is_number(value) -> bool:
+    try:
+        if value is None or value == "":
+            return False
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _has_positive_number(data: dict, *keys: str) -> bool:
+    return any(_is_number(data.get(key)) and float(data[key]) > 0 for key in keys)
+
+
+def _has_number(data: dict, *keys: str) -> bool:
+    return any(_is_number(data.get(key)) for key in keys)
+
+
+def _market_pulse_status(intel_dict: dict) -> dict:
+    """
+    Report whether the metric boxes in the expanded holding UI have live values.
+    The browser uses this to retry only the holdings that came back sparse.
+    """
+    missing: list[str] = []
+    coverage_type = intel_dict.get("coverage_type") or ""
+
+    if coverage_type == "equity":
+        if not _has_positive_number(intel_dict, "market_cap", "enterprise_value"):
+            missing.append("market_cap")
+        if not _has_positive_number(
+            intel_dict,
+            "enterprise_to_revenue",
+            "enterprise_to_ebitda",
+            "forward_pe",
+            "pe_ratio",
+            "price_to_sales",
+        ):
+            missing.append("valuation")
+        if not _has_number(
+            intel_dict,
+            "fcf_yield",
+            "revenue_growth",
+            "gross_margin",
+            "operating_margin",
+            "profit_margin",
+            "dividend_yield",
+        ):
+            missing.append("quality")
+    else:
+        if not _has_number(intel_dict, "expense_ratio", "expense_ratio_bps"):
+            missing.append("expense_ratio")
+        if not _has_positive_number(intel_dict, "volume", "average_volume"):
+            missing.append("volume")
+        if not _has_number(intel_dict, "bid_ask_spread_pct"):
+            missing.append("bid_ask_spread")
+
+    return {"loaded": not missing, "missing": missing}
+
+
+def _with_load_status(intel_dict: dict) -> dict:
+    intel_dict["load_status"] = {
+        "coverage": bool(intel_dict.get("strategy") and intel_dict.get("coverage_label")),
+        "market_pulse": _market_pulse_status(intel_dict),
+    }
+    return intel_dict
+
+
 def _estimate_text_tokens(text: str | None) -> int:
     """Approximate token count from persisted text when exact API usage is unavailable."""
     if not text:
@@ -375,7 +442,7 @@ async def get_holding_intelligence_single(ticker: str):
     if stock_data.get("error"):
         raise HTTPException(status_code=404, detail=f"Cannot fetch data for {ticker}")
     intel = get_holding_intelligence(ticker, stock_data)
-    return _enrich_intelligence_dict(intelligence_to_dict(intel), stock_data)
+    return _with_load_status(_enrich_intelligence_dict(intelligence_to_dict(intel), stock_data))
 
 
 @router.get("/intelligence/all/batch")
@@ -384,20 +451,24 @@ async def get_all_intelligence(db: Session = Depends(get_db)):
     Return holding intelligence for all portfolio holdings.
     Combines structured coverage data (sectors, countries, benchmarks) for every holding.
     """
-    quotes = {q["ticker"]: q for q in get_all_quotes(_active_portfolio_tickers(db))}
+    active_tickers = _active_portfolio_tickers(db)
+    quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
     results: dict[str, dict] = {}
-    for ticker, stock_data in quotes.items():
+    for ticker in active_tickers:
+        stock_data = quotes.get(ticker) or {"ticker": ticker, "error": "Missing quote"}
         try:
             intel = get_holding_intelligence(
                 ticker, stock_data if not stock_data.get("error") else None
             )
-            results[ticker] = _enrich_intelligence_dict(
-                intelligence_to_dict(intel),
-                stock_data if not stock_data.get("error") else None,
+            results[ticker] = _with_load_status(
+                _enrich_intelligence_dict(
+                    intelligence_to_dict(intel),
+                    stock_data if not stock_data.get("error") else None,
+                )
             )
         except Exception as e:
             logger.error("Intelligence fetch failed for %s: %s", ticker, e)
-            results[ticker] = {
+            results[ticker] = _with_load_status({
                 "ticker": ticker,
                 "coverage_type": "equity",
                 "coverage_label": "Unknown",
@@ -440,8 +511,19 @@ async def get_all_intelligence(db: Session = Depends(get_db)):
                 "aum": None,
                 "data_quality": "static",
                 "data_sources": [],
-            }
-    return {"intelligence": results, "count": len(results)}
+            })
+
+    incomplete_tickers = [
+        ticker for ticker in active_tickers
+        if not results.get(ticker, {}).get("load_status", {}).get("market_pulse", {}).get("loaded")
+    ]
+    return {
+        "intelligence": results,
+        "count": len(results),
+        "expected_count": len(active_tickers),
+        "complete": not incomplete_tickers and len(results) == len(active_tickers),
+        "incomplete_tickers": incomplete_tickers,
+    }
 
 
 # ── Analyst Recommendation endpoints ─────────────────────────────────────────

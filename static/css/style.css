@@ -3344,6 +3344,14 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .market-pulse-card.negative { --pulse-color: var(--accent-red); }
 .market-pulse-card.neutral { --pulse-color: var(--text-tertiary); }
 
+.intel-refresh-note {
+    align-items: flex-start;
+    color: var(--text-tertiary);
+    border-color: color-mix(in srgb, var(--accent-cyan) 22%, transparent);
+    background: color-mix(in srgb, var(--accent-cyan) 8%, transparent);
+    white-space: normal;
+}
+
 .pulse-icon {
     position: relative;
     z-index: 1;
