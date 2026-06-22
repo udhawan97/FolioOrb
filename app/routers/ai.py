@@ -13,6 +13,8 @@ from app.models import AISummary, Holding
 from app.services.ai_service import MODEL, generate_stock_summary
 from app.services.move_explainer import (
     HoldingMoveSummary,
+    _day_change_pct_cached,
+    compute_contribution_breakdown,
     explain_move,
     get_benchmark_data,
 )
@@ -101,6 +103,51 @@ def _with_load_status(intel_dict: dict) -> dict:
         "market_pulse": _market_pulse_status(intel_dict),
     }
     return intel_dict
+
+
+def _attach_contributions_batch(intel_dicts: dict[str, dict]) -> None:
+    """
+    Batch-fetch day_change_pct for all unique holding tickers across ETF intel dicts,
+    then attach contribution_breakdown to each dict that has top_holdings.
+
+    Runs one concurrent ThreadPoolExecutor pass for all unique tickers to minimise
+    total wall-clock time.  Falls back gracefully: individual fetch failures yield
+    contribution_pp=0.0 for that holding; a complete timeout leaves the field None.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    unique: set[str] = set()
+    for d in intel_dicts.values():
+        if d.get("coverage_type") == "equity":
+            continue
+        for h in d.get("top_holdings") or []:
+            unique.add(h["ticker"])
+
+    preloaded: dict[str, float] = {}
+    if unique:
+        try:
+            with ThreadPoolExecutor(max_workers=min(16, len(unique))) as pool:
+                futures = {pool.submit(_day_change_pct_cached, t): t for t in unique}
+                for future in as_completed(futures, timeout=8.0):
+                    t = futures[future]
+                    try:
+                        preloaded[t] = future.result()
+                    except Exception:
+                        preloaded[t] = 0.0
+        except Exception:
+            pass  # populate what we have; remainder gets 0.0 inside compute_contribution_breakdown
+
+    for d in intel_dicts.values():
+        top_holdings = d.get("top_holdings") or []
+        if not top_holdings or d.get("coverage_type") == "equity":
+            d["contribution_breakdown"] = None
+            continue
+        try:
+            d["contribution_breakdown"] = compute_contribution_breakdown(
+                top_holdings, preloaded_changes=preloaded
+            )
+        except Exception:
+            d["contribution_breakdown"] = None
 
 
 def _estimate_text_tokens(text: str | None) -> int:
@@ -442,7 +489,35 @@ async def get_holding_intelligence_single(ticker: str):
     if stock_data.get("error"):
         raise HTTPException(status_code=404, detail=f"Cannot fetch data for {ticker}")
     intel = get_holding_intelligence(ticker, stock_data)
-    return _with_load_status(_enrich_intelligence_dict(intelligence_to_dict(intel), stock_data))
+    intel_dict = _enrich_intelligence_dict(intelligence_to_dict(intel), stock_data)
+    top_holdings = intel_dict.get("top_holdings") or []
+    if top_holdings and intel_dict.get("coverage_type") != "equity":
+        try:
+            intel_dict["contribution_breakdown"] = compute_contribution_breakdown(top_holdings)
+        except Exception:
+            intel_dict["contribution_breakdown"] = None
+    else:
+        intel_dict["contribution_breakdown"] = None
+    return _with_load_status(intel_dict)
+
+
+_FALLBACK_INTEL_BASE = {
+    "coverage_type": "equity", "coverage_label": "Unknown",
+    "strategy": "Data unavailable", "asset_class": "equities", "theme": None,
+    "sectors": [], "countries": [], "top_holdings": [],
+    "benchmark_tickers": ["SPY"], "benchmark_labels": {"SPY": "S&P 500"},
+    "peer_tickers": [], "key_drivers": [], "concentration_level": "medium",
+    "concentration_label": "", "expense_ratio": None, "expense_ratio_bps": None,
+    "day_change_pct": None, "volume": None, "average_volume": None,
+    "bid": None, "ask": None, "bid_ask_spread_pct": None,
+    "market_cap": None, "enterprise_value": None, "total_revenue": None,
+    "ebitda": None, "free_cashflow": None, "fcf_yield": None,
+    "pe_ratio": None, "forward_pe": None, "price_to_sales": None,
+    "enterprise_to_revenue": None, "enterprise_to_ebitda": None,
+    "revenue_growth": None, "gross_margin": None, "operating_margin": None,
+    "profit_margin": None, "dividend_yield": None, "aum": None,
+    "data_quality": "static", "data_sources": [],
+}
 
 
 @router.get("/intelligence/all/batch")
@@ -453,65 +528,32 @@ async def get_all_intelligence(db: Session = Depends(get_db)):
     """
     active_tickers = _active_portfolio_tickers(db)
     quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
-    results: dict[str, dict] = {}
+
+    # Phase 1: build all intel dicts (existing behaviour)
+    intel_dicts: dict[str, dict] = {}
     for ticker in active_tickers:
         stock_data = quotes.get(ticker) or {"ticker": ticker, "error": "Missing quote"}
         try:
             intel = get_holding_intelligence(
                 ticker, stock_data if not stock_data.get("error") else None
             )
-            results[ticker] = _with_load_status(
-                _enrich_intelligence_dict(
-                    intelligence_to_dict(intel),
-                    stock_data if not stock_data.get("error") else None,
-                )
+            intel_dicts[ticker] = _enrich_intelligence_dict(
+                intelligence_to_dict(intel),
+                stock_data if not stock_data.get("error") else None,
             )
         except Exception as e:
             logger.error("Intelligence fetch failed for %s: %s", ticker, e)
-            results[ticker] = _with_load_status({
-                "ticker": ticker,
-                "coverage_type": "equity",
-                "coverage_label": "Unknown",
-                "strategy": "Data unavailable",
-                "asset_class": "equities",
-                "theme": None,
-                "sectors": [],
-                "countries": [],
-                "top_holdings": [],
-                "benchmark_tickers": ["SPY"],
-                "benchmark_labels": {"SPY": "S&P 500"},
-                "peer_tickers": [],
-                "key_drivers": [],
-                "concentration_level": "medium",
-                "concentration_label": "",
-                "expense_ratio": None,
-                "expense_ratio_bps": None,
-                "day_change_pct": None,
-                "volume": None,
-                "average_volume": None,
-                "bid": None,
-                "ask": None,
-                "bid_ask_spread_pct": None,
-                "market_cap": None,
-                "enterprise_value": None,
-                "total_revenue": None,
-                "ebitda": None,
-                "free_cashflow": None,
-                "fcf_yield": None,
-                "pe_ratio": None,
-                "forward_pe": None,
-                "price_to_sales": None,
-                "enterprise_to_revenue": None,
-                "enterprise_to_ebitda": None,
-                "revenue_growth": None,
-                "gross_margin": None,
-                "operating_margin": None,
-                "profit_margin": None,
-                "dividend_yield": None,
-                "aum": None,
-                "data_quality": "static",
-                "data_sources": [],
-            })
+            intel_dicts[ticker] = {"ticker": ticker, **_FALLBACK_INTEL_BASE}
+
+    # Phase 2: batch-fetch holding prices and attach contribution breakdowns
+    try:
+        _attach_contributions_batch(intel_dicts)
+    except Exception as e:
+        logger.warning("Contribution batch failed, skipping: %s", e)
+        for d in intel_dicts.values():
+            d.setdefault("contribution_breakdown", None)
+
+    results = {ticker: _with_load_status(d) for ticker, d in intel_dicts.items()}
 
     incomplete_tickers = [
         ticker for ticker in active_tickers

@@ -5741,6 +5741,28 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     opacity: 0.46;
     vertical-align: 0.12em;
 }
+.target-stock-stack {
+    min-width: 5.9rem;
+}
+.target-stock-value {
+    font-size: 0.88rem;
+    font-weight: 750;
+    line-height: 1.12;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.target-stock-upside {
+    --target-stock-color: var(--text-tertiary);
+    margin-top: 0.22rem;
+    font-size: 0.66rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--target-stock-color);
+}
+.target-stock-upside.positive { --target-stock-color: var(--accent-green); }
+.target-stock-upside.negative { --target-stock-color: var(--accent-red); }
+.target-stock-upside.neutral { --target-stock-color: var(--text-tertiary); }
 .target-upside {
     font-size: 0.62rem;
     font-weight: 600;
@@ -6629,6 +6651,99 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 [data-bs-theme="light"] .intel-loading-title {
     color: #1C1C1E;
 }
+
+/* ── Holdings Contribution Breakdown ─────────────────────────────────────── */
+.contrib-breakdown {
+    margin-bottom: 0.5rem;
+}
+
+.contrib-header {
+    display: grid;
+    grid-template-columns: 54px 44px 1fr 40px;
+    gap: 0.3rem;
+    margin-bottom: 0.2rem;
+    padding-bottom: 0.18rem;
+    border-bottom: 1px solid var(--hairline-soft);
+}
+.contrib-col-ticker,
+.contrib-col-chg,
+.contrib-col-bar,
+.contrib-col-pp {
+    font-size: 0.57rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-tertiary);
+}
+.contrib-col-chg,
+.contrib-col-pp { text-align: right; }
+
+.contrib-row {
+    display: grid;
+    grid-template-columns: 54px 44px 1fr 40px;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.09rem 0;
+    animation: intelFadeUp 0.38s var(--ease) both;
+    animation-delay: var(--contrib-delay, 0s);
+}
+
+.contrib-ticker {
+    font-size: 0.67rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.contrib-chg,
+.contrib-pp {
+    font-size: 0.63rem;
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+.contrib-chg.positive,
+.contrib-pp.positive { color: var(--accent-green); }
+.contrib-chg.negative,
+.contrib-pp.negative { color: var(--accent-red); }
+
+.contrib-bar-track {
+    height: 4px;
+    background: var(--control-bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.contrib-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transform-origin: left center;
+    transform: scaleX(var(--contrib-bar, 0));
+    animation: intelBarReveal 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--contrib-delay, 0s) + 0.06s);
+}
+.contrib-bar-fill.pos {
+    background: linear-gradient(90deg, rgba(48, 209, 88, 0.5), var(--accent-green));
+}
+.contrib-bar-fill.neg {
+    background: linear-gradient(90deg, rgba(255, 69, 58, 0.4), rgba(255, 69, 58, 0.7));
+}
+
+.contrib-summary {
+    margin-top: 0.35rem;
+    padding-top: 0.28rem;
+    border-top: 1px solid var(--hairline-soft);
+    font-size: 0.63rem;
+    color: var(--text-tertiary);
+    line-height: 1.4;
+}
+.contrib-summary strong.positive { color: var(--accent-green); font-weight: 600; }
+.contrib-summary strong.negative { color: var(--accent-red);   font-weight: 600; }
 
 .intel-loading-sub {
     font-size: 0.70rem;

@@ -5,6 +5,8 @@ Every explanation is grounded in retrieved data — no invented reasons.
 Benchmarks are chosen per-holding, not defaulted to SPY/QQQ for everything.
 """
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -137,6 +139,71 @@ def _day_change_pct(ticker: str) -> float:
     except Exception:
         pass
     return 0.0
+
+
+# Per-ticker daily-change cache so batch contribution fetches don't spam yfinance.
+_HOLDING_CHANGE_CACHE: dict[str, tuple[float, float]] = {}  # ticker → (pct, monotonic_ts)
+_HOLDING_CACHE_TTL = 300.0  # 5 minutes
+
+
+def _day_change_pct_cached(ticker: str) -> float:
+    now = time.monotonic()
+    entry = _HOLDING_CHANGE_CACHE.get(ticker)
+    if entry and now - entry[1] < _HOLDING_CACHE_TTL:
+        return entry[0]
+    pct = _day_change_pct(ticker)
+    _HOLDING_CHANGE_CACHE[ticker] = (pct, now)
+    return pct
+
+
+def compute_contribution_breakdown(
+    top_holdings: list[dict],
+    *,
+    preloaded_changes: dict[str, float] | None = None,
+    max_workers: int = 10,
+    timeout: float = 8.0,
+) -> list[dict]:
+    """
+    Return weight-adjusted contribution (in percentage points) for each holding.
+
+    Pass preloaded_changes when prices were already fetched in batch (avoids redundant
+    network calls). Falls back to concurrent yfinance fetches for any ticker not covered.
+    """
+    if not top_holdings:
+        return []
+
+    changes: dict[str, float] = dict(preloaded_changes or {})
+    missing = [h["ticker"] for h in top_holdings if h["ticker"] not in changes]
+
+    if missing:
+        try:
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(missing))) as pool:
+                futures = {pool.submit(_day_change_pct_cached, t): t for t in missing}
+                done = as_completed(futures, timeout=timeout)
+                for future in done:
+                    t = futures[future]
+                    try:
+                        changes[t] = future.result()
+                    except Exception:
+                        changes[t] = 0.0
+        except Exception:
+            pass  # use what we have; missing tickers get 0.0 below
+
+    results = []
+    for h in top_holdings:
+        t = h["ticker"]
+        w = float(h.get("weight") or 0)
+        chg = changes.get(t, 0.0)
+        results.append({
+            "ticker": t,
+            "name": h.get("name", t),
+            "weight": w,
+            "day_change_pct": round(chg, 2),
+            "contribution_pp": round(w / 100.0 * chg, 4),
+        })
+
+    results.sort(key=lambda x: abs(x["contribution_pp"]), reverse=True)
+    return results
 
 
 def get_benchmark_data() -> dict[str, float]:

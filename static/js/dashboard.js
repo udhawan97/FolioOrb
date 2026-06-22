@@ -1727,6 +1727,10 @@ function renderMoveExplainer(section, data, coverageData = null) {
         : "";
     const keyDriversHtml = renderKeyDriversSpecRows(coverageData?.key_drivers || []);
     const moveStatStripHtml = renderMoveStatStrip(data);
+    const contributionHtml = renderContributionBreakdown(
+        coverageData?.contribution_breakdown,
+        data.day_change_pct
+    );
 
     section.innerHTML = `
         <div class="intel-move">
@@ -1745,6 +1749,7 @@ function renderMoveExplainer(section, data, coverageData = null) {
             ${macroPillsHtml}
             ${keyDriversHtml}
             ${moveStatStripHtml}
+            ${contributionHtml}
         </div>`;
     const heroEl = section.querySelector('.move-hero-number');
     if (heroEl) animateMoveHeroNumber(heroEl, heroEl.textContent);
@@ -2066,6 +2071,56 @@ function buildMoveStatItems(data) {
     });
 
     return items;
+}
+
+function renderContributionBreakdown(breakdown, etfDayChangePct) {
+    if (!breakdown || !breakdown.length) return "";
+
+    const maxAbs = Math.max(...breakdown.map(h => Math.abs(h.contribution_pp)), 0.0001);
+    const totalPp = breakdown.reduce((s, h) => s + h.contribution_pp, 0);
+
+    const rows = breakdown.map((h, i) => {
+        const isPos = h.contribution_pp >= 0;
+        const barPct = Math.round(Math.abs(h.contribution_pp) / maxAbs * 100);
+        const chgSign = h.day_change_pct >= 0 ? "+" : "";
+        const chgStr = `${chgSign}${h.day_change_pct.toFixed(2)}%`;
+        const ppSign  = h.contribution_pp >= 0 ? "+" : "";
+        const ppStr   = `${ppSign}${h.contribution_pp.toFixed(2)}%`;
+        return `
+        <div class="contrib-row" style="--contrib-delay:${i * 0.06}s">
+            <span class="contrib-ticker">${escapeHtml(h.ticker)}</span>
+            <span class="contrib-chg ${isPos ? "positive" : "negative"}">${escapeHtml(chgStr)}</span>
+            <div class="contrib-bar-track">
+                <div class="contrib-bar-fill ${isPos ? "pos" : "neg"}" style="--contrib-bar:${barPct / 100}"></div>
+            </div>
+            <span class="contrib-pp ${isPos ? "positive" : "negative"}">${escapeHtml(ppStr)}</span>
+        </div>`;
+    }).join("");
+
+    const totalSign = totalPp >= 0 ? "+" : "";
+    const totalStr  = `${totalSign}${totalPp.toFixed(2)}%`;
+    const totalTone = totalPp >= 0 ? "positive" : "negative";
+
+    let summaryLine = `Top holdings contributed <strong class="${totalTone}">${escapeHtml(totalStr)}</strong> to today's move`;
+    if (isFiniteNumber(etfDayChangePct) && Math.abs(etfDayChangePct) > 0.01) {
+        const pct = Math.round(Math.abs(totalPp) / Math.abs(etfDayChangePct) * 100);
+        summaryLine += ` (${pct}% explained by top ${breakdown.length})`;
+    }
+
+    return `
+        <div class="intel-label" style="margin-top:.6rem">
+            <i class="bi bi-distribute-vertical"></i> Holdings Contribution
+        </div>
+        <div class="contrib-breakdown">
+            <div class="contrib-header">
+                <span class="contrib-col-ticker">Holding</span>
+                <span class="contrib-col-chg">Move</span>
+                <span class="contrib-col-bar"></span>
+                <span class="contrib-col-pp">Impact</span>
+            </div>
+            ${rows}
+            <div class="contrib-summary">${summaryLine}</div>
+        </div>`;
 }
 
 function renderMoveStatStrip(data) {
@@ -2390,11 +2445,12 @@ function renderTargetCell(rec) {
     // Stocks with analyst consensus price target
     if (rec.target_price) {
         const upside = rec.target_upside_pct;
-        const sign = upside >= 0 ? "+" : "";
-        const color = upside >= 0 ? "var(--accent-green)" : "var(--accent-red)";
-        return `<div class="target-price-value">${formatCurrency(rec.target_price)}</div>
-                <div class="target-upside" style="color:${color}">${sign}${upside.toFixed(1)}%</div>
-                ${renderTargetKind("stock", "bi-bullseye", "Stock target")}`;
+        const tone = signalTone(upside);
+        return `<div class="target-signal-stack target-stock-stack">
+                    <div class="target-price-value target-stock-value">${formatCurrency(rec.target_price)}</div>
+                    <div class="target-stock-upside ${tone}">${escapeHtml(formatSignalPct(upside))}</div>
+                    ${renderTargetKind("stock", "bi-bullseye", "Stock target")}
+                </div>`;
     }
     // ETFs and stocks without analyst coverage — show Free Cash Flow Yield
     if (rec.fcf_yield != null) {
