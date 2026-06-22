@@ -8,6 +8,7 @@ from app.services.holding_intelligence import (
     get_holding_intelligence,
     intelligence_to_dict,
     COVERAGE_TYPE_LABELS,
+    TopHolding,
     _STATIC,
 )
 
@@ -154,6 +155,18 @@ class TestGetHoldingIntelligence:
         assert len(intel.top_holdings) > 0
         tickers = [h.ticker for h in intel.top_holdings]
         assert any(t in tickers for t in ["RTX", "LMT", "GD", "NOC", "BA"])
+
+    def test_static_etf_keeps_extended_live_holdings_for_contributions(self):
+        live_holdings = [
+            TopHolding(ticker=f"H{i}", name=f"Holding {i}", weight=1.0)
+            for i in range(8)
+        ]
+        with patch("app.services.holding_intelligence._try_yfinance_enrichment") as mock_yf:
+            mock_yf.return_value = ([], [], live_holdings)
+            intel = get_holding_intelligence("IEMG", None)
+
+        assert len(intel.top_holdings) == 8
+        assert intel.top_holdings[-1].ticker == "H7"
 
     def test_unknown_ticker_returns_derived_intelligence(self):
         with patch("app.services.holding_intelligence._try_yfinance_enrichment") as mock_yf:

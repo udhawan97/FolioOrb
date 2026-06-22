@@ -18,6 +18,8 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
+MAX_CONTRIBUTION_HOLDINGS = 25
+
 
 # ── Dataclasses ───────────────────────────────────────────────────────────────
 
@@ -494,7 +496,7 @@ def _try_yfinance_enrichment(ticker: str) -> tuple[list, list, list]:
         if countries:
             countries.sort(key=lambda x: x.weight, reverse=True)
 
-        for h in (info.get("holdings") or [])[:5]:
+        for h in (info.get("holdings") or [])[:MAX_CONTRIBUTION_HOLDINGS]:
             if isinstance(h, dict):
                 sym = h.get("symbol") or ""
                 name = h.get("holdingName") or sym
@@ -544,8 +546,8 @@ def get_holding_intelligence(
             data_sources.append("yfinance")
         if live_c and not raw_countries:
             raw_countries = live_c[:6]
-        if live_h and not raw_holdings:
-            raw_holdings = live_h[:5]
+        if live_h and len(live_h) > len(raw_holdings):
+            raw_holdings = live_h
 
     return HoldingIntelligence(
         ticker=ticker,
@@ -556,7 +558,7 @@ def get_holding_intelligence(
         theme=static.get("theme"),
         sectors=raw_sectors[:6],
         countries=raw_countries[:6],
-        top_holdings=raw_holdings[:5],
+        top_holdings=raw_holdings[:MAX_CONTRIBUTION_HOLDINGS],
         benchmark_tickers=static["benchmark_tickers"],
         benchmark_labels=static["benchmark_labels"],
         peer_tickers=static.get("peer_tickers") or [],
@@ -606,7 +608,7 @@ def _derive_unknown(ticker: str, stock_data: Optional[dict]) -> HoldingIntellige
         theme=sector if sector not in ("N/A", "") else None,
         sectors=live_s[:6],
         countries=live_c[:6],
-        top_holdings=live_h[:5],
+        top_holdings=live_h[:MAX_CONTRIBUTION_HOLDINGS],
         benchmark_tickers=benchmarks,
         benchmark_labels=labels,
         peer_tickers=[],

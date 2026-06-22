@@ -1731,7 +1731,8 @@ function renderMoveExplainer(section, data, coverageData = null) {
         coverageData?.contribution_breakdown,
         data.day_change_pct,
         coverageData?.ticker,
-        coverageData?.coverage_type
+        coverageData?.coverage_type,
+        coverageData?.top_holdings
     );
 
     section.innerHTML = `
@@ -1808,7 +1809,7 @@ function renderFundScaleSpotlight(data, priceSignal = null) {
     const change30 = firstFiniteValue(priceSignal?.vs30dChangePct, priceSignal?.vs30dPct);
     const change200 = firstFiniteValue(priceSignal?.vs200dChangePct, priceSignal?.vs200dPct);
     const hasTrends = isFiniteNumber(change30) || isFiniteNumber(change200);
-    if (!hasAum && !hasTrends) return "";
+    if (!hasAum) return "";
 
     return `
         <div class="fund-scale-spotlight" aria-label="Fund scale and price trend">
@@ -1817,7 +1818,7 @@ function renderFundScaleSpotlight(data, priceSignal = null) {
             </div>
             <div class="fund-scale-copy">
                 <span class="fund-scale-label">Fund scale</span>
-                <strong class="fund-scale-value">${hasAum ? escapeHtml(formatCompact(aum)) : "AUM unavailable"}</strong>
+                <strong class="fund-scale-value">${escapeHtml(formatCompact(aum))}</strong>
                 <span class="fund-scale-detail">Assets under management</span>
             </div>
             ${hasTrends ? `
@@ -2075,10 +2076,12 @@ function buildMoveStatItems(data) {
     return items;
 }
 
-function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverageType) {
+function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverageType, topHoldings) {
     if (!breakdown || !breakdown.length) {
-        // For ETFs only: show a retry placeholder instead of nothing
-        if (coverageType && coverageType !== "equity" && ticker) {
+        // Only show the retry placeholder for ETFs that have top holdings defined
+        // but the price fetch failed — not for ETFs with no holdings data at all
+        const hasKnownHoldings = Array.isArray(topHoldings) && topHoldings.length > 0;
+        if (coverageType && coverageType !== "equity" && ticker && hasKnownHoldings) {
             return `
                 <div class="intel-label" style="margin-top:.6rem">
                     <i class="bi bi-distribute-vertical"></i> Holdings Contribution
@@ -2094,10 +2097,28 @@ function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverag
         return "";
     }
 
-    const maxAbs = Math.max(...breakdown.map(h => Math.abs(h.contribution_pp)), 0.0001);
-    const totalPp = breakdown.reduce((s, h) => s + h.contribution_pp, 0);
+    const normalized = breakdown
+        .map(h => ({
+            ...h,
+            day_change_pct: Number(h.day_change_pct),
+            contribution_pp: Number(h.contribution_pp),
+        }))
+        .filter(h => isFiniteNumber(h.day_change_pct) && isFiniteNumber(h.contribution_pp));
 
-    const rows = breakdown.map((h, i) => {
+    if (!normalized.length) return "";
+
+    const topGainers = normalized
+        .filter(h => h.contribution_pp > 0)
+        .sort((a, b) => b.contribution_pp - a.contribution_pp)
+        .slice(0, 5);
+    const topLosers = normalized
+        .filter(h => h.contribution_pp < 0)
+        .sort((a, b) => a.contribution_pp - b.contribution_pp)
+        .slice(0, 5);
+    const displayedRows = [...topGainers, ...topLosers];
+    const totalPp = displayedRows.reduce((s, h) => s + h.contribution_pp, 0);
+
+    const renderRows = (items, maxAbs, baseIndex) => items.map((h, i) => {
         const isPos = h.contribution_pp >= 0;
         const barPct = Math.round(Math.abs(h.contribution_pp) / maxAbs * 100);
         const chgSign = h.day_change_pct >= 0 ? "+" : "";
@@ -2106,7 +2127,7 @@ function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverag
         const ppStr   = `${ppSign}${h.contribution_pp.toFixed(2)}%`;
         const dirIcon = isPos ? "bi-caret-up-fill" : "bi-caret-down-fill";
         return `
-        <div class="contrib-row" style="--contrib-delay:${i * 0.06}s">
+        <div class="contrib-row" style="--contrib-delay:${(baseIndex + i) * 0.06}s">
             <span class="contrib-ticker">${escapeHtml(h.ticker)}</span>
             <span class="contrib-chg ${isPos ? "positive" : "negative"}"><i class="bi ${dirIcon} contrib-dir-icon"></i>${escapeHtml(chgStr)}</span>
             <div class="contrib-bar-track">
@@ -2116,22 +2137,41 @@ function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverag
         </div>`;
     }).join("");
 
+    const renderGroup = (title, tone, items, baseIndex) => {
+        const icon = tone === "positive" ? "bi-arrow-up-right" : "bi-arrow-down-right";
+        if (!items.length) {
+            return `
+                <div class="contrib-group ${tone}">
+                    <div class="contrib-group-title"><i class="bi ${icon}"></i>${title}</div>
+                    <div class="contrib-empty-row">No ${tone === "positive" ? "gainers" : "losers"} in the sampled holdings</div>
+                </div>`;
+        }
+        const maxAbs = Math.max(...items.map(h => Math.abs(h.contribution_pp)), 0.0001);
+        return `
+            <div class="contrib-group ${tone}">
+                <div class="contrib-group-title"><i class="bi ${icon}"></i>${title}</div>
+                ${renderRows(items, maxAbs, baseIndex)}
+            </div>`;
+    };
+
     const totalSign = totalPp >= 0 ? "+" : "";
     const totalStr  = `${totalSign}${totalPp.toFixed(2)}%`;
     const totalTone = totalPp >= 0 ? "positive" : "negative";
+    const shownCount = displayedRows.length;
+    const groupLabel = `${topGainers.length} gainers / ${topLosers.length} losers`;
 
-    let summaryLine = `Top holdings contributed <strong class="${totalTone}">${escapeHtml(totalStr)}</strong> to today's move`;
+    let summaryLine = `Top gainers and losers netted <strong class="${totalTone}">${escapeHtml(totalStr)}</strong> to today's move`;
     if (isFiniteNumber(etfDayChangePct) && Math.abs(etfDayChangePct) > 0.01) {
         const sameSide = (totalPp >= 0) === (etfDayChangePct >= 0);
         const pct = Math.round(Math.abs(totalPp) / Math.abs(etfDayChangePct) * 100);
         if (!sameSide) {
-            // Top holdings moved against the ETF's net direction — other holdings dominated
+            // Displayed holdings moved against the ETF's net direction; other holdings dominated.
             summaryLine += ` — other holdings drove the net move`;
         } else if (pct > 100) {
-            // Top holdings over-explain the ETF's move; other holdings partially offset
-            summaryLine += ` — offset by other holdings (top ${breakdown.length} over-explain net move)`;
+            // Displayed holdings over-explain the ETF's move; other holdings partially offset.
+            summaryLine += ` — offset by other holdings (shown ${shownCount} over-explain net move)`;
         } else {
-            summaryLine += ` (${pct}% of net move from top ${breakdown.length})`;
+            summaryLine += ` (${pct}% of net move from ${groupLabel})`;
         }
     }
 
@@ -2146,7 +2186,8 @@ function renderContributionBreakdown(breakdown, etfDayChangePct, ticker, coverag
                 <span class="contrib-col-bar"></span>
                 <span class="contrib-col-pp"><i class="bi bi-bullseye"></i> Impact</span>
             </div>
-            ${rows}
+            ${renderGroup("Top Gains", "positive", topGainers, 0)}
+            ${renderGroup("Top Losers", "negative", topLosers, topGainers.length)}
             <div class="contrib-summary">${summaryLine}</div>
         </div>`;
 }
