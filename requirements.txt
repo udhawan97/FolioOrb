@@ -23,7 +23,7 @@ numpy==2.4.6
 pandas==3.0.3
 peewee==4.0.6
 platformdirs==4.10.0
-protobuf==7.35.0
+protobuf==7.35.1
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
