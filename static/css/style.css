@@ -6852,3 +6852,239 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         inset 0 1px 0 rgba(255, 255, 255, 0.80),
         var(--shadow-card-hover);
 }
+
+/* ── Light-mode AI summary / intel panel — full override ─────────────────── */
+
+/* Summary expand row wrapper */
+[data-bs-theme="light"] .summary-inner {
+    border-color: rgba(10, 120, 180, 0.14);
+    background:
+        linear-gradient(135deg, rgba(10, 120, 180, 0.05), rgba(94, 92, 230, 0.03) 52%, rgba(20, 135, 92, 0.025)),
+        rgba(255, 255, 255, 0.72);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.90),
+        0 18px 42px -32px rgba(10, 120, 180, 0.22);
+}
+
+[data-bs-theme="light"] .summary-bullet:hover {
+    background: rgba(0, 0, 0, 0.035);
+}
+
+/* Premium intel grid — replace near-black background with frosted light surface */
+[data-bs-theme="light"] .intel-grid {
+    background:
+        radial-gradient(900px 420px at 78% -20%, rgba(10, 120, 180, 0.07), transparent 66%),
+        radial-gradient(780px 460px at -8% 112%, rgba(94, 92, 230, 0.05), transparent 70%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(248, 249, 255, 0.88) 48%, rgba(246, 250, 255, 0.90) 100%);
+    border-top-color: rgba(10, 120, 180, 0.14);
+    border-bottom-color: rgba(94, 92, 230, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -1px 0 rgba(10, 120, 180, 0.06),
+        0 12px 30px -22px rgba(10, 120, 180, 0.18);
+}
+
+/* Glass instrument overlay — lighten for day mode */
+[data-bs-theme="light"] .intel-grid::before {
+    background:
+        repeating-linear-gradient(
+            90deg,
+            rgba(10, 120, 180, 0.018) 0,
+            rgba(10, 120, 180, 0.018) 1px,
+            transparent 1px,
+            transparent 64px
+        ),
+        repeating-linear-gradient(
+            0deg,
+            rgba(94, 92, 230, 0.012) 0,
+            rgba(94, 92, 230, 0.012) 1px,
+            transparent 1px,
+            transparent 48px
+        ),
+        radial-gradient(560px 320px at 72% 24%, rgba(10, 120, 180, 0.04), rgba(94, 92, 230, 0.02) 42%, transparent 72%),
+        linear-gradient(125deg, rgba(10, 120, 180, 0.045), rgba(94, 92, 230, 0.03) 46%, rgba(20, 135, 92, 0.018));
+    opacity: 0.72;
+}
+
+/* Specular pass: switch blend mode so it reads on a white surface */
+[data-bs-theme="light"] .summary-body.open .intel-grid::after {
+    mix-blend-mode: multiply;
+    background:
+        linear-gradient(105deg,
+            transparent 0%,
+            rgba(0, 0, 0, 0.00) 36%,
+            rgba(94, 92, 230, 0.06) 49%,
+            rgba(10, 120, 180, 0.07) 52%,
+            rgba(0, 0, 0, 0.00) 66%,
+            transparent 100%);
+}
+
+/* Section ambient glows — lighten */
+[data-bs-theme="light"] .intel-coverage-section::before {
+    background:
+        radial-gradient(320px 220px at 18% 12%, rgba(10, 120, 180, 0.04), transparent 70%),
+        linear-gradient(120deg, transparent 0%, rgba(94, 92, 230, 0.016) 45%, transparent 70%);
+}
+[data-bs-theme="light"] .intel-move-section::before {
+    background:
+        radial-gradient(340px 240px at 82% 12%, rgba(10, 120, 180, 0.036), transparent 72%),
+        linear-gradient(120deg, transparent 4%, rgba(94, 92, 230, 0.018) 48%, transparent 72%);
+}
+
+/* Section header label glow — tone down for light */
+[data-bs-theme="light"] .intel-coverage > .intel-label:first-child,
+[data-bs-theme="light"] .intel-move > .intel-label:first-child {
+    text-shadow: none;
+}
+
+/* Theme badge */
+[data-bs-theme="light"] .intel-theme {
+    border-color: rgba(10, 120, 180, 0.16);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.72)),
+        linear-gradient(135deg, rgba(10, 120, 180, 0.07), rgba(94, 92, 230, 0.04));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 6px 16px -12px rgba(10, 120, 180, 0.22);
+}
+
+/* Strategy text — hardcoded white rgba → theme variable */
+[data-bs-theme="light"] .intel-strategy {
+    color: var(--text-secondary);
+}
+
+/* Sector bars — labels, tracks, percentages */
+[data-bs-theme="light"] .sector-bar-label {
+    color: var(--text-secondary);
+}
+[data-bs-theme="light"] .sector-bar-track {
+    background: rgba(0, 0, 0, 0.07);
+}
+[data-bs-theme="light"] .sector-bar-pct {
+    color: var(--text-secondary);
+}
+
+/* Spec / profile rows */
+[data-bs-theme="light"] .intel-spec-row > span {
+    color: var(--text-secondary);
+}
+[data-bs-theme="light"] .intel-spec-row > strong {
+    color: var(--text-primary);
+}
+
+/* Move-explainer text */
+[data-bs-theme="light"] .move-explanation-text {
+    color: var(--text-secondary);
+}
+[data-bs-theme="light"] .driver-item,
+[data-bs-theme="light"] .news-item {
+    color: var(--text-secondary);
+}
+
+/* Fund Scale spotlight — replace near-black slab with frosted card */
+[data-bs-theme="light"] .fund-scale-spotlight {
+    border-color: rgba(10, 120, 180, 0.22);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 255, 0.88)),
+        linear-gradient(135deg, rgba(10, 120, 180, 0.10), rgba(94, 92, 230, 0.055) 54%, rgba(20, 135, 92, 0.04));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.97),
+        inset 0 -1px 0 rgba(10, 120, 180, 0.06),
+        0 10px 24px -16px rgba(10, 120, 180, 0.28);
+}
+
+[data-bs-theme="light"] .fund-scale-label {
+    color: var(--text-tertiary);
+}
+[data-bs-theme="light"] .fund-scale-value {
+    color: var(--text-primary);
+    text-shadow: none;
+}
+[data-bs-theme="light"] .fund-scale-detail {
+    color: var(--text-secondary);
+}
+
+/* Fund trend chips */
+[data-bs-theme="light"] .fund-trend-chip {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 249, 255, 0.80)),
+        color-mix(in srgb, var(--chip-color) 7%, transparent);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 2px 8px -4px rgba(0, 0, 0, 0.08);
+}
+[data-bs-theme="light"] .fund-trend-chip span {
+    color: var(--text-tertiary);
+}
+[data-bs-theme="light"] .fund-trend-chip strong {
+    text-shadow: none;
+}
+
+/* Market pulse cards — replace near-black with frosted light surface */
+[data-bs-theme="light"] .market-pulse-card {
+    border-color: color-mix(in srgb, var(--pulse-color) 18%, rgba(0, 0, 0, 0.07));
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 255, 0.86)),
+        linear-gradient(135deg, color-mix(in srgb, var(--pulse-color) 10%, transparent), rgba(242, 244, 250, 0.60) 66%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.97),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.04),
+        0 8px 22px -16px rgba(0, 0, 0, 0.12);
+}
+[data-bs-theme="light"] .market-pulse-card::before {
+    background: linear-gradient(110deg, transparent 0%, color-mix(in srgb, var(--pulse-color) 12%, transparent) 46%, transparent 72%);
+}
+
+[data-bs-theme="light"] .pulse-label {
+    color: var(--text-tertiary);
+}
+[data-bs-theme="light"] .pulse-copy strong {
+    color: var(--text-primary);
+    text-shadow: none;
+}
+[data-bs-theme="light"] .pulse-detail {
+    color: var(--text-secondary);
+}
+[data-bs-theme="light"] .pulse-icon {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.90),
+        0 0 12px -6px var(--pulse-color);
+}
+
+/* Country / peer chips — white-rgba bg invisible on light */
+[data-bs-theme="light"] .country-chip {
+    background: rgba(0, 0, 0, 0.045);
+}
+[data-bs-theme="light"] .country-chip.primary {
+    background: rgba(10, 120, 180, 0.10);
+}
+[data-bs-theme="light"] .peer-chip {
+    background: rgba(0, 0, 0, 0.038);
+}
+
+/* Smooth theme transitions for the intel panel in both directions */
+.intel-grid,
+.fund-scale-spotlight,
+.market-pulse-card,
+.summary-inner,
+.fund-trend-chip {
+    transition: background 0.30s ease, border-color 0.28s ease, box-shadow 0.30s ease;
+}
+.intel-strategy,
+.sector-bar-label,
+.sector-bar-track,
+.sector-bar-pct,
+.intel-spec-row > span,
+.intel-spec-row > strong,
+.move-explanation-text,
+.driver-item,
+.news-item,
+.fund-scale-label,
+.fund-scale-value,
+.fund-scale-detail,
+.fund-trend-chip span,
+.pulse-label,
+.pulse-copy strong,
+.pulse-detail {
+    transition: color 0.26s ease;
+}
