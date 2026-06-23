@@ -53,8 +53,9 @@ def _build_prompt(stock_data: dict) -> str:
     chg_pct  = stock_data.get("day_change_pct", 0)
     fwh      = stock_data.get("fifty_two_week_high", 0)
     fwl      = stock_data.get("fifty_two_week_low", 0)
-    pe       = stock_data.get("pe_ratio") or None
-    div_pct  = round(stock_data.get("dividend_yield", 0) * 100, 2) or None
+    pe       = stock_data.get("pe_ratio")
+    _dv      = stock_data.get("dividend_yield")
+    div_pct  = round(_dv * 100, 2) if _dv is not None else None
     mktcap   = stock_data.get("market_cap", 0)
     qt       = (stock_data.get("quote_type") or "EQUITY").upper()
 

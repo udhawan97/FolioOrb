@@ -23,8 +23,9 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./database/portfolio.db")
     # Anthropic API key for AI features (leave blank to disable AI endpoints)
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    # When DEBUG=True, SQLAlchemy prints every SQL query to the console
-    DEBUG: bool = os.getenv("DEBUG", "True") == "True"
+    # When DEBUG=True, SQLAlchemy prints every SQL query to the console.
+    # Defaults to False — set DEBUG=True in .env for local development only.
+    DEBUG: bool = os.getenv("DEBUG", "False") == "True"
     SECRET_KEY: str = (
         os.getenv("SECRET_KEY")
         or os.getenv("APP_SECRET_KEY")

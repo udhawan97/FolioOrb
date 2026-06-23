@@ -331,15 +331,16 @@ async def get_stock_summary(
 @router.get("/summaries/all")
 async def get_all_summaries(db: Session = Depends(get_db)):
     """
-    Get or generate summaries for all default holdings.
+    Get or generate AI summaries for all active portfolio holdings.
     Returns cached summaries immediately, generates new ones for missing or stale tickers.
     This endpoint may take 30-60 seconds if generating all summaries fresh.
     """
     results = {}
 
-    quotes = {q["ticker"]: q for q in get_all_quotes()}
+    active_tickers = _active_portfolio_tickers(db)
+    quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
 
-    for ticker in DEFAULT_HOLDINGS:
+    for ticker in active_tickers:
         current_price = quotes.get(ticker, {}).get("current_price")
 
         cached = (

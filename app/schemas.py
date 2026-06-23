@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # Pydantic schemas define the shape of data coming IN (requests) and going OUT (responses).
@@ -43,6 +43,8 @@ class HoldingUpdate(BaseModel):
 
 class HoldingResponse(BaseModel):
     """Shape of a holding returned in API responses."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     ticker: str
     company_name: Optional[str]
@@ -51,9 +53,6 @@ class HoldingResponse(BaseModel):
     is_active: bool
     notes: Optional[str]
     added_at: datetime
-
-    class Config:
-        from_attributes = True  # Lets Pydantic read values directly from SQLAlchemy model objects
 
 
 # ── Portfolio Schemas ──────────────────────────────────────────────────
@@ -66,11 +65,10 @@ class PortfolioCreate(BaseModel):
 
 class PortfolioResponse(BaseModel):
     """Shape of a portfolio returned in API responses, including its list of holdings."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     description: Optional[str]
     created_at: datetime
     holdings: list[HoldingResponse] = []
-
-    class Config:
-        from_attributes = True

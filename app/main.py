@@ -28,11 +28,12 @@ app = FastAPI(
 )
 
 # Allow the local dashboard to call the API without exposing it to every origin.
+# Methods are restricted to only what the API actually uses.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Serve static files (CSS, JS, images) from the /static folder
@@ -43,7 +44,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(stocks.router)
 app.include_router(portfolio.router)
 app.include_router(ai.router)
-
 
 
 @app.get("/")

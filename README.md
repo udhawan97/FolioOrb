@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite"/>
   <img src="https://img.shields.io/badge/Bootstrap-5-7952B3?style=flat-square&logo=bootstrap&logoColor=white" alt="Bootstrap 5"/>
   <img src="https://img.shields.io/badge/Chart.js-FF6384?style=flat-square&logo=chartdotjs&logoColor=white" alt="Chart.js"/>
-  <img src="https://img.shields.io/badge/release-v1.2-brightgreen?style=flat-square" alt="Release v1.2"/>
+  <img src="https://img.shields.io/badge/release-v1.3-brightgreen?style=flat-square" alt="Release v1.3"/>
 </p>
 
 <p align="center">
@@ -51,12 +51,14 @@
 - Total portfolio value and daily P&L *(color-coded — green good, red bad, you know the drill)*
 - Allocation, return, and performance-history views
 - Market open/closed indicator with auto-refresh countdown — so you can watch it drop in real time
+- **Portfolio Butler companion** — a lightweight dashboard pet with witty market reactions and a polished top-bar toggle
 
 ### 🧠 Portfolio Intelligence *(the whole point)*
 - **Movement explanations** — macro, sector, benchmark, volume, earnings, and company context for each holding
 - **Portfolio-level AI analysis** — diversification themes, concentration risks, notable movers
 - **Holding coverage** — ETF sectors, regions, themes, and benchmark context
 - **Analyst recommendations** and ETF quality labels *(take with an appropriate grain of salt)*
+- **Claude texting animation** — Holding Intel now cues a subtle bottom-right chat animation while analysis runs
 
 ### ⚙️ Portfolio Management
 - Add and remove holdings from the UI
@@ -96,23 +98,23 @@ You do not need to be a developer to run FolioSenseAI locally. Think of this lik
 
 The Anthropic API key is optional. Without it, FolioSenseAI still runs with live market data and portfolio tracking; AI explanations stay disabled until you add a key from [console.anthropic.com](https://console.anthropic.com/).
 
-These commands install the GitHub release [v1.2](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v1.2).
+These commands install the GitHub release [v1.3](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v1.3).
 
 **Mac / Linux**
 
 ```bash
-curl -L -o FolioSenseAI-v1.2.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v1.2.zip
-unzip FolioSenseAI-v1.2.zip
-cd FolioSenseAI-release-v1.2
+curl -L -o FolioSenseAI-v1.3.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v1.3.zip
+unzip FolioSenseAI-v1.3.zip
+cd FolioSenseAI-release-v1.3
 ./scripts/setup.sh
 ```
 
 **Windows PowerShell**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v1.2.zip" -OutFile "FolioSenseAI-v1.2.zip"
-Expand-Archive -Path "FolioSenseAI-v1.2.zip" -DestinationPath .
-cd FolioSenseAI-release-v1.2
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v1.3.zip" -OutFile "FolioSenseAI-v1.3.zip"
+Expand-Archive -Path "FolioSenseAI-v1.3.zip" -DestinationPath .
+cd FolioSenseAI-release-v1.3
 .\scripts\setup.ps1
 ```
 
@@ -245,11 +247,13 @@ pip install --upgrade certifi
 
 ---
 
-## 🪄 What's New In v1.2
+## 🪄 What's New In v1.3
 
-- Cleaner move explanations for holdings: the dashboard focuses on market, sector, benchmark, volume, and earnings context.
-- Stronger holding-specific attribution using market, sector, benchmark, volume, and earnings context.
-- Regression coverage for stock move explanations so unsupported catalyst claims stay out of the UI.
+- Added **Portfolio Butler**, a living bottom-right dashboard companion with a subtle top-bar toggle.
+- Holding rows now trigger tiered, witty reactions based on daily move size: low, medium, and large gains or losses.
+- Holding Intel now shows a polished bottom-right texting animation while Claude works, while the table overlay keeps its clean scan/loading treatment.
+- Improved pet performance by keeping reactions local, deterministic, and animation-light with transform/opacity-based motion.
+- Refined dashboard copy and visual details around AI loading, cache-busted static assets, and interaction states.
 
 ---
 

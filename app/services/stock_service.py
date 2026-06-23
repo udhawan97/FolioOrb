@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 import yfinance as yf
 
@@ -62,6 +63,12 @@ def get_stock_data(ticker: str) -> dict:
             except (TypeError, ValueError, ZeroDivisionError):
                 fcf_yield = None
 
+        # Helper: round a numeric field to n decimal places, or return None if missing.
+        # Using explicit None check instead of `or 0` so callers can distinguish
+        # "zero" from "not available" — important for ratio display in the UI.
+        def _r(val, n: int):
+            return round(val, n) if val is not None else None
+
         return {
             "ticker": ticker.upper(),
             "name": info.get("longName") or info.get("shortName") or ticker,
@@ -91,16 +98,16 @@ def get_stock_data(ticker: str) -> dict:
                 or info.get("netExpenseRatio")
             ),
             "holdings_count": info.get("holdingsCount"),
-            "pe_ratio": round(info.get("trailingPE") or 0, 2),
-            "forward_pe": round(info.get("forwardPE") or 0, 2),
-            "price_to_sales": round(info.get("priceToSalesTrailing12Months") or 0, 2),
-            "enterprise_to_revenue": round(info.get("enterpriseToRevenue") or 0, 2),
-            "enterprise_to_ebitda": round(info.get("enterpriseToEbitda") or 0, 2),
+            "pe_ratio": _r(info.get("trailingPE"), 2),
+            "forward_pe": _r(info.get("forwardPE"), 2),
+            "price_to_sales": _r(info.get("priceToSalesTrailing12Months"), 2),
+            "enterprise_to_revenue": _r(info.get("enterpriseToRevenue"), 2),
+            "enterprise_to_ebitda": _r(info.get("enterpriseToEbitda"), 2),
             "revenue_growth": info.get("revenueGrowth"),
             "gross_margin": info.get("grossMargins"),
             "operating_margin": info.get("operatingMargins"),
             "profit_margin": info.get("profitMargins"),
-            "dividend_yield": round(info.get("dividendYield") or 0, 4),
+            "dividend_yield": _r(info.get("dividendYield"), 4),
             "currency": info.get("currency") or "USD",
             "sector": info.get("sector") or info.get("categoryName") or "N/A",
             "quote_type": info.get("quoteType") or "EQUITY",
@@ -126,16 +133,17 @@ def get_stock_data(ticker: str) -> dict:
 
 def get_all_quotes(tickers: Optional[list[str]] = None) -> list[dict]:
     """
-    Fetch live quotes for a list of tickers.
+    Fetch live quotes for a list of tickers in parallel.
     Defaults to DEFAULT_HOLDINGS when no list is provided.
+    Quote order matches the input ticker order.
     """
     if tickers is None:
         tickers = DEFAULT_HOLDINGS
-    quotes = []
-    for ticker in tickers:
-        quote = get_stock_data(ticker)
-        quotes.append(quote)
-        logger.info("Fetched quote")
+    if not tickers:
+        return []
+    with ThreadPoolExecutor(max_workers=min(10, len(tickers))) as pool:
+        quotes = list(pool.map(get_stock_data, tickers))
+    logger.info("Fetched %d quotes", len(quotes))
     return quotes
 
 
@@ -170,21 +178,3 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
         return []
 
 
-def save_price_snapshot(
-    _ticker: str, price: float, day_change_pct: float, holding_id: int, db
-) -> None:
-    """
-    Save a price snapshot to the database for historical tracking.
-    Called after every price fetch to build historical data.
-    """
-    from datetime import datetime, timezone
-    from app.models import PriceSnapshot
-
-    snapshot = PriceSnapshot(
-        holding_id=holding_id,
-        price=price,
-        day_change_pct=day_change_pct,
-        recorded_at=datetime.now(timezone.utc),
-    )
-    db.add(snapshot)
-    db.commit()
