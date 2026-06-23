@@ -361,6 +361,7 @@ body > .navbar {
 }
 
 .brand-cost-trigger {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 0.28rem;
@@ -385,6 +386,43 @@ body > .navbar {
     background: rgba(111, 214, 240, 0.12);
     color: var(--brand-cyan);
     border-color: rgba(111, 214, 240, 0.28);
+}
+
+.brand-cost-notif {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #FF9F0A;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 6px rgba(255, 159, 10, 0.65);
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+.brand-cost-notif--active {
+    opacity: 1;
+    transform: scale(1);
+    animation: notifPulse 2.4s ease-in-out infinite;
+}
+@keyframes notifPulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--bg), 0 0 6px rgba(255, 159, 10, 0.65); }
+    50% { box-shadow: 0 0 0 2px var(--bg), 0 0 10px rgba(255, 159, 10, 0.9); }
+}
+
+.brand-cost-breakdown {
+    display: block;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-tertiary);
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+}
+[data-bs-theme="light"] .brand-cost-breakdown {
+    border-top-color: rgba(0, 0, 0, 0.07);
 }
 
 .brand-icon-wrap {

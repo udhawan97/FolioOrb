@@ -2653,10 +2653,14 @@ async function loadAnalystRecommendations() {
     }
 }
 
+let _lastAiCostUsd = null;
+
 async function loadAiCostStats() {
     const valueEl = document.getElementById("brand-cost-value");
     const metaEl = document.getElementById("brand-cost-meta");
     const triggerLabel = document.getElementById("brand-cost-trigger-label");
+    const breakdownEl = document.getElementById("brand-cost-breakdown");
+    const notifEl = document.getElementById("brand-cost-notif");
     if (!valueEl || !metaEl) return;
 
     try {
@@ -2667,6 +2671,17 @@ async function loadAiCostStats() {
         valueEl.textContent = cost;
         metaEl.textContent = `${toNumber(data.estimated_total_tokens).toLocaleString()} est. tokens across ${data.cached_summaries} cached summaries`;
         if (triggerLabel) triggerLabel.textContent = cost;
+        if (breakdownEl) {
+            const inputTok = toNumber(data.estimated_input_tokens).toLocaleString();
+            const outputTok = toNumber(data.estimated_output_tokens).toLocaleString();
+            breakdownEl.textContent = `${inputTok} in · ${outputTok} out · $1/$5 per M`;
+        }
+        const newCost = toNumber(data.estimated_cost_usd);
+        if (notifEl && _lastAiCostUsd !== null && newCost !== _lastAiCostUsd) {
+            notifEl.classList.add("brand-cost-notif--active");
+            notifEl.setAttribute("aria-hidden", "false");
+        }
+        _lastAiCostUsd = newCost;
     } catch (err) {
         valueEl.textContent = "Unavailable";
         metaEl.textContent = "Could not load AI cost stats";
@@ -2692,6 +2707,11 @@ function initBrandCostCallout() {
 
     trigger.addEventListener("click", (e) => {
         e.stopPropagation();
+        const notifEl = document.getElementById("brand-cost-notif");
+        if (notifEl) {
+            notifEl.classList.remove("brand-cost-notif--active");
+            notifEl.setAttribute("aria-hidden", "true");
+        }
         callout.classList.contains("is-visible") ? closeCallout() : openCallout();
     });
 
@@ -2702,6 +2722,7 @@ function initBrandCostCallout() {
     });
 
     loadAiCostStats();
+    setInterval(loadAiCostStats, 60_000);
 }
 
 document.addEventListener("DOMContentLoaded", () => { initDashboard(); HoldingsBg.init(); });
