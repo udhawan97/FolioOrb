@@ -399,7 +399,7 @@ class TestMoveExplainerBenchmarks:
             with patch("app.services.move_explainer._day_change_pct", return_value=0.49):
                 result = explain_move(csco_data, shared_benchmarks=benchmarks)
 
-        assert result.news == []
+        assert not result.news
         assert all(driver.driver_type != "news" for driver in result.drivers)
         assert "News activity" not in result.explanation_text
         assert "Recent news" not in result.explanation_text
