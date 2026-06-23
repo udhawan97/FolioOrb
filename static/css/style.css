@@ -918,9 +918,11 @@ table tbody tr:hover {
     position: relative;
     z-index: 2;
     padding: 0 0.15rem 0.2rem;
+    min-height: clamp(520px, 64vh, 860px);
+    overflow-anchor: none;
     transition: opacity 0.18s var(--ease);
     content-visibility: auto;
-    contain-intrinsic-size: 0 400px;
+    contain-intrinsic-size: 0 760px;
 }
 
 #holdings-card.is-ai-checking .table-responsive {
@@ -1996,31 +1998,66 @@ table tbody tr:hover {
 }
 .form-control::placeholder { color: var(--text-tertiary) !important; }
 
-/* ── Modal — deep frosted sheet ──────────────────────────────────────────── */
-.modal-content.bg-dark {
+/* ── Portfolio manager — fixed top overlay ───────────────────────────────── */
+body > .portfolio-manager-popover {
+    position: fixed;
+    top: calc(76px + env(safe-area-inset-top));
+    right: clamp(0.75rem, 2.5vw, 2rem);
+    width: min(1080px, calc(100vw - 1.5rem));
+    max-height: calc(100dvh - 92px - env(safe-area-inset-top));
+    z-index: 12000;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(0, -10px, 0) scale(0.985);
+    transform-origin: top right;
+    transition:
+        opacity 0.18s var(--ease),
+        transform 0.24s var(--spring);
+}
+
+body > .portfolio-manager-popover.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
+.portfolio-manager-panel {
     background: var(--modal-surface) !important;
     backdrop-filter: saturate(180%) blur(40px);
     -webkit-backdrop-filter: saturate(180%) blur(40px);
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 20px !important;
-    box-shadow: 0 40px 90px -24px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.62);
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+    overflow: hidden;
 }
-.modal-header.border-secondary { border-bottom: 1px solid var(--hairline) !important; }
+
+.portfolio-manager-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.95rem 1rem;
+    border-bottom: 1px solid var(--hairline) !important;
+}
+
 .modal-title { font-weight: 600; letter-spacing: 0; }
 
-.portfolio-manager-dialog {
-    --bs-modal-margin: 1rem;
+.portfolio-manager-subtitle {
+    margin-top: 0.12rem;
+    color: var(--text-tertiary);
+    font-size: 0.72rem;
+    line-height: 1.3;
 }
 
-.portfolio-manager-dialog .modal-content {
-    max-height: calc(100dvh - 2rem);
-}
-
-.portfolio-manager-dialog .modal-body {
+.portfolio-manager-body {
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
+    padding: 1rem;
 }
 
 .manage-holdings-table-wrap {
@@ -2032,6 +2069,10 @@ table tbody tr:hover {
 .portfolio-manager-table {
     min-width: 520px;
     margin-bottom: 0;
+}
+
+.portfolio-manager-popover.is-loading .manage-holdings-table-wrap {
+    opacity: 0.72;
 }
 
 .portfolio-manager-table input.form-control {
@@ -2052,12 +2093,18 @@ table tbody tr:hover {
 }
 
 @media (max-width: 575.98px) {
-    .portfolio-manager-dialog {
-        --bs-modal-margin: 0.5rem;
+    body > .portfolio-manager-popover {
+        top: calc(64px + env(safe-area-inset-top));
+        right: 0.5rem;
+        left: 0.5rem;
+        width: auto;
+        max-height: calc(100dvh - 74px - env(safe-area-inset-top));
     }
 
-    .portfolio-manager-dialog .modal-content {
-        max-height: calc(100dvh - 1rem);
+    .portfolio-manager-header,
+    .portfolio-manager-body {
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
     }
 
     .portfolio-manager-table {

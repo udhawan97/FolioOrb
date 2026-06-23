@@ -110,9 +110,9 @@
                         </span>
                     </span>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary"
-                        data-bs-toggle="modal" data-bs-target="#portfolioModal"
-                        onclick="loadManageHoldings()">
+                <button class="btn btn-sm btn-outline-secondary" id="portfolio-manager-trigger"
+                        type="button" aria-expanded="false" aria-controls="portfolioModal"
+                        onclick="openPortfolioManager()">
                     <i class="bi bi-gear"></i> Manage
                 </button>
             </div>
@@ -443,8 +443,7 @@
                                         <div class="perf-callout-title">No performance history yet</div>
                                         <div class="perf-callout-body">Set your share counts to track portfolio return over time. Showing S&amp;P 500 as reference.</div>
                                     </div>
-                                    <button class="btn perf-callout-btn" data-bs-toggle="modal"
-                                            data-bs-target="#portfolioModal" onclick="loadManageHoldings()">
+                                    <button class="btn perf-callout-btn" type="button" onclick="openPortfolioManager()">
                                         Set up holdings
                                     </button>
                                 </div>
@@ -640,16 +639,19 @@
         </div>
     </div>
 
-    <!-- Portfolio Management Modal -->
-    <div class="modal fade" id="portfolioModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable portfolio-manager-dialog">
-            <div class="modal-content bg-dark border-secondary">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Manage Portfolio</h5>
-                    <button type="button" class="btn-close btn-close-white"
-                            data-bs-dismiss="modal"></button>
+    <!-- Portfolio Management Overlay -->
+    <div class="portfolio-manager-popover" id="portfolioModal" role="dialog"
+         aria-modal="false" aria-labelledby="portfolio-manager-title" aria-hidden="true">
+        <div class="portfolio-manager-panel bg-dark border-secondary">
+            <div class="portfolio-manager-header border-secondary">
+                <div>
+                    <h5 class="modal-title" id="portfolio-manager-title">Manage Portfolio</h5>
+                    <div class="portfolio-manager-subtitle">Edits save instantly while the dashboard refreshes behind the scenes.</div>
                 </div>
-                <div class="modal-body">
+                <button type="button" class="btn-close btn-close-white"
+                        aria-label="Close portfolio manager" onclick="closePortfolioManager()"></button>
+            </div>
+            <div class="portfolio-manager-body">
                     <h6 class="text-secondary mb-3">Add New Holding</h6>
                     <form id="add-holding-form" class="row g-2 mb-4">
                         <div class="col-4">
@@ -688,7 +690,6 @@
                             <tbody id="manage-holdings-table"></tbody>
                         </table>
                     </div>
-                </div>
             </div>
         </div>
     </div>

@@ -570,6 +570,8 @@ async function loadPortfolioValue() {
             el.innerHTML = `${largest.ticker} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
         }
 
+        // Show portfolio mutations as soon as valuation data arrives; sparklines can catch up.
+        renderHoldings();
         latestTrendData = await loadTrendData(data.holdings.map(h => h.ticker));
         renderHoldings();
         const updatedEl = document.getElementById("last-updated");
@@ -1582,8 +1584,7 @@ function _updateHoldingsCostCallout(show) {
                 <div class="perf-callout-title">Cost basis missing</div>
                 <div class="perf-callout-body">Enter your average purchase price to track total return. Showing today's change as an estimate.</div>
             </div>
-            <button class="btn perf-callout-btn" data-bs-toggle="modal"
-                    data-bs-target="#portfolioModal" onclick="loadManageHoldings()">
+            <button class="btn perf-callout-btn" type="button" onclick="openPortfolioManager()">
                 Update holdings
             </button>`;
         cardBody.insertBefore(callout, cardBody.firstChild);
@@ -2702,21 +2703,51 @@ function initBrandCostCallout() {
 
 document.addEventListener("DOMContentLoaded", () => { initDashboard(); HoldingsBg.init(); });
 
-function refreshData() {
+function refreshDashboardData({
+    includeManageHoldings = false,
+    includeMarketStatus = true,
+    includeRecommendations = false,
+    animateButton = false,
+} = {}) {
     const refreshButton = document.querySelector(".btn-refresh-data");
-    refreshButton?.classList.remove("is-refreshing");
-    if (refreshButton && !prefersReducedMotion()) {
+    if (animateButton) refreshButton?.classList.remove("is-refreshing");
+    if (animateButton && refreshButton && !prefersReducedMotion()) {
         void refreshButton.offsetWidth;
         refreshButton.classList.add("is-refreshing");
     }
 
-    Promise.allSettled([
+    const jobs = [
         loadPortfolioValue(),
         loadPnl(),
-        updateMarketStatus(),
-    ]).finally(() => {
-        window.setTimeout(() => refreshButton?.classList.remove("is-refreshing"), 260);
+    ];
+    if (includeManageHoldings && isPortfolioManagerOpen()) {
+        jobs.push(loadManageHoldings({ preserveExisting: true }));
+    }
+    if (includeMarketStatus) jobs.push(updateMarketStatus());
+    if (includeRecommendations) jobs.push(loadAnalystRecommendations());
+
+    return Promise.allSettled(jobs).then(results => {
+        const failed = results.filter(result => result.status === "rejected");
+        if (failed.length) console.warn("Dashboard refresh partially failed:", failed);
+    }).finally(() => {
+        if (animateButton) {
+            window.setTimeout(() => refreshButton?.classList.remove("is-refreshing"), 260);
+        }
     });
+}
+
+function refreshData() {
+    refreshDashboardData({ animateButton: true });
+}
+
+function refreshPortfolioMutationInBackground(options = {}) {
+    Promise.resolve()
+        .then(() => refreshDashboardData({
+            includeManageHoldings: true,
+            includeRecommendations: true,
+            ...options,
+        }))
+        .catch(err => console.warn("Background portfolio refresh failed:", err));
 }
 
 
@@ -2838,7 +2869,11 @@ document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
 
-    if (e.key === "Escape") { hideKeyboardHelp(); return; }
+    if (e.key === "Escape") {
+        if (closePortfolioManager()) return;
+        hideKeyboardHelp();
+        return;
+    }
     if (e.key === "?")      { showKeyboardHelp(); return; }
     if (e.key === "r" || e.key === "R") { refreshData(); return; }
     if (e.key === "t" || e.key === "T") {
@@ -2850,8 +2885,7 @@ document.addEventListener("keydown", (e) => {
         return;
     }
     if (e.key === "m" || e.key === "M") {
-        const modal = document.getElementById("portfolioModal");
-        if (modal) { loadManageHoldings(); new bootstrap.Modal(modal).show(); }
+        openPortfolioManager();
         return;
     }
     if (e.key === "i" || e.key === "I") { loadHoldingIntelligence(); return; }
@@ -2862,6 +2896,7 @@ async function initDashboard() {
     initTextSizeToggle();
     initBrandCostCallout();
     initPerformanceTabs();
+    initPortfolioManager();
     await loadPortfolioValue();
     await loadPnl();
     await updateMarketStatus();
@@ -3158,42 +3193,128 @@ async function loadHoldingIntelligence() {
 }
 
 
-// ── Portfolio Management Modal ──────────────────────────────────────────────
+// ── Portfolio Management Overlay ────────────────────────────────────────────
 
-async function loadManageHoldings() {
-    const res = await fetch("/api/portfolio/holdings");
-    const data = await res.json();
-    const tbody = document.getElementById("manage-holdings-table");
-    tbody.innerHTML = "";
+let manageHoldingsRequestId = 0;
 
-    data.holdings.forEach(h => {
-        const row = tbody.insertRow();
-        row.innerHTML = `
-            <td class="fw-bold">${h.ticker}</td>
-            <td>
-                <input type="number" value="${h.shares}" min="0.001" step="0.001"
-                       class="form-control form-control-sm bg-dark border-secondary
-                              text-white d-inline" style="width:90px"
-                       id="shares-${h.id}">
-            </td>
-            <td>
-                <input type="number" value="${h.avg_cost || ""}" min="0.01" step="0.01"
-                       class="form-control form-control-sm bg-dark border-secondary
-                              text-white d-inline" style="width:90px"
-                       id="cost-${h.id}" placeholder="--">
-            </td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary me-1"
-                        onclick="updateHolding(${h.id})">
-                    <i class="bi bi-check"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger"
-                        onclick="removeHolding(${h.id}, '${h.ticker}')">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </td>
-        `;
+function portfolioManagerTriggers() {
+    return Array.from(document.querySelectorAll("[aria-controls='portfolioModal'], button[onclick*='openPortfolioManager']"));
+}
+
+function isPortfolioManagerOpen() {
+    return document.getElementById("portfolioModal")?.classList.contains("is-visible") || false;
+}
+
+function setPortfolioManagerTriggerState(open) {
+    portfolioManagerTriggers().forEach(trigger => {
+        trigger.setAttribute("aria-expanded", String(open));
     });
+}
+
+function openPortfolioManager() {
+    const popover = document.getElementById("portfolioModal");
+    if (!popover) return;
+    const wasOpen = popover.classList.contains("is-visible");
+    popover.classList.add("is-visible");
+    popover.setAttribute("aria-hidden", "false");
+    if (!wasOpen) {
+        const body = popover.querySelector(".portfolio-manager-body");
+        if (body) body.scrollTop = 0;
+    }
+    setPortfolioManagerTriggerState(true);
+    loadManageHoldings({ preserveExisting: true });
+}
+
+function closePortfolioManager() {
+    const popover = document.getElementById("portfolioModal");
+    if (!popover || !popover.classList.contains("is-visible")) return false;
+    popover.classList.remove("is-visible");
+    popover.setAttribute("aria-hidden", "true");
+    setPortfolioManagerTriggerState(false);
+    return true;
+}
+
+function initPortfolioManager() {
+    document.addEventListener("click", (e) => {
+        const popover = document.getElementById("portfolioModal");
+        if (!popover?.classList.contains("is-visible")) return;
+        const clickedPanel = popover.contains(e.target);
+        const clickedTrigger = portfolioManagerTriggers().some(trigger => trigger.contains(e.target));
+        if (!clickedPanel && !clickedTrigger) closePortfolioManager();
+    });
+}
+
+function renderManageHoldingsLoading(tbody) {
+    tbody.innerHTML = Array.from({ length: 7 }, () => `
+        <tr>
+            <td><span class="shimmer-line" style="width:70px"></span></td>
+            <td><span class="shimmer-line" style="width:92px"></span></td>
+            <td><span class="shimmer-line" style="width:92px"></span></td>
+            <td><span class="shimmer-line" style="width:74px"></span></td>
+        </tr>
+    `).join("");
+}
+
+async function loadManageHoldings({ preserveExisting = false } = {}) {
+    const tbody = document.getElementById("manage-holdings-table");
+    const popover = document.getElementById("portfolioModal");
+    if (!tbody) return;
+
+    const requestId = ++manageHoldingsRequestId;
+    popover?.classList.add("is-loading");
+    if (!preserveExisting || tbody.children.length === 0) renderManageHoldingsLoading(tbody);
+
+    try {
+        const res = await fetch("/api/portfolio/holdings");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (requestId !== manageHoldingsRequestId) return;
+
+        tbody.innerHTML = "";
+        if (!data.holdings.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-secondary py-4">No holdings yet.</td></tr>`;
+            return;
+        }
+
+        data.holdings.forEach(h => {
+            const row = tbody.insertRow();
+            const tickerLabel = escapeHtml(h.ticker);
+            const tickerArg = JSON.stringify(h.ticker).replace(/"/g, "&quot;");
+            row.id = `manage-row-${h.id}`;
+            row.innerHTML = `
+                <td class="fw-bold">${tickerLabel}</td>
+                <td>
+                    <input type="number" value="${h.shares}" min="0.001" step="0.001"
+                           class="form-control form-control-sm bg-dark border-secondary
+                                  text-white d-inline" style="width:90px"
+                           id="shares-${h.id}">
+                </td>
+                <td>
+                    <input type="number" value="${h.avg_cost || ""}" min="0.01" step="0.01"
+                           class="form-control form-control-sm bg-dark border-secondary
+                                  text-white d-inline" style="width:90px"
+                           id="cost-${h.id}" placeholder="--">
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1"
+                            onclick="updateHolding(${h.id})" aria-label="Save ${tickerLabel}">
+                        <i class="bi bi-check"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger"
+                            onclick="removeHolding(${h.id}, ${tickerArg})" aria-label="Remove ${tickerLabel}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+        });
+    } catch (err) {
+        console.warn("Unable to load manage holdings:", err);
+        if (requestId === manageHoldingsRequestId && !preserveExisting) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">Unable to load holdings.</td></tr>`;
+        }
+    } finally {
+        if (requestId === manageHoldingsRequestId) popover?.classList.remove("is-loading");
+    }
 }
 
 
@@ -3213,8 +3334,7 @@ async function updateHolding(holdingId) {
     });
     if (res.ok) {
         showToast("Holding updated!", "success");
-        loadPortfolioValue();
-        loadPnl();
+        refreshPortfolioMutationInBackground();
     } else {
         showToast("Update failed", "danger");
     }
@@ -3228,10 +3348,9 @@ async function removeHolding(holdingId, ticker) {
         method: "DELETE"
     });
     if (res.ok) {
+        document.getElementById(`manage-row-${holdingId}`)?.remove();
         showToast(`${ticker} removed`, "warning");
-        loadManageHoldings();
-        loadPortfolioValue();
-        loadPnl();
+        refreshPortfolioMutationInBackground();
     }
 }
 
@@ -3252,9 +3371,8 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
         msg.className = "ms-2 small text-success";
         msg.textContent = `${ticker} added!`;
         e.target.reset();
-        loadManageHoldings();
-        loadPortfolioValue();
-        loadPnl();
+        loadManageHoldings({ preserveExisting: true });
+        refreshPortfolioMutationInBackground();
     } else {
         const err = await res.json();
         msg.className = "ms-2 small text-danger";
@@ -3319,11 +3437,7 @@ function highlightHoldingFromCard(elId) {
 
 // Open portfolio manager from the Holdings count card click
 function openManageFromCard() {
-    const modal = document.getElementById("portfolioModal");
-    if (modal) {
-        loadManageHoldings();
-        new bootstrap.Modal(modal).show();
-    }
+    openPortfolioManager();
 }
 
 // ── Keyboard shortcut overlay ──────────────────────────────────────────────
