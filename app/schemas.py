@@ -23,6 +23,7 @@ class HoldingCreate(BaseModel):
     shares: float = Field(..., gt=0, description="Number of shares (must be > 0)")
     avg_cost: Optional[float] = Field(None, gt=0, description="Average purchase price per share")
     notes: Optional[str] = Field(None, max_length=500)
+    is_watchlist: Optional[bool] = False  # True = research-only, excluded from P&L
 
     @field_validator("ticker")
     @classmethod
@@ -37,6 +38,7 @@ class HoldingUpdate(BaseModel):
     avg_cost: Optional[float] = Field(None, gt=0)
     notes: Optional[str] = Field(None, max_length=500)
     is_active: Optional[bool] = None
+    is_watchlist: Optional[bool] = None  # Toggle research mode without affecting P&L
 
 
 class HoldingResponse(BaseModel):

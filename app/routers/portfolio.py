@@ -30,6 +30,7 @@ def _compute_portfolio(portfolio_id, db):
     )
     shares_map = {h.ticker: h.shares for h in holdings}
     cost_map = {h.ticker: (h.avg_cost or 0.0) for h in holdings}
+    watchlist_map = {h.ticker: bool(h.is_watchlist) for h in holdings}
 
     quotes = get_all_quotes(list(shares_map.keys()))
     realized_stats = _realized_stats_by_ticker(portfolio_id, db)
@@ -45,6 +46,7 @@ def _compute_portfolio(portfolio_id, db):
         ticker = q["ticker"]
         shares = shares_map.get(ticker, 0)
         avg_cost = cost_map.get(ticker, 0.0)
+        is_watchlist = watchlist_map.get(ticker, False)
         current_value = shares * q["current_price"]
         daily_value_change = shares * q["day_change"]
         cost_basis = shares * avg_cost
@@ -61,9 +63,11 @@ def _compute_portfolio(portfolio_id, db):
             else None
         )
 
-        total_value += current_value
-        total_daily_change += daily_value_change
-        total_cost_basis += cost_basis
+        # Watchlist (research-mode) holdings are excluded from portfolio totals and snapshots
+        if not is_watchlist:
+            total_value += current_value
+            total_daily_change += daily_value_change
+            total_cost_basis += cost_basis
 
         result.append({
             "ticker": ticker,
@@ -82,10 +86,11 @@ def _compute_portfolio(portfolio_id, db):
             "day_change_pct": q["day_change_pct"],
             "daily_value_change": round(daily_value_change, 2),
             "allocation_pct": 0,
+            "is_watchlist": is_watchlist,
         })
 
     for item in result:
-        if total_value > 0:
+        if total_value > 0 and not item.get("is_watchlist"):
             item["allocation_pct"] = round(
                 (item["current_value"] / total_value) * 100, 1
             )
@@ -176,7 +181,8 @@ def _record_reduction(holding, old_shares, new_shares, db):
 def _upsert_daily_snapshot(portfolio_id, totals, db):
     """Create or refresh today's portfolio snapshot (one row per calendar day)."""
     _result, total_value, _daily, total_cost_basis = totals
-    unrealized = round(sum(i["unrealized_gain"] for i in _result), 2)
+    # Exclude research-mode (watchlist) holdings from the performance snapshot
+    unrealized = round(sum(i["unrealized_gain"] for i in _result if not i.get("is_watchlist")), 2)
     realized = _cumulative_realized(portfolio_id, db)
     total_return = round(unrealized + realized, 2)
 
@@ -239,7 +245,14 @@ async def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
     return {
         "portfolio_id": portfolio_id,
         "holdings": [
-            {"id": h.id, "ticker": h.ticker, "shares": h.shares} for h in holdings
+            {
+                "id": h.id,
+                "ticker": h.ticker,
+                "shares": h.shares,
+                "avg_cost": h.avg_cost,
+                "is_watchlist": bool(h.is_watchlist),
+            }
+            for h in holdings
         ],
         "count": len(holdings),
     }
@@ -278,6 +291,7 @@ async def add_holding(
         shares=data.shares,
         avg_cost=data.avg_cost,
         notes=data.notes,
+        is_watchlist=data.is_watchlist or False,
     )
     db.add(holding)
     db.commit()
@@ -312,6 +326,8 @@ async def update_holding(
         holding.notes = data.notes
     if data.is_active is not None:
         holding.is_active = data.is_active
+    if data.is_watchlist is not None:
+        holding.is_watchlist = data.is_watchlist
 
     db.commit()
     db.refresh(holding)
@@ -328,12 +344,17 @@ async def remove_holding(holding_id: int, db: Session = Depends(get_db)):
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
 
-    # Removing a position realizes the gain/loss on the entire remaining stake.
-    _record_reduction(holding, holding.shares, 0, db)
+    # Watchlist (research-mode) holdings are discarded silently — no realized gain recorded.
+    if not holding.is_watchlist:
+        _record_reduction(holding, holding.shares, 0, db)
 
     holding.is_active = False
     db.commit()
-    return {"ticker": holding.ticker, "message": "Holding removed from portfolio"}
+    return {
+        "ticker": holding.ticker,
+        "message": "Holding removed from portfolio",
+        "was_watchlist": bool(holding.is_watchlist),
+    }
 
 
 # ── Seed Endpoint ──────────────────────────────────────────────────────
@@ -405,10 +426,10 @@ async def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_d
         "total_return": total_return,
         "total_return_pct": total_return_pct,
         "best_performer": (
-            max(result, key=lambda x: x["day_change_pct"]) if result else None
+            max((h for h in result if not h.get("is_watchlist")), key=lambda x: x["day_change_pct"], default=None)
         ),
         "worst_performer": (
-            min(result, key=lambda x: x["day_change_pct"]) if result else None
+            min((h for h in result if not h.get("is_watchlist")), key=lambda x: x["day_change_pct"], default=None)
         ),
         "holdings": result,
     }

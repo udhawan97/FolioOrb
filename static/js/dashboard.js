@@ -537,7 +537,7 @@ async function loadPortfolioValue() {
         document.getElementById("total-value").textContent =
             formatCompact(data.total_value);
         document.getElementById("holding-count").textContent =
-            data.holdings.length;
+            data.holdings.filter(h => !h.is_watchlist).length;
         document.getElementById("daily-pnl").innerHTML =
             `<span class="${colorClass(data.total_daily_change)}">
              ${formatCompact(data.total_daily_change)}
@@ -1521,12 +1521,15 @@ function updateHoldingsTable(holdings, trendData = {}) {
             : ``;
 
         const rec = cachedRecommendations[h.ticker];
+        const researchBadge = h.is_watchlist
+            ? `<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask"></i></span>`
+            : "";
 
         row.innerHTML = `
             <td class="fw-bold holding-ticker-cell">
                 <span class="holding-ticker-wrap">
                     <span class="ticker-dot" style="background:${chartColor(i)}"></span>
-                    <span class="holding-ticker-symbol">${h.ticker}</span>
+                    <span class="holding-ticker-symbol">${h.ticker}</span>${researchBadge}
                     <i class="bi bi-chevron-right row-chevron"></i>
                 </span>
             </td>
@@ -3280,9 +3283,23 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
             const row = tbody.insertRow();
             const tickerLabel = escapeHtml(h.ticker);
             const tickerArg = JSON.stringify(h.ticker).replace(/"/g, "&quot;");
+            const isWatchlist = !!h.is_watchlist;
             row.id = `manage-row-${h.id}`;
+            if (isWatchlist) row.classList.add("watchlist-row");
+            const watchlistBadge = isWatchlist
+                ? `<span class="badge ms-1 watchlist-badge" title="Research mode — excluded from P&L"><i class="bi bi-flask"></i></span>`
+                : "";
+            const removeBtn = isWatchlist
+                ? `<button class="btn btn-sm btn-outline-warning"
+                           onclick="removeHolding(${h.id}, ${tickerArg}, true)" aria-label="Discard ${tickerLabel}">
+                       <i class="bi bi-x-lg"></i>
+                   </button>`
+                : `<button class="btn btn-sm btn-outline-danger"
+                           onclick="removeHolding(${h.id}, ${tickerArg}, false)" aria-label="Remove ${tickerLabel}">
+                       <i class="bi bi-trash"></i>
+                   </button>`;
             row.innerHTML = `
-                <td class="fw-bold">${tickerLabel}</td>
+                <td class="fw-bold">${tickerLabel}${watchlistBadge}</td>
                 <td>
                     <input type="number" value="${h.shares}" min="0.001" step="0.001"
                            class="form-control form-control-sm bg-dark border-secondary
@@ -3300,10 +3317,7 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
                             onclick="updateHolding(${h.id})" aria-label="Save ${tickerLabel}">
                         <i class="bi bi-check"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger"
-                            onclick="removeHolding(${h.id}, ${tickerArg})" aria-label="Remove ${tickerLabel}">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                    ${removeBtn}
                 </td>
             `;
         });
@@ -3341,15 +3355,21 @@ async function updateHolding(holdingId) {
 }
 
 
-async function removeHolding(holdingId, ticker) {
-    if (!confirm(`Remove ${ticker} from your portfolio?`)) return;
+async function removeHolding(holdingId, ticker, isWatchlist = false) {
+    const msg = isWatchlist
+        ? `Discard ${ticker} research position? This won't affect your P&L or performance.`
+        : `Remove ${ticker} from your portfolio? This will record any realized gain/loss.`;
+    if (!confirm(msg)) return;
 
     const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
         method: "DELETE"
     });
     if (res.ok) {
         document.getElementById(`manage-row-${holdingId}`)?.remove();
-        showToast(`${ticker} removed`, "warning");
+        showToast(
+            isWatchlist ? `${ticker} research position discarded` : `${ticker} removed`,
+            isWatchlist ? "success" : "warning"
+        );
         refreshPortfolioMutationInBackground();
     }
 }
@@ -3360,22 +3380,24 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
     const ticker = document.getElementById("new-ticker").value.trim().toUpperCase();
     const shares = parseFloat(document.getElementById("new-shares").value);
     const avgCost = parseFloat(document.getElementById("new-avgcost").value) || null;
+    const isWatchlist = document.getElementById("new-watchlist")?.checked || false;
 
     const res = await fetch("/api/portfolio/holdings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker, shares, avg_cost: avgCost }),
+        body: JSON.stringify({ ticker, shares, avg_cost: avgCost, is_watchlist: isWatchlist }),
     });
     const msg = document.getElementById("add-msg");
     if (res.ok) {
-        msg.className = "ms-2 small text-success";
-        msg.textContent = `${ticker} added!`;
+        msg.className = "small text-success";
+        msg.textContent = isWatchlist ? `${ticker} added in research mode!` : `${ticker} added!`;
         e.target.reset();
+        document.getElementById("new-watchlist").checked = false;
         loadManageHoldings({ preserveExisting: true });
         refreshPortfolioMutationInBackground();
     } else {
         const err = await res.json();
-        msg.className = "ms-2 small text-danger";
+        msg.className = "small text-danger";
         msg.textContent = err.detail || "Error adding holding";
     }
 });

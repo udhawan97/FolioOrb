@@ -7135,3 +7135,26 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .pulse-detail {
     transition: color 0.26s ease;
 }
+
+/* ── Research / Watchlist Mode ───────────────────────────────────────────── */
+.watchlist-badge {
+    background: rgba(255, 193, 7, 0.18);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    font-size: .65rem;
+    padding: 1px 5px;
+    border-radius: 4px;
+    vertical-align: middle;
+    line-height: 1.4;
+}
+.watchlist-row td {
+    opacity: .82;
+}
+.watchlist-row td:first-child {
+    opacity: 1;
+}
+[data-bs-theme="light"] .watchlist-badge {
+    background: rgba(200, 130, 0, 0.12);
+    color: #a06800;
+    border-color: rgba(200, 130, 0, 0.25);
+}
