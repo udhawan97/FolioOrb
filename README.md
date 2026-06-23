@@ -33,7 +33,7 @@
 
 ---
 
-## 📸 Marketing
+## 📸 Snapshot
 
 <p align="center">
   <img src="docs/dashboard.png" alt="FolioSenseAI Dashboard" width="850"/>
