@@ -262,6 +262,7 @@ let latestHoldings = [];     // Most recent holdings, for re-sorting without a r
 let latestTrendData = {};    // Cached sparkline data, so the Holdings table re-sorts without a refetch
 let allocSortDir = "desc";   // Allocation sort direction: "desc" | "asc"
 let holdingsSort = { key: "allocation_pct", dir: "desc" };
+let holdingsViewFilter = "all"; // "all" | "portfolio" | "research"
 let allocationTotal = 0;     // Portfolio total, drawn in the doughnut's center
 let latestPortfolioDailyChange = null; // Backend total, used to validate allocation impact math
 let _hasLoadedOnce = false;  // True after first successful data load
@@ -550,6 +551,7 @@ async function loadPortfolioValue() {
             ? Number(data.total_daily_change)
             : null;
         latestHoldings = data.holdings;
+        updateHoldingsFilterCounts();
         renderAllocation();
 
         if (data.best_performer) {
@@ -1221,8 +1223,26 @@ const segmentGlowPlugin = {
 };
 
 function renderHoldings() {
-    updateHoldingsTable(sortedHoldings(latestHoldings), latestTrendData);
+    let filtered = latestHoldings;
+    if (holdingsViewFilter === "portfolio") filtered = latestHoldings.filter(h => !h.is_watchlist);
+    else if (holdingsViewFilter === "research") filtered = latestHoldings.filter(h => h.is_watchlist);
+    updateHoldingsTable(sortedHoldings(filtered), latestTrendData);
     updateSortCarets();
+
+    // Show/hide research banner
+    const bannerEl = document.getElementById("research-filter-banner");
+    const tableWrap = document.querySelector(".holdings-table")?.closest(".table-responsive");
+    if (holdingsViewFilter === "research") {
+        if (!bannerEl && tableWrap) {
+            const banner = document.createElement("div");
+            banner.id = "research-filter-banner";
+            banner.className = "research-filter-banner";
+            banner.innerHTML = `<i class="bi bi-flask"></i> Research holdings &mdash; not included in your P&amp;L or performance tracking`;
+            tableWrap.parentNode.insertBefore(banner, tableWrap);
+        }
+    } else if (bannerEl) {
+        bannerEl.remove();
+    }
 }
 
 function toggleHoldingsSort(key) {
@@ -1240,6 +1260,42 @@ function toggleAllocationSort() {
     renderHoldings();
 }
 
+function setHoldingsFilter(view) {
+    if (holdingsViewFilter === view) return;
+    holdingsViewFilter = view;
+
+    // Update tab active states
+    document.querySelectorAll(".hvt-tab").forEach(btn => {
+        const isActive = btn.dataset.view === view;
+        btn.classList.toggle("hvt-tab--active", isActive);
+        btn.setAttribute("aria-pressed", String(isActive));
+    });
+
+    // Amber card accent in research mode
+    const card = document.getElementById("holdings-card");
+    if (card) card.classList.toggle("holdings-research-mode", view === "research");
+
+    renderHoldings();
+}
+
+function updateHoldingsFilterCounts() {
+    const all = latestHoldings.length;
+    const research = latestHoldings.filter(h => h.is_watchlist).length;
+    const portfolio = all - research;
+    const elAll = document.getElementById("hvt-count-all");
+    const elPortfolio = document.getElementById("hvt-count-portfolio");
+    const elResearch = document.getElementById("hvt-count-research");
+    if (elAll) elAll.textContent = all;
+    if (elPortfolio) elPortfolio.textContent = portfolio;
+    if (elResearch) elResearch.textContent = research;
+
+    // Hide research tab entirely if user has no research holdings
+    const researchTab = document.querySelector(".hvt-tab[data-view='research']");
+    if (researchTab) researchTab.style.display = research === 0 ? "none" : "";
+
+    // If current filter is research but user removed all research holdings, reset to all
+    if (holdingsViewFilter === "research" && research === 0) setHoldingsFilter("all");
+}
 
 const formatSignedCurrency = (n) =>
     `${toNumber(n) >= 0 ? "+" : "-"}${formatCurrency(Math.abs(toNumber(n)))}`;
@@ -1510,6 +1566,19 @@ function updateHoldingsTable(holdings, trendData = {}) {
     const tbody = document.getElementById("holdings-table");
     tbody.innerHTML = "";
 
+    if (holdings.length === 0 && holdingsViewFilter === "research") {
+        const tr = tbody.insertRow();
+        tr.innerHTML = `<td colspan="9" class="text-center py-4">
+            <div class="research-empty-state">
+                <i class="bi bi-flask research-empty-icon"></i>
+                <div class="research-empty-title">No research holdings yet</div>
+                <div class="research-empty-body">Add a ticker in research mode to track ideas without affecting your P&L.</div>
+                <button class="btn btn-sm btn-outline-warning mt-2" onclick="openPortfolioManager()">Add research holding</button>
+            </div>
+        </td>`;
+        return;
+    }
+
     holdings.forEach((h, i) => {
         const row = tbody.insertRow();
         row.dataset.ticker = h.ticker;
@@ -1521,8 +1590,13 @@ function updateHoldingsTable(holdings, trendData = {}) {
             : ``;
 
         const rec = cachedRecommendations[h.ticker];
+
+        if (h.is_watchlist) {
+            row.classList.add("research-holding-row");
+        }
+
         const researchBadge = h.is_watchlist
-            ? `<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask"></i></span>`
+            ? `<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask me-1"></i>Research</span>`
             : "";
 
         row.innerHTML = `
@@ -2654,6 +2728,8 @@ async function loadAnalystRecommendations() {
 }
 
 let _lastAiCostUsd = null;
+let _brandIntroTimer = null;
+let _brandIntroAnimTimer = null;
 
 async function loadAiCostStats() {
     const valueEl = document.getElementById("brand-cost-value");
@@ -2723,6 +2799,58 @@ function initBrandCostCallout() {
 
     loadAiCostStats();
     setInterval(loadAiCostStats, 60_000);
+}
+
+function initBrandIntro() {
+    const trigger = document.getElementById("brand-intro-trigger");
+    const callout = document.getElementById("brand-intro-callout");
+    if (!trigger || !callout) return;
+
+    const hideIntro = () => {
+        callout.classList.remove("is-visible");
+        callout.setAttribute("aria-hidden", "true");
+        trigger.setAttribute("aria-expanded", "false");
+    };
+
+    const playIntro = (event) => {
+        event.preventDefault();
+
+        const costCallout = document.getElementById("brand-cost-callout");
+        const costTrigger = document.getElementById("brand-cost-trigger");
+        costCallout?.classList.remove("is-visible");
+        costCallout?.setAttribute("aria-hidden", "true");
+        costTrigger?.setAttribute("aria-expanded", "false");
+
+        window.clearTimeout(_brandIntroTimer);
+        window.clearTimeout(_brandIntroAnimTimer);
+
+        if (!prefersReducedMotion()) {
+            trigger.classList.remove("is-intro-playing");
+            void trigger.offsetWidth;
+            trigger.classList.add("is-intro-playing");
+            _brandIntroAnimTimer = window.setTimeout(() => {
+                trigger.classList.remove("is-intro-playing");
+            }, 820);
+        }
+
+        callout.classList.add("is-visible");
+        callout.setAttribute("aria-hidden", "false");
+        trigger.setAttribute("aria-expanded", "true");
+        _brandIntroTimer = window.setTimeout(hideIntro, 5200);
+    };
+
+    trigger.addEventListener("click", playIntro);
+    trigger.addEventListener("keydown", (event) => {
+        if (event.key !== " ") return;
+        playIntro(event);
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!callout.contains(event.target) && !trigger.contains(event.target)) {
+            window.clearTimeout(_brandIntroTimer);
+            hideIntro();
+        }
+    });
 }
 
 document.addEventListener("DOMContentLoaded", () => { initDashboard(); HoldingsBg.init(); });
@@ -2918,6 +3046,7 @@ document.addEventListener("keydown", (e) => {
 async function initDashboard() {
     initThemeToggle();
     initTextSizeToggle();
+    initBrandIntro();
     initBrandCostCallout();
     initPerformanceTabs();
     initPortfolioManager();
@@ -3309,7 +3438,7 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
             row.id = `manage-row-${h.id}`;
             if (isWatchlist) row.classList.add("watchlist-row");
             const watchlistBadge = isWatchlist
-                ? `<span class="badge ms-1 watchlist-badge" title="Research mode — excluded from P&L"><i class="bi bi-flask"></i></span>`
+                ? `<span class="badge ms-1 watchlist-badge" title="Research mode — excluded from P&L"><i class="bi bi-flask me-1"></i>Research</span>`
                 : "";
             const removeBtn = isWatchlist
                 ? `<button class="btn btn-sm btn-outline-warning"
