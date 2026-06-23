@@ -176,5 +176,3 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
             type(exc).__name__,
         )
         return []
-
-
