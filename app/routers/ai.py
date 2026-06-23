@@ -393,15 +393,6 @@ def _summary_to_dict(s: HoldingMoveSummary) -> dict:
             }
             for d in s.drivers
         ],
-        "news": [
-            {
-                "title": n.title,
-                "source": n.source,
-                "url": n.url,
-                "published_at": n.published_at,
-            }
-            for n in s.news
-        ],
         "filings": [
             {
                 "filing_type": f.filing_type,
@@ -435,7 +426,6 @@ _UNCLEAR_RESULT = {
     "confidence": "Low",
     "explanation_text": "Move explanation temporarily unavailable.",
     "drivers": [],
-    "news": [],
     "filings": [],
     "macro_context": None,
     "volume_vs_avg": None,
@@ -449,8 +439,8 @@ _UNCLEAR_RESULT = {
 async def get_move_explanation(ticker: str):
     """
     Explain why a ticker moved today.
-    Returns market context, attribution type, likely drivers, and recent news.
-    Not cached — prices and news change throughout the day.
+    Returns market context, attribution type, and likely drivers.
+    Not cached — prices and benchmark context change throughout the day.
     """
     ticker = ticker.upper()
     stock_data = get_stock_data(ticker)

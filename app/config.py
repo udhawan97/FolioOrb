@@ -36,8 +36,8 @@ class Settings:
     )
     APP_NAME: str = "FolioSenseAI"
     APP_DESCRIPTION: str = (
-        "FolioSenseAI helps explain portfolio movement by surfacing market context, "
-        "news, and AI-generated insights for holdings."
+        "FolioSenseAI helps explain portfolio movement by surfacing market context "
+        "and AI-generated insights for holdings."
     )
     # Optional comma-separated tickers pre-loaded when the default portfolio is created.
     # Empty by default so forks do not inherit anyone's personal portfolio.

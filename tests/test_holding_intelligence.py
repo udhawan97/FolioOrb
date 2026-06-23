@@ -266,7 +266,6 @@ class TestMoveExplainerBenchmarks:
         }.get(key, default)
         ticker_mock = MagicMock()
         ticker_mock.info = info
-        ticker_mock.news = []
         ticker_mock.calendar = None
         return ticker_mock
 
@@ -357,7 +356,6 @@ class TestMoveExplainerBenchmarks:
 
         with patch("yfinance.Ticker") as mock_yf:
             mock_instance = MagicMock()
-            mock_instance.news = []
             mock_instance.calendar = None
             mock_yf.return_value = mock_instance
             with patch("app.services.move_explainer._day_change_pct", return_value=2.0):
@@ -369,7 +367,7 @@ class TestMoveExplainerBenchmarks:
         # Should NOT attribute to broad market given 3.8% vs 0.3% SPY
         assert result.attribution_type in ("company-specific", "mixed", "sector-driven")
 
-    def test_individual_stock_does_not_surface_generic_news_activity(self):
+    def test_move_explanation_does_not_surface_news_activity(self):
         from app.services.move_explainer import explain_move
 
         csco_data = {
@@ -382,24 +380,15 @@ class TestMoveExplainerBenchmarks:
             "average_volume": 1000000,
         }
         benchmarks = {"SPY": -0.31, "QQQ": -0.36}
-        yahoo_news = [{
-            "content": {
-                "title": "Cisco item from Yahoo feed",
-                "provider": {"displayName": "Example"},
-                "canonicalUrl": {"url": "https://example.com/cisco"},
-                "pubDate": "2026-06-23T00:00:00Z",
-            }
-        }]
 
         with patch("yfinance.Ticker") as mock_yf:
             mock_instance = MagicMock()
-            mock_instance.news = yahoo_news
             mock_instance.calendar = None
             mock_yf.return_value = mock_instance
             with patch("app.services.move_explainer._day_change_pct", return_value=0.49):
                 result = explain_move(csco_data, shared_benchmarks=benchmarks)
 
-        assert not result.news
+        assert not hasattr(result, "news")
         assert all(driver.driver_type != "news" for driver in result.drivers)
         assert "News activity" not in result.explanation_text
         assert "Recent news" not in result.explanation_text

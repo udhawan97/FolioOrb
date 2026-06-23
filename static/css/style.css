@@ -2848,31 +2848,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .macro-pill.positive { background: rgba(48, 209, 88, .12); color: #30d158; }
 .macro-pill.negative { background: rgba(255, 69,  58, .11); color: #ff6b63; }
 
-/* Evidence / news section */
-.evidence-section {
-    margin-top: 0.4rem;
-    padding-top: 0.35rem;
-    border-top: 1px solid var(--hairline-soft);
-}
-.news-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.4rem;
-    padding: 0.22rem 0;
-    font-size: 0.72rem;
-    line-height: 1.35;
-}
-.news-item a {
-    color: var(--accent-cyan);
-    text-decoration: none;
-}
-.news-item a:hover { text-decoration: underline; }
-.news-source {
-    font-size: 0.62rem;
-    color: var(--text-tertiary);
-    white-space: nowrap;
-}
-
 /* ── Holding Intelligence — two-column expanded row ─────────────────────── */
 
 /* 2-col grid inside the expand row (stacks on mobile) */
@@ -3917,8 +3892,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     margin-bottom: 0.85rem;
 }
 
-.driver-item,
-.news-item {
+.driver-item {
     padding: 0.3rem 0;
     color: rgba(245, 250, 255, 0.68);
 }
@@ -3945,15 +3919,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 
 .macro-pill.negative {
     background: rgba(255, 69, 58, .08);
-}
-
-.evidence-section {
-    margin-top: 0.65rem;
-    padding-top: 0.65rem;
-}
-
-.evidence-label {
-    margin-top: 0;
 }
 
 @media (max-width: 768px) {
@@ -7223,8 +7188,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 [data-bs-theme="light"] .move-explanation-text {
     color: var(--text-secondary);
 }
-[data-bs-theme="light"] .driver-item,
-[data-bs-theme="light"] .news-item {
+[data-bs-theme="light"] .driver-item {
     color: var(--text-secondary);
 }
 
@@ -7325,7 +7289,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .intel-spec-row > strong,
 .move-explanation-text,
 .driver-item,
-.news-item,
 .fund-scale-label,
 .fund-scale-value,
 .fund-scale-detail,

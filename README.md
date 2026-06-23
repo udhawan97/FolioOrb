@@ -247,7 +247,7 @@ pip install --upgrade certifi
 
 ## 🪄 What's New In v1.2
 
-- Cleaner move explanations for individual stocks: the dashboard no longer shows generic "news activity" unless article evidence is actually surfaced.
+- Cleaner move explanations for holdings: the dashboard focuses on market, sector, benchmark, volume, and earnings context.
 - Stronger holding-specific attribution using market, sector, benchmark, volume, and earnings context.
 - Regression coverage for stock move explanations so unsupported catalyst claims stay out of the UI.
 
