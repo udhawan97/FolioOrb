@@ -6,7 +6,7 @@
   </picture>
 </p>
 
-<h2 align="center">FolioSenseAI</h2>
+<h2 align="center">Folio Sense AI</h2>
 <p align="center"><em>Your portfolio's therapist. Explains the red. Won't fix it.</em></p>
 
 <p align="center">
