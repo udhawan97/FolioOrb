@@ -401,7 +401,7 @@ let claudeMessageIndex = 0;
 let claudeOfflineScanMessageIndex = 0;
 
 function nextClaudeScanMessage() {
-    if (_isClaudeApiLive === false) {
+    if (_isClaudeApiLive === false || _forcedLocalMode) {
         const message = CLAUDE_OFFLINE_SCAN_MESSAGES[claudeOfflineScanMessageIndex % CLAUDE_OFFLINE_SCAN_MESSAGES.length];
         claudeOfflineScanMessageIndex += 1;
         return message;
@@ -565,6 +565,7 @@ function renderAiScanTickers() {
 function setAiChecking(active, message = "Reading positions", insightsReady = false) {
     const card = document.getElementById("holdings-card");
     const panel = document.getElementById("ai-scan-panel");
+    const title = document.getElementById("ai-scan-title");
     const subtitle = document.getElementById("ai-scan-subtitle");
     const dashboardPet = document.getElementById("dashboard-pet");
 
@@ -587,6 +588,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     let messageIndex = 0;
     card.classList.add("is-ai-checking");
     dashboardPet?.classList.add("is-texting");
+    if (title) title.textContent = (_isClaudeApiLive === false || _forcedLocalMode) ? "Local checking holdings" : "AI checking holdings";
     setAgentReadyState(false);
     HoldingsBg.stop();
     if (panel) {
@@ -3267,7 +3269,7 @@ function _verdictLoadingLine(ticker) {
 
 function _verdictKickerLabel() {
     return (_isClaudeApiLive === false || _forcedLocalMode)
-        ? "Folio Sense is missing Claude (reunite the lovers for a more precise verdict)"
+        ? "Folio Sense Local Intelligence"
         : FOLIO_SENSE_VERDICT_COPY.kicker;
 }
 
