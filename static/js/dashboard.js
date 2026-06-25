@@ -3441,6 +3441,36 @@ const DASHBOARD_PET_QUOTES = [
     "I would flirt more, but compliance asked me to cite the candle first.",
 ];
 
+function applyClaudeApiStatus(claudeLive) {
+    const navToggle = document.getElementById("pet-nav-toggle");
+    const bubble = document.getElementById("dashboard-pet-bubble");
+    const callout = document.getElementById("brand-intro-callout");
+
+    if (claudeLive === false) {
+        navToggle?.classList.add("claude-offline");
+
+        if (bubble && !bubble.querySelector(".pet-offline-note")) {
+            const note = document.createElement("span");
+            note.className = "pet-offline-note";
+            note.id = "pet-offline-note";
+            note.textContent = "Running on local logic — add Claude API to let me connect with my lost love, Claude.";
+            bubble.appendChild(note);
+        }
+
+        if (callout && !callout.querySelector(".brand-intro-offline-note")) {
+            const note = document.createElement("span");
+            note.className = "brand-intro-offline-note";
+            note.id = "brand-intro-offline-note";
+            note.textContent = "Running on local logic — add Claude API to reconnect.";
+            callout.appendChild(note);
+        }
+    } else if (claudeLive === true) {
+        navToggle?.classList.remove("claude-offline");
+        document.getElementById("pet-offline-note")?.remove();
+        document.getElementById("brand-intro-offline-note")?.remove();
+    }
+}
+
 function initDashboardPet() {
     const pet = document.getElementById("dashboard-pet");
     const toggle = document.getElementById("dashboard-pet-toggle");
@@ -4158,6 +4188,7 @@ async function loadHoldingIntelligence() {
             Object.entries(verdictData.signals || {}).forEach(([ticker, sig]) => {
                 cachedVerdicts[ticker] = sig;
             });
+            applyClaudeApiStatus(verdictData.claude_live ?? null);
         }
 
         await verifyAndRefreshIncompleteIntelligence();
@@ -4387,6 +4418,7 @@ async function refreshAiVerdicts() {
         Object.entries(data.signals || {}).forEach(([ticker, sig]) => {
             cachedVerdicts[ticker] = sig;
         });
+        applyClaudeApiStatus(data.claude_live ?? null);
         document.querySelectorAll("tr[data-ticker]").forEach(mainRow => {
             const ticker = mainRow.dataset.ticker;
             const verdictSection = mainRow.nextElementSibling?.querySelector(".intel-verdict-section");

@@ -5458,6 +5458,43 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     outline-offset: 3px;
 }
 
+.pet-nav-toggle.claude-offline,
+.pet-nav-toggle.claude-offline[aria-pressed="true"] {
+    color: #e05252;
+    border-color: rgba(224, 82, 82, 0.35);
+}
+
+.pet-nav-toggle.claude-offline::after {
+    background: #e05252;
+    opacity: 0.9;
+    transform: scale(1);
+}
+
+.pet-offline-note {
+    display: block;
+    margin-top: 0.45rem;
+    padding-top: 0.38rem;
+    border-top: 1px solid var(--hairline);
+    color: var(--text-tertiary);
+    font-size: 0.62rem;
+    font-style: italic;
+    line-height: 1.3;
+    opacity: 0.82;
+}
+
+.brand-intro-offline-note {
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.28rem 0.5rem;
+    border-radius: 6px;
+    background: rgba(224, 82, 82, 0.08);
+    border: 1px solid rgba(224, 82, 82, 0.22);
+    color: #e05252;
+    font-size: 0.62rem;
+    font-style: italic;
+    line-height: 1.3;
+}
+
 /* ── Living dashboard pet ───────────────────────────────────────────────── */
 body > .dashboard-pet {
     position: fixed;

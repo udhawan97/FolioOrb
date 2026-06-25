@@ -939,6 +939,7 @@ async def get_all_investment_signals(db: Session = Depends(get_db)):  # pylint: 
         include_portfolio_quip = True
 
     # Batch-generate quips for stale/missing tickers
+    claude_live: bool | None = None
     if missing_quip_tickers or include_portfolio_quip:
         quip_inputs = [
             {
@@ -961,6 +962,7 @@ async def get_all_investment_signals(db: Session = Depends(get_db)):  # pylint: 
                 }
             )
         new_quips = generate_verdict_quips(quip_inputs)
+        claude_live = bool(new_quips)
 
         for ticker in missing_quip_tickers:
             fallback_action = signals[ticker].get("action", "needs-data")
@@ -1022,7 +1024,7 @@ async def get_all_investment_signals(db: Session = Depends(get_db)):  # pylint: 
         "disclaimer": _VERDICT_DISCLAIMER,
     }
 
-    return {"signals": signals, "count": len(signals), "portfolio_health": portfolio_health}
+    return {"signals": signals, "count": len(signals), "portfolio_health": portfolio_health, "claude_live": claude_live}
 
 
 @router.get("/analyst-recommendation/{ticker}")
