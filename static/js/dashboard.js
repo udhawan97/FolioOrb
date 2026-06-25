@@ -637,8 +637,28 @@ async function loadPortfolioValue() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
+        // Data arrived — record the sync time and mark success before any rendering
+        // that could throw. The catch block only fires for actual network/API failures.
+        _lastDashboardSyncText = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        const _wasLoadedOnce = _hasLoadedOnce;
+        _hasLoadedOnce = true;
+
+        // Update the HUD popover sync display immediately (before rendering).
+        const popUpdatedEl = document.getElementById("hud-pop-updated");
+        if (popUpdatedEl) popUpdatedEl.textContent = _lastDashboardSyncText;
+        const syncSubEl = document.getElementById("hud-pop-sync-sub");
+        if (syncSubEl) syncSubEl.textContent = "Prices, P&L and holdings pulled from market data";
+        const syncIconEl = document.getElementById("hud-sync-icon");
+        if (syncIconEl) syncIconEl.innerHTML = `<i class="bi bi-check-circle-fill"></i>`;
+        const pill = document.getElementById("hud-status-pill");
+        if (pill) {
+            pill.classList.remove("is-refreshed");
+            void pill.offsetWidth;
+            pill.classList.add("is-refreshed");
+        }
+
         // Flash on refresh (not on first load)
-        if (_hasLoadedOnce) {
+        if (_wasLoadedOnce) {
             ["total-value", "daily-pnl", "best-performer", "worst-performer", "largest-holding"].forEach(id => {
                 flashValue(document.getElementById(id));
             });
@@ -686,20 +706,6 @@ async function loadPortfolioValue() {
         renderHoldings();
         latestTrendData = await loadTrendData(data.holdings.map(h => h.ticker));
         renderHoldings();
-        _lastDashboardSyncText = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        const popUpdatedEl = document.getElementById("hud-pop-updated");
-        if (popUpdatedEl) popUpdatedEl.textContent = _lastDashboardSyncText;
-        const syncSubEl = document.getElementById("hud-pop-sync-sub");
-        if (syncSubEl) syncSubEl.textContent = "Prices, P&L and holdings pulled from market data";
-        const syncIconEl = document.getElementById("hud-sync-icon");
-        if (syncIconEl) syncIconEl.innerHTML = `<i class="bi bi-check-circle-fill"></i>`;
-        const pill = document.getElementById("hud-status-pill");
-        if (pill) {
-            pill.classList.remove("is-refreshed");
-            void pill.offsetWidth;
-            pill.classList.add("is-refreshed");
-        }
-        _hasLoadedOnce = true;
 
     } catch (err) {
         console.error("Error loading portfolio value:", err);
