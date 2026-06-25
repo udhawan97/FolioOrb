@@ -326,13 +326,15 @@ Full interactive docs at `/docs` when running locally. Here's the cheat sheet:
 |--------|----------|-------------|
 | `GET` | `/api/ai/summary/{ticker}` | AI summary for one holding |
 | `GET` | `/api/ai/summaries/all` | AI summaries for all holdings |
-| `GET` | `/api/ai/portfolio-insight` | Portfolio-level AI analysis |
-| `GET` | `/api/ai/explain-move/{ticker}` | Why is this thing moving? |
-| `GET` | `/api/ai/explain-moves/all` | Why is everything moving? |
-| `GET` | `/api/ai/holding-intelligence/all` | Coverage and benchmark context |
-| `GET` | `/api/ai/analyst-recommendations/all` | Analyst takes and ETF quality labels |
+| `GET` | `/api/ai/move-explanation/{ticker}` | Why is this thing moving? |
+| `GET` | `/api/ai/move-explanations/all` | Why is everything moving? |
+| `GET` | `/api/ai/intelligence/{ticker}` | Coverage and benchmark context for one holding |
+| `GET` | `/api/ai/intelligence/all/batch` | Coverage and benchmark context for all holdings |
+| `GET` | `/api/ai/investment-signal/{ticker}` | Folio Sense × Claude verdict for one holding |
+| `GET` | `/api/ai/investment-signals/all` | Folio Sense × Claude verdicts for all holdings |
+| `GET` | `/api/ai/analyst-recommendation/{ticker}` | Analyst take and ETF quality label for one holding |
+| `GET` | `/api/ai/analyst-recommendations/all` | Analyst takes and ETF quality labels for all holdings |
 | `GET` | `/api/ai/cache/stats` | Cache stats and estimated API cost |
-| `DELETE` | `/api/ai/cache/clear` | Clear cached summaries |
 
 </details>
 
