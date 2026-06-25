@@ -406,7 +406,6 @@ These checks run on GitHub Actions, so pull requests get the useful red/green li
 - [ ] CSV Uploads and Downloads
 - [ ] Transaction history views
 - [ ] News Section
-- [ ] AI-powered rebalancing suggestions
 
 ---
 
