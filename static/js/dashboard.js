@@ -3403,7 +3403,7 @@ function renderAiVerdictShimmer(section, ticker) {
     if (section._verdictShimmerTicker === ticker) return;
     section._verdictShimmerTicker = ticker;
     section.innerHTML = `
-        <div class="intel-label"><i class="bi bi-dice-5"></i> ${escapeHtml(_verdictKickerLabel())}</div>
+        <div class="intel-label"><i class="bi bi-dice-5"></i> <span class="verdict-kicker-label">${escapeHtml(_verdictKickerLabel())}</span></div>
         <div class="verdict-shimmer">
             <div style="display:flex;align-items:center;gap:.55rem;border-bottom:1px solid var(--hairline-soft);padding-bottom:.5rem;margin-bottom:.1rem">
                 <div class="shimmer-line" style="width:5px;height:5px;border-radius:50%;flex-shrink:0"></div>
@@ -3444,7 +3444,7 @@ function _animateConfidence(el, target, reducedMotion) {
 function renderAiVerdict(section, verdict, ticker) {
     if (!verdict) {
         section.innerHTML = `
-            <div class="intel-label"><i class="bi bi-dice-5"></i> ${escapeHtml(_verdictKickerLabel())}</div>
+            <div class="intel-label"><i class="bi bi-dice-5"></i> <span class="verdict-kicker-label">${escapeHtml(_verdictKickerLabel())}</span></div>
             <span class="intel-na">${escapeHtml(FOLIO_SENSE_VERDICT_COPY.unavailable)}</span>`;
         return;
     }
@@ -3488,7 +3488,7 @@ function renderAiVerdict(section, verdict, ticker) {
         .join("");
 
     section.innerHTML = `
-        <div class="intel-label"><i class="bi bi-dice-5"></i> ${escapeHtml(brandCopy.kicker)} ${_verdictInfoTip()}</div>
+        <div class="intel-label"><i class="bi bi-dice-5"></i> <span class="verdict-kicker-label">${escapeHtml(brandCopy.kicker)}</span> ${_verdictInfoTip()}</div>
         <div class="intel-verdict ${revealClass}" data-action="${escapeHtml(action)}"
              aria-label="${escapeHtml(label)} verdict, ${conf}% confidence">
             <div class="verdict-header-bar">
@@ -3639,6 +3639,13 @@ function applyClaudeApiStatus(claudeLive) {
         navToggle?.classList.add("claude-offline");
         pet?.classList.add("claude-offline");
 
+        document.querySelectorAll(".verdict-kicker-label").forEach(el => {
+            el.textContent = _verdictKickerLabel();
+        });
+        document.querySelectorAll(".verdict-header-label").forEach(el => {
+            el.textContent = "Local Intelligence Verdict";
+        });
+
         if (bubble && !bubble.querySelector(".pet-offline-note")) {
             const note = document.createElement("span");
             note.className = "pet-offline-note";
@@ -3672,6 +3679,13 @@ function applyClaudeApiStatus(claudeLive) {
         pet?.classList.remove("claude-offline");
         document.getElementById("pet-offline-note")?.remove();
         document.getElementById("brand-intro-offline-note")?.remove();
+
+        document.querySelectorAll(".verdict-kicker-label").forEach(el => {
+            el.textContent = FOLIO_SENSE_VERDICT_COPY.kicker;
+        });
+        document.querySelectorAll(".verdict-header-label").forEach(el => {
+            el.textContent = "AI Verdict";
+        });
     }
 }
 
