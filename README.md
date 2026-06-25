@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite"/>
   <img src="https://img.shields.io/badge/Bootstrap-5-7952B3?style=flat-square&logo=bootstrap&logoColor=white" alt="Bootstrap 5"/>
   <img src="https://img.shields.io/badge/Chart.js-FF6384?style=flat-square&logo=chartdotjs&logoColor=white" alt="Chart.js"/>
-  <img src="https://img.shields.io/badge/release-v2.0-brightgreen?style=flat-square" alt="Release v2.0"/>
+  <img src="https://img.shields.io/badge/release-v2.1-brightgreen?style=flat-square" alt="Release v2.1"/>
 </p>
 
 <p align="center">
@@ -27,7 +27,7 @@
 
 ---
 
-> **v2 is here: FolioSenseAI now reads your portfolio like an analyst with a personality.**
+> **v2.1 is here: FolioSenseAI now reads your portfolio like an analyst with a personality.**
 >
 > FolioSenseAI tracks your holdings, pulls live prices from Yahoo Finance, and asks Claude AI to explain what on earth is happening — market context, sector moves, macro events, analyst takes, and now a clearer Add / Hold / Trim read. All the excuses reasons you need, in one dashboard.
 
@@ -58,6 +58,7 @@
 - **Portfolio-level AI analysis** — diversification themes, concentration risks, notable movers
 - **Holding coverage** — ETF sectors, regions, themes, and benchmark context
 - **Folio Sense × Claude verdicts** — Add, Hold, Trim, or Needs Data calls with confidence, reasons, risks, and one-line color commentary
+- **Anchor Hold** — mark any position as a long-term anchor; Folio Sense never trims it, instead surfaces better add moments when price dips below its own trend; toggleable from the verdict card or Manage Holdings
 - **Market-mood awareness** — live price momentum now tempers marginal calls before the app gets too enthusiastic
 - **Portfolio health quip** — a coarse read on the whole book, including concentration and dominant action mix
 - **ETF holdings fallback** — optional Claude-seeded holdings when market data providers leave an ETF's top holdings blank
@@ -102,23 +103,23 @@ You do not need to be a developer to run FolioSenseAI locally. Think of this lik
 
 The Anthropic API key is optional. Without it, FolioSenseAI still runs with live market data and portfolio tracking; AI explanations stay disabled until you add a key from [console.anthropic.com](https://console.anthropic.com/).
 
-These commands install the GitHub release [v2.0](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v2.0).
+These commands install the GitHub release [v2.0](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v2.1).
 
 **Mac / Linux**
 
 ```bash
-curl -L -o FolioSenseAI-v2.0.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v2.0.zip
+curl -L -o FolioSenseAI-v2.0.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v2.1.zip
 unzip FolioSenseAI-v2.0.zip
-cd FolioSenseAI-release-v2.0
+cd FolioSenseAI-release-v2.1
 ./scripts/setup.sh
 ```
 
 **Windows PowerShell**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v2.0.zip" -OutFile "FolioSenseAI-v2.0.zip"
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v2.1.zip" -OutFile "FolioSenseAI-v2.0.zip"
 Expand-Archive -Path "FolioSenseAI-v2.0.zip" -DestinationPath .
-cd FolioSenseAI-release-v2.0
+cd FolioSenseAI-release-v2.1
 .\scripts\setup.ps1
 ```
 
@@ -248,6 +249,24 @@ pip install --upgrade certifi
 | `http://localhost:8000` | The dashboard |
 | `http://localhost:8000/docs` | Swagger API docs (surprisingly pretty) |
 | `http://localhost:8000/health` | Health check endpoint |
+
+---
+
+## 🪄 What's New In v2.1
+
+**FolioSenseAI v2.1 adds conviction to the verdict — mark what you're keeping, lock in long-term positions, and get cleaner signals on everything else.**
+
+- Added **Anchor Hold** — designate any position as a long-term anchor directly from its verdict card or the Manage Holdings panel; anchored positions are never flagged for trimming, and Folio Sense surfaces add signals on dips below their own price trend instead.
+- Added **AI Recommendations panel** — a dedicated section that surfaces the full Folio Sense × Claude verdict per holding in a focused, scrollable view alongside the dashboard.
+- Improved **analyst review validation** — tighter checks on analyst consensus fields prevent bad data from inflating or deflating confidence scores.
+- Polished **verdict card UI** — cleaner layout for action chips, confidence meter, anchor pill, and reasons/risks; better spacing and typography across the dashboard.
+- Fixed **anchor state persistence** — hold_class now round-trips correctly between the verdict engine and the manage-holdings panel.
+
+### v2.1 Release Notes
+
+**For users:** v2.1 is about commitment — you can now tell Folio Sense which positions are untouchable. Mark a holding as an Anchor and the app shifts from "should I trim?" to "when's the best moment to add more?" Everything else continues to get Add / Hold / Trim verdicts as before.
+
+**For developers:** v2.1 adds `hold_class` (anchor / auto) to the investment signal model, a toggle API on the portfolio holdings endpoint, CSS and JS validation improvements, and stricter analyst-recommendation parsing for edge-case tickers.
 
 ---
 
