@@ -3434,11 +3434,13 @@ function _renderSignalMix(verdict) {
 
 function _renderQuip(quip) {
     if (!quip) return "";
+    const isLocal = _isClaudeApiLive === false || _forcedLocalMode;
+    if (isLocal) return "";
     return `<div class="verdict-quote">
-        <span class="verdict-tea-label">Claude spilled:</span>
+        <span class="verdict-tea-label">FolioSense thinks:</span>
         ${_verdictTip({
-            title: "Claude's take",
-            body: "Claude writes this one line from the same signals — color commentary, not a separate recommendation. It's cached, so it costs almost nothing and only refreshes when the verdict or the market mood changes.",
+            title: "FolioSense's take",
+            body: "FolioSense writes this one line from the same signals — color commentary, not a separate recommendation. It's cached, so it costs almost nothing and only refreshes when the verdict or the market mood changes.",
             variant: "ai",
         })}
         ${escapeHtml(quip)}
