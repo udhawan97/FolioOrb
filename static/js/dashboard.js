@@ -3117,7 +3117,7 @@ function _renderAnchorPill(verdict, ticker) {
     const holding = latestHoldings.find(h => h.ticker === ticker);
     if (!isAnchor && !holding?.id) return "";
     const pressed = isAnchor ? "true" : "false";
-    return `<button class="verdict-anchor-pill tip-trigger ${isAnchor ? "is-anchor" : ""}"
+    return `<span class="verdict-anchor-sep" aria-hidden="true">|</span><button class="verdict-anchor-pill tip-trigger ${isAnchor ? "is-anchor" : ""}"
             type="button"
             aria-pressed="${pressed}"
             onclick="toggleAnchorHold(event, ${holding?.id || "null"}, ${inlineJsString(ticker)})"
@@ -4331,12 +4331,13 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
                 <td class="text-center">
                     <input class="form-check-input anchor-hold-check" type="checkbox"
                            id="anchor-${h.id}" ${isAnchor ? "checked" : ""}
-                           aria-label="Anchor ${tickerLabel}">
+                           aria-label="Anchor ${tickerLabel}"
+                           onchange="autoSaveAnchorHold(this, ${h.id}, ${tickerArg})">
                 </td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1"
-                            onclick="updateHolding(${h.id})" aria-label="Save ${tickerLabel}">
-                        <i class="bi bi-check"></i>
+                            onclick="updateHolding(${h.id})" aria-label="Save ${tickerLabel} shares and cost">
+                        <i class="bi bi-floppy me-1"></i>Save
                     </button>
                     ${removeBtn}
                 </td>
@@ -4405,6 +4406,12 @@ async function toggleAnchorHold(event, holdingId, ticker) {
     }
     const holding = latestHoldings.find(h => h.id === holdingId || h.ticker === ticker) || {};
     const nextClass = holding.hold_class === "anchor" ? "auto" : "anchor";
+
+    const confirmMsg = nextClass === "anchor"
+        ? `Anchor ${ticker}? Folio Sense will never suggest trimming it — only flag good moments to add more.`
+        : `Remove anchor from ${ticker}? It will return to standard recommendations.`;
+    if (!confirm(confirmMsg)) return;
+
     try {
         const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
             method: "PUT",
@@ -4412,18 +4419,81 @@ async function toggleAnchorHold(event, holdingId, ticker) {
             body: JSON.stringify({ hold_class: nextClass }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // Update in-memory state
         latestHoldings = latestHoldings.map(h => (
             h.id === holdingId || h.ticker === ticker ? { ...h, hold_class: nextClass } : h
         ));
+        if (cachedVerdicts[ticker]) {
+            cachedVerdicts[ticker] = { ...cachedVerdicts[ticker], hold_class: nextClass };
+        }
+
+        // Surgically update the anchor pill — no full table re-render
+        const mainRow = document.querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
+        const verdictSection = mainRow?.nextElementSibling?.querySelector(".intel-verdict-section");
+        const pill = verdictSection?.querySelector(".verdict-anchor-pill");
+        if (pill) {
+            const isAnchor = nextClass === "anchor";
+            pill.classList.toggle("is-anchor", isAnchor);
+            pill.setAttribute("aria-pressed", String(isAnchor));
+        }
+
+        // Sync manage holdings checkbox if open
         const check = document.getElementById(`anchor-${holdingId}`);
         if (check) check.checked = nextClass === "anchor";
-        showToast(nextClass === "anchor" ? `${ticker} anchored` : `${ticker} set to auto`, "success");
-        renderHoldings();
-        await refreshAiVerdicts();
+
+        showToast(nextClass === "anchor" ? `${ticker} anchored` : `${ticker} unanchored`, "success");
         refreshPortfolioMutationInBackground({ includeRecommendations: false });
     } catch (err) {
         console.warn("Unable to toggle anchor:", err);
         showToast("Anchor update failed", "danger");
+    }
+}
+
+
+async function autoSaveAnchorHold(checkbox, holdingId, ticker) {
+    const nextClass = checkbox.checked ? "anchor" : "auto";
+    const confirmMsg = nextClass === "anchor"
+        ? `Anchor ${ticker}? Folio Sense will never suggest trimming it — only flag good moments to add more.`
+        : `Remove anchor from ${ticker}? It will return to standard recommendations.`;
+
+    if (!confirm(confirmMsg)) {
+        checkbox.checked = !checkbox.checked;
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hold_class: nextClass }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // Update in-memory state
+        latestHoldings = latestHoldings.map(h => (
+            h.id === holdingId || h.ticker === ticker ? { ...h, hold_class: nextClass } : h
+        ));
+        if (cachedVerdicts[ticker]) {
+            cachedVerdicts[ticker] = { ...cachedVerdicts[ticker], hold_class: nextClass };
+        }
+
+        // Surgically update the anchor pill in the verdict section
+        const mainRow = document.querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
+        const verdictSection = mainRow?.nextElementSibling?.querySelector(".intel-verdict-section");
+        const pill = verdictSection?.querySelector(".verdict-anchor-pill");
+        if (pill) {
+            const isAnchor = nextClass === "anchor";
+            pill.classList.toggle("is-anchor", isAnchor);
+            pill.setAttribute("aria-pressed", String(isAnchor));
+        }
+
+        showToast(nextClass === "anchor" ? `${ticker} anchored` : `${ticker} unanchored`, "success");
+        refreshPortfolioMutationInBackground({ includeRecommendations: false });
+    } catch (err) {
+        console.warn("Unable to auto-save anchor:", err);
+        showToast("Anchor update failed", "danger");
+        checkbox.checked = !checkbox.checked;
     }
 }
 

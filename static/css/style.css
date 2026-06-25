@@ -8272,6 +8272,11 @@ tr.research-holding-row:hover {
 
 .verdict-header-label { color: var(--text-secondary); font-weight: 750; }
 .verdict-header-sep   { opacity: 0.3; }
+.verdict-anchor-sep {
+    opacity: 0.22;
+    margin: 0 0.1rem;
+    font-weight: 400;
+}
 .verdict-header-ticker {
     margin-left: auto;
     color: var(--verdict-color, var(--accent-cyan));
