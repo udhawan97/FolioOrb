@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.gzip import GZipMiddleware
 from app.routers import stocks, portfolio, ai
 from app.config import settings
 from app.database import engine, ensure_startup_migrations
@@ -36,6 +37,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Serve static files (CSS, JS, images) from the /static folder
 # Files at static/css/style.css → URL: /static/css/style.css

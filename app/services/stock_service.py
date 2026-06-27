@@ -14,6 +14,8 @@ QUOTE_FETCH_ERROR = "Quote data is temporarily unavailable."
 
 _QUOTE_CACHE: dict[str, tuple[float, dict]] = {}
 _QUOTE_TTL = 60
+_HISTORY_CACHE: dict[tuple[str, str], tuple[float, list]] = {}
+_HISTORY_TTL = 300
 TICKER_PATTERN = re.compile(r"^[A-Z0-9.^-]{1,10}$")
 SUGGESTION_QUERY_PATTERN = re.compile(r"[^A-Za-z0-9 .^\-&]")
 SUPPORTED_QUOTE_TYPES = {
@@ -179,6 +181,103 @@ def get_stock_data(ticker: str) -> dict:
         }
 
 
+def _fast_float(value, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def get_fast_quote(ticker: str) -> dict:
+    """
+    Lightweight quote via yfinance fast_info — much faster than stock.info.
+    Used for portfolio valuation on dashboard load; falls back to full fetch
+    when fast_info does not return a usable price.
+    """
+    ticker = normalize_ticker(ticker)
+    cache_key = f"fast:{ticker}"
+    now = time.monotonic()
+    cached = _QUOTE_CACHE.get(cache_key)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    try:
+        fi = yf.Ticker(ticker).fast_info
+        current_price = _fast_float(getattr(fi, "last_price", None))
+        prev_close = _fast_float(getattr(fi, "previous_close", None))
+        if current_price <= 0:
+            return get_stock_data(ticker)
+
+        if prev_close > 0:
+            day_change = current_price - prev_close
+            day_change_pct = (day_change / prev_close) * 100
+        else:
+            day_change = 0.0
+            day_change_pct = 0.0
+
+        year_high = _fast_float(
+            getattr(fi, "year_high", None) or getattr(fi, "fifty_two_week_high", None)
+        )
+        year_low = _fast_float(
+            getattr(fi, "year_low", None) or getattr(fi, "fifty_two_week_low", None)
+        )
+        security_type = classify_security(ticker, None).value
+
+        result = {
+            "ticker": ticker,
+            "name": ticker,
+            "current_price": round(current_price, 2),
+            "prev_close": round(prev_close, 2),
+            "day_change": round(day_change, 2),
+            "day_change_pct": round(day_change_pct, 2),
+            "day_high": round(_fast_float(getattr(fi, "day_high", None), current_price), 2),
+            "day_low": round(_fast_float(getattr(fi, "day_low", None), current_price), 2),
+            "fifty_two_week_high": round(year_high, 2) if year_high > 0 else 0,
+            "fifty_two_week_low": round(year_low, 2) if year_low > 0 else 0,
+            "fifty_day_average": None,
+            "two_hundred_day_average": None,
+            "volume": int(_fast_float(getattr(fi, "last_volume", None))),
+            "average_volume": 0,
+            "market_cap": int(_fast_float(getattr(fi, "market_cap", None))),
+            "enterprise_value": None,
+            "total_revenue": None,
+            "ebitda": None,
+            "free_cashflow": None,
+            "fcf_yield": None,
+            "aum": None,
+            "bid": None,
+            "ask": None,
+            "bid_ask_spread_pct": None,
+            "expense_ratio": None,
+            "holdings_count": None,
+            "pe_ratio": None,
+            "forward_pe": None,
+            "price_to_sales": None,
+            "enterprise_to_revenue": None,
+            "enterprise_to_ebitda": None,
+            "revenue_growth": None,
+            "gross_margin": None,
+            "operating_margin": None,
+            "profit_margin": None,
+            "dividend_yield": None,
+            "currency": str(getattr(fi, "currency", None) or "USD"),
+            "sector": "N/A",
+            "quote_type": "ETF" if security_type == "ETF" else "EQUITY",
+            "security_type": security_type,
+            "error": None,
+        }
+        _QUOTE_CACHE[cache_key] = (now + _QUOTE_TTL, result)
+        return result
+    except Exception as exc:
+        logger.warning(
+            "Fast quote failed, falling back to full fetch; ticker=%s exception_type=%s",
+            ticker,
+            type(exc).__name__,
+        )
+        return get_stock_data(ticker)
+
+
 def suggest_tickers(query: str, limit: int = 3) -> list[dict]:
     """Return likely ticker matches from Yahoo Finance search."""
     query = _clean_suggestion_query(query)
@@ -274,6 +373,18 @@ def get_all_quotes(tickers: Optional[list[str]] = None) -> list[dict]:
     return quotes
 
 
+def get_portfolio_quotes(tickers: Optional[list[str]] = None) -> list[dict]:
+    """Fast parallel quotes for dashboard portfolio valuation."""
+    if tickers is None:
+        tickers = DEFAULT_HOLDINGS
+    if not tickers:
+        return []
+    with ThreadPoolExecutor(max_workers=min(10, len(tickers))) as pool:
+        quotes = list(pool.map(get_fast_quote, tickers))
+    logger.info("Fetched %d fast portfolio quotes", len(quotes))
+    return quotes
+
+
 def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
     """
     Return daily OHLCV (open/high/low/close/volume) data for a ticker.
@@ -284,6 +395,12 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
     caller always receives JSON-safe floats (Starlette serializes with allow_nan=False).
     """
     try:
+        cache_key = (ticker.upper(), period)
+        now = time.monotonic()
+        cached = _HISTORY_CACHE.get(cache_key)
+        if cached and cached[0] > now:
+            return cached[1]
+
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
         results = []
@@ -305,6 +422,7 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
                     "volume": int(volume),
                 }
             )
+        _HISTORY_CACHE[cache_key] = (now + _HISTORY_TTL, results)
         return results
     except Exception as exc:
         logger.error(

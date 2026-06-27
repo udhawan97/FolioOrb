@@ -123,6 +123,14 @@ const uiScale = () => toNumber(cssVar("--ui-scale"), 1);
 const prefersReducedMotion = () =>
     window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
+function scheduleWhenIdle(fn, timeoutMs = 1500) {
+    if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(() => fn(), { timeout: timeoutMs });
+    } else {
+        setTimeout(fn, 50);
+    }
+}
+
 function chartTheme() {
     const isLight = currentTheme() === "light";
     return {
@@ -773,13 +781,17 @@ async function loadPortfolioValue() {
                 el.innerHTML = `${largest.ticker} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
             }
 
-            // Render the holdings table once, after trend (sparkline) data resolves.
-            // The loading shimmer / prior content stays visible until then, so we
-            // avoid a double render (and the partial-table flash) on every load.
-            // `.catch` guarantees a render even if trend data fails to load.
-            latestTrendData = await trendPromise.catch(() => ({}));
+            // Show holdings immediately; sparklines fill in when trend data arrives.
             renderHoldings();
-            repaintOpenVerdictSparklines();
+            trendPromise
+                .then((trendData) => {
+                    latestTrendData = trendData || {};
+                    renderHoldings();
+                    repaintOpenVerdictSparklines();
+                })
+                .catch(() => {
+                    latestTrendData = {};
+                });
 
             latestProjectionData = null;
             projectionLoadPromise = null;
@@ -4205,13 +4217,13 @@ function _renderAiSynthesisPanel(verdict, ticker = "") {
     </div>`;
 }
 
-function _renderSignalRadarMarkup(verdict, variant = "ai") {
+function _renderSignalRadarMarkup(verdict, variant = "ai", compact = false) {
     const components = verdict?.confidence_detail?.components;
     if (!Array.isArray(components) || components.length < 4) return "";
     const scores = components.slice(0, 4).map(c => Math.min(100, Math.max(0, Number(c.score) || 0)));
     const cx = 50;
     const cy = 50;
-    const maxR = 38;
+    const maxR = compact ? 34 : 38;
     const angles = [-90, 0, 90, 180];
     const labels = ["Experts", "Price", "Trend", "Quality"];
 
@@ -4235,16 +4247,19 @@ function _renderSignalRadarMarkup(verdict, variant = "ai") {
         return `<line class="ai-radar-spoke" x1="${cx}" y1="${cy}" x2="${cx + maxR * Math.cos(rad)}" y2="${cy + maxR * Math.sin(rad)}"></line>`;
     }).join("");
 
-    const textAnchors = ["middle", "start", "middle", "end"];
-    const labelNodes = angles.map((deg, i) => {
+    const labelNodes = compact ? "" : angles.map((deg, i) => {
+        const textAnchors = ["middle", "start", "middle", "end"];
         const rad = (deg * Math.PI) / 180;
         const lx = cx + (maxR + 8) * Math.cos(rad);
         const ly = cy + (maxR + 8) * Math.sin(rad);
         return `<text class="ai-radar-label" x="${lx}" y="${ly}" text-anchor="${textAnchors[i]}" dominant-baseline="middle">${labels[i]}</text>`;
     }).join("");
 
-    return `<div class="signal-radar-wrap is-${variant}">
-        <svg class="signal-radar" viewBox="-32 -14 164 128" role="img" aria-label="Signal balance radar">
+    const viewBox = compact ? "8 8 84 84" : "-32 -14 164 128";
+    const compactCls = compact ? " is-compact" : "";
+
+    return `<div class="signal-radar-wrap is-${variant}${compactCls}">
+        <svg class="signal-radar" viewBox="${viewBox}" role="img" aria-label="Signal balance radar">
             ${rings}
             ${spokes}
             <polygon class="signal-radar-fill" points="${poly}"></polygon>
@@ -5345,6 +5360,319 @@ function _animateConfidence(el, target, reducedMotion) {
     requestAnimationFrame(tick);
 }
 
+const _BRIEFING_COMP_KEYS = ["analyst", "valuation", "momentum", "quality"];
+const _BRIEFING_COMP_SHORT = ["Experts", "Price", "Trend", "Quality"];
+const _BRIEFING_CONVICTION_LABEL = {
+    high: "High conviction",
+    moderate: "Moderate conviction",
+    low: "Low conviction",
+};
+
+function _briefingConvictionLabel(verdict, ai) {
+    const conv = ai?.conviction;
+    if (conv && _BRIEFING_CONVICTION_LABEL[conv]) return _BRIEFING_CONVICTION_LABEL[conv];
+    return verdict?.confidence_detail?.level || "";
+}
+
+function _renderBriefingConfidenceRing(conf, verdict) {
+    const r = 26;
+    const c = 2 * Math.PI * r;
+    const pct = Math.min(100, Math.max(0, Math.round(conf || 0)));
+    const offset = c * (1 - pct / 100);
+    const ai = verdict?.ai_enhancement;
+    const conviction = _briefingConvictionLabel(verdict, ai);
+    const detail = verdict?.confidence_detail || {};
+    const low = detail.range_low;
+    const high = detail.range_high;
+    const rangeCopy = Number.isFinite(low) && Number.isFinite(high) && high - low >= 3
+        ? `<span class="briefing-conf-range">Likely ${low}–${high}%</span>`
+        : "";
+    const deltaHtml = _renderAiDeltaBadge(verdict);
+
+    return `<div class="briefing-conf-ring-wrap" aria-label="${pct}% signal strength">
+        <svg class="briefing-conf-ring" viewBox="0 0 64 64" aria-hidden="true">
+            <circle class="briefing-conf-ring-track" cx="32" cy="32" r="${r}"></circle>
+            <circle class="briefing-conf-ring-fill" cx="32" cy="32" r="${r}"
+                stroke-dasharray="${c.toFixed(2)}"
+                stroke-dashoffset="${offset.toFixed(2)}"></circle>
+        </svg>
+        <span class="briefing-conf-ring-pct">${pct}%</span>
+        <span class="briefing-conf-ring-caption">${conviction ? escapeHtml(conviction) : "Signal strength"}</span>
+        ${rangeCopy}
+        ${deltaHtml}
+    </div>`;
+}
+
+function _renderBriefingHeroMeta(verdict, ticker) {
+    const action = verdict.action || "hold";
+    const label = verdict.label || "Hold";
+    const icon = VERDICT_ICONS[action] || "bi-question-circle";
+    const anchorPill = _renderAnchorPill(verdict, ticker);
+    const horizonPill = _renderHorizonPill(verdict, ticker);
+    return `<div class="briefing-hero-meta">
+        <span class="briefing-verdict-pill" data-action="${escapeHtml(action)}">
+            <i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i>
+            ${escapeHtml(label)}
+        </span>
+        ${anchorPill}
+        ${horizonPill}
+    </div>`;
+}
+
+function _renderBriefingHero(verdict, ticker) {
+    const ai = verdict.ai_enhancement || {};
+    const headline = ai.headline || "";
+    const summary = _synthPlainSummary(verdict, ai, ticker);
+    const driver = ai.key_driver || "";
+    const tags = (ai.tags || []).slice(0, 3);
+    const tagHtml = tags.map(tag => _renderSynthTag(tag, "ai")).join("");
+    const contextChips = _renderVerdictContextChips(verdict, ticker);
+    const conf = verdict.confidence || 0;
+
+    return `<section class="briefing-hero">
+        ${_renderBriefingHeroMeta(verdict, ticker)}
+        ${headline ? `<h3 class="briefing-headline">${escapeHtml(headline)}</h3>` : ""}
+        ${driver ? `<p class="briefing-driver">${escapeHtml(driver)}</p>` : ""}
+        ${summary ? `<p class="briefing-summary">${escapeHtml(summary)}</p>` : ""}
+        ${tagHtml ? `<div class="briefing-tags">${tagHtml}</div>` : ""}
+        ${contextChips ? `<div class="briefing-context-row">${contextChips}</div>` : ""}
+        <div class="briefing-hero-aside">
+            ${_renderBriefingConfidenceRing(conf, verdict)}
+        </div>
+    </section>`;
+}
+
+function _renderBriefingSignalLens(verdict) {
+    const ai = verdict.ai_enhancement || {};
+    const components = verdict?.confidence_detail?.components;
+    if (!Array.isArray(components) || components.length < 4) return "";
+
+    const callouts = ai.factor_callouts || [];
+    const radarHtml = _renderSignalRadarMarkup(verdict, "ai", true);
+
+    const cells = _BRIEFING_COMP_KEYS.map((key, idx) => {
+        const comp = components.find(c => c.key === key) || components[idx] || {};
+        const stance = ["support", "neutral", "against"].includes(comp.stance) ? comp.stance : "neutral";
+        const score = Math.min(100, Math.max(0, Math.round(comp.score || 0)));
+        const meta = _VERDICT_COMP_META[key] || { layman: "" };
+        const callout = (callouts[idx] || "").trim() || meta.layman;
+        const nudge = Number(comp.ai_nudge);
+        const nudgeHtml = Number.isFinite(nudge) && nudge !== 0
+            ? `<span class="briefing-lens-nudge">${nudge > 0 ? "+" : ""}${nudge}</span>`
+            : "";
+        return `<div class="briefing-lens-cell" data-stance="${escapeHtml(stance)}">
+            <div class="briefing-lens-cell-head">
+                <span class="briefing-lens-dot" aria-hidden="true"></span>
+                <span class="briefing-lens-name">${escapeHtml(_BRIEFING_COMP_SHORT[idx])}</span>
+                <span class="briefing-lens-score">${score}%${nudgeHtml}</span>
+            </div>
+            <span class="briefing-lens-callout">${escapeHtml(callout)}</span>
+        </div>`;
+    }).join("");
+
+    return `<article class="briefing-artifact briefing-signal-lens">
+        <header class="briefing-artifact-head">
+            <span class="briefing-artifact-title">Signal lens</span>
+            ${_verdictTip({
+                title: "How to read this",
+                body: "Radar shows balance across four inputs. Each cell adds Claude's one-line read — green supports the call, grey is neutral, red pushes back.",
+                icon: "bi-radar",
+                variant: "ai",
+            })}
+        </header>
+        <div class="briefing-lens-body">
+            ${radarHtml}
+            <div class="briefing-lens-grid">${cells}</div>
+        </div>
+    </article>`;
+}
+
+function _renderBriefingOutlook(verdict) {
+    const scenarios = verdict?.confidence_detail?.scenarios;
+    if (!scenarios?.base) return "";
+
+    const forecast = scenarios.forecast || {};
+    const probs = forecast.probabilities || {};
+    const likely = forecast.likely || null;
+    const note = forecast.note || "";
+    const isClaude = forecast.source === "claude";
+
+    const probBar = ["base", "bull", "bear"].map(key => {
+        const pct = Number(probs[key]) || 0;
+        if (pct <= 0) return "";
+        return `<span class="briefing-outlook-seg is-${key}${likely === key ? " is-likely" : ""}"
+            style="width:${pct}%"></span>`;
+    }).join("");
+
+    const legend = [
+        { key: "base", label: "Base" },
+        { key: "bull", label: "Bull" },
+        { key: "bear", label: "Bear" },
+    ].map(({ key, label }) => {
+        const pct = Number(probs[key]);
+        if (!Number.isFinite(pct)) return "";
+        const likelyMark = likely === key ? `<span class="briefing-outlook-likely-tag">Likely</span>` : "";
+        return `<span class="briefing-outlook-legend is-${key}${likely === key ? " is-active" : ""}">
+            ${escapeHtml(label)} <strong>${pct}%</strong>${likelyMark}
+        </span>`;
+    }).join("");
+
+    const likelyLabel = likely
+        ? likely.charAt(0).toUpperCase() + likely.slice(1)
+        : "";
+
+    return `<article class="briefing-artifact briefing-outlook">
+        <header class="briefing-artifact-head">
+            <span class="briefing-artifact-title">Outlook</span>
+            ${isClaude ? `<span class="briefing-artifact-badge"><i class="bi bi-stars" aria-hidden="true"></i> Claude</span>` : ""}
+            ${_verdictTip({
+                title: "Three simple futures",
+                body: "Rough odds on Base, Bull, and Bear paths from the same signals — a read, not a forecast.",
+                icon: "bi-signpost-split",
+                variant: "ai",
+            })}
+        </header>
+        ${probBar ? `<div class="briefing-outlook-bar" role="img" aria-label="Scenario probability split">${probBar}</div>` : ""}
+        ${legend ? `<div class="briefing-outlook-legend-row">${legend}</div>` : ""}
+        ${note ? `<p class="briefing-outlook-note">${likelyLabel ? `<span class="briefing-outlook-pick">Likely ${escapeHtml(likelyLabel)}</span> — ` : ""}${escapeHtml(note)}</p>` : ""}
+    </article>`;
+}
+
+function _renderBriefingFlag(verdict) {
+    const ai = verdict?.ai_enhancement;
+    if (!ai?.tension) return "";
+    const flip = ai.flip_if;
+    const flipCopy = flip
+        ? `Would reconsider if ${flip.metric || "signal"} ${flip.direction || "changes"}.`
+        : "";
+    return `<div class="briefing-flag">
+        <i class="bi bi-flag-fill" aria-hidden="true"></i>
+        <span class="briefing-flag-copy">${escapeHtml(ai.tension)}</span>
+        ${flipCopy ? `<span class="briefing-flag-flip">${escapeHtml(flipCopy)}</span>` : ""}
+    </div>`;
+}
+
+function _renderBriefingReasoning(verdict, ticker) {
+    const ai = verdict.ai_enhancement || {};
+    const insights = (ai.insights || []).filter(Boolean);
+    const reasons = verdict.reasons || [];
+    const risks = verdict.risks || [];
+    const action = verdict.action || "hold";
+    const label = verdict.label || "Hold";
+
+    const insightHtml = insights.map(line =>
+        `<li class="briefing-insight-item">${escapeHtml(line)}</li>`
+    ).join("");
+
+    const reasonsHtml = reasons.map(r =>
+        `<div class="intel-spec-row verdict-reason-row">
+            <span aria-hidden="true"><i class="bi bi-check-circle-fill"></i></span>
+            <span>${escapeHtml(r)}</span>
+        </div>`
+    ).join("");
+
+    const risksHtml = risks.map(r =>
+        `<div class="intel-spec-row verdict-risk-row">
+            <span aria-hidden="true"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            <span><span class="spec-pill risk">${escapeHtml(r)}</span></span>
+        </div>`
+    ).join("");
+
+    const peerHtml = _renderPeerRelativeLine(verdict);
+    const sparkHtml = _renderVerdictSparkline(verdict, ticker);
+    const flipHtml = _renderFlipTriggers(verdict);
+    const timingHtml = _renderTimingLine(verdict);
+    const metaChips = [_renderSinceLastScan(verdict), _renderFreshness(verdict)]
+        .filter(Boolean)
+        .join("");
+    const bookHtml = _renderBookExposureStrip(ticker);
+    const calHtml = _renderCalibrationFootnote(verdict);
+    const disc = _verdictDisclaimer(verdict);
+
+    const hasBody = insightHtml || reasonsHtml || risksHtml || peerHtml || sparkHtml
+        || flipHtml || timingHtml || metaChips || bookHtml;
+
+    if (!hasBody) return "";
+
+    return `<details class="briefing-reasoning">
+        <summary class="briefing-reasoning-toggle">
+            <span>See reasoning</span>
+            <i class="bi bi-chevron-down briefing-reasoning-chevron" aria-hidden="true"></i>
+        </summary>
+        <div class="briefing-reasoning-body">
+            ${insightHtml ? `<ul class="briefing-insights">${insightHtml}</ul>` : ""}
+            ${reasonsHtml ? `<div class="verdict-detail-block verdict-reasons-group">
+                <div class="verdict-detail-head"><i class="bi bi-check2-circle"></i> Why ${escapeHtml(label.toLowerCase())}</div>
+                <div class="intel-spec-rows verdict-spec-rows">${reasonsHtml}</div>
+            </div>` : ""}
+            ${risksHtml ? `<div class="verdict-detail-block verdict-risks-group">
+                <div class="verdict-detail-head"><i class="bi bi-shield-exclamation"></i> Watch outs</div>
+                <div class="intel-spec-rows verdict-spec-rows">${risksHtml}</div>
+            </div>` : ""}
+            ${peerHtml}
+            ${sparkHtml}
+            ${flipHtml}
+            ${timingHtml}
+            ${bookHtml}
+            ${metaChips ? `<div class="verdict-mini-chip-row">${metaChips}</div>` : ""}
+            ${calHtml}
+            ${disc ? `<div class="intel-meta-row verdict-disc-row"><span class="fact-tag">${escapeHtml(disc)}</span></div>` : ""}
+        </div>
+    </details>`;
+}
+
+function renderAiBriefingVerdict(section, verdict, ticker, options = {}) {
+    const action = verdict.action || "needs-data";
+    const label = verdict.label || "Needs Data";
+    const conf = verdict.confidence || 0;
+    const brandCopy = _verdictBrand(verdict);
+    const reducedMotion = prefersReducedMotion();
+    const shouldReveal = options.animate === true && !reducedMotion;
+    const revealClass = shouldReveal ? " is-revealing" : "";
+
+    section.innerHTML = `
+        <div class="intel-label"><i class="bi ${_verdictIntelIcon()}"></i> <span class="verdict-kicker-label">${escapeHtml(brandCopy.kicker)}</span> ${_verdictInfoTip()}</div>
+        <div class="intel-verdict intel-briefing is-ai-enhanced${revealClass}" data-action="${escapeHtml(action)}"
+             aria-label="${escapeHtml(label)} verdict, ${conf}% confidence">
+            <div class="verdict-header-bar briefing-header-bar">
+                <span class="verdict-status-dot" aria-hidden="true"></span>
+                <span class="verdict-header-label">Intelligence Briefing</span>
+                <span class="verdict-mode-pill is-ai"><i class="bi bi-stars" aria-hidden="true"></i> Claude</span>
+                <span class="verdict-header-sep" aria-hidden="true">·</span>
+                <span class="verdict-header-ticker">${escapeHtml(ticker)}</span>
+            </div>
+            ${_renderBriefingHero(verdict, ticker)}
+            ${_renderBriefingFlag(verdict)}
+            <div class="briefing-artifacts">
+                ${_renderBriefingSignalLens(verdict)}
+                ${_renderBriefingOutlook(verdict)}
+            </div>
+            ${_renderBriefingReasoning(verdict, ticker)}
+        </div>`;
+
+    if (shouldReveal) {
+        setTimeout(() => {
+            section.querySelector(".intel-briefing")?.classList.remove("is-revealing");
+        }, 360);
+    }
+
+    const ringFill = section.querySelector(".briefing-conf-ring-fill");
+    if (ringFill) {
+        const circumference = 2 * Math.PI * 26;
+        const targetOffset = circumference * (1 - conf / 100);
+        if (shouldReveal && !reducedMotion) {
+            ringFill.style.strokeDashoffset = String(circumference);
+            requestAnimationFrame(() => {
+                ringFill.style.strokeDashoffset = targetOffset.toFixed(2);
+            });
+        } else {
+            ringFill.style.strokeDashoffset = targetOffset.toFixed(2);
+        }
+    }
+
+    _syncVerdictCharts(section, verdict, ticker);
+}
+
 function renderAiVerdict(section, verdict, ticker, options = {}) {
     if (!verdict) {
         section.innerHTML = `
@@ -5354,6 +5682,11 @@ function renderAiVerdict(section, verdict, ticker, options = {}) {
     }
 
     verdict = _sanitizeVerdict(verdict) || verdict;
+
+    if (_isAiVerdictActive(verdict)) {
+        renderAiBriefingVerdict(section, verdict, ticker, options);
+        return;
+    }
 
     const action    = verdict.action || "needs-data";
     const label     = verdict.label  || "Needs Data";
@@ -5991,6 +6324,7 @@ function initBrandCostCallout() {
     if (!trigger || !callout) return;
 
     function openCallout() {
+        ensureAiCostStatsLoaded();
         callout.classList.add("is-visible");
         callout.setAttribute("aria-hidden", "false");
         trigger.setAttribute("aria-expanded", "true");
@@ -6018,8 +6352,14 @@ function initBrandCostCallout() {
         }
     });
 
+}
+
+let _aiCostStatsInterval = null;
+
+function ensureAiCostStatsLoaded() {
+    if (_aiCostStatsInterval) return;
     loadAiCostStats();
-    setInterval(loadAiCostStats, 60_000);
+    _aiCostStatsInterval = setInterval(loadAiCostStats, 60_000);
 }
 
 function initNavOverflow() {
@@ -6362,8 +6702,7 @@ function startCountdown() {
         if (_hudCountdown <= 0) {
             clearInterval(interval);
             loadPortfolioValue().then(() => {
-                loadPnl();
-                updateMarketStatus();
+                Promise.all([loadPnl(), updateMarketStatus()]);
                 startCountdown();
             });
         }
@@ -6719,6 +7058,15 @@ function initPortfolioBriefing() {
 async function initDashboard() {
     initThemeToggle();
     initTextSizeToggle();
+    initDashboardZones();
+
+    // Kick off critical data before heavier UI setup.
+    const criticalData = Promise.all([
+        loadPortfolioValue(),
+        loadPnl(),
+        updateMarketStatus(),
+    ]);
+
     initBrandIntro();
     initBrandCostCallout();
     initNavOverflow();
@@ -6726,25 +7074,26 @@ async function initDashboard() {
     initPerformanceTabs();
     initProjectionControls();
     initPortfolioManager();
-    initDashboardZones();
     initPortfolioBriefing();
-    window.AnalyticsCharts?.init?.();
-    // Sync the sliding indicator once layout is settled
     requestAnimationFrame(syncHvtIndicator);
     window.addEventListener("resize", syncHvtIndicator, { passive: true });
-    await loadPortfolioValue();
-    await loadPnl();
-    await updateMarketStatus();
-    // Fire without blocking — prices and P&L are already visible
-    loadAnalystRecommendations();
-    loadWorldMarkets();
-    loadPortfolioBriefing();
+
+    await criticalData;
+
     startCountdown();
     initHudPopover();
-    startClaudeHeartbeat();
     initTips();
     initHoldingExpandFab();
     initKeyboardHelp();
+
+    scheduleWhenIdle(() => {
+        window.AnalyticsCharts?.init?.();
+        loadAnalystRecommendations();
+        loadWorldMarkets();
+        loadPortfolioBriefing();
+        startClaudeHeartbeat();
+        ensureAiCostStatsLoaded();
+    });
 }
 
 // ── World Markets ─────────────────────────────────────────────────────────────
@@ -7918,8 +8267,8 @@ function initTips() {
 
 /* ── Holdings table canvas — active only during AI scan ─────────────────── */
 const HoldingsBg = (() => {
-    const MIN_DOTS      = 18;
-    const MAX_DOTS      = 36;
+    const MIN_DOTS      = 12;
+    const MAX_DOTS      = 24;
     const CONN_DIST     = 128;
     const CONN_DIST_SQ  = CONN_DIST * CONN_DIST;
     let canvas, ctx, W = 0, H = 0, dpr = 1, dots = [], raf, running = false, tick = 0;
@@ -8019,23 +8368,21 @@ const HoldingsBg = (() => {
             if (d.y > H+10) d.y = -10;
         }
 
-        // connections — squared-distance check avoids Math.sqrt, no shadowBlur
+        // connections — single batched stroke (uniform opacity for speed)
         ctx.lineWidth = 0.8;
+        ctx.strokeStyle = `rgba(${cyan},${dark ? 0.14 : 0.09})`;
+        ctx.beginPath();
         for (let i = 0; i < dots.length; i++) {
             for (let j = i + 1; j < dots.length; j++) {
                 const dx = dots[i].x - dots[j].x;
                 const dy = dots[i].y - dots[j].y;
-                const distSq = dx * dx + dy * dy;
-                if (distSq < CONN_DIST_SQ) {
-                    const a = (dark ? 0.34 : 0.20) * (1 - Math.sqrt(distSq) / CONN_DIST);
-                    ctx.strokeStyle = `rgba(${cyan},${a.toFixed(3)})`;
-                    ctx.beginPath();
+                if (dx * dx + dy * dy < CONN_DIST_SQ) {
                     ctx.moveTo(dots[i].x, dots[i].y);
                     ctx.lineTo(dots[j].x, dots[j].y);
-                    ctx.stroke();
                 }
             }
         }
+        ctx.stroke();
 
         // nodes — no shadowBlur
         for (const d of dots) {

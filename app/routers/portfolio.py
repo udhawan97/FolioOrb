@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models import Portfolio, Holding, RealizedTrade, PortfolioSnapshot
 from app.schemas import HoldingCreate, HoldingUpdate, PortfolioCreate
 from app.config import settings
-from app.services.stock_service import get_all_quotes, get_stock_data, validate_ticker_symbol
+from app.services.stock_service import get_all_quotes, get_portfolio_quotes, get_stock_data, validate_ticker_symbol
 from app.services.portfolio_projection import get_cached_projection
 from app.services.portfolio_analytics import (
     compute_risk_metrics,
@@ -89,7 +89,7 @@ def _compute_portfolio(portfolio_id, db):
     hold_class_map = {h.ticker: (h.hold_class or "auto") for h in holdings}
     id_map = {h.ticker: h.id for h in holdings}
 
-    quotes = get_all_quotes(list(shares_map.keys()))
+    quotes = get_portfolio_quotes(list(shares_map.keys()))
     realized_stats = _realized_stats_by_ticker(portfolio_id, db)
 
     result = []
@@ -469,7 +469,7 @@ async def seed_portfolio(db: Session = Depends(get_db)):
 
 
 @router.get("/value")
-async def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """
     Calculate total portfolio value using live prices × shares, plus cumulative
     profit/loss (realized + unrealized). Also refreshes today's snapshot so the

@@ -96,9 +96,32 @@ def normalize_ai_bundle(raw: dict | None) -> dict | None:
 
     scenario_note = str(raw.get("sc_w") or raw.get("scenario_note") or "").strip()[:120]
 
+    insights_raw = raw.get("ins") or raw.get("insights") or []
+    if isinstance(insights_raw, str):
+        insights_raw = [insights_raw]
+    insights = [
+        str(item).strip()[:80]
+        for item in (insights_raw if isinstance(insights_raw, list) else [])
+        if str(item).strip()
+    ][:3]
+
+    fc_raw = raw.get("fc") or raw.get("factor_callouts") or []
+    if isinstance(fc_raw, str):
+        fc_raw = [fc_raw]
+    factor_callouts: list[str] = []
+    if isinstance(fc_raw, list):
+        for item in fc_raw[:4]:
+            factor_callouts.append(str(item).strip()[:48])
+        while len(factor_callouts) < 4:
+            factor_callouts.append("")
+
+    conv_raw = str(raw.get("conv") or raw.get("conviction") or "").strip().lower()
+    conviction = conv_raw if conv_raw in ("high", "moderate", "low") else None
+
     return {
         "headline": str(raw.get("h") or raw.get("headline") or "").strip()[:80],
         "plain_summary": str(raw.get("p") or raw.get("plain_summary") or "").strip()[:220],
+        "key_driver": str(raw.get("drv") or raw.get("key_driver") or "").strip()[:80],
         "overall_nudge": _int_nudge(
             raw.get("n", raw.get("overall_nudge", 0)),
             -_MAX_OVERALL_NUDGE,
@@ -113,6 +136,9 @@ def normalize_ai_bundle(raw: dict | None) -> dict | None:
         "likely_scenario": likely,
         "scenario_probs": scenario_probs,
         "scenario_note": scenario_note,
+        "insights": insights,
+        "factor_callouts": factor_callouts,
+        "conviction": conviction,
     }
 
 
@@ -205,6 +231,7 @@ def apply_ai_enhancement(sig_dict: dict, ai_raw: dict | None) -> dict:
     sig_dict["ai_enhancement"] = {
         "headline": ai["headline"],
         "plain_summary": ai.get("plain_summary", ""),
+        "key_driver": ai.get("key_driver", ""),
         "tags": ai["tags"],
         "note": ai["note"],
         "local_score": local_score,
@@ -219,6 +246,9 @@ def apply_ai_enhancement(sig_dict: dict, ai_raw: dict | None) -> dict:
         "likely_scenario": ai.get("likely_scenario"),
         "scenario_probs": ai.get("scenario_probs"),
         "scenario_note": ai.get("scenario_note"),
+        "insights": ai.get("insights") or [],
+        "factor_callouts": ai.get("factor_callouts") or ["", "", "", ""],
+        "conviction": ai.get("conviction"),
     }
     return sig_dict
 

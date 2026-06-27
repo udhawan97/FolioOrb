@@ -27,9 +27,9 @@
 
 ---
 
-> **v3 is here: FolioSenseAI finally admits your portfolio has overlap, a mood, and a preferred timeline.**
+> **v3 is here: FolioSenseAI finally admits your portfolio has overlap, a mood, a preferred timeline, and a whole Analytics tab.**
 >
-> FolioSenseAI still tracks your holdings, pulls live prices from Yahoo Finance, and lets Claude and Local Intelligence argue politely over Add/Hold/Trim. v3 adds look-through exposure, market-regime context, peer comparisons, earnings risk flags, Base/Bull/Bear scenarios with probability bars, and a verdict card that breathes instead of screaming in a grid. The navbar got an overflow menu so the top bar stops looking like an aircraft cockpit. Very composed. Still judging you.
+> FolioSenseAI still tracks your holdings, pulls live prices from Yahoo Finance, and lets Claude and Local Intelligence argue politely over Add/Hold/Trim. v3 adds look-through exposure, market-regime context, peer comparisons, earnings risk flags, Base/Bull/Bear scenarios with probability bars, and a verdict card that breathes instead of screaming in a grid. The dashboard now splits into **Overview**, **Holdings**, and **Analytics** zones — with a portfolio briefing card, five analytics sub-tabs (Performance, Risk, Exposure, Signals, Markets), and per-widget insight lines. The navbar got an overflow menu so the top bar stops looking like an aircraft cockpit. Very composed. Still judging you.
 
 ---
 
@@ -47,9 +47,11 @@
 ## ✨ Features
 
 ### 📊 Live Dashboard
+- **Three dashboard zones** — **Overview** (hero stats, briefing, charts), **Holdings** (verdict table), and **Analytics** (deep charts); zone choice persists in browser storage
 - Real-time prices and daily gain/loss for all holdings
 - Total portfolio value and daily P&L *(semantic color tokens — green means up, red means down, not "we liked this palette")*
 - Allocation, return, and performance-history views
+- **Portfolio briefing card** — AI mode asks Claude for a plain-English book narrative; Local mode serves a free deterministic digest of movers and drivers
 - Market open/closed indicator with auto-refresh countdown — so you can watch it drop in real time
 - **Navbar overflow menu** — theme, text size, pet mode, and AI-cost controls tucked into one Apple-style settings sheet
 - **Live feed HUD** with refresh state, force-refresh control, and Claude API heartbeat
@@ -81,6 +83,15 @@
 - **Analyst recommendations** and ETF quality labels *(take with an appropriate grain of salt)*
 - **Claude texting animation** — Holding Intel now cues a subtle bottom-right chat animation while analysis runs
 
+### 📈 Analytics *(new in v3)*
+- **Five sub-tabs** — Performance, Risk, Exposure, Signals, and Markets, each with lazy-rendered Chart.js visualizations
+- **Per-tab insight bar** — Claude or Local Intelligence one-liner for the active analytics section, plus per-widget insight lines beneath each chart
+- **Performance** — total return breakdown, cumulative P&L history, growth projection (avg / best / worst vs S&P 500), benchmark tracker, monthly return calendar heatmap
+- **Risk** — risk/reward scatter, correlation matrix, HHI concentration gauge, drawdown underwater chart, portfolio beta dial, rolling volatility
+- **Exposure** — sector tilt vs S&P 500, geographic look-through bars with country flags, theme overlap treemap
+- **Signals** — conviction gaps (verdict vs position size) and confidence spectrum (allocation-weighted score distribution)
+- **Markets** — global index correlation grid, macro-alignment scatter, and look-through geographic alignment vs world markets
+
 ### ⚙️ Portfolio Management
 - Add and remove holdings from the UI
 - Update share counts and average cost basis
@@ -101,7 +112,7 @@
 | 🗄️ **Database** | SQLite · SQLAlchemy 2.0 · Pydantic v2 | ACID-compliant, unlike your trading decisions |
 | 🤖 **AI** | Anthropic Claude | Smarter than CNBC. Low bar. Cleared it. |
 | 📈 **Market Data** | yfinance · Yahoo Finance | Free real-time data — the only free thing in investing |
-| 🎨 **Frontend** | Bootstrap 5 · Chart.js · Vanilla JS | Zero frontend frameworks harmed in the making |
+| 🎨 **Frontend** | Bootstrap 5 · Chart.js · chartjs-chart-matrix · chartjs-chart-treemap · Vanilla JS | Zero React frameworks harmed in the making |
 | 🔐 **Config** | python-dotenv | Secrets stay secret. Your ticker picks do not. |
 
 ---
@@ -273,8 +284,12 @@ pip install --upgrade certifi
 
 ## 🪄 What's New In v3
 
-**FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" release: richer local intelligence, Claude that can disagree on purpose, and a dashboard that finally learned negative space.**
+**FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" release: richer local intelligence, Claude that can disagree on purpose, a full Analytics zone, and a dashboard that finally learned negative space.**
 
+- Added **dashboard zones** — Overview, Holdings, and Analytics with persistent tab state and zone-aware chart lifecycle.
+- Added **portfolio briefing card** — `/api/ai/portfolio-summary` with AI (Claude Haiku, 24 h cache) and Local deterministic modes.
+- Added **Analytics zone** with five sub-tabs (Performance, Risk, Exposure, Signals, Markets), lazy Chart.js charts, and per-widget insight lines via `/api/ai/analytics-insights`.
+- Added **portfolio analytics engine** — risk metrics, correlation, drawdown, contribution, benchmark comparison, return calendar, beta, rolling vol, sector tilt, conviction gaps, confidence spectrum, macro alignment, and growth projection endpoints under `/api/portfolio/*`.
 - Added **look-through portfolio exposure** — sector, country, theme overlap, duplicate detection, and HHI concentration so "diversified" has to earn the title.
 - Added **market regime context** from SPY/TLT/VIX/UUP with cached daily weight shifts for the backdrop chip.
 - Added **peer-relative positioning** — own-range percentile vs peer median, for when you need to know if you're early, late, or merely emotional.
@@ -284,20 +299,21 @@ pip install --upgrade certifi
 - Added **Base / Bull / Bear scenarios** with local paths plus Claude probability splits (`likely`, `sc_p`, `sc_w`) when AI is connected.
 - Added **Claude tension gating** — nudges only when inputs conflict (`agrees`, `tension`, `flip_if`); agreement does not get performative drama.
 - Added **verdict calibration snapshots** — logged to SQLite with bucket summaries *(hit-rate reporting matures when forward prices catch up)*.
-- Added API endpoints for **`/api/ai/portfolio-exposure`**, **`/api/ai/verdict-calibration`**, and **`/api/ai/intelligence/{ticker}/deep`**.
+- Added API endpoints for **`/api/ai/portfolio-exposure`**, **`/api/ai/verdict-calibration`**, **`/api/ai/intelligence/{ticker}/deep`**, **`/api/ai/portfolio-summary`**, and **`/api/ai/analytics-insights`**.
+- Added **`/api/stocks/world-markets`** and **`/api/stocks/history/batch`** for analytics and market-context charts.
 - Extended **`/api/ai/investment-signals/all`** with `portfolio_exposure`, `regime`, `calibration_summary`, and per-signal `regime_context`, `peer_relative`, `events`, `exposure_context`, `calibration_footnote`.
 - Polished the **verdict card layout** — flex spacing, roomier confidence panel, scenario pills that don't feel like compressed fortune cookies.
 - Added a **navbar overflow menu** for theme, text size, pet mode, and inline AI-cost detail — fewer buttons fighting for oxygen.
 - Introduced **semantic color tokens** (`--color-gain/loss/neutral/state/brand`) so green always means money up, not "design liked it."
 - Renamed **Timing signal → Time horizon** in tooltips because words should mean things.
 - Tightened **global state** so mode toggles, sync HUD, and verdict rendering stop stepping on each other's toes.
-- **247 tests passing** — including coverage for nav overflow wiring, semantic tokens, scenario normalization, and calibration logging.
+- **286 tests passing** — including coverage for analytics wiring, portfolio briefing, projection, nav overflow, semantic tokens, scenario normalization, and calibration logging.
 
 ### v3 Release Notes
 
-**For users:** v3 makes verdicts feel less like a single hot take and more like a briefing: exposure overlap, market mood, peer context, earnings risk, three scenarios, and — when Claude is connected — a probability bar for which future is least delusional. The dashboard also got calmer: settings live in the overflow menu, colors mean what they say, and the pet only wiggles when you hover like a normal companion.
+**For users:** v3 makes verdicts feel less like a single hot take and more like a briefing: exposure overlap, market mood, peer context, earnings risk, three scenarios, and — when Claude is connected — a probability bar for which future is least delusional. The new **Analytics** tab adds performance, risk, exposure, signal, and market charts with plain-English insight lines. The **Overview** zone adds a portfolio briefing card. Settings live in the overflow menu, colors mean what they say, and the pet only wiggles when you hover like a normal companion.
 
-**For developers:** v3 bumps the FastAPI app to `3.0.0`, adds `portfolio_exposure.py`, `market_regime.py`, `peer_relative.py`, `event_calendar.py`, and `verdict_calibration.py`; extends `investment_signal.py` with horizon weights, confidence ranges, scenario builders, and modifier hooks; extends Claude prompts in `ai_service.py` for disagreement and scenario-probability fields; adds `VerdictSnapshot` persistence; ships a large `dashboard.js` / `style.css` pass for exposure strips, regime chips, scenario UI, and nav overflow; bumps static asset cache keys to `v=77`. `force_local=true` still skips Claude; all local intelligence features work offline.
+**For developers:** v3 bumps the FastAPI app to `3.0.0`, adds `portfolio_exposure.py`, `market_regime.py`, `peer_relative.py`, `event_calendar.py`, `verdict_calibration.py`, `verdict_ai_enhancement.py`, `portfolio_analytics.py`, `portfolio_projection.py`, and `analytics_insights.py`; extends `investment_signal.py` with horizon weights, confidence ranges, scenario builders, and modifier hooks; extends Claude prompts in `ai_service.py` for disagreement, scenario-probability, briefing, and analytics-narrator fields; adds `VerdictSnapshot` persistence; ships `analytics-charts.js` plus a large `dashboard.js` / `style.css` pass for zones, exposure strips, regime chips, scenario UI, and nav overflow; bumps static asset cache keys to `style.css?v=86`, `dashboard.js?v=79`, `analytics-charts.js?v=8`. `force_local=true` still skips Claude; all local intelligence features work offline.
 
 ---
 
@@ -366,7 +382,9 @@ Full interactive docs at `/docs` when running locally. Here's the cheat sheet:
 | `GET` | `/api/stocks/prices` | Live prices for all holdings |
 | `GET` | `/api/stocks/price/{ticker}` | Single ticker price |
 | `GET` | `/api/stocks/history/{ticker}?period=1mo` | Historical OHLCV data |
+| `GET` | `/api/stocks/history/batch?tickers=AAPL,MSFT&period=1mo` | Batched historical closes for multiple tickers (v3) |
 | `GET` | `/api/stocks/market-status` | Is the market open (and punishing you)? |
+| `GET` | `/api/stocks/world-markets` | Global index quotes for Markets analytics (v3) |
 
 </details>
 
@@ -382,6 +400,20 @@ Full interactive docs at `/docs` when running locally. Here's the cheat sheet:
 | `DELETE` | `/api/portfolio/trades/{trade_id}` | Remove one realized sale and refresh today's snapshot |
 | `GET` | `/api/portfolio/value` | Portfolio value, allocation, daily P&L |
 | `GET` | `/api/portfolio/pnl` | Historical returns and realized P&L |
+| `GET` | `/api/portfolio/projection` | Growth scenarios (avg / best / worst) vs S&P 500 (v3) |
+| `GET` | `/api/portfolio/risk-metrics` | Annualized return/volatility per holding (v3) |
+| `GET` | `/api/portfolio/correlation` | Daily-return correlation matrix (v3) |
+| `GET` | `/api/portfolio/drawdown` | Underwater drawdown series from snapshots (v3) |
+| `GET` | `/api/portfolio/contribution?period=day` | Per-holding P&L contribution — day, week, or month (v3) |
+| `GET` | `/api/portfolio/benchmark-comparison` | Portfolio vs S&P 500 cumulative return (v3) |
+| `GET` | `/api/portfolio/return-calendar` | Monthly return heatmap (v3) |
+| `GET` | `/api/portfolio/beta` | Portfolio beta vs S&P 500 (v3) |
+| `GET` | `/api/portfolio/rolling-volatility` | Trailing 30-day annualized vol series (v3) |
+| `GET` | `/api/portfolio/sector-tilt` | Sector overweight/underweight vs S&P 500 (v3) |
+| `GET` | `/api/portfolio/conviction-gaps` | Verdict vs position-size mismatches (v3) |
+| `GET` | `/api/portfolio/confidence-spectrum` | Allocation-weighted confidence distribution (v3) |
+| `GET` | `/api/portfolio/market-context` | World indices with portfolio correlation (v3) |
+| `GET` | `/api/portfolio/macro-alignment` | Index correlation vs geographic exposure (v3) |
 | `POST` | `/api/portfolio/seed` | Backward-compatible first-run helper; usually no longer needed |
 
 </details>
@@ -402,6 +434,8 @@ Full interactive docs at `/docs` when running locally. Here's the cheat sheet:
 | `GET` | `/api/ai/portfolio-exposure` | Look-through sector/country/theme overlap, duplicates, and concentration (v3) |
 | `GET` | `/api/ai/verdict-calibration` | Verdict snapshot buckets and calibration summary (v3) |
 | `GET` | `/api/ai/intelligence/{ticker}/deep` | Deep holding intelligence loaded on demand (v3) |
+| `GET` | `/api/ai/portfolio-summary` | Portfolio briefing card — `mode=ai` or `mode=local` (v3) |
+| `GET` | `/api/ai/analytics-insights` | Per-tab and per-widget analytics insight lines — `mode=ai` or `mode=local` (v3) |
 | `GET` | `/api/ai/analyst-recommendation/{ticker}` | Analyst take and ETF quality label for one holding |
 | `GET` | `/api/ai/analyst-recommendations/all` | Analyst takes and ETF quality labels for all holdings |
 | `GET` | `/api/ai/cache/stats` | Cache stats and estimated API cost |

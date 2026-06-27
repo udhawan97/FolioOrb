@@ -94,6 +94,21 @@ def test_normalize_ai_bundle_scenario_forecast():
     assert ai["scenario_note"].startswith("Momentum")
 
 
+def test_normalize_ai_bundle_briefing_artifacts():
+    ai = normalize_ai_bundle({
+        "h": "Quality anchor",
+        "drv": "Trend is the strongest input",
+        "conv": "moderate",
+        "ins": ["Trend at 94%", "Valuation neutral"],
+        "fc": ["Wall Street split", "Mid-range", "Uptrend intact", "Low-cost fund"],
+    })
+    assert ai["key_driver"] == "Trend is the strongest input"
+    assert ai["conviction"] == "moderate"
+    assert len(ai["insights"]) == 2
+    assert ai["factor_callouts"][2] == "Uptrend intact"
+    assert ai["factor_callouts"][3] == "Low-cost fund"
+
+
 def test_apply_ai_enhancement_merges_scenario_forecast():
     sig = build_investment_signal(_etf_rec("Fair"))
     sig_dict = signal_to_dict(sig)
@@ -111,3 +126,26 @@ def test_apply_ai_enhancement_merges_scenario_forecast():
     assert forecast["likely"] == "bear"
     assert forecast["probabilities"]["bear"] == 45
     assert "Cooling" in forecast["note"]
+    assert sig_dict["ai_enhancement"]["insights"] == []
+    assert len(sig_dict["ai_enhancement"]["factor_callouts"]) == 4
+
+
+def test_apply_ai_enhancement_preserves_briefing_fields():
+    sig = build_investment_signal(_etf_rec("Fair"))
+    sig_dict = signal_to_dict(sig)
+    apply_ai_enhancement(sig_dict, {
+        "n": 0,
+        "cn": [0, 0, 0, 0],
+        "agrees": True,
+        "tension": "",
+        "h": "Steady hold",
+        "drv": "Quality supports patience",
+        "conv": "high",
+        "ins": ["All four inputs align", "No red flags"],
+        "fc": ["Neutral views", "Fair price", "Trend ok", "Solid fund"],
+    })
+    ai = sig_dict["ai_enhancement"]
+    assert ai["key_driver"] == "Quality supports patience"
+    assert ai["conviction"] == "high"
+    assert ai["insights"] == ["All four inputs align", "No red flags"]
+    assert ai["factor_callouts"][0] == "Neutral views"

@@ -19,12 +19,10 @@
     </script>
     <link rel="icon" type="image/svg+xml" href="/static/img/brand/folio-orbit-icon.svg">
     <link rel="apple-touch-icon" href="/static/img/brand/folio-orbit-icon-1024.png">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=86" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.0.0/dist/chartjs-chart-treemap.min.js"></script>
+    <link href="/static/css/style.css?v=87" rel="stylesheet">
 </head>
 <body>
 
@@ -749,9 +747,9 @@
             </div>
         </div>
 
-        <!-- ── Benchmark comparison + return calendar ─────────────────── -->
+        <!-- ── Benchmark comparison ───────────────────────────────────── -->
         <div class="row g-3 g-md-4 mb-3">
-            <div class="col-12 col-lg-7">
+            <div class="col-12">
                 <div class="card bg-dark border-secondary h-100 analytics-chart-card" id="benchmark-tracker-card">
                     <div class="card-header d-flex align-items-center gap-2 flex-wrap">
                         <i class="bi bi-bar-chart analytics-card-icon"></i>
@@ -799,49 +797,13 @@
                                 <span class="benchmark-stat-value" id="benchmark-alpha-pct">—</span>
                             </div>
                         </div>
-                        <div class="analytics-chart-shell analytics-chart-shell--md">
+                        <div class="analytics-chart-shell analytics-chart-shell--lg">
                             <canvas id="benchmark-chart" aria-label="Portfolio vs S&P 500 chart"></canvas>
                         </div>
                         <p class="analytics-widget-insight" data-widget-insight="benchmark-tracker"></p>
                         <p class="analytics-chart-caption">
                             Solid line is your portfolio; dashed is the S&amp;P 500 — both rebased to zero
                             at the start of the selected window.
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-lg-5">
-                <div class="card bg-dark border-secondary h-100 analytics-chart-card" id="return-calendar-card">
-                    <div class="card-header d-flex align-items-center gap-2">
-                        <i class="bi bi-calendar3 analytics-card-icon"></i>
-                        <div class="analytics-card-titles">
-                            <span>Return calendar</span>
-                            <span class="analytics-card-sub">monthly heatmap</span>
-                        </div>
-                        <button class="tip-trigger ms-auto"
-                            data-tip-title="Return Calendar"
-                            data-tip-body="Each tile is one month's portfolio return from your snapshot history. Greener months gained; redder months lost."
-                            data-tip-hint="Needs a few weeks of visits"
-                            data-tip-icon="bi-calendar3">
-                            <i class="bi bi-info-circle"></i>
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div id="return-calendar-empty" class="perf-callout" style="display:none">
-                            <i class="bi bi-calendar3 perf-callout-icon"></i>
-                            <div class="perf-callout-text">
-                                <div class="perf-callout-title">Not enough monthly history</div>
-                                <div class="perf-callout-body">Return tiles fill in as you build snapshot history over time.</div>
-                            </div>
-                        </div>
-                        <div id="return-calendar-loading" class="analytics-skeleton" aria-hidden="true">
-                            <div class="shimmer-line"></div>
-                        </div>
-                        <div id="return-calendar-grid" class="return-calendar-grid"
-                             aria-label="Monthly portfolio returns"></div>
-                        <p class="analytics-widget-insight" data-widget-insight="return-calendar"></p>
-                        <p class="analytics-chart-caption analytics-chart-caption--center">
-                            Month-by-month scorecard — quick scan for winning and losing stretches.
                         </p>
                     </div>
                 </div>
@@ -1555,7 +1517,7 @@
                                 <i class="bi bi-info-circle"></i>
                             </button>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body macro-alignment-body">
                             <div id="macro-alignment-empty" class="perf-callout" style="display:none">
                                 <i class="bi bi-scatter-chart perf-callout-icon"></i>
                                 <div class="perf-callout-text">
@@ -1569,10 +1531,13 @@
                             <div class="analytics-chart-shell analytics-chart-shell--xl macro-alignment-shell">
                                 <canvas id="macro-alignment-chart" aria-label="Macro alignment scatter chart"></canvas>
                             </div>
-                            <div class="macro-alignment-legend" id="macro-alignment-legend" aria-label="Index legend" hidden></div>
-                            <p class="analytics-widget-insight" data-widget-insight="macro-alignment"></p>
-                            <p class="analytics-chart-caption">
-                                Color-coded dots show where each index sits. The legend below lists every index with its correlation and geographic exposure. The <strong>top-right</strong> quadrant is where global headlines hit your portfolio hardest.
+                            <div class="macro-alignment-legend-wrap" id="macro-alignment-legend-wrap" hidden>
+                                <p class="macro-alignment-legend-heading">Index legend</p>
+                                <div class="macro-alignment-legend" id="macro-alignment-legend" aria-label="Index legend"></div>
+                            </div>
+                            <p class="analytics-widget-insight macro-alignment-insight" data-widget-insight="macro-alignment"></p>
+                            <p class="analytics-chart-caption macro-alignment-caption">
+                                Color-coded dots show where each index sits. The legend above lists every index with its correlation and geographic exposure. The <strong>top-right</strong> quadrant is where global headlines hit your portfolio hardest.
                             </p>
                         </div>
                     </div>
@@ -1773,8 +1738,11 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.0.0/dist/chartjs-chart-treemap.min.js"></script>
     <script defer src="/static/js/analytics-charts.js?v=8"></script>
-    <script defer src="/static/js/dashboard.js?v=79"></script>
+    <script defer src="/static/js/dashboard.js?v=81"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>

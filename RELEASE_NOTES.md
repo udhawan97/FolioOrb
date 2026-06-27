@@ -4,10 +4,14 @@ Release date: June 27, 2026
 
 ## Headline
 
-FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" release: richer local intelligence, Claude that can disagree on purpose, and a dashboard that finally learned negative space. Exposure overlap, market mood, peer context, earnings risk, three scenarios, and — when Claude is connected — a probability bar for which future is least delusional.
+FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" release: richer local intelligence, Claude that can disagree on purpose, a full Analytics zone, and a dashboard that finally learned negative space. Exposure overlap, market mood, peer context, earnings risk, three scenarios, growth projection, and — when Claude is connected — a probability bar for which future is least delusional.
 
 ## What's New
 
+- **Dashboard zones**: Overview, Holdings, and Analytics with persistent tab state and zone-aware chart lifecycle.
+- **Portfolio briefing card**: `/api/ai/portfolio-summary` with AI (Claude Haiku, 24 h cache) and Local deterministic modes.
+- **Analytics zone**: five sub-tabs (Performance, Risk, Exposure, Signals, Markets), lazy Chart.js charts, per-tab insight bar, and per-widget insight lines via `/api/ai/analytics-insights`.
+- **Portfolio analytics engine**: risk metrics, correlation, drawdown, contribution, benchmark comparison, return calendar, beta, rolling vol, sector tilt, conviction gaps, confidence spectrum, macro alignment, and growth projection under `/api/portfolio/*`.
 - **Look-through portfolio exposure**: sector, country, theme overlap, duplicate detection, and HHI concentration via `/api/ai/portfolio-exposure`.
 - **Market regime context**: SPY/TLT/VIX/UUP backdrop with cached daily component weight shifts.
 - **Peer-relative positioning**: own-range percentile vs peer median on each verdict card.
@@ -26,15 +30,16 @@ FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" releas
 
 - Bumped FastAPI metadata version to `3.0.0`.
 - Updated the dashboard intro badge to `v3`.
-- Added services: `portfolio_exposure.py`, `market_regime.py`, `peer_relative.py`, `event_calendar.py`, `verdict_calibration.py`, `verdict_ai_enhancement.py`.
+- Added services: `portfolio_exposure.py`, `market_regime.py`, `peer_relative.py`, `event_calendar.py`, `verdict_calibration.py`, `verdict_ai_enhancement.py`, `portfolio_analytics.py`, `portfolio_projection.py`, `analytics_insights.py`.
 - Extended `investment_signal.py` with horizon weights, confidence ranges, scenario builders, and modifier hooks.
-- Extended Claude prompts in `ai_service.py` for disagreement and scenario-probability fields.
+- Extended Claude prompts in `ai_service.py` for disagreement, scenario-probability, briefing, and analytics-narrator fields.
 - Added `VerdictSnapshot` model and startup migration for `verdict_snapshots`.
 - Extended `hold_class` schema to accept `trade` and `core` alongside `auto` and `anchor`.
 - Extended `/api/ai/investment-signals/all` with `portfolio_exposure`, `regime`, `calibration_summary`, and per-signal context fields.
-- Large `dashboard.js` / `style.css` pass for exposure strips, regime chips, scenario UI, and nav overflow.
-- Bumped static asset cache keys to `v=77`.
-- **247 tests passing**, including new coverage for nav overflow, semantic tokens, scenario normalization, and calibration logging.
+- Added `/api/stocks/world-markets`, `/api/stocks/history/batch`, `/api/ai/portfolio-summary`, and `/api/ai/analytics-insights`.
+- Shipped `analytics-charts.js` plus a large `dashboard.js` / `style.css` pass for zones, exposure strips, regime chips, scenario UI, and nav overflow.
+- Bumped static asset cache keys to `style.css?v=86`, `dashboard.js?v=79`, `analytics-charts.js?v=8`.
+- **286 tests passing**, including new coverage for analytics wiring, portfolio briefing, projection, nav overflow, semantic tokens, scenario normalization, and calibration logging.
 
 ## Upgrade Notes
 

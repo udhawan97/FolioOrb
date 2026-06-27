@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models import AISummary, Holding, VerdictSnapshot
 from app.services.ai_service import (
     MODEL,
-    claude_api_heartbeat,
+    get_cached_claude_heartbeat,
     generate_etf_profile_seed,
     generate_portfolio_briefing,
     generate_analytics_insights,
@@ -369,10 +369,10 @@ async def get_ai_cache_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/heartbeat")
-async def get_claude_heartbeat():
+def get_claude_heartbeat():
     """Return a lightweight Claude API reachability check for the dashboard HUD."""
     return {
-        **claude_api_heartbeat(),
+        **get_cached_claude_heartbeat(),
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "model": MODEL,
     }

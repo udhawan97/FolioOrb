@@ -429,7 +429,7 @@ const AnalyticsCharts = (() => {
     }
 
     async function loadPerformancePane() {
-        await Promise.all([loadBenchmarkChart(), loadReturnCalendar()]);
+        await loadBenchmarkChart();
     }
 
     async function loadRiskPane() {
@@ -1298,43 +1298,6 @@ const AnalyticsCharts = (() => {
         }
     }
 
-    function renderReturnCalendar(months) {
-        const grid = $("return-calendar-grid");
-        if (!grid) return;
-        grid.innerHTML = months.map(m => {
-            const ret = Number(m.return_pct) || 0;
-            const tone = ret > 0.05 ? "up" : ret < -0.05 ? "down" : "flat";
-            const label = MONTH_LABELS[(m.month || 1) - 1] || "?";
-            const yr = String(m.year || "").slice(-2);
-            return `<div class="return-cal-tile return-cal-tile--${tone}" title="${m.label}: ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%">
-                <span class="return-cal-month">${label}</span>
-                <span class="return-cal-year">'${yr}</span>
-                <span class="return-cal-pct">${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%</span>
-            </div>`;
-        }).join("");
-    }
-
-    async function loadReturnCalendar() {
-        showLoading("return-calendar-loading", true);
-        showEmpty("return-calendar-empty", false);
-        try {
-            const res = await fetch("/api/portfolio/return-calendar");
-            const data = await res.json();
-            if (!data.has_data) {
-                showEmpty("return-calendar-empty", true);
-                const grid = $("return-calendar-grid");
-                if (grid) grid.innerHTML = "";
-                return;
-            }
-            renderReturnCalendar(data.months || []);
-        } catch (err) {
-            console.warn("Return calendar failed:", err);
-            showEmpty("return-calendar-empty", true);
-        } finally {
-            showLoading("return-calendar-loading", false);
-        }
-    }
-
     function betaLaymanNote(beta) {
         const b = Number(beta) || 1;
         const marketMove = (b * 1).toFixed(1);
@@ -1846,9 +1809,10 @@ const AnalyticsCharts = (() => {
 
     function renderMacroAlignmentLegend(points) {
         const legend = $("macro-alignment-legend");
+        const wrap = $("macro-alignment-legend-wrap");
         if (!legend) return;
         if (!points?.length) {
-            legend.hidden = true;
+            if (wrap) wrap.hidden = true;
             legend.innerHTML = "";
             return;
         }
@@ -1856,13 +1820,15 @@ const AnalyticsCharts = (() => {
         const sorted = [...points].sort((a, b) => b.x - a.x || b.y - a.y);
         legend.innerHTML = sorted.map(pt => {
             const name = `${pt.flag ? pt.flag + " " : ""}${esc(pt.label)}`;
-            return `<span class="macro-alignment-legend-item">
-                <span class="macro-alignment-legend-dot" style="background:${pt.color}"></span>
-                <span>${name}</span>
+            return `<div class="macro-alignment-legend-item">
+                <div class="macro-alignment-legend-head">
+                    <span class="macro-alignment-legend-dot" style="background:${pt.color}"></span>
+                    <span class="macro-alignment-legend-name">${name}</span>
+                </div>
                 <span class="macro-alignment-legend-meta">${pt.x.toFixed(0)}% corr · ${pt.y.toFixed(0)}% geo</span>
-            </span>`;
+            </div>`;
         }).join("");
-        legend.hidden = false;
+        if (wrap) wrap.hidden = false;
     }
 
     async function loadMacroAlignment() {
@@ -1936,9 +1902,9 @@ const AnalyticsCharts = (() => {
                     c.beginPath(); c.moveTo(a.left, qy);   c.lineTo(a.right, qy);  c.stroke();
                     c.setLineDash([]);
 
-                    const lfs = Math.max(9, 10 * scale);
-                    const sfs = Math.max(7,  8 * scale);
-                    const pad = 10;
+                    const lfs = Math.max(10, 11 * scale);
+                    const sfs = Math.max(8, 9 * scale);
+                    const pad = 14;
 
                     quadDefs.forEach(q => {
                         const isRight = q.anchor.endsWith("r");
@@ -1955,7 +1921,7 @@ const AnalyticsCharts = (() => {
 
                         c.font = `400 ${sfs}px -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif`;
                         c.fillStyle = isLight ? "rgba(0,0,0,.20)" : "rgba(255,255,255,.16)";
-                        c.fillText(q.sub, lx, baseY + sfs + 3);
+                        c.fillText(q.sub, lx, baseY + sfs + 5);
                     });
 
                     c.restore();
@@ -1983,10 +1949,10 @@ const AnalyticsCharts = (() => {
                     maintainAspectRatio: false,
                     layout: {
                         padding: {
-                            top: 8,
-                            right: 8,
-                            bottom: 10,
-                            left: 4,
+                            top: 14,
+                            right: 14,
+                            bottom: 16,
+                            left: 8,
                         },
                     },
                     plugins: {
@@ -2016,7 +1982,8 @@ const AnalyticsCharts = (() => {
                                 display: true,
                                 text: "← Less correlated   ·   More correlated →",
                                 color: theme.tick,
-                                font: { size: 9.5 * scale, weight: "500" },
+                                font: { size: 10 * scale, weight: "500" },
+                                padding: { top: 6, bottom: 4 },
                             },
                             min: 0,
                             max: 100,
@@ -2033,7 +2000,8 @@ const AnalyticsCharts = (() => {
                                 display: true,
                                 text: "Geographic exposure (% of portfolio) ↑",
                                 color: theme.tick,
-                                font: { size: 9.5 * scale, weight: "500" },
+                                font: { size: 10 * scale, weight: "500" },
+                                padding: { top: 4, bottom: 6 },
                             },
                             min: 0,
                             suggestedMax: Math.max(maxY * 1.15, maxY + 8),
@@ -2695,7 +2663,6 @@ const AnalyticsCharts = (() => {
         }
         if (rendered.has("performance")) {
             loadBenchmarkChart();
-            loadReturnCalendar();
         }
         if (rendered.has("markets")) {
             loadMacroAlignment();

@@ -82,7 +82,7 @@ def row_by_ticker(rows, ticker):
 def test_open_holding_total_pct_uses_current_price(monkeypatch):
     db = make_db()
     add_holding(db, "OPEN", shares=10, avg_cost=100)
-    monkeypatch.setattr(portfolio_router, "get_all_quotes", lambda _tickers: [quote("OPEN", 115)])
+    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", lambda _tickers: [quote("OPEN", 115)])
 
     rows, *_ = portfolio_router._compute_portfolio(1, db)
 
@@ -94,7 +94,7 @@ def test_holding_daily_value_change_uses_share_count_times_quote_move(monkeypatc
     add_holding(db, "VOO", shares=8.5, avg_cost=400)
     monkeypatch.setattr(
         portfolio_router,
-        "get_all_quotes",
+        "get_portfolio_quotes",
         lambda _tickers: [quote("VOO", 456.70, day_change=-1.32, day_change_pct=-0.29)],
     )
 
@@ -112,7 +112,7 @@ def test_partial_sale_total_pct_combines_realized_and_unrealized(monkeypatch):
     add_holding(db, "MIX", shares=5, avg_cost=100)
     add_trade(db, "MIX", shares_sold=2, sale_price=130, avg_cost=100)
     add_trade(db, "MIX", shares_sold=3, sale_price=90, avg_cost=100)
-    monkeypatch.setattr(portfolio_router, "get_all_quotes", lambda _tickers: [quote("MIX", 120)])
+    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", lambda _tickers: [quote("MIX", 120)])
 
     rows, *_ = portfolio_router._compute_portfolio(1, db)
 
@@ -137,7 +137,7 @@ def test_missing_or_zero_basis_returns_none(monkeypatch):
     db = make_db()
     add_holding(db, "FREE", shares=10, avg_cost=0)
     add_trade(db, "ZERO", shares_sold=2, sale_price=50, avg_cost=0)
-    monkeypatch.setattr(portfolio_router, "get_all_quotes", lambda _tickers: [quote("FREE", 20)])
+    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", lambda _tickers: [quote("FREE", 20)])
 
     rows, *_ = portfolio_router._compute_portfolio(1, db)
     stats = portfolio_router._realized_stats_by_ticker(1, db)["ZERO"]
@@ -315,7 +315,7 @@ def test_delete_realized_trade_adjusts_realized_total_and_today_snapshot(monkeyp
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "SOLD").first()
     monkeypatch.setattr(
         portfolio_router,
-        "get_all_quotes",
+        "get_portfolio_quotes",
         lambda _tickers: [quote("SOLD", 110)],
     )
 

@@ -59,7 +59,6 @@ def test_analytics_new_widgets_present():
     js = (ROOT / "static/js/analytics-charts.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
     assert 'id="benchmark-tracker-card"' in html
-    assert 'id="return-calendar-card"' in html
     assert 'id="beta-dial-card"' in html
     assert 'id="rolling-vol-card"' in html
     assert 'id="sector-tilt-card"' in html
@@ -71,4 +70,3 @@ def test_analytics_new_widgets_present():
     assert "loadBenchmarkChart" in js
     assert "loadMacroAlignment" in js
     assert ".analytics-widget-insight" in css
-    assert ".return-calendar-grid" in css

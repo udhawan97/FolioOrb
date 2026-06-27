@@ -6,6 +6,7 @@ Claude AI integration for generating stock and portfolio summaries.
 import json
 import logging
 import re
+import time
 from time import perf_counter
 
 import anthropic
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 MODEL = "claude-haiku-4-5-20251001"
+
+_HEARTBEAT_CACHE: tuple[float, dict] | None = None
+_HEARTBEAT_TTL = 30  # seconds — matches frontend poll interval
 
 
 def claude_api_heartbeat(timeout: float = 2.0) -> dict:
@@ -48,6 +52,18 @@ def claude_api_heartbeat(timeout: float = 2.0) -> dict:
             "latency_ms": round((perf_counter() - start) * 1000),
             "message": "Claude API heartbeat failed",
         }
+
+
+def get_cached_claude_heartbeat(timeout: float = 2.0) -> dict:
+    """Return a cached Claude reachability check to avoid blocking every poll."""
+    global _HEARTBEAT_CACHE  # pylint: disable=global-statement
+    now = time.monotonic()
+    if _HEARTBEAT_CACHE and _HEARTBEAT_CACHE[0] > now:
+        return _HEARTBEAT_CACHE[1]
+
+    result = claude_api_heartbeat(timeout=timeout)
+    _HEARTBEAT_CACHE = (now + _HEARTBEAT_TTL, result)
+    return result
 
 # Rotating fallback quips per action (no Claude required)
 _FALLBACK_QUIPS: dict[str, list[str]] = {
@@ -139,6 +155,10 @@ def generate_verdict_ai_bundles(signals: list[dict]) -> dict[str, dict]:
         "  likely: base|bull|bear — your best guess for the most probable near-term path\n"
         "  sc_p: array of 3 integers [base%, bull%, bear%] summing to 100 (rough split)\n"
         "  sc_w: ≤22 words explaining why you picked that likely path (plain English)\n"
+        "  ins: array of 2–3 insight bullets ≤12 words each (plain English, expandable reasoning)\n"
+        "  fc: array of 4 short factor callouts ≤8 words [Analyst, Valuation, Momentum, Quality]\n"
+        "  drv: key driver ≤15 words — the one thing shaping the call\n"
+        "  conv: high|moderate|low — how strongly inputs agree with the verdict\n"
         "Rules: never invent prices or percentages; only set n/cn when tension is non-empty "
         "OR agrees is false — otherwise n=0 and cn=[0,0,0,0]; "
         "sc_p must sum to 100 and likely should match your highest bucket (or explain in sc_w); "
