@@ -7,7 +7,7 @@
 </p>
 
 <h2 align="center">FolioSenseAI</h2>
-<p align="center"><em>Your portfolio's therapist. Explains the red. Does not call it character development.</em></p>
+<p align="center"><em>Your folio, finally making sense.</em></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/release-v3.0-brightgreen?style=flat-square" alt="Release v3.0"/>
