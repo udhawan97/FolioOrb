@@ -44,6 +44,7 @@ class InvestmentSignal:  # pylint: disable=too-many-instance-attributes
     hold_class: str = "auto"
     instrument_role: str = "tactical"
     timing: dict | None = None
+    confidence_detail: dict | None = None
 
 
 def signal_to_dict(sig: InvestmentSignal) -> dict:
@@ -64,6 +65,7 @@ def signal_to_dict(sig: InvestmentSignal) -> dict:
         "hold_class": sig.hold_class,
         "instrument_role": sig.instrument_role,
         "timing": sig.timing,
+        "confidence_detail": sig.confidence_detail,
     }
 
 
@@ -192,13 +194,13 @@ def _timing_reason(timing: dict | None) -> str:
         return f"50-day crossed below the 200-day {sessions} sessions ago"
     state = timing.get("momentum_state")
     if state == "rolling_over":
-        return "Trend is rolling over versus the 50- and 200-day averages"
+        return "The uptrend is losing steam vs its moving averages"
     if state == "weakening":
-        return "Price is below key trend lines and the 50-day is falling"
+        return "Price is below its key averages and still drifting down"
     if state == "stabilizing":
-        return "Price is stabilizing while the 50-day trend improves"
+        return "Price is steadying while the short-term trend improves"
     if state == "trend_intact":
-        return "Trend check is intact above key moving averages"
+        return "Still above its key moving averages — trend looks healthy"
     drawdown = timing.get("drawdown_from_52w_high_pct")
     if drawdown is not None and drawdown > 0:
         return f"Down {drawdown:.0f}% from its 12-month high"
@@ -271,6 +273,293 @@ def _apply_timing_modifier(
     return action, conf, reasons, risks
 
 
+# ── Confidence detail (weighted, layman-friendly) ───────────────────────────
+
+_COMPONENT_META: dict[str, dict[str, str]] = {
+    "analyst": {
+        "label": "Expert opinions",
+        "tip_title": "What analysts think",
+        "tip_body": (
+            "For stocks, this reflects how many Wall Street analysts cover the name "
+            "and how strongly they agree on buy, hold, or sell. More analysts and "
+            "tighter agreement raise this score."
+        ),
+    },
+    "valuation": {
+        "label": "Price vs history",
+        "tip_title": "Is it cheap or rich?",
+        "tip_body": (
+            "Compares today's price to analyst targets for stocks, or to the fund's "
+            "own recent trading range for ETFs. Higher means the price looks "
+            "favorable for the current call."
+        ),
+    },
+    "momentum": {
+        "label": "Recent trend",
+        "tip_title": "Which way is price moving?",
+        "tip_body": (
+            "Reads short-term price action — where it sits vs its 50- and 200-day "
+            "averages and whether momentum is building or fading. Helps judge timing."
+        ),
+    },
+    "quality": {
+        "label": "Fund / business quality",
+        "tip_title": "How solid is the holding?",
+        "tip_body": (
+            "For ETFs: cost, liquidity, and diversification. For stocks: depth of "
+            "analyst coverage and financial quality signals we have on hand."
+        ),
+    },
+}
+
+_STOCK_COMPONENT_WEIGHTS = {"analyst": 32, "valuation": 26, "momentum": 24, "quality": 18}
+_ETF_COMPONENT_WEIGHTS = {"analyst": 8, "valuation": 34, "momentum": 26, "quality": 32}
+
+_MOOD_SCORES = {"hot": 84, "warm": 70, "neutral": 50, "cooling": 36, "cold": 22}
+
+
+def _confidence_level(score: int) -> str:
+    if score >= 78:
+        return "Strong agreement"
+    if score >= 62:
+        return "Moderate agreement"
+    if score >= 46:
+        return "Mixed signals"
+    if score >= 30:
+        return "Low conviction"
+    return "Very uncertain"
+
+
+def _confidence_summary(score: int, action: str) -> str:
+    level = _confidence_level(score)
+    action_phrase = {
+        "add": "leaning toward adding",
+        "hold": "comfortable holding",
+        "trim": "leaning toward trimming",
+        "needs-data": "waiting on more data",
+    }.get(action, "evaluating")
+    if score >= 62:
+        return f"{level} — signals mostly point the same way on {action_phrase}."
+    if score >= 46:
+        return f"{level} — some inputs agree, others are quiet on {action_phrase}."
+    return f"{level} — the inputs don't strongly agree yet."
+
+
+def _analyst_component_score(rec: AnalystRec, action: str) -> int:
+    if rec.security_type == "ETF" or rec.action == "etf-quality":
+        return 50
+    count = rec.analyst_count or 0
+    if count == 0 and rec.action == "unavailable":
+        return 28
+    mean = rec.recommendation_mean
+    upside = rec.target_upside_pct
+    score = 38 + min(count, 28)
+    if mean is not None:
+        score += round(abs(3.0 - mean) * 11)
+    if upside is not None:
+        if action == "add" and upside > 8:
+            score += 10
+        elif action == "trim" and upside < -8:
+            score += 10
+        elif action == "hold" and abs(upside) <= 6:
+            score += 6
+        elif action == "add" and upside < 0:
+            score -= 8
+        elif action == "trim" and upside > 8:
+            score -= 8
+    return _clamp(score)
+
+
+def _valuation_component_score(
+    *,
+    action: str,
+    upside: float | None,
+    zone: str | None,
+    percentile: float | None,
+) -> int:
+    if zone is not None:
+        zone_base = {
+            "Bargain": 86,
+            "Fair": 54,
+            "Elevated": 44,
+            "Rich": 24,
+            "Unavailable": 50,
+        }.get(zone, 50)
+        score = zone_base
+        if percentile is not None:
+            edge = abs(50 - percentile) / 50.0
+            if action == "add":
+                score = min(95, score + round(edge * 12))
+            elif action == "trim":
+                score = min(95, score + round(edge * 12))
+        return _clamp(score)
+
+    if upside is None:
+        return 50
+    # Map upside -25..+25 → 18..88
+    capped = max(-25.0, min(25.0, upside))
+    score = round(53 + capped * 1.4)
+    return _clamp(score)
+
+
+def _momentum_component_score(market_mood: str, timing: dict | None) -> int:
+    score = _MOOD_SCORES.get(market_mood, 50)
+    if not timing or not timing.get("available"):
+        return score
+    state = timing.get("momentum_state")
+    if state == "trend_intact":
+        score = min(95, score + 10)
+    elif state == "stabilizing":
+        score = min(92, score + 6)
+    elif state == "rolling_over":
+        score = max(12, score - 14)
+    elif state == "weakening":
+        score = max(10, score - 18)
+    cross = timing.get("cross") or {}
+    if cross.get("recent"):
+        if cross.get("type") == "golden":
+            score = min(95, score + 5)
+        elif cross.get("type") == "death":
+            score = max(10, score - 5)
+    return _clamp(score)
+
+
+def _quality_component_score(data_quality: str, etf_quality_score: int | None) -> int:
+    if etf_quality_score is not None:
+        return _clamp(round(etf_quality_score * 0.92))
+    mapping = {"high": 82, "medium": 56, "low": 32}
+    return mapping.get(data_quality, 50)
+
+
+def _component_payload(key: str, score: int, weight: int, stance: str) -> dict:
+    meta = _COMPONENT_META[key]
+    return {
+        "key": key,
+        "label": meta["label"],
+        "score": score,
+        "weight_pct": weight,
+        "stance": stance,
+        "bar_pct": score,
+        "tip_title": meta["tip_title"],
+        "tip_body": meta["tip_body"],
+    }
+
+
+def _weighted_score(components: list[dict]) -> int:
+    total_weight = sum(c["weight_pct"] for c in components)
+    if total_weight <= 0:
+        return 0
+    weighted = sum(c["score"] * c["weight_pct"] for c in components)
+    return _clamp(round(weighted / total_weight))
+
+
+def _attach_confidence_detail(
+    sig: InvestmentSignal,
+    *,
+    rec: AnalystRec,
+    zone: str | None = None,
+    percentile: float | None = None,
+    upside: float | None = None,
+    etf_quality_score: int | None = None,
+    allocation_pct: float | None = None,
+    is_watchlist: bool = False,
+) -> None:
+    """Compute transparent weighted confidence and attach layman-readable detail."""
+    is_etf = rec.security_type == "ETF"
+    weights = _ETF_COMPONENT_WEIGHTS if is_etf else _STOCK_COMPONENT_WEIGHTS
+
+    mix_map = {item.get("label"): item.get("stance") for item in sig.signal_mix}
+
+    components = [
+        _component_payload(
+            "analyst",
+            _analyst_component_score(rec, sig.action),
+            weights["analyst"],
+            mix_map.get("Analyst", "neutral"),
+        ),
+        _component_payload(
+            "valuation",
+            _valuation_component_score(
+                action=sig.action,
+                upside=upside,
+                zone=zone,
+                percentile=percentile,
+            ),
+            weights["valuation"],
+            mix_map.get("Valuation", "neutral"),
+        ),
+        _component_payload(
+            "momentum",
+            _momentum_component_score(sig.market_mood, sig.timing),
+            weights["momentum"],
+            mix_map.get("Momentum", "neutral"),
+        ),
+        _component_payload(
+            "quality",
+            _quality_component_score(sig.data_quality, etf_quality_score),
+            weights["quality"],
+            mix_map.get("Quality", "neutral"),
+        ),
+    ]
+
+    base = _weighted_score(components)
+    modifiers: list[dict] = []
+
+    if (
+        allocation_pct is not None
+        and allocation_pct >= _HIGH_ALLOC_PCT
+        and sig.action == "add"
+        and not is_watchlist
+    ):
+        modifiers.append({
+            "label": "Already a big slice of portfolio",
+            "delta": -_CONCENTRATION_CONF_PENALTY,
+            "tip_title": "Position size",
+            "tip_body": (
+                f"This holding is about {allocation_pct:.0f}% of your portfolio. "
+                "Adding more increases concentration risk, so the score is adjusted down."
+            ),
+        })
+
+    if sig.hold_class == "anchor":
+        pre_anchor = base + sum(m["delta"] for m in modifiers)
+        anchor_target = _clamp(min(max(pre_anchor, 45), 68))
+        anchor_delta = anchor_target - pre_anchor
+        if anchor_delta != 0:
+            modifiers.append({
+                "label": "Long-term anchor policy",
+                "delta": anchor_delta,
+                "tip_title": "Anchor holdings",
+                "tip_body": (
+                    "Anchors are meant to stay for the long run. The score stays in a "
+                    "moderate band — never extreme — because trim calls are suppressed."
+                ),
+            })
+
+    final = _clamp(base + sum(m["delta"] for m in modifiers))
+    sig.confidence = final
+
+    agreement = {"supporting": 0, "neutral": 0, "opposing": 0}
+    for item in sig.signal_mix:
+        stance = item.get("stance", "neutral")
+        if stance == "support":
+            agreement["supporting"] += 1
+        elif stance == "against":
+            agreement["opposing"] += 1
+        else:
+            agreement["neutral"] += 1
+
+    sig.confidence_detail = {
+        "score": final,
+        "level": _confidence_level(final),
+        "summary": _confidence_summary(final, sig.action),
+        "components": components,
+        "modifiers": modifiers,
+        "agreement": agreement,
+        "base_score": base,
+    }
+
+
 def _apply_anchor_override(sig: InvestmentSignal, zone: str | None = None) -> InvestmentSignal:
     sig.hold_class = "anchor"
     sig.instrument_role = "anchor"
@@ -278,7 +567,6 @@ def _apply_anchor_override(sig: InvestmentSignal, zone: str | None = None) -> In
     if flags:
         sig.action = "add"
         sig.label = "Add (anchor)"
-        sig.confidence = _clamp(max(sig.confidence, 62))
         sig.reasons = _prepend_reason(
             sig.reasons,
             "Good moment to add to your anchor — on sale vs its own history",
@@ -286,10 +574,9 @@ def _apply_anchor_override(sig: InvestmentSignal, zone: str | None = None) -> In
     else:
         sig.action = "hold"
         sig.label = "Hold"
-        sig.confidence = _clamp(min(max(sig.confidence, 45), 68))
         sig.reasons = _prepend_reason(
             sig.reasons,
-            "Anchor hold — staying the course; signals below are FYI",
+            "Anchor hold — long-term position; details below are for context",
         )
     sig.risks = [risk for risk in sig.risks if "trim" not in risk.lower()][:2]
     sig.signal_mix = [
@@ -548,12 +835,10 @@ def _apply_allocation_modifier(
         return
     if allocation_pct >= _HIGH_ALLOC_PCT:
         sig.risks.append(
-            f"Already a large position ({allocation_pct:.0f}% of portfolio)"
-            " — concentration risk"
+            f"Large position ({allocation_pct:.0f}% of portfolio)"
+            " — adding more increases concentration risk"
         )
         sig.source_fields.append("allocation_pct")
-        if sig.action == "add":
-            sig.confidence = _clamp(sig.confidence - _CONCENTRATION_CONF_PENALTY)
 
 
 # pylint: disable-next=too-many-branches,too-many-statements,too-many-positional-arguments
@@ -684,6 +969,13 @@ def _build_stock_signal(
     _apply_allocation_modifier(sig, allocation_pct, is_watchlist)
     if hold_class == "anchor":
         _apply_anchor_override(sig)
+    _attach_confidence_detail(
+        sig,
+        rec=rec,
+        upside=upside,
+        allocation_pct=allocation_pct,
+        is_watchlist=is_watchlist,
+    )
     return sig
 
 
@@ -769,6 +1061,13 @@ def _build_stock_no_analyst_signal(
     _apply_allocation_modifier(sig, allocation_pct, is_watchlist)
     if hold_class == "anchor":
         _apply_anchor_override(sig)
+    _attach_confidence_detail(
+        sig,
+        rec=rec,
+        upside=None,
+        allocation_pct=allocation_pct,
+        is_watchlist=is_watchlist,
+    )
     return sig
 
 
@@ -912,6 +1211,15 @@ def _build_etf_signal(
     _apply_allocation_modifier(sig, allocation_pct, is_watchlist)
     if hold_class == "anchor":
         _apply_anchor_override(sig, zone=zone)
+    _attach_confidence_detail(
+        sig,
+        rec=rec,
+        zone=zone,
+        percentile=percentile,
+        etf_quality_score=quality_score,
+        allocation_pct=allocation_pct,
+        is_watchlist=is_watchlist,
+    )
     return sig
 
 

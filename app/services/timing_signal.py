@@ -247,6 +247,17 @@ def build_timing_signal(
         },
     }
     signal["bucket"] = timing_bucket(signal)
+    if len(values) >= 2:
+        slice_vals = values[-30:]
+        base = slice_vals[0]
+        if base > 0:
+            signal["sparkline_30d"] = [
+                round((v / base - 1) * 100, 2) for v in slice_vals
+            ]
+        else:
+            signal["sparkline_30d"] = []
+    else:
+        signal["sparkline_30d"] = []
     return signal
 
 

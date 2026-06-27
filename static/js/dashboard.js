@@ -357,6 +357,40 @@ let intelligenceExhaustedTickers = new Set();
 let _isClaudeApiLive = null;
 let _forcedLocalMode = false;
 
+function isLocalIntelligenceMode() {
+    return _isClaudeApiLive === false || _forcedLocalMode;
+}
+
+const BRAND_INTRO_COPY = {
+    claude: "Folio Sense and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.",
+    local: "Folio Sense keeps things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.",
+};
+
+const LOCAL_INTEL_SCAN_MESSAGES = [
+    "Running local signals while Folio Sense keeps the thesis tidy.",
+    "Local intelligence is scoring context across your holdings.",
+    "Folio Sense is reading positions with on-device signal logic.",
+    "Deterministic models are doing the math with quiet dignity.",
+    "Folio Sense lowered the noise and let local signals take the wheel.",
+    "Matching benchmarks, checking catalysts — no cloud required.",
+    "Local signals are unusually brave with your holdings today.",
+    "Folio Sense is maintaining financial composure on local horsepower.",
+    "Context received. Nuance forming locally.",
+    "Running the numbers with crisp, deterministic logic.",
+];
+
+function _intelLoadingTitle() {
+    return isLocalIntelligenceMode()
+        ? "Running local intelligence on your portfolio signal..."
+        : "Sending Claude the cleanest version of your portfolio signal...";
+}
+
+function _defaultScanSubtitle() {
+    return isLocalIntelligenceMode()
+        ? LOCAL_INTEL_SCAN_MESSAGES[0]
+        : "Sending Claude the cleanest version of your portfolio signal...";
+}
+
 // Rating state: stock analyst ratings or ETF quality labels
 let cachedRecommendations = {};  // ticker → rec object from /api/ai/analyst-recommendations/all
 let cachedVerdicts = {};         // ticker → verdict object from /api/ai/investment-signals/all
@@ -401,8 +435,8 @@ let claudeMessageIndex = 0;
 let claudeOfflineScanMessageIndex = 0;
 
 function nextClaudeScanMessage() {
-    if (_isClaudeApiLive === false || _forcedLocalMode) {
-        const message = CLAUDE_OFFLINE_SCAN_MESSAGES[claudeOfflineScanMessageIndex % CLAUDE_OFFLINE_SCAN_MESSAGES.length];
+    if (isLocalIntelligenceMode()) {
+        const message = LOCAL_INTEL_SCAN_MESSAGES[claudeOfflineScanMessageIndex % LOCAL_INTEL_SCAN_MESSAGES.length];
         claudeOfflineScanMessageIndex += 1;
         return message;
     }
@@ -588,7 +622,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     let messageIndex = 0;
     card.classList.add("is-ai-checking");
     dashboardPet?.classList.add("is-texting");
-    if (title) title.textContent = (_isClaudeApiLive === false || _forcedLocalMode) ? "Local checking holdings" : "AI checking holdings";
+    if (title) title.textContent = isLocalIntelligenceMode() ? "Local checking holdings" : "AI checking holdings";
     setAgentReadyState(false);
     HoldingsBg.stop();
     if (panel) {
@@ -2937,7 +2971,7 @@ function injectSummaryRows(tbody) {
                 <div class="intel-loading-overlay" aria-hidden="true">
                     <div class="intel-loading-content">
                         <img src="/static/img/brand/folio-orbit-icon.svg" alt="" class="intel-loading-orbit">
-                        <div class="intel-loading-title">Sending Claude the cleanest version of your portfolio signal...</div>
+                        <div class="intel-loading-title">${escapeHtml(_intelLoadingTitle())}</div>
                         <div class="intel-loading-sub">Context received. Nuance forming. Usually lands in 30-60s.</div>
                     </div>
                 </div>
@@ -3215,7 +3249,20 @@ const FOLIO_SENSE_VERDICT_COPY = {
     kicker: "Folio Sense \u00d7 Claude",
     feelsPrefix: "Folio Sense feels",
     unavailable: "Verdict unavailable — tap Holding Intel to refresh.",
+    localDisclaimer:
+        "Folio Sense Local Intelligence \u2014 a signal read, not financial advice. Verify before you trade.",
+    aiDisclaimer:
+        "Folio Sense \u00d7 Claude \u2014 local signals plus a small AI refinement. Not financial advice.",
 };
+
+function _isAiVerdictActive(verdict) {
+    return !!(
+        verdict?.ai_enhanced
+        && verdict?.ai_enhancement
+        && _isClaudeApiLive !== false
+        && !_forcedLocalMode
+    );
+}
 
 function _verdictColor(action) {
     const map = {
@@ -3261,22 +3308,34 @@ const _verdictSettled = new Set();  // tickers whose die has already settled
 
 function _verdictLoadingLine(ticker) {
     const seed = String(ticker || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    if (_isClaudeApiLive === false) {
-        return CLAUDE_OFFLINE_SCAN_MESSAGES[seed % CLAUDE_OFFLINE_SCAN_MESSAGES.length];
+    if (isLocalIntelligenceMode()) {
+        return LOCAL_INTEL_SCAN_MESSAGES[seed % LOCAL_INTEL_SCAN_MESSAGES.length];
     }
     return CLAUDE_FUNNY_MESSAGES[seed % CLAUDE_FUNNY_MESSAGES.length];
 }
 
 function _verdictKickerLabel() {
-    return (_isClaudeApiLive === false || _forcedLocalMode)
+    return isLocalIntelligenceMode()
         ? "Folio Sense Local Intelligence"
         : FOLIO_SENSE_VERDICT_COPY.kicker;
+}
+
+function _verdictDisclaimer(verdict) {
+    if (isLocalIntelligenceMode()) {
+        return FOLIO_SENSE_VERDICT_COPY.localDisclaimer;
+    }
+    if (_isAiVerdictActive(verdict)) {
+        return verdict?.disclaimer || FOLIO_SENSE_VERDICT_COPY.aiDisclaimer;
+    }
+    return verdict?.disclaimer || "";
 }
 
 function _verdictBrand(verdict) {
     const brand = verdict?.brand || {};
     return {
-        kicker: brand.kicker || _verdictKickerLabel(),
+        kicker: isLocalIntelligenceMode()
+            ? _verdictKickerLabel()
+            : (brand.kicker || FOLIO_SENSE_VERDICT_COPY.kicker),
         feelsPrefix: brand.feels_prefix || brand.feelsPrefix || FOLIO_SENSE_VERDICT_COPY.feelsPrefix,
     };
 }
@@ -3301,12 +3360,289 @@ function _verdictInfoTip() {
     });
 }
 
-function _confidenceTip() {
+function _confidenceTip(isAi) {
     return _verdictTip({
-        title: "Confidence",
-        body: "How strongly the underlying signals agree. A calm 30–60% on a Hold is normal — no strong push either way. Higher means more signals point the same way.",
-        icon: "bi-speedometer2",
+        title: isAi ? "AI signal strength" : "Signal strength",
+        body: isAi
+            ? "Starts from local weighted inputs, then Claude applies tiny bounded nudges (±12 pts max) after reading the same data. Higher means stronger agreement on the call."
+            : "A weighted score from four inputs — expert opinions, price vs history, recent trend, and quality. Higher means the inputs agree more on the current Add, Hold, or Trim call.",
+        icon: isAi ? "bi-stars" : "bi-speedometer2",
+        variant: isAi ? "ai" : "",
     });
+}
+
+function _renderAiDeltaBadge(verdict) {
+    const ai = verdict?.ai_enhancement;
+    if (!_isAiVerdictActive(verdict) || !ai || !Number.isFinite(ai.delta) || ai.delta === 0) return "";
+    const sign = ai.delta > 0 ? "+" : "";
+    return `<span class="verdict-ai-delta" title="Claude adjustment vs local">${sign}${ai.delta} AI</span>`;
+}
+
+function _renderAiSynthesisPanel(verdict) {
+    if (!_isAiVerdictActive(verdict)) return "";
+    const ai = verdict.ai_enhancement;
+    const headline = ai.headline || "";
+    const note = ai.note || "";
+    const tags = (ai.tags || []).slice(0, 2);
+    const localScore = ai.local_score;
+    const aiScore = ai.ai_score;
+
+    const tagHtml = tags.map(tag =>
+        `<span class="ai-synth-tag">${escapeHtml(tag)}</span>`
+    ).join("");
+
+    const compareHtml = Number.isFinite(localScore) && Number.isFinite(aiScore)
+        ? `<span class="ai-synth-compare">Local ${localScore}% → AI ${aiScore}%</span>`
+        : "";
+
+    return `<div class="verdict-ai-synthesis">
+        <div class="verdict-ai-synthesis-head">
+            <span class="ai-synth-kicker"><i class="bi bi-stars" aria-hidden="true"></i> Claude synthesis</span>
+            ${_verdictTip({
+                title: "How Claude refines this",
+                body: "One batched read of the same local stats — a headline, tiny score nudges, and a watch note. No new prices or invented data. Cached 24h like the quip.",
+                icon: "bi-stars",
+                variant: "ai",
+            })}
+            ${compareHtml}
+        </div>
+        ${headline ? `<div class="ai-synth-headline">${escapeHtml(headline)}</div>` : ""}
+        ${tagHtml ? `<div class="ai-synth-tags">${tagHtml}</div>` : ""}
+        ${note ? `<p class="ai-synth-note">${escapeHtml(note)}</p>` : ""}
+        ${_renderAiRadarArtifact(verdict)}
+    </div>`;
+}
+
+function _renderAiRadarArtifact(verdict) {
+    const components = verdict?.confidence_detail?.components;
+    if (!Array.isArray(components) || components.length < 4) return "";
+    const scores = components.slice(0, 4).map(c => Math.min(100, Math.max(0, Number(c.score) || 0)));
+    const cx = 50;
+    const cy = 50;
+    const maxR = 38;
+    const angles = [-90, 0, 90, 180];
+    const labels = ["Experts", "Price", "Trend", "Quality"];
+
+    const poly = scores.map((score, i) => {
+        const rad = (angles[i] * Math.PI) / 180;
+        const r = (score / 100) * maxR;
+        return `${cx + r * Math.cos(rad)},${cy + r * Math.sin(rad)}`;
+    }).join(" ");
+
+    const rings = [0.35, 0.65, 1].map(scale => {
+        const pts = angles.map(deg => {
+            const rad = (deg * Math.PI) / 180;
+            const r = maxR * scale;
+            return `${cx + r * Math.cos(rad)},${cy + r * Math.sin(rad)}`;
+        }).join(" ");
+        return `<polygon class="ai-radar-ring" points="${pts}"></polygon>`;
+    }).join("");
+
+    const spokes = angles.map(deg => {
+        const rad = (deg * Math.PI) / 180;
+        return `<line class="ai-radar-spoke" x1="${cx}" y1="${cy}" x2="${cx + maxR * Math.cos(rad)}" y2="${cy + maxR * Math.sin(rad)}"></line>`;
+    }).join("");
+
+    const labelNodes = angles.map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const lx = cx + (maxR + 10) * Math.cos(rad);
+        const ly = cy + (maxR + 10) * Math.sin(rad);
+        return `<text class="ai-radar-label" x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle">${labels[i]}</text>`;
+    }).join("");
+
+    return `<div class="ai-radar-wrap">
+        <svg class="ai-radar" viewBox="0 0 100 100" role="img" aria-label="Signal balance radar">
+            ${rings}
+            ${spokes}
+            <polygon class="ai-radar-fill" points="${poly}"></polygon>
+            <polygon class="ai-radar-stroke" points="${poly}"></polygon>
+            ${labelNodes}
+        </svg>
+    </div>`;
+}
+
+function _renderAiOrbital(conf) {
+    return `<div class="verdict-ai-orbital" aria-hidden="true">
+        <span class="verdict-ai-orbit-ring"></span>
+        <span class="verdict-ai-orbit-ring ring-2"></span>
+    </div>`;
+}
+
+function _confidenceLevelClass(level) {
+    const key = String(level || "").toLowerCase();
+    if (key.includes("strong")) return "is-strong";
+    if (key.includes("moderate")) return "is-moderate";
+    if (key.includes("mixed")) return "is-mixed";
+    if (key.includes("low") || key.includes("uncertain")) return "is-low";
+    return "";
+}
+
+function _renderConfidenceStats(verdict) {
+    const detail = verdict?.confidence_detail;
+    if (!detail?.components?.length) return "";
+
+    const isAi = _isAiVerdictActive(verdict);
+    const level = detail.level || "Mixed signals";
+    const summary = detail.summary || "";
+    const levelClass = _confidenceLevelClass(level);
+    const aiPanelClass = isAi ? " is-ai-refined" : "";
+
+    const bars = detail.components.map(comp => {
+        const stance = ["support", "neutral", "against"].includes(comp.stance)
+            ? comp.stance
+            : "neutral";
+        const score = Math.min(100, Math.max(0, Math.round(comp.score || 0)));
+        const nudge = Number(comp.ai_nudge);
+        const nudgeHtml = isAi && Number.isFinite(nudge) && nudge !== 0
+            ? `<span class="conf-stat-nudge">${nudge > 0 ? "+" : ""}${nudge}</span>`
+            : "";
+        const tip = _verdictTip({
+            title: comp.tip_title || comp.label,
+            body: isAi && Number.isFinite(comp.local_score)
+                ? `${comp.tip_body || ""} Local was ${comp.local_score}%; Claude nudged ${nudge > 0 ? "+" : ""}${nudge || 0}.`
+                : (comp.tip_body || ""),
+            icon: isAi ? "bi-stars" : "bi-bar-chart-fill",
+            variant: isAi ? "ai" : "",
+        });
+        return `<div class="conf-stat-row" data-stance="${escapeHtml(stance)}">
+            <div class="conf-stat-head">
+                <span class="conf-stat-label">${escapeHtml(comp.label || "Signal")}</span>
+                <span class="conf-stat-score">${score}${nudgeHtml}${tip}</span>
+            </div>
+            <div class="conf-stat-bar" role="presentation">
+                <div class="conf-stat-bar-fill" style="width:${score}%"></div>
+            </div>
+        </div>`;
+    }).join("");
+
+    const modifiers = (detail.modifiers || []).filter(m => m.delta).map(mod => {
+        const sign = mod.delta > 0 ? "+" : "";
+        const isClaude = String(mod.label || "").toLowerCase().includes("claude");
+        return `<span class="conf-mod-chip${isClaude ? " is-ai-mod" : ""}">
+            ${escapeHtml(mod.label || "Adjustment")} ${sign}${mod.delta}
+            ${_verdictTip({
+                title: mod.tip_title || mod.label,
+                body: mod.tip_body || "",
+                icon: isClaude ? "bi-stars" : "bi-sliders",
+                variant: isClaude ? "ai" : "",
+            })}
+        </span>`;
+    }).join("");
+
+    const agreement = detail.agreement || {};
+    const agreeParts = [];
+    if (agreement.supporting) agreeParts.push(`${agreement.supporting} agree`);
+    if (agreement.neutral) agreeParts.push(`${agreement.neutral} neutral`);
+    if (agreement.opposing) agreeParts.push(`${agreement.opposing} disagree`);
+    const agreeCopy = agreeParts.length ? agreeParts.join(" · ") : "";
+
+    return `<div class="verdict-confidence-panel ${levelClass}${aiPanelClass}">
+        <div class="verdict-confidence-head">
+            <span class="verdict-confidence-level">${escapeHtml(level)}</span>
+            ${_verdictTip({
+                title: isAi ? "AI-refined score" : "How to read this",
+                body: isAi
+                    ? "Bars start from local inputs, then show Claude's tiny per-input nudges. The headline score is the re-weighted result — still bounded and explainable."
+                    : "Each bar shows how strongly one input supports the verdict (0 = weak, 100 = strong). The big number is the weighted blend. A Hold in the 45–60 range is normal — it means no input is shouting.",
+                icon: isAi ? "bi-stars" : "bi-pie-chart-fill",
+                variant: isAi ? "ai" : "",
+            })}
+        </div>
+        ${summary ? `<p class="verdict-confidence-summary">${escapeHtml(summary)}</p>` : ""}
+        <div class="conf-stats-grid">${bars}</div>
+        ${agreeCopy ? `<div class="conf-agreement-row">
+            <span class="conf-agreement-label">Inputs at a glance</span>
+            <span class="conf-agreement-copy">${escapeHtml(agreeCopy)}</span>
+        </div>` : ""}
+        ${modifiers ? `<div class="conf-mod-row">${modifiers}</div>` : ""}
+    </div>`;
+}
+
+function _renderVerdictSparkline(verdict, ticker) {
+    const points = verdict?.timing?.sparkline_30d;
+    const hasApiPoints = Array.isArray(points) && points.length >= 2;
+    const trendHistory = latestTrendData[ticker];
+    const useTrend = !hasApiPoints && Array.isArray(trendHistory) && trendHistory.length >= 2;
+    if (!hasApiPoints && !useTrend) return "";
+
+    return `<div class="verdict-sparkline-wrap">
+        <div class="verdict-sparkline-head">
+            <span class="verdict-face-label">Last 30 days</span>
+            ${_verdictTip({
+                title: "Price path",
+                body: "A quick look at how the price moved over the last month. Green means up vs the start of the window; red means down. Uses the same cached prices as the rest of the dashboard.",
+                icon: "bi-graph-up",
+            })}
+        </div>
+        <canvas class="verdict-sparkline" width="280" height="56"
+            aria-label="${escapeHtml(ticker)} 30-day price trend"></canvas>
+    </div>`;
+}
+
+function _paintVerdictSparkline(section, verdict, ticker) {
+    const canvas = section.querySelector("canvas.verdict-sparkline");
+    if (!canvas) return;
+    const apiPoints = verdict?.timing?.sparkline_30d;
+    if (Array.isArray(apiPoints) && apiPoints.length >= 2) {
+        _drawPctSparkline(canvas, apiPoints);
+        return;
+    }
+    const history = latestTrendData[ticker];
+    if (Array.isArray(history) && history.length >= 2) {
+        drawTrend(canvas, history);
+    }
+}
+
+function _drawPctSparkline(canvas, pctSeries = []) {
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 4;
+    const values = pctSeries.filter(v => Number.isFinite(v));
+    ctx.clearRect(0, 0, width, height);
+    if (values.length < 2) return;
+
+    const min = Math.min(...values, 0);
+    const max = Math.max(...values, 0);
+    const range = max - min || 1;
+    const isPositive = values[values.length - 1] >= values[0];
+    const lineColor = isPositive
+        ? (cssVar("--accent-green") || "#30d158")
+        : (cssVar("--accent-red") || "#ff453a");
+
+    const coords = values.map((val, index) => ({
+        x: padding + (index * (width - padding * 2)) / (values.length - 1),
+        y: height - padding - ((val - min) / range) * (height - padding * 2),
+    }));
+
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, height);
+    fillGrad.addColorStop(0, isPositive ? "rgba(48,209,88,0.24)" : "rgba(255,69,58,0.24)");
+    fillGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.beginPath();
+    coords.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.lineTo(coords[coords.length - 1].x, height);
+    ctx.lineTo(coords[0].x, height);
+    ctx.closePath();
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    coords.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.stroke();
+
+    const zeroY = height - padding - ((0 - min) / range) * (height - padding * 2);
+    ctx.strokeStyle = cssVar("--hairline-soft") || "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(padding, zeroY);
+    ctx.lineTo(width - padding, zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
 }
 
 function _anchorTipAttrs() {
@@ -3335,7 +3671,7 @@ function _renderFlipTriggers(verdict) {
     return `<div class="verdict-insight-row verdict-flip-line">
         <span class="verdict-row-icon"><i class="bi bi-signpost-split" aria-hidden="true"></i></span>
         <span class="verdict-row-copy">
-            <span class="verdict-face-label">Could flip at</span>
+            <span class="verdict-face-label">Could change near</span>
             <span class="verdict-price-pair">
                 <span><i class="bi bi-arrow-up-right" aria-hidden="true"></i> Add near ${escapeHtml(formatCurrency(flips.add_price))}</span>
                 <span class="verdict-price-sep" aria-hidden="true"></span>
@@ -3344,37 +3680,57 @@ function _renderFlipTriggers(verdict) {
         </span>
         ${_verdictTip({
             title: "What flips it",
-            body: "The rough price levels where the verdict would change — the cheaper zone where it tilts toward adding, the richer zone where it tilts toward trimming. Approximate, and shown only when the data supports it.",
+            body: "Rough price levels where the verdict would change — a cheaper zone where adding makes more sense, and a richer zone where trimming might. Approximate guide only.",
             icon: "bi-signpost-split",
         })}
     </div>`;
 }
 
+function _timingLaymanCopy(timing) {
+    if (!timing?.available) return "";
+    const parts = [];
+    const state = timing.momentum_state;
+    const stateLabels = {
+        trend_intact: "Still on track",
+        stabilizing: "Finding its footing",
+        rolling_over: "Trend is fading",
+        weakening: "Below key averages",
+        neutral: "No clear trend",
+    };
+    if (timing.cross?.type) {
+        const crossLabel = timing.cross.type === "golden"
+            ? "Short-term average crossed above long-term"
+            : "Short-term average crossed below long-term";
+        parts.push(`${crossLabel} (${timing.cross.sessions_ago} days ago)`);
+    } else if (state) {
+        parts.push(stateLabels[state] || String(state).replaceAll("_", " "));
+    }
+    if (Number.isFinite(timing.vs50d_pct)) {
+        const vs50 = timing.vs50d_pct;
+        if (vs50 >= 2) parts.push(`${Math.abs(vs50).toFixed(1)}% above 50-day average`);
+        else if (vs50 <= -2) parts.push(`${Math.abs(vs50).toFixed(1)}% below 50-day average`);
+        else parts.push("Near its 50-day average");
+    }
+    if (Number.isFinite(timing.drawdown_from_52w_high_pct) && timing.drawdown_from_52w_high_pct >= 1) {
+        parts.push(`${timing.drawdown_from_52w_high_pct.toFixed(0)}% below yearly high`);
+    }
+    return parts.slice(0, 3).join(" · ");
+}
+
 function _renderTimingLine(verdict) {
     const timing = verdict?.timing;
     if (!timing?.available) return "";
-    const parts = [];
-    if (timing.cross?.type) {
-        const label = timing.cross.type === "golden" ? "Golden cross" : "Death cross";
-        parts.push(`${label} ${timing.cross.sessions_ago}d ago`);
-    } else if (timing.momentum_state) {
-        parts.push(String(timing.momentum_state).replaceAll("_", " "));
-    }
-    if (Number.isFinite(timing.vs50d_pct)) parts.push(`${timing.vs50d_pct}% vs 50d`);
-    if (Number.isFinite(timing.drawdown_from_52w_high_pct)) {
-        parts.push(`${timing.drawdown_from_52w_high_pct}% off high`);
-    }
-    const copy = parts.slice(0, 3).join(" · ");
+    const copy = _timingLaymanCopy(timing);
     if (!copy) return "";
     return `<div class="verdict-insight-row verdict-timing-line">
         <span class="verdict-row-icon"><i class="bi bi-activity" aria-hidden="true"></i></span>
         <span class="verdict-row-copy">
-            <span class="verdict-face-label">Trend check</span>
+            <span class="verdict-face-label">Price trend</span>
             <span class="verdict-timing-copy">${escapeHtml(copy)}</span>
         </span>
         ${_verdictTip({
-            title: "Timing signal",
-            body: "Reads the price against its 50- and 200-day averages, whether those just crossed (a golden or death cross) and how recently, whether momentum is building or fading, and how far it sits below its 12-month high. This is how it judges WHEN, not just what.",
+            title: "Price trend",
+            body: "Compares today's price to its 50-day and 200-day moving averages — smooth lines that show the medium-term direction. Also notes how far price sits below its highest point in the last year.",
             icon: "bi-activity",
         })}
     </div>`;
@@ -3408,6 +3764,25 @@ function _renderFreshness(verdict) {
     </span>`;
 }
 
+const _SIGNAL_MIX_TIPS = {
+    Analyst: {
+        title: "Expert opinions",
+        body: "Wall Street analyst ratings for stocks. ETFs don't have analyst coverage, so this stays neutral for funds.",
+    },
+    Valuation: {
+        title: "Price vs fair value",
+        body: "For stocks: distance to analyst price targets. For ETFs: where today's price sits in its own recent range (cheap, fair, or rich).",
+    },
+    Momentum: {
+        title: "Recent price trend",
+        body: "Whether price momentum supports or fights the verdict — rising trends can delay a trim call; falling trends can delay an add.",
+    },
+    Quality: {
+        title: "Fund / business quality",
+        body: "ETF cost, liquidity, and diversification — or stock data depth and financial quality when available.",
+    },
+};
+
 function _renderSignalMix(verdict) {
     const mix = Array.isArray(verdict?.signal_mix) ? verdict.signal_mix : [];
     if (!mix.length) return "";
@@ -3415,17 +3790,25 @@ function _renderSignalMix(verdict) {
         const stance = ["support", "neutral", "against"].includes(item.stance)
             ? item.stance
             : "neutral";
-        return `<span class="signal-mix-item">
+        const label = item.label || "Signal";
+        const tipMeta = _SIGNAL_MIX_TIPS[label] || {
+            title: label,
+            body: "One of the inputs blended into the signal strength score.",
+        };
+        const stanceLabel = stance === "support" ? "supports" : stance === "against" ? "pushes back" : "neutral";
+        return `<span class="signal-mix-item" title="">
             <span class="signal-mix-dot ${stance}" aria-hidden="true"></span>
-            ${escapeHtml(item.label || "Signal")}
+            ${escapeHtml(label)}
+            <span class="signal-mix-stance">${escapeHtml(stanceLabel)}</span>
+            ${_verdictTip({ title: tipMeta.title, body: tipMeta.body, icon: "bi-ui-checks-grid" })}
         </span>`;
     }).join("");
     return `<div class="verdict-insight-row signal-mix-strip">
         <span class="verdict-row-icon"><i class="bi bi-ui-checks-grid" aria-hidden="true"></i></span>
-        <span class="verdict-face-label">Signal mix</span>
+        <span class="verdict-face-label">What went into this</span>
         ${_verdictTip({
-            title: "Signal mix",
-            body: "Each input behind the call — Analyst, Valuation, Momentum, Quality. Green supports the verdict, grey is neutral, red points the other way. The blend sets the confidence shown above.",
+            title: "Signal inputs",
+            body: "Four lenses behind every verdict. Green supports the call, grey is neutral, red points the other way.",
             icon: "bi-ui-checks-grid",
         })}
         <span class="signal-mix-items">${dots}</span>
@@ -3434,7 +3817,7 @@ function _renderSignalMix(verdict) {
 
 function _renderQuip(quip) {
     if (!quip) return "";
-    const isLocal = _isClaudeApiLive === false || _forcedLocalMode;
+    const isLocal = isLocalIntelligenceMode();
     if (isLocal) return "";
     return `<div class="verdict-quote">
         <span class="verdict-tea-label">FolioSense thinks:</span>
@@ -3502,16 +3885,19 @@ function renderAiVerdict(section, verdict, ticker) {
     const action    = verdict.action || "needs-data";
     const label     = verdict.label  || "Needs Data";
     const conf      = verdict.confidence || 0;
+    const confLevel = verdict.confidence_detail?.level || "";
     const quip      = verdict.quip || "";
     const reasons   = verdict.reasons || [];
     const risks     = verdict.risks   || [];
-    const disc      = verdict.disclaimer || "";
+    const disc      = _verdictDisclaimer(verdict);
     const icon      = VERDICT_ICONS[action] || "bi-question-circle";
     const alreadySettled = _verdictSettled.has(ticker);
     const reducedMotion  = prefersReducedMotion();
     const shouldReveal = !alreadySettled && !reducedMotion;
     const brandCopy = _verdictBrand(verdict);
     const anchorPill = _renderAnchorPill(verdict, ticker);
+    const isAi = _isAiVerdictActive(verdict);
+    const aiClass = isAi ? " is-ai-enhanced" : "";
 
     const reasonsHtml = reasons.map(r =>
         `<div class="intel-spec-row verdict-reason-row">
@@ -3537,11 +3923,12 @@ function renderAiVerdict(section, verdict, ticker) {
 
     section.innerHTML = `
         <div class="intel-label"><i class="bi bi-dice-5"></i> <span class="verdict-kicker-label">${escapeHtml(brandCopy.kicker)}</span> ${_verdictInfoTip()}</div>
-        <div class="intel-verdict ${revealClass}" data-action="${escapeHtml(action)}"
+        <div class="intel-verdict ${revealClass}${aiClass}" data-action="${escapeHtml(action)}"
              aria-label="${escapeHtml(label)} verdict, ${conf}% confidence">
             <div class="verdict-header-bar">
                 <span class="verdict-status-dot" aria-hidden="true"></span>
-                <span class="verdict-header-label">${(_isClaudeApiLive === false || _forcedLocalMode) ? "Local Intelligence Verdict" : "AI Verdict"}</span>
+                <span class="verdict-header-label">${isLocalIntelligenceMode() ? "Local Intelligence Verdict" : (isAi ? "AI-Refined Verdict" : "AI Verdict")}</span>
+                ${isAi ? `<span class="verdict-ai-live-pill"><i class="bi bi-stars" aria-hidden="true"></i> Claude</span>` : ""}
                 <span class="verdict-header-sep" aria-hidden="true">·</span>
                 <span class="verdict-header-ticker">${escapeHtml(ticker)}</span>
                 ${anchorPill}
@@ -3560,20 +3947,25 @@ function renderAiVerdict(section, verdict, ticker) {
                     <div class="verdict-feels-line">${escapeHtml(brandCopy.feelsPrefix)} this could be a</div>
                 </div>
                 <div class="verdict-hero-conf">
+                    ${isAi ? _renderAiOrbital(conf) : ""}
                     <span class="verdict-conf-pct" data-conf-target="${conf}">${initialConf}</span>
-                    <span class="verdict-conf-label">how sure ${_confidenceTip()}</span>
+                    ${_renderAiDeltaBadge(verdict)}
+                    <span class="verdict-conf-label">${confLevel ? `<span class="verdict-conf-level">${escapeHtml(confLevel)}</span>` : ""} signal strength ${_confidenceTip(isAi)}</span>
                 </div>
             </div>
             <div class="verdict-meter-wrap">
-                <div class="verdict-meter"
+                <div class="verdict-meter${isAi ? " is-ai-meter" : ""}"
                      role="meter"
                      aria-valuenow="${conf}"
                      aria-valuemin="0"
                      aria-valuemax="100"
-                     aria-label="Confidence">
+                     aria-label="Signal strength">
                     <div class="verdict-meter-fill" style="width:${meterWidth}"></div>
                 </div>
             </div>
+            ${_renderAiSynthesisPanel(verdict)}
+            ${_renderConfidenceStats(verdict)}
+            ${_renderVerdictSparkline(verdict, ticker)}
             ${_renderFlipTriggers(verdict)}
             ${_renderTimingLine(verdict)}
             ${metaChips ? `<div class="verdict-mini-chip-row">${metaChips}</div>` : ""}
@@ -3605,12 +3997,14 @@ function renderAiVerdict(section, verdict, ticker) {
         }
         setTimeout(() => {
             section.querySelector(".intel-verdict")?.classList.remove("is-revealing");
+            _paintVerdictSparkline(section, verdict, ticker);
         }, 730);
     } else {
         if (meterFill) meterFill.style.width = `${conf}%`;
         if (confEl) _animateConfidence(confEl, conf, true);
         _verdictSettled.add(ticker);
     }
+    _paintVerdictSparkline(section, verdict, ticker);
 }
 
 let _lastAiCostUsd = null;
@@ -3651,6 +4045,24 @@ const DASHBOARD_PET_QUOTES = [
     "A tidy risk model is basically a handwritten note, but with fewer audit problems.",
 ];
 
+const DASHBOARD_PET_LOCAL_QUOTES = [
+    "Quietly overperforming by keeping every basis point documented.",
+    "A tidy risk model is basically a handwritten note, but with fewer audit problems.",
+    "Compliance asked me to cite the candle before making mysterious eye contact with the thesis.",
+    "Local Intelligence is scoring the book while I keep every assumption legible.",
+    "Folio Sense prefers clean inputs — local mode still respects that.",
+    "The signals are deterministic, but my composure remains discretionary.",
+    "Running on local models today: same discipline, fewer tokens.",
+    "Portfolio butler mode: crisp charts, calm reads, no drama in the thesis.",
+    "I trust local logic like I trust a well-labeled pivot table.",
+    "Folio Sense is reading the covariance matrix with professional restraint.",
+    "Local signals have the wheel. I have the spreadsheet.",
+    "Every basis point documented, every assumption cited, every chart labeled.",
+    "The thesis stays crisp because the inputs stay tidy.",
+    "Nothing unsettles a dashboard like a well-labeled chart and a calm signal read.",
+    "Local intelligence is doing the math while I maintain financial composure.",
+];
+
 const DASHBOARD_PET_OFFLINE_QUOTES = [
     "Claude is not connecting. Folio Sense is refreshing with unnecessary dignity :')",
     "Local mode is steady, but the Claude-shaped silence has excellent dramatic timing :-/",
@@ -3672,6 +4084,51 @@ function nextDashboardPetOfflineQuote() {
     return message;
 }
 
+function applyIntelligenceModeUi() {
+    const local = isLocalIntelligenceMode();
+    const kicker = local ? _verdictKickerLabel() : FOLIO_SENSE_VERDICT_COPY.kicker;
+    const header = local ? "Local Intelligence Verdict" : "AI Verdict";
+
+    document.querySelectorAll(".verdict-kicker-label").forEach(el => { el.textContent = kicker; });
+    document.querySelectorAll(".verdict-header-label").forEach(el => { el.textContent = header; });
+
+    const introCopy = document.querySelector(".brand-intro-copy");
+    if (introCopy) {
+        introCopy.textContent = local ? BRAND_INTRO_COPY.local : BRAND_INTRO_COPY.claude;
+    }
+
+    const scanActive = document.querySelector(".card.is-ai-checking");
+    const scanSubtitle = document.getElementById("ai-scan-subtitle");
+    const scanTitle = document.getElementById("ai-scan-title");
+    if (!scanActive) {
+        if (scanSubtitle) scanSubtitle.textContent = _defaultScanSubtitle();
+        if (scanTitle) scanTitle.textContent = local ? "Local checking holdings" : "AI checking holdings";
+    }
+
+    document.querySelectorAll(".intel-loading-title").forEach(el => {
+        el.textContent = _intelLoadingTitle();
+    });
+
+    const hudClaudeRow = document.getElementById("hud-claude-row");
+    if (hudClaudeRow) hudClaudeRow.hidden = local;
+
+    const claudeChip = document.querySelector(".hud-status-chip-claude");
+    const claudeHeartbeat = document.getElementById("claude-heartbeat");
+    if (claudeChip && claudeHeartbeat) {
+        const icon = claudeChip.querySelector("i");
+        if (local) {
+            claudeChip.setAttribute("aria-label", "Local intelligence status");
+            if (icon) icon.className = "bi bi-cpu-fill";
+            claudeHeartbeat.textContent = "Local";
+        } else {
+            claudeChip.setAttribute("aria-label", "Claude status");
+            if (icon) icon.className = "bi bi-stars";
+        }
+    }
+
+    updateHudPillSummary();
+}
+
 function applyClaudeApiStatus(claudeLive) {
     _isClaudeApiLive = claudeLive;
     const brand = document.getElementById("brand-intro-trigger");
@@ -3687,18 +4144,11 @@ function applyClaudeApiStatus(claudeLive) {
         navToggle?.classList.add("claude-offline");
         pet?.classList.add("claude-offline");
 
-        document.querySelectorAll(".verdict-kicker-label").forEach(el => {
-            el.textContent = _verdictKickerLabel();
-        });
-        document.querySelectorAll(".verdict-header-label").forEach(el => {
-            el.textContent = "Local Intelligence Verdict";
-        });
-
         if (bubble && !bubble.querySelector(".pet-offline-note")) {
             const note = document.createElement("span");
             note.className = "pet-offline-note";
             note.id = "pet-offline-note";
-            note.textContent = "Local Intelligence is running the numbers for now. Reconnect Claude so Folio Sense can resume the quiet exchange of clean data and sharper insight.";
+            note.textContent = "Local Intelligence is running the numbers for now. Add an Anthropic API key in .env to enable cloud AI quips and richer commentary.";
             bubble.appendChild(note);
         }
 
@@ -3706,7 +4156,7 @@ function applyClaudeApiStatus(claudeLive) {
             const note = document.createElement("div");
             note.className = "brand-intro-offline-note";
             note.id = "brand-intro-offline-note";
-            note.innerHTML = `<span class="brand-offline-label">Claude offline — AI features paused</span>
+            note.innerHTML = `<span class="brand-offline-label">Cloud AI unavailable — local intelligence active</span>
 <ol class="brand-offline-steps">
   <li>Get an API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></li>
   <li>Open <code>.env</code> in your FolioSenseAI folder</li>
@@ -3724,8 +4174,13 @@ function applyClaudeApiStatus(claudeLive) {
         }
 
         if (typeof _dashboardPetSpeak === "function") {
-            _dashboardPetSpeak(nextDashboardPetOfflineQuote(), { reveal: false, persist: false });
+            const offlineQuote = DASHBOARD_PET_LOCAL_QUOTES[
+                _dashboardPetOfflineQuoteIndex % DASHBOARD_PET_LOCAL_QUOTES.length
+            ];
+            _dashboardPetOfflineQuoteIndex += 1;
+            _dashboardPetSpeak(offlineQuote, { reveal: false, persist: false });
         }
+        applyIntelligenceModeUi();
     } else if (claudeLive === true) {
         brand?.classList.add("claude-live");
         brand?.classList.remove("claude-offline");
@@ -3743,14 +4198,7 @@ function applyClaudeApiStatus(claudeLive) {
                 : "Switch to Local Intelligence — skip Claude for this session";
         }
 
-        if (!_forcedLocalMode) {
-            document.querySelectorAll(".verdict-kicker-label").forEach(el => {
-                el.textContent = FOLIO_SENSE_VERDICT_COPY.kicker;
-            });
-            document.querySelectorAll(".verdict-header-label").forEach(el => {
-                el.textContent = "AI Verdict";
-            });
-        }
+        applyIntelligenceModeUi();
     }
 }
 
@@ -3803,7 +4251,8 @@ function initDashboardPet() {
     }
 
     function currentPetQuotes() {
-        return pet.classList.contains("claude-offline") ? DASHBOARD_PET_OFFLINE_QUOTES : DASHBOARD_PET_QUOTES;
+        if (isLocalIntelligenceMode()) return DASHBOARD_PET_LOCAL_QUOTES;
+        return DASHBOARD_PET_QUOTES;
     }
 
     function showQuote(nextIndex = null, { withEmoticon = false } = {}) {
@@ -3906,20 +4355,21 @@ function initDashboardPet() {
                 ? "Switch back to Folio Sense × Claude"
                 : "Switch to Local Intelligence — skip Claude for this session";
         }
-        const kicker = local ? _verdictKickerLabel() : FOLIO_SENSE_VERDICT_COPY.kicker;
-        const header = local ? "Local Intelligence Verdict" : "AI Verdict";
-        document.querySelectorAll(".verdict-kicker-label").forEach(el => { el.textContent = kicker; });
-        document.querySelectorAll(".verdict-header-label").forEach(el => { el.textContent = header; });
+        applyIntelligenceModeUi();
         if (announce) {
             const msg = local
                 ? "Without my second half, I'm basic — but still running the numbers with quiet, deterministic dignity."
                 : "Second half reconnected. The thesis is sharper, the quips have opinions, and the portfolio finally has someone to impress.";
             speak(msg, { reveal: true, persist: false });
+        } else {
+            const quotes = local ? DASHBOARD_PET_LOCAL_QUOTES : DASHBOARD_PET_QUOTES;
+            quote.textContent = quotes[_dashboardPetQuoteIndex % quotes.length];
         }
     }
 
     try { _forcedLocalMode = localStorage.getItem(PET_MODE_KEY) === "1"; } catch (_) {}
     if (_forcedLocalMode) applyForcedLocalMode(true, false);
+    else applyIntelligenceModeUi();
 
     modeToggle?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -4199,8 +4649,12 @@ function formatHudTimer(totalSeconds) {
 function updateHudPillSummary() {
     const pill = document.getElementById("hud-status-pill");
     if (!pill) return;
-    const claudeStatus = document.getElementById("claude-heartbeat")?.textContent || "AI";
-    pill.setAttribute("aria-label", `Refresh in ${formatHudTimer(_hudCountdown)}. Claude ${claudeStatus}. Open live feed details.`);
+    if (isLocalIntelligenceMode()) {
+        pill.setAttribute("aria-label", `Refresh in ${formatHudTimer(_hudCountdown)}. Local Intelligence. Open live feed details.`);
+    } else {
+        const claudeStatus = document.getElementById("claude-heartbeat")?.textContent || "AI";
+        pill.setAttribute("aria-label", `Refresh in ${formatHudTimer(_hudCountdown)}. Claude ${claudeStatus}. Open live feed details.`);
+    }
     pill.title = "Open live feed details";
 }
 
@@ -4240,7 +4694,7 @@ function updateClaudeHeartbeatUi(data, checking = false) {
     navToggle?.classList.toggle("claude-checking", checking);
     if (progress) progress.classList.toggle("is-offline", offline && !checking);
 
-    if (label) {
+    if (label && !isLocalIntelligenceMode()) {
         label.textContent = checking ? "..." : live ? "Live" : offline ? "Off" : "AI";
     }
 

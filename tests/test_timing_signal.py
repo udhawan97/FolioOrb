@@ -31,6 +31,13 @@ def test_timing_signal_detects_death_cross_and_drawdown():
     assert signal["near_52w_low"] is True
 
 
+def test_timing_signal_includes_sparkline_30d():
+    closes = [100 + (i * 0.2) for i in range(40)]
+    signal = timing_signal.build_timing_signal(closes, current_price=closes[-1])
+    assert len(signal["sparkline_30d"]) >= 2
+    assert signal["sparkline_30d"][0] == 0.0
+
+
 def test_timing_signal_uses_info_mas_as_thin_history_fallback():
     signal = timing_signal.build_timing_signal(
         [99, 100, 101],

@@ -49,8 +49,14 @@ from app.services.timing_signal import (
     get_cached_history_closes,
     timing_bucket,
 )
-from app.services.ai_service import fallback_quip, generate_verdict_quips
+from app.services.ai_service import fallback_quip, generate_verdict_ai_bundles
 from app.services.verdict_scan_cache import attach_since_last_scan
+from app.services.verdict_ai_enhancement import (
+    apply_ai_enhancement,
+    compact_signal_mix,
+    decode_verdict_cache,
+    encode_verdict_cache,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -660,10 +666,15 @@ async def get_all_intelligence(db: Session = Depends(get_db)):
 # ── Analyst Recommendation endpoints ─────────────────────────────────────────
 
 VERDICT_BRAND_KICKER = "Folio Sense \u00d7 Claude"
+VERDICT_BRAND_KICKER_LOCAL = "Folio Sense Local Intelligence"
 VERDICT_FEELS_PREFIX = "Folio Sense feels"
 _VERDICT_DISCLAIMER = (
-    "\U0001f3b2 Folio Sense rolled the dice with Claude \u2014 a hunch, not "
+    "Folio Sense Local Intelligence \u2014 a signal read, not "
     "financial advice. Verify before you trade."
+)
+_AI_VERDICT_DISCLAIMER = (
+    "Folio Sense \u00d7 Claude \u2014 local signals plus a small AI refinement. "
+    "Not financial advice. Verify before you trade."
 )
 _PORTFOLIO_CACHE_TICKER = "BOOK"
 _ACTION_CACHE_CODE = {"add": "a", "hold": "h", "trim": "t", "needs-data": "n"}
@@ -825,8 +836,25 @@ def _portfolio_fallback_quip(dominant_action: str, concentration_band: str) -> s
     )
 
 
-def _brand_payload() -> dict:
-    return {**VERDICT_BRAND_COPY, "disclaimer": _VERDICT_DISCLAIMER}
+def _brand_payload(*, ai_mode: bool = False) -> dict:
+    return {
+        "kicker": VERDICT_BRAND_KICKER if ai_mode else VERDICT_BRAND_KICKER_LOCAL,
+        "feels_prefix": VERDICT_FEELS_PREFIX,
+        "disclaimer": _AI_VERDICT_DISCLAIMER if ai_mode else _VERDICT_DISCLAIMER,
+    }
+
+
+def _hydrate_cached_verdict(sig_dict: dict, cached_text: str | None) -> bool:
+    """Apply cached quip + AI bundle to sig_dict. Returns True when AI layer present."""
+    decoded = decode_verdict_cache(cached_text)
+    quip = decoded.get("quip") or ""
+    if quip:
+        sig_dict["quip"] = quip
+    ai_raw = decoded.get("ai")
+    if ai_raw and sig_dict.get("action") != "needs-data":
+        apply_ai_enhancement(sig_dict, ai_raw)
+        return True
+    return False
 
 
 @router.get("/investment-signal/{ticker}")
@@ -925,7 +953,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
             sig_dict["disclaimer"] = _VERDICT_DISCLAIMER
             sig_dict["brand"] = _brand_payload()
 
-            # Check cache for quip
+            # Check cache for quip + AI bundle
             summary_type = _verdict_summary_type(
                 sig_dict.get("action", "needs-data"),
                 sig_dict.get("market_mood", "neutral"),
@@ -939,7 +967,10 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                 .first()
             )
             if cached and _cache_is_fresh(cached):
-                sig_dict["quip"] = getattr(cached, "summary_text", "")
+                sig_dict["ai_enhanced"] = _hydrate_cached_verdict(
+                    sig_dict,
+                    getattr(cached, "summary_text", ""),
+                )
             else:
                 sig_dict["quip"] = None  # will be filled by batch call
                 missing_quip_tickers.append(ticker)
@@ -981,6 +1012,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
     if force_local:
         for ticker in missing_quip_tickers:
             signals[ticker]["quip"] = fallback_quip(signals[ticker].get("action", "needs-data"))
+            signals[ticker]["ai_enhanced"] = False
         if include_portfolio_quip:
             portfolio_quip = _portfolio_fallback_quip(
                 portfolio_state["dominant_action"],
@@ -998,6 +1030,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                 "confidence": signals[t].get("confidence", 0),
                 "market_mood": signals[t].get("market_mood", "neutral"),
                 "reason": (signals[t].get("reasons") or [""])[0],
+                "mix": compact_signal_mix(signals[t].get("signal_mix")),
             }
             for t in missing_quip_tickers
         ]
@@ -1009,15 +1042,23 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                     "confidence": 60,
                     "market_mood": "neutral",
                     "reason": portfolio_state["reason"],
+                    "mix": "",
                 }
             )
-        new_quips = generate_verdict_quips(quip_inputs)
-        claude_live = bool(new_quips)
+        new_bundles = generate_verdict_ai_bundles(quip_inputs)
+        claude_live = bool(new_bundles)
 
         for ticker in missing_quip_tickers:
             fallback_action = signals[ticker].get("action", "needs-data")
-            quip = new_quips.get(ticker) or fallback_quip(fallback_action)
+            bundle = new_bundles.get(ticker) or {}
+            quip = bundle.get("quip") or fallback_quip(fallback_action)
             signals[ticker]["quip"] = quip
+            ai_raw = bundle.get("ai")
+            if ai_raw and claude_live:
+                apply_ai_enhancement(signals[ticker], ai_raw)
+                signals[ticker]["ai_enhanced"] = True
+            else:
+                signals[ticker]["ai_enhanced"] = False
 
             # Persist to cache
             current_price = (quotes.get(ticker) or {}).get("current_price")
@@ -1031,9 +1072,9 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                 db.add(AISummary(
                     ticker=ticker,
                     summary_type=summary_type,
-                    summary_text=quip,
+                    summary_text=encode_verdict_cache(quip, ai_raw if claude_live else None),
                     price_when_generated=current_price,
-                    model_used=MODEL if new_quips.get(ticker) else "fallback",
+                    model_used=MODEL if bundle.get("quip") and claude_live else "fallback",
                 ))
             except Exception as exc:  # pylint: disable=broad-except
                 logger.debug(
@@ -1041,7 +1082,8 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                     ticker, type(exc).__name__,
                 )
         if include_portfolio_quip:
-            portfolio_quip = new_quips.get(_PORTFOLIO_CACHE_TICKER) or _portfolio_fallback_quip(
+            book_bundle = new_bundles.get(_PORTFOLIO_CACHE_TICKER) or {}
+            portfolio_quip = book_bundle.get("quip") or _portfolio_fallback_quip(
                 portfolio_state["dominant_action"],
                 portfolio_state["concentration_band"],
             )
@@ -1049,9 +1091,9 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                 db.add(AISummary(
                     ticker=_PORTFOLIO_CACHE_TICKER,
                     summary_type=portfolio_state["summary_type"],
-                    summary_text=portfolio_quip,
+                    summary_text=encode_verdict_cache(portfolio_quip, None),
                     price_when_generated=None,
-                    model_used=MODEL if new_quips.get(_PORTFOLIO_CACHE_TICKER) else "fallback",
+                    model_used=MODEL if book_bundle.get("quip") and claude_live else "fallback",
                 ))
             except Exception as exc:  # pylint: disable=broad-except
                 logger.debug(
@@ -1062,6 +1104,25 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
     elif scan_snapshot_changed:
         db.commit()
 
+    if force_local:
+        local_brand = _brand_payload(ai_mode=False)
+        for sig in signals.values():
+            sig["brand"] = local_brand
+            sig["disclaimer"] = _VERDICT_DISCLAIMER
+    elif claude_live:
+        ai_brand = _brand_payload(ai_mode=True)
+        for sig in signals.values():
+            sig["brand"] = ai_brand
+            sig["disclaimer"] = _AI_VERDICT_DISCLAIMER
+    else:
+        any_ai = any(sig.get("ai_enhanced") for sig in signals.values())
+        if any_ai:
+            ai_brand = _brand_payload(ai_mode=True)
+            for sig in signals.values():
+                if sig.get("ai_enhanced"):
+                    sig["brand"] = ai_brand
+                    sig["disclaimer"] = _AI_VERDICT_DISCLAIMER
+
     portfolio_health = {
         "quip": portfolio_quip or _portfolio_fallback_quip(
             portfolio_state["dominant_action"],
@@ -1070,8 +1131,12 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
         "dominant_action": portfolio_state["dominant_action"],
         "concentration_band": portfolio_state["concentration_band"],
         "signature": portfolio_state["summary_type"],
-        "brand": _brand_payload(),
-        "disclaimer": _VERDICT_DISCLAIMER,
+        "brand": _brand_payload(ai_mode=bool(claude_live) and not force_local),
+        "disclaimer": (
+            _VERDICT_DISCLAIMER
+            if force_local
+            else (_AI_VERDICT_DISCLAIMER if claude_live else _VERDICT_DISCLAIMER)
+        ),
     }
 
     return {

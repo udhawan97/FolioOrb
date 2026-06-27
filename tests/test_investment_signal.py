@@ -458,7 +458,7 @@ class TestSignalToDict:
         d = signal_to_dict(sig)
         for key in ("ticker", "action", "label", "confidence", "reasons",
                     "market_mood", "risks", "data_quality", "source_fields", "generated_at",
-                    "flip_triggers", "signal_mix", "freshness"):
+                    "flip_triggers", "signal_mix", "freshness", "confidence_detail"):
             assert key in d, f"signal_to_dict missing key: {key}"
 
     def test_stock_signal_includes_static_verdict_addons(self):
@@ -482,6 +482,38 @@ class TestSignalToDict:
         d = signal_to_dict(sig)
         assert d["flip_triggers"] == {"add_price": 80.0, "trim_price": 102.0}
         assert any(item["label"] == "Quality" for item in d["signal_mix"])
+
+
+class TestConfidenceDetail:
+    def test_confidence_detail_has_components(self):
+        sig = build_investment_signal(_etf_rec("Fair"))
+        detail = sig.confidence_detail
+        assert detail is not None
+        assert detail["score"] == sig.confidence
+        assert len(detail["components"]) == 4
+        assert detail["level"]
+        assert detail["summary"]
+
+    def test_component_scores_in_range(self):
+        sig = build_investment_signal(_stock_rec("buy"))
+        for comp in sig.confidence_detail["components"]:
+            assert 0 <= comp["score"] <= 100
+            assert comp["label"]
+            assert comp["tip_title"]
+            assert comp["tip_body"]
+
+    def test_anchor_confidence_stays_moderate_band(self):
+        sig = build_investment_signal(
+            _etf_rec("Rich", price_overrides={"percentile": 95}),
+            hold_class="anchor",
+        )
+        assert sig.hold_class == "anchor"
+        assert 45 <= sig.confidence <= 68
+
+    def test_allocation_modifier_in_detail(self):
+        sig = build_investment_signal(_stock_rec("buy"), allocation_pct=15.0)
+        modifiers = sig.confidence_detail.get("modifiers") or []
+        assert any("portfolio" in m["label"].lower() for m in modifiers)
 
 
 # ── fallback_quip ──────────────────────────────────────────────────────────────
@@ -522,12 +554,12 @@ class TestGenerateVerdictQuips:
         mock_msg = MagicMock()
         mock_block = MagicMock()
         mock_block.type = "text"
-        mock_block.text = '{"NOW": "Quietly stacking gains like nobody is watching."}'
+        mock_block.text = '{"NOW": {"q": "Quietly stacking gains like nobody is watching.", "n": 2, "cn": [0,0,0,0]}}'
         mock_msg.content = [mock_block]
         with patch("app.services.ai_service.client") as mock_client:
             mock_client.messages.create.return_value = mock_msg
             result = generate_verdict_quips([
-                {"ticker": "NOW", "action": "add", "confidence": 72, "reason": "Analysts bullish"}
+                {"ticker": "NOW", "action": "add", "confidence": 72, "reason": "Analysts bullish", "mix": "An:s"}
             ])
         assert "NOW" in result
         assert isinstance(result["NOW"], str)
@@ -537,12 +569,12 @@ class TestGenerateVerdictQuips:
         mock_msg = MagicMock()
         mock_block = MagicMock()
         mock_block.type = "text"
-        mock_block.text = '```json\n{"VOO": "The index never blinked."}\n```'
+        mock_block.text = '```json\n{"VOO": {"q": "The index never blinked.", "n": 0, "cn": [0,0,0,0]}}\n```'
         mock_msg.content = [mock_block]
         with patch("app.services.ai_service.client") as mock_client:
             mock_client.messages.create.return_value = mock_msg
             result = generate_verdict_quips([
-                {"ticker": "VOO", "action": "hold", "confidence": 55, "reason": "Fair value zone"}
+                {"ticker": "VOO", "action": "hold", "confidence": 55, "reason": "Fair value zone", "mix": "Val:n"}
             ])
         assert "VOO" in result
 
@@ -564,9 +596,15 @@ def test_verdict_quip_cache_uses_action_and_market_mood(monkeypatch):
 
     def fake_generate(inputs):
         calls.append(inputs)
-        return {item["ticker"]: f"quip {item['ticker']} {len(calls)}" for item in inputs}
+        return {
+            item["ticker"]: {
+                "quip": f"quip {item['ticker']} {len(calls)}",
+                "ai": {"n": 1, "cn": [0, 0, 0, 0], "h": "Test", "t": []},
+            }
+            for item in inputs
+        }
 
-    monkeypatch.setattr(ai_router, "generate_verdict_quips", fake_generate)
+    monkeypatch.setattr(ai_router, "generate_verdict_ai_bundles", fake_generate)
 
     first = asyncio.run(ai_router.get_all_investment_signals(db))
     assert first["signals"]["NOW"]["market_mood"] == "warm"
@@ -581,7 +619,7 @@ def test_verdict_quip_cache_uses_action_and_market_mood(monkeypatch):
     third = asyncio.run(ai_router.get_all_investment_signals(db))
     assert third["signals"]["NOW"]["market_mood"] == "cold"
     assert len(calls) == 2, "mood flip should request a fresh quip"
-    assert set(calls[0][0]) == {"ticker", "action", "confidence", "market_mood", "reason"}
+    assert set(calls[0][0]) == {"ticker", "action", "confidence", "market_mood", "reason", "mix"}
 
 
 def test_verdict_quip_key_includes_hold_class_and_timing_bucket():
@@ -610,7 +648,7 @@ def test_all_signals_passes_batched_history_into_recommendation(monkeypatch):
         return _etf_rec("Fair")
 
     monkeypatch.setattr(ai_router, "get_analyst_recommendation", fake_rec)
-    monkeypatch.setattr(ai_router, "generate_verdict_quips", lambda inputs: {})
+    monkeypatch.setattr(ai_router, "generate_verdict_ai_bundles", lambda inputs: {})
 
     result = asyncio.run(ai_router.get_all_investment_signals(db))
 
@@ -645,12 +683,12 @@ def test_portfolio_quip_cache_and_fallback(monkeypatch):
         calls.append(inputs)
         return {}
 
-    monkeypatch.setattr(ai_router, "generate_verdict_quips", fail_generate)
+    monkeypatch.setattr(ai_router, "generate_verdict_ai_bundles", fail_generate)
 
     first = asyncio.run(ai_router.get_all_investment_signals(db))
     assert "portfolio_health" in first
     assert first["portfolio_health"]["quip"]
-    assert first["portfolio_health"]["brand"]["kicker"] == ai_router.VERDICT_BRAND_KICKER
+    assert first["portfolio_health"]["brand"]["kicker"] == ai_router.VERDICT_BRAND_KICKER_LOCAL
     assert "Folio Sense" in first["signals"]["AAA"]["disclaimer"]
     assert len(calls) == 1
 

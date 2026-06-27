@@ -89,60 +89,70 @@ def fallback_quip(action: str) -> str:
 
 
 def generate_verdict_quips(signals: list[dict]) -> dict[str, str]:
+    """Backward-compatible wrapper — returns ticker→quip only."""
+    bundles = generate_verdict_ai_bundles(signals)
+    return {
+        ticker: data["quip"]
+        for ticker, data in bundles.items()
+        if data.get("quip")
+    }
+
+
+def _compact_verdict_input(s: dict) -> str:
+    mix = s.get("mix") or ""
+    reason = str(s.get("reason", "")).replace('"', "'")[:90]
+    return (
+        f'{s["ticker"]}|{s["action"]}|loc={s["confidence"]}|{mix}|'
+        f'mood={s.get("market_mood", "neutral")}|"{reason}"'
+    )
+
+
+def generate_verdict_ai_bundles(signals: list[dict]) -> dict[str, dict]:
     """
-    One batched Haiku call for all holdings. Returns ticker→one-sentence quip.
-    Input: list of {ticker, action, confidence, reason (top reason or "")}.
-    On ANY failure returns {} so the router falls back to fallback_quip().
+    One batched Haiku call: quip + bounded confidence nudges per ticker.
+    Returns ticker → {quip, ai} where ai may be None for BOOK-only rows.
+    On failure returns {} so the router falls back to local-only rendering.
     """
     if not signals:
         return {}
 
-    lines = "\n".join(
-        f'{s["ticker"]}: action={s["action"]}, confidence={s["confidence"]}%, '
-        f'market_mood={s.get("market_mood", "neutral")}, reason="{s.get("reason", "")}"'
-        for s in signals
-    )
+    from app.services.verdict_ai_enhancement import parse_ai_bundle_response
+
+    lines = "\n".join(_compact_verdict_input(s) for s in signals)
+    ticker_set = {str(s["ticker"]).upper() for s in signals}
 
     system = (
-        "You are writing one-sentence verdicts for an investment dashboard. "
-        "For each ticker listed, write exactly ONE sentence (≤18 words). "
-        "Be witty but professional — Claude's voice, not a broker's. "
-        "Reference the action (add/hold/trim/needs-data) naturally. "
-        "No new financial advice. No invented numbers. "
-        "Return ONLY a JSON object with ticker keys and sentence values, nothing else."
+        "You refine investment verdict cards. For each ticker line, return JSON keyed by ticker. "
+        "Each value is an object with:\n"
+        "  q: one witty sentence (≤18 words), professional Claude voice\n"
+        "  n: integer overall nudge -12..12 (how much local confidence should move)\n"
+        "  cn: array of 4 integers [-6..6] nudging [Analyst, Valuation, Momentum, Quality]\n"
+        "  h: headline ≤8 plain words for the card\n"
+        "  t: up to 2 short tags (e.g. steady, core, watch)\n"
+        "  w: optional watch note ≤20 words (plain English)\n"
+        "Rules: never invent prices or percentages; nudge only when mix/reason justify it; "
+        "hold calls usually stay near local score; BOOK ticker gets q only (no n/cn/h/t/w). "
+        "Return ONLY JSON."
     )
 
-    prompt = (
-        f"Write one witty sentence per ticker. Return only JSON.\n\n{lines}"
-    )
+    prompt = f"Refine these verdicts. Return only JSON.\n\n{lines}"
 
     try:
         message = client.messages.create(
             model=MODEL,
-            max_tokens=60 * len(signals) + 80,
+            max_tokens=min(120 * len(signals) + 120, 4096),
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
         text_block = next((b for b in message.content if b.type == "text"), None)
         raw = text_block.text.strip() if text_block else ""
-
-        # Strip markdown code fences if present
-        raw = re.sub(r"^```[a-z]*\s*|\s*```$", "", raw, flags=re.DOTALL).strip()
-
-        parsed = json.loads(raw)
-        if not isinstance(parsed, dict):
-            return {}
-
-        result: dict[str, str] = {}
-        for ticker, sentence in parsed.items():
-            if isinstance(ticker, str) and isinstance(sentence, str) and sentence.strip():
-                result[ticker.upper()] = sentence.strip()
-        logger.info("Generated %d verdict quips", len(result))
-        return result
+        bundles = parse_ai_bundle_response(raw, ticker_set)
+        logger.info("Generated %d verdict AI bundles", len(bundles))
+        return bundles
 
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning(
-            "generate_verdict_quips failed; exception_type=%s",
+            "generate_verdict_ai_bundles failed; exception_type=%s",
             type(exc).__name__,
         )
         return {}
