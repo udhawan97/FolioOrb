@@ -2583,12 +2583,13 @@ const AnalyticsCharts = (() => {
         grid.innerHTML = tickers.map(ticker => {
             const s = signals[ticker];
             const action = (s.action || "hold").toLowerCase();
-            const conf = s.confidence ?? 50;
+            const conf = Math.max(0, Math.min(100, s.confidence ?? 50));
             const bg = actionColor(action);
             const alpha = 0.25 + (conf / 100) * 0.55;
-            return `<div class="signal-board-tile" role="listitem" style="background: color-mix(in srgb, ${bg} ${Math.round(alpha * 100)}%, var(--surface))">
+            return `<div class="signal-board-tile" role="listitem" title="${escapeHtml(ticker)} · ${escapeHtml(action)} · ${conf}% confidence" style="--sig-color:${bg};background: color-mix(in srgb, ${bg} ${Math.round(alpha * 100)}%, var(--surface))">
                 <span class="signal-board-ticker">${escapeHtml(ticker)}</span>
                 <span class="signal-board-action">${escapeHtml(action)}</span>
+                <span class="signal-board-conf" style="--sig-conf:${conf}%" aria-hidden="true"></span>
             </div>`;
         }).join("");
     }
@@ -2658,12 +2659,15 @@ const AnalyticsCharts = (() => {
 
         const avgConf = Math.round(confWeighted / weightTotal);
         const dominant = (health.dominant_action || "hold").toUpperCase();
+        const dominantColor = actionColor(health.dominant_action || "hold");
         const conc = concentrationPlain(health.concentration_band || "medium");
 
         stats.innerHTML = `
-            <div class="verdict-mix-stat">
+            <div class="verdict-mix-stat verdict-mix-stat--accent" style="--vm-accent:${dominantColor}">
                 <span class="verdict-mix-stat-label">Overall tone</span>
-                <span class="verdict-mix-stat-value">${escapeHtml(dominant)}</span>
+                <span class="verdict-mix-stat-value verdict-mix-stat-value--accent">
+                    <i class="verdict-mix-stat-dot" aria-hidden="true"></i>${escapeHtml(dominant)}
+                </span>
             </div>
             <div class="verdict-mix-stat">
                 <span class="verdict-mix-stat-label">Avg confidence</span>

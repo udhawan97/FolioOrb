@@ -16528,7 +16528,16 @@ svg.signal-radar {
     min-width: 3px;
     height: 100%;
     border-radius: 2px;
-    transition: width 0.45s var(--ease);
+    transition: width 0.45s var(--ease), opacity 0.2s var(--ease), filter 0.2s var(--ease);
+}
+
+.verdict-mix-bar:hover .verdict-mix-seg {
+    opacity: 0.5;
+}
+
+.verdict-mix-bar .verdict-mix-seg:hover {
+    opacity: 1;
+    filter: brightness(1.12);
 }
 
 .verdict-mix-seg:first-child {
@@ -16579,12 +16588,29 @@ svg.signal-radar {
 .verdict-mix-stat {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
-    padding: 0.8rem 0.75rem;
-    border-radius: 14px;
+    gap: 0.35rem;
+    padding: 0.85rem 0.75rem;
+    border-radius: 16px;
     background: var(--surface);
     border: 1px solid var(--hairline-soft);
     text-align: center;
+    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+    will-change: transform;
+}
+
+.verdict-mix-stat:hover {
+    transform: translateY(-2px);
+    border-color: var(--hairline);
+    box-shadow: var(--shadow-card);
+}
+
+.verdict-mix-stat--accent {
+    border-color: color-mix(in srgb, var(--vm-accent, var(--hairline)) 28%, var(--hairline-soft));
+    background: color-mix(in srgb, var(--vm-accent, transparent) 6%, var(--surface));
+}
+
+.verdict-mix-stat--accent:hover {
+    border-color: color-mix(in srgb, var(--vm-accent, var(--hairline)) 50%, transparent);
 }
 
 .verdict-mix-stat-label {
@@ -16604,6 +16630,23 @@ svg.signal-radar {
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
+}
+
+.verdict-mix-stat-value--accent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.42rem;
+    color: var(--vm-accent, var(--text-primary));
+}
+
+.verdict-mix-stat-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--vm-accent, var(--accent-cyan));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--vm-accent, var(--accent-cyan)) 16%, transparent);
 }
 
 .portfolio-outlook-quip {
@@ -16935,44 +16978,70 @@ svg.signal-radar {
 }
 
 .signal-board-tile {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    min-height: 72px;
-    padding: 0.7rem 0.5rem;
-    border-radius: 14px;
-    border: 1px solid var(--hairline-soft);
+    gap: 0.45rem;
+    min-height: 78px;
+    padding: 0.75rem 0.55rem 0.9rem;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--sig-color, var(--hairline)) 26%, var(--hairline-soft));
     background: var(--surface);
     text-align: center;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
     will-change: transform;
 }
 
 .signal-board-tile:hover {
     transform: translateY(-2px);
-    border-color: var(--hairline);
-    box-shadow: var(--shadow-card);
+    border-color: color-mix(in srgb, var(--sig-color, var(--hairline)) 55%, transparent);
+    box-shadow: var(--shadow-card), 0 0 0 1px color-mix(in srgb, var(--sig-color, transparent) 22%, transparent);
 }
 
 .signal-board-ticker {
-    font-size: 0.95rem;
-    font-weight: 700;
+    font-size: 1rem;
+    font-weight: 750;
     letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
     color: var(--text-primary);
-    line-height: 1.1;
+    line-height: 1.05;
 }
 
 .signal-board-action {
-    font-size: 0.66rem;
-    font-weight: 600;
+    font-size: 0.62rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
     line-height: 1;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.signal-board-conf {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+}
+
+.signal-board-conf::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    width: var(--sig-conf, 50%);
+    background: color-mix(in srgb, var(--sig-color, var(--accent-cyan)) 82%, white);
+    border-radius: 0 999px 999px 0;
+    transition: width 0.4s var(--ease);
 }
 
 .markets-tape-wrap {
@@ -17149,6 +17218,8 @@ svg.signal-radar {
     .analytics-zone-tab,
     .contribution-period-btn,
     .signal-board-tile,
+    .signal-board-conf::before,
+    .verdict-mix-stat,
     .markets-tape-track,
     .geo-bar-fill,
     .contribution-bar,
