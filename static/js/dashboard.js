@@ -5008,15 +5008,7 @@ function _syncManageHoldModeCard(holdingId, holdClass) {
 
     const detail = card.querySelector(".manage-hold-mode-detail");
     if (detail) {
-        if (detail._enterRaf) cancelAnimationFrame(detail._enterRaf);
-        detail.classList.remove("is-entering");
         detail.innerHTML = `<strong>${escapeHtml(meta.tipTitle)}.</strong> ${escapeHtml(meta.tipBody)}`;
-        // Schedule in the next frame — browser commits the DOM change first,
-        // then the animation class triggers a fresh keyframe (no forced reflow).
-        detail._enterRaf = requestAnimationFrame(() => {
-            detail._enterRaf = null;
-            detail.classList.add("is-entering");
-        });
     }
 }
 
@@ -8326,10 +8318,8 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
 
         if (empty) empty.hidden = true;
         list.hidden = false;
-        // Single DOM write for all cards, then a separate read pass for binds —
-        // avoids the write→read→flush cycle that was forcing a layout recalc per card.
-        list.innerHTML = manageHoldingsCache.map(h => renderManageHoldingCard(h)).join("");
         manageHoldingsCache.forEach(h => {
+            list.insertAdjacentHTML("beforeend", renderManageHoldingCard(h));
             bindManageHoldingInputs(document.getElementById(`manage-row-${h.id}`), h.id);
         });
         filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
