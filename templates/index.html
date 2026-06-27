@@ -20,7 +20,7 @@
     <link rel="apple-touch-icon" href="/static/img/brand/folio-orbit-icon-1024.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=77" rel="stylesheet">
+    <link href="/static/css/style.css?v=78" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -44,7 +44,7 @@
                     <span class="brand-wordmark">FolioSenseAI</span>
                 </a>
                 <div class="brand-intro-callout" id="brand-intro-callout" role="status" aria-live="polite" aria-hidden="true">
-                    <span class="brand-intro-version">v2.4</span>
+                    <span class="brand-intro-version">v3</span>
                     <span class="brand-intro-kicker">FolioSenseAI</span>
                     <span class="brand-intro-title">Portfolio butler, at your service</span>
                     <span class="brand-intro-copy">FolioSense and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.</span>
@@ -130,7 +130,7 @@
 
                         <div class="nav-menu-section">Appearance</div>
                         <div class="nav-menu-row" role="menuitem">
-                            <i class="bi bi-circle-half nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-circle-half"></i></span>
                             <span class="nav-menu-label">Theme</span>
                             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" aria-pressed="true">
                                 <span class="theme-toggle-track" aria-hidden="true">
@@ -141,11 +141,11 @@
                             </button>
                         </div>
                         <div class="nav-menu-row" role="menuitem">
-                            <i class="bi bi-fonts nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-type"></i></span>
                             <span class="nav-menu-label">Text size</span>
                             <button class="text-size-toggle" id="text-size-toggle" type="button" aria-label="Switch to comfortable text size" aria-pressed="false">
                                 <span class="text-size-toggle-track" aria-hidden="true">
-                                    <span class="text-size-glyph text-size-glyph-small">A</span>
+                                    <span class="text-size-glyph text-size-glyph-small">Aa</span>
                                     <span class="text-size-glyph text-size-glyph-large">A</span>
                                     <span class="text-size-toggle-thumb">
                                         <i class="bi bi-type"></i>
@@ -157,7 +157,7 @@
                         <div class="nav-menu-divider" aria-hidden="true"></div>
                         <div class="nav-menu-section">Intelligence</div>
                         <div class="nav-menu-row" role="menuitem">
-                            <i class="bi bi-cpu nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-cpu"></i></span>
                             <span class="nav-menu-label">Engine</span>
                             <button class="pet-mode-toggle" id="pet-mode-toggle" type="button"
                                     aria-pressed="false"
@@ -168,10 +168,12 @@
                         </div>
                         <button class="nav-menu-row nav-menu-row--btn brand-cost-trigger" id="brand-cost-trigger" type="button"
                                 aria-expanded="false" aria-controls="brand-cost-callout" title="View AI token cost">
-                            <i class="bi bi-stars nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-magic"></i></span>
                             <span class="nav-menu-label">AI cost</span>
-                            <span class="nav-menu-value" id="brand-cost-trigger-label">—</span>
-                            <span class="brand-cost-notif" id="brand-cost-notif" aria-hidden="true" aria-label="Cost updated"></span>
+                            <span class="nav-menu-trailing">
+                                <span class="nav-menu-value" id="brand-cost-trigger-label">—</span>
+                                <span class="brand-cost-notif" id="brand-cost-notif" aria-hidden="true" aria-label="Cost updated"></span>
+                            </span>
                         </button>
                         <div class="brand-cost-callout" id="brand-cost-callout" role="tooltip" aria-hidden="true">
                             <span class="brand-cost-kicker">AI token cost</span>
@@ -183,7 +185,7 @@
                         <div class="nav-menu-divider" aria-hidden="true"></div>
                         <div class="nav-menu-section">Dashboard</div>
                         <div class="nav-menu-row" role="menuitem">
-                            <i class="bi bi-chat-heart nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-chat-heart"></i></span>
                             <span class="nav-menu-label">Dashboard pet</span>
                             <button class="pet-nav-toggle" id="pet-nav-toggle" type="button"
                                     aria-label="Hide dashboard pet" aria-pressed="true" title="Hide dashboard pet">
@@ -192,9 +194,9 @@
                         </div>
                         <button class="nav-menu-row nav-menu-row--btn" type="button" onclick="showKeyboardHelp()"
                                 aria-label="View keyboard shortcuts">
-                            <i class="bi bi-keyboard nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-keyboard"></i></span>
                             <span class="nav-menu-label">Keyboard shortcuts</span>
-                            <span class="nav-menu-key" aria-hidden="true">?</span>
+                            <span class="nav-menu-key" aria-hidden="true"><i class="bi bi-question-lg"></i></span>
                         </button>
 
                     </div>
@@ -297,6 +299,54 @@
                             </div>
                         </div>
 
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Portfolio Briefing ───────────────────────────────────────── -->
+        <div class="row mb-3" id="briefing-row">
+            <div class="col-12">
+                <div class="card bg-dark border-secondary briefing-card" id="briefing-card">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <i class="bi bi-stars briefing-card-icon" aria-hidden="true"></i>
+                        <span class="briefing-card-title">Portfolio briefing</span>
+                        <button class="tip-trigger ms-1" onclick="event.stopPropagation()"
+                            data-tip-title="Portfolio Briefing"
+                            data-tip-body="AI mode asks Claude to narrate your portfolio in plain English. Local mode is a free, deterministic digest of what moved and why — no AI cost."
+                            data-tip-hint="Switch modes with the AI / Local toggle"
+                            data-tip-icon="bi-stars">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                        <button class="briefing-refresh-btn ms-1" id="briefing-refresh-btn"
+                                type="button" title="Refresh briefing"
+                                aria-label="Refresh briefing"
+                                onclick="loadPortfolioBriefing(null, true)">
+                            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                        </button>
+                        <div class="briefing-seg ms-auto" id="briefing-seg" role="group" aria-label="Briefing mode">
+                            <button class="briefing-seg-btn" data-mode="ai" type="button"
+                                    aria-pressed="false" id="briefing-seg-ai">
+                                <i class="bi bi-stars" aria-hidden="true"></i>
+                                AI
+                            </button>
+                            <button class="briefing-seg-btn" data-mode="local" type="button"
+                                    aria-pressed="false" id="briefing-seg-local">
+                                <i class="bi bi-cpu-fill" aria-hidden="true"></i>
+                                Local
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body briefing-card-body" id="briefing-body">
+                        <!-- skeleton shown while loading -->
+                        <div class="briefing-skeleton" id="briefing-skeleton" aria-hidden="true">
+                            <div class="shimmer-line" style="width:72%;margin-bottom:.6rem"></div>
+                            <div class="shimmer-line" style="width:52%;margin-bottom:.45rem"></div>
+                            <div class="shimmer-line" style="width:61%;margin-bottom:.45rem"></div>
+                            <div class="shimmer-line" style="width:40%;margin-top:.7rem"></div>
+                        </div>
+                        <!-- content injected by JS -->
+                        <div class="briefing-content" id="briefing-content" aria-live="polite"></div>
                     </div>
                 </div>
             </div>
@@ -548,6 +598,76 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Growth projection (scenarios vs S&P 500) ─────────────────── -->
+        <div class="row g-3 g-md-4 mb-3">
+            <div class="col-12">
+                <div class="card bg-dark border-secondary h-100" id="projection-card">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap projection-card-header">
+                        <i class="bi bi-bezier2 projection-card-icon"></i>
+                        <span>Growth projection</span>
+                        <div class="projection-horizon-tabs ms-auto" id="projection-horizon-tabs"
+                             role="group" aria-label="Projection horizon" data-active-horizon="1y">
+                            <button class="projection-horizon-btn" type="button" data-horizon="30d" aria-pressed="false">30D</button>
+                            <button class="projection-horizon-btn is-active" type="button" data-horizon="1y" aria-pressed="true">1Y</button>
+                            <button class="projection-horizon-btn" type="button" data-horizon="3y" aria-pressed="false">3Y</button>
+                            <button class="projection-horizon-btn" type="button" data-horizon="5y" aria-pressed="false">5Y</button>
+                            <button class="projection-horizon-btn" type="button" data-horizon="10y" aria-pressed="false">10Y</button>
+                        </div>
+                        <button class="tip-trigger"
+                            data-tip-title="Growth Projection"
+                            data-tip-body="Three scenarios based on 3-year historical return and volatility: average (expected), best (+1σ), worst (−1σ). Dashed line shows S&amp;P 500 for comparison."
+                            data-tip-hint="Not financial advice"
+                            data-tip-icon="bi-bezier2">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="projection-empty-callout" class="perf-callout" style="display:none">
+                            <i class="bi bi-pie-chart perf-callout-icon"></i>
+                            <div class="perf-callout-text">
+                                <div class="perf-callout-title">Add holdings to project growth</div>
+                                <div class="perf-callout-body">Set share counts to see personalized scenarios. Showing S&amp;P 500 benchmark paths.</div>
+                            </div>
+                            <button class="btn perf-callout-btn" type="button" onclick="openPortfolioManager()">
+                                Set up holdings
+                            </button>
+                        </div>
+                        <div class="projection-summary-row" id="projection-summary-row">
+                            <div class="projection-stat">
+                                <span class="projection-stat-label">Average</span>
+                                <span class="projection-stat-value" id="proj-end-avg">—</span>
+                                <span class="projection-stat-delta" id="proj-delta-avg"></span>
+                            </div>
+                            <div class="projection-stat">
+                                <span class="projection-stat-label">Best case</span>
+                                <span class="projection-stat-value projection-stat-value--best" id="proj-end-best">—</span>
+                                <span class="projection-stat-delta" id="proj-delta-best"></span>
+                            </div>
+                            <div class="projection-stat">
+                                <span class="projection-stat-label">Worst case</span>
+                                <span class="projection-stat-value projection-stat-value--worst" id="proj-end-worst">—</span>
+                                <span class="projection-stat-delta" id="proj-delta-worst"></span>
+                            </div>
+                            <div class="projection-stat projection-stat--bench">
+                                <span class="projection-stat-label">S&amp;P 500 avg</span>
+                                <span class="projection-stat-value projection-stat-value--bench" id="proj-end-spy">—</span>
+                                <span class="projection-stat-delta" id="proj-delta-spy"></span>
+                            </div>
+                        </div>
+                        <div class="projection-legend" id="projection-legend" aria-hidden="true">
+                            <span class="projection-legend-item"><i class="projection-legend-swatch projection-legend-swatch--band"></i>Range</span>
+                            <span class="projection-legend-item"><i class="projection-legend-swatch projection-legend-swatch--avg"></i>Portfolio avg</span>
+                            <span class="projection-legend-item"><i class="projection-legend-swatch projection-legend-swatch--spy"></i>S&amp;P 500</span>
+                        </div>
+                        <div class="projection-chart-shell">
+                            <canvas id="projection-chart" height="220"></canvas>
+                        </div>
+                        <p class="projection-disclaimer" id="projection-disclaimer"></p>
                     </div>
                 </div>
             </div>

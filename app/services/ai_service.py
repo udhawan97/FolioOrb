@@ -340,6 +340,84 @@ def _build_prompt(stock_data: dict) -> str:
     )
 
 
+_BRIEFING_SYSTEM = (
+    "You are FolioSense's portfolio briefer. You receive a compact JSON snapshot of the user's "
+    "portfolio. Write a crisp, confident briefing in the second person (\"your portfolio\"). "
+    "Return ONLY valid JSON (no markdown, no prose outside JSON) with exactly these keys:\n"
+    "- \"health\": one sentence on how the portfolio is doing overall, grounded in the P/L numbers.\n"
+    "- \"drivers\": array of 2–3 short strings naming the specific holdings or sectors behind the "
+    "biggest change, each citing its number from the snapshot.\n"
+    "- \"adjustments\": array of 1–2 short strings — optional rebalancing OBSERVATIONS (e.g. "
+    "concentration, a runaway winner, a persistent laggard). If nothing stands out, return "
+    "[\"No changes needed — the book looks balanced.\"].\n"
+    "- \"quote\": one funny, witty, motivational one-liner to send the user off (≤20 words).\n"
+    "Rules: use ONLY numbers present in the snapshot — never invent prices, percentages, or news. "
+    "No buy/sell financial advice; frame adjustments as observations. Keep every line tight and human."
+)
+
+_BRIEFING_CANNED_QUOTES: list[str] = [
+    "Even when the market sneezes, a well-diversified portfolio hands you a tissue.",
+    "Compounding: the one magic trick where watching paint dry is actually the strategy.",
+    "Your portfolio called — it said 'thanks for not panic-selling today.'",
+    "The best investment decision is usually the one you didn't make at 3 a.m.",
+]
+_BRIEFING_CANNED_IDX = 0
+
+
+def next_briefing_canned_quote() -> str:
+    """Return a rotating canned quote — no API required."""
+    global _BRIEFING_CANNED_IDX
+    q = _BRIEFING_CANNED_QUOTES[_BRIEFING_CANNED_IDX % len(_BRIEFING_CANNED_QUOTES)]
+    _BRIEFING_CANNED_IDX += 1
+    return q
+
+
+def generate_portfolio_briefing(snapshot: dict) -> dict:
+    """
+    One Haiku call: portfolio briefing from a compact snapshot.
+    Returns {health, drivers, adjustments, quote}.
+    Raises on API failure — let the caller handle fallback.
+    """
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=400,
+        system=_BRIEFING_SYSTEM,
+        messages=[{"role": "user", "content": json.dumps(snapshot)}],
+    )
+    text_block = next((b for b in message.content if b.type == "text"), None)
+    raw = (text_block.text.strip() if text_block else "")
+    logger.info(
+        "Generated portfolio briefing: %s+%s tokens",
+        message.usage.input_tokens,
+        message.usage.output_tokens,
+    )
+
+    cleaned = re.sub(r"^```[a-z]*\s*|\s*```$", "", raw, flags=re.DOTALL).strip()
+    data = json.loads(cleaned)
+    if not isinstance(data, dict):
+        raise ValueError("Briefing response is not a JSON object")
+
+    health = str(data.get("health") or "").strip()
+    if not health:
+        raise ValueError("Briefing response missing 'health' key")
+
+    raw_drivers = data.get("drivers")
+    if not isinstance(raw_drivers, list):
+        raw_drivers = [str(raw_drivers)] if raw_drivers else []
+    drivers = [str(d).strip() for d in raw_drivers[:3] if d]
+
+    raw_adj = data.get("adjustments")
+    if not isinstance(raw_adj, list):
+        raw_adj = [str(raw_adj)] if raw_adj else []
+    adjustments = [str(a).strip() for a in raw_adj[:2] if a]
+    if not adjustments:
+        adjustments = ["No changes needed — the book looks balanced."]
+
+    quote = str(data.get("quote") or "").strip() or next_briefing_canned_quote()
+
+    return {"health": health, "drivers": drivers, "adjustments": adjustments, "quote": quote}
+
+
 def generate_stock_summary(stock_data: dict) -> str:
     """
     Generate a 3-bullet AI summary for a single holding.

@@ -189,6 +189,7 @@ function initThemeToggle() {
 function refreshThemeAwareVisuals() {
     updateChartChrome(allocationChart);
     updateChartChrome(pnlChart);
+    updateChartChrome(projectionChart);
     if (latestHoldings.length) renderHoldings();
 }
 
@@ -764,6 +765,10 @@ async function loadPortfolioValue() {
             latestTrendData = await trendPromise.catch(() => ({}));
             renderHoldings();
             repaintOpenVerdictSparklines();
+
+            latestProjectionData = null;
+            projectionLoadPromise = null;
+            if (dashboardZone === "analytics") loadProjection();
         } catch (renderErr) {
             console.warn("Portfolio render error (data is current):", renderErr);
         }
@@ -1569,13 +1574,19 @@ function setDashboardZone(zone, opts = {}) {
         requestAnimationFrame(() => {
             if (allocationChart) { allocationChart.resize(); allocationChart.update("none"); }
         });
+        // Load briefing on first Overview visit if not already done
+        if (!_cachedBriefing.ai && !_cachedBriefing.local && !_briefingLoading) {
+            loadPortfolioBriefing();
+        }
     } else {
         allocationChart?.$haloPause?.();
     }
     if (zone === "analytics") {
         requestAnimationFrame(() => {
             if (pnlChart) { pnlChart.resize(); pnlChart.update("none"); }
+            if (projectionChart) { projectionChart.resize(); projectionChart.update("none"); }
         });
+        ensureProjectionLoaded();
     }
 }
 
@@ -1935,6 +1946,273 @@ function renderRealizedTable(trades) {
                 </button>
             </td>
         `;
+    });
+}
+
+
+// ── Growth projection chart (Analytics) ─────────────────────────────────────
+
+const PROJECTION_HORIZONS = ["30d", "1y", "3y", "5y", "10y"];
+const PROJECTION_HORIZON_KEY = "foliosense-projection-horizon";
+
+let projectionChart = null;
+let projectionHorizon = "1y";
+let latestProjectionData = null;
+let projectionLoadPromise = null;
+
+function normalizeProjectionHorizon(horizon) {
+    return PROJECTION_HORIZONS.includes(horizon) ? horizon : "1y";
+}
+
+function initProjectionControls() {
+    const group = document.getElementById("projection-horizon-tabs");
+    if (!group) return;
+    try {
+        const stored = localStorage.getItem(PROJECTION_HORIZON_KEY);
+        if (stored) projectionHorizon = normalizeProjectionHorizon(stored);
+    } catch (_) {}
+    updateProjectionHorizonControls();
+    group.querySelectorAll("[data-horizon]").forEach(button => {
+        button.addEventListener("click", () => setProjectionHorizon(button.dataset.horizon));
+    });
+}
+
+function updateProjectionHorizonControls() {
+    const group = document.getElementById("projection-horizon-tabs");
+    if (!group) return;
+    group.dataset.activeHorizon = projectionHorizon;
+    group.querySelectorAll("[data-horizon]").forEach(button => {
+        const active = button.dataset.horizon === projectionHorizon;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+    });
+}
+
+function setProjectionHorizon(horizon) {
+    projectionHorizon = normalizeProjectionHorizon(horizon);
+    updateProjectionHorizonControls();
+    try { localStorage.setItem(PROJECTION_HORIZON_KEY, projectionHorizon); } catch (_) {}
+    if (latestProjectionData) {
+        renderProjectionChart(latestProjectionData);
+        updateProjectionSummary(latestProjectionData);
+    }
+}
+
+function ensureProjectionLoaded() {
+    if (latestProjectionData) return;
+    if (!projectionLoadPromise) projectionLoadPromise = loadProjection();
+}
+
+async function loadProjection() {
+    try {
+        const res = await fetch("/api/portfolio/projection");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        latestProjectionData = await res.json();
+        projectionLoadPromise = null;
+
+        const callout = document.getElementById("projection-empty-callout");
+        if (callout) callout.style.display = latestProjectionData.has_holdings ? "none" : "";
+
+        const disclaimer = document.getElementById("projection-disclaimer");
+        if (disclaimer) disclaimer.textContent = latestProjectionData.disclaimer || "";
+
+        if (dashboardZone === "analytics") {
+            renderProjectionChart(latestProjectionData);
+            updateProjectionSummary(latestProjectionData);
+        }
+    } catch (err) {
+        projectionLoadPromise = null;
+        console.warn("Unable to load projection:", err);
+    }
+}
+
+function _projectionHorizonData(data) {
+    return data?.horizons?.[projectionHorizon] || data?.horizons?.["1y"];
+}
+
+function updateProjectionSummary(data) {
+    const hz = _projectionHorizonData(data);
+    if (!hz) return;
+    const start = toNumber(data.current_value) || toNumber(hz.portfolio?.values?.avg?.[0]?.value);
+    const endPort = hz.portfolio?.end || {};
+    const endSpy = hz.sp500?.end?.avg || 0;
+
+    const setEnd = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = formatCompact(val);
+    };
+    const setDelta = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el || !start) { if (el) el.textContent = ""; return; }
+        const pct = ((val - start) / start) * 100;
+        el.textContent = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+        el.className = `projection-stat-delta ${pct >= 0 ? "text-success" : "text-danger"}`;
+    };
+
+    setEnd("proj-end-avg", endPort.avg);
+    setEnd("proj-end-best", endPort.best);
+    setEnd("proj-end-worst", endPort.worst);
+    setEnd("proj-end-spy", endSpy);
+    setDelta("proj-delta-avg", endPort.avg);
+    setDelta("proj-delta-best", endPort.best);
+    setDelta("proj-delta-worst", endPort.worst);
+    setDelta("proj-delta-spy", endSpy);
+}
+
+function _shortProjectionLabel(isoDate, total) {
+    const d = new Date(`${isoDate}T12:00:00`);
+    if (total <= 14) {
+        return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+    if (total <= 60) {
+        return d.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+    }
+    return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
+
+function renderProjectionChart(data) {
+    const canvas = document.getElementById("projection-chart");
+    if (!canvas) return;
+    const hz = _projectionHorizonData(data);
+    if (!hz?.labels?.length) return;
+
+    const labels = hz.labels.map((d, i) => _shortProjectionLabel(d, hz.labels.length));
+    const portIdx = hz.portfolio?.indexed || {};
+    const spyIdx = hz.sp500?.indexed?.avg || [];
+    const best = portIdx.best || [];
+    const worst = portIdx.worst || [];
+    const avg = portIdx.avg || [];
+    const portVals = hz.portfolio?.values || {};
+    const spyVals = hz.sp500?.values?.avg || [];
+
+    const theme = chartTheme();
+    const scale = uiScale();
+    const isLight = currentTheme() === "light";
+    const bandFill = isLight ? "rgba(48, 209, 88, 0.12)" : "rgba(48, 209, 88, 0.16)";
+    const avgColor = "#30d158";
+    const spyColor = isLight ? "rgba(16,24,40,0.42)" : "rgba(235,235,245,0.38)";
+
+    const datasets = [
+        {
+            label: "Best",
+            data: best,
+            borderColor: "transparent",
+            backgroundColor: "transparent",
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            borderWidth: 0,
+            fill: false,
+            order: 4,
+        },
+        {
+            label: "Range",
+            data: worst,
+            borderColor: "transparent",
+            backgroundColor: bandFill,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            borderWidth: 0,
+            fill: "-1",
+            order: 3,
+        },
+        {
+            label: "Portfolio avg",
+            data: avg,
+            borderColor: avgColor,
+            backgroundColor: "transparent",
+            borderWidth: 2.25,
+            tension: 0.32,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: avgColor,
+            fill: false,
+            order: 1,
+        },
+        {
+            label: "S&P 500",
+            data: spyIdx,
+            borderColor: spyColor,
+            backgroundColor: "transparent",
+            borderWidth: 1.5,
+            borderDash: [6, 4],
+            tension: 0.32,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            pointHoverBackgroundColor: spyColor,
+            fill: false,
+            order: 2,
+        },
+    ];
+
+    const tooltipCb = (items) => {
+        if (!items.length) return [];
+        const idx = items[0].dataIndex;
+        const lines = [];
+        const pushVal = (label, pts) => {
+            const pt = pts?.[idx];
+            if (pt?.value != null) lines.push(`${label}: ${formatCompact(pt.value)}`);
+        };
+        pushVal("Portfolio avg", portVals.avg);
+        pushVal("Best case", portVals.best);
+        pushVal("Worst case", portVals.worst);
+        pushVal("S&P 500", spyVals);
+        return lines;
+    };
+
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: prefersReducedMotion() ? false : { duration: 280, easing: "easeOutQuart" },
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                ...tooltipOptions(),
+                filter: (item) => item.datasetIndex === 2 || item.datasetIndex === 3,
+                callbacks: {
+                    title: (items) => {
+                        const i = items[0]?.dataIndex ?? 0;
+                        return hz.labels[i] || "";
+                    },
+                    label: () => "",
+                    afterBody: tooltipCb,
+                },
+            },
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: {
+                    color: theme.tick,
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 7,
+                    font: { size: 10 * scale },
+                },
+            },
+            y: {
+                grid: { color: theme.grid },
+                ticks: {
+                    color: theme.tick,
+                    font: { size: 10 * scale },
+                    callback: (v) => `${v.toFixed(0)}`,
+                },
+            },
+        },
+    };
+
+    if (projectionChart) {
+        projectionChart.data.labels = labels;
+        projectionChart.data.datasets = datasets;
+        projectionChart.options = options;
+        projectionChart.update();
+        return;
+    }
+
+    projectionChart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { labels, datasets },
+        options,
     });
 }
 
@@ -5036,6 +5314,9 @@ async function onIntelligenceModeChanged(local, { notify = false } = {}) {
         if (latestHoldings.length) renderHoldings();
     }
 
+    // Sync briefing card to new global mode
+    loadPortfolioBriefing();
+
     if (!notify) return;
     if (local) {
         showToast(
@@ -5853,6 +6134,183 @@ document.addEventListener("keydown", (e) => {
     }
 });
 
+// ── Portfolio Briefing ────────────────────────────────────────────────────────
+
+const _cachedBriefing = { ai: null, local: null };
+let _briefingActiveMode = null;  // current mode shown in card
+let _briefingLoading = false;
+
+function _briefingDefaultMode() {
+    return isLocalIntelligenceMode() ? "local" : "ai";
+}
+
+function _briefingSyncSegControl(mode, claudeOffline) {
+    const aiBtn   = document.getElementById("briefing-seg-ai");
+    const locBtn  = document.getElementById("briefing-seg-local");
+    if (!aiBtn || !locBtn) return;
+
+    aiBtn.setAttribute("aria-pressed", String(mode === "ai"));
+    locBtn.setAttribute("aria-pressed", String(mode === "local"));
+    aiBtn.classList.toggle("briefing-seg-btn--active", mode === "ai");
+    locBtn.classList.toggle("briefing-seg-btn--active", mode === "local");
+
+    if (claudeOffline) {
+        aiBtn.disabled = true;
+        aiBtn.title = "Claude offline — using Local mode";
+        const noteEl = document.getElementById("briefing-offline-note");
+        if (!noteEl) {
+            const note = document.createElement("span");
+            note.id = "briefing-offline-note";
+            note.className = "briefing-offline-note";
+            note.textContent = "Local only — Claude offline";
+            const header = document.querySelector("#briefing-card .card-header");
+            header?.appendChild(note);
+        }
+    } else {
+        aiBtn.disabled = false;
+        aiBtn.title = "";
+        document.getElementById("briefing-offline-note")?.remove();
+    }
+}
+
+function _briefingShowSkeleton(show) {
+    const sk = document.getElementById("briefing-skeleton");
+    const ct = document.getElementById("briefing-content");
+    if (sk) sk.style.display = show ? "" : "none";
+    if (ct) ct.style.display = show ? "none" : "";
+}
+
+function _briefingRenderAi(data) {
+    const content = document.getElementById("briefing-content");
+    if (!content) return;
+
+    const esc = s => escapeHtml(String(s || ""));
+    const driverItems = (data.drivers || [])
+        .map(d => `<li class="briefing-driver-item">${esc(d)}</li>`)
+        .join("");
+    const adjItems = (data.adjustments || [])
+        .map(a => `<li class="briefing-adj-item">${esc(a)}</li>`)
+        .join("");
+
+    const sourceNote = data.source === "local-fallback"
+        ? `<span class="briefing-source-note">Local fallback — Claude unavailable</span>`
+        : (data.from_cache ? `<span class="briefing-source-note">Cached</span>` : "");
+
+    content.innerHTML = `
+        <div class="briefing-ai-wrap">
+            <div class="briefing-section">
+                <div class="briefing-section-label">
+                    <i class="bi bi-activity" aria-hidden="true"></i> Health
+                </div>
+                <p class="briefing-health-text">${esc(data.health)}</p>
+            </div>
+            <div class="briefing-section">
+                <div class="briefing-section-label">
+                    <i class="bi bi-arrow-left-right" aria-hidden="true"></i> What moved
+                </div>
+                <ul class="briefing-list">${driverItems}</ul>
+            </div>
+            <div class="briefing-section">
+                <div class="briefing-section-label">
+                    <i class="bi bi-sliders2" aria-hidden="true"></i> Observations
+                </div>
+                <ul class="briefing-list">${adjItems}</ul>
+            </div>
+            <div class="briefing-quote-chip">
+                <i class="bi bi-chat-quote-fill briefing-quote-icon" aria-hidden="true"></i>
+                <span class="briefing-quote-text">${esc(data.quote)}</span>
+                ${sourceNote}
+            </div>
+        </div>`;
+}
+
+function _briefingRenderLocal(data) {
+    const content = document.getElementById("briefing-content");
+    if (!content) return;
+
+    const esc = s => escapeHtml(String(s || ""));
+    const movers = (data.movers || []).map(m => {
+        const sign = m.day_change_pct >= 0 ? "gain" : "loss";
+        const pct  = (m.day_change_pct >= 0 ? "+" : "") + Number(m.day_change_pct).toFixed(2) + "%";
+        const dollar = (m.day_change_dollar >= 0 ? "+$" : "-$") +
+            Math.abs(m.day_change_dollar).toFixed(2);
+        return `
+            <div class="briefing-mover-row">
+                <span class="briefing-mover-ticker">${esc(m.ticker)}</span>
+                <span class="briefing-mover-change text-${sign}">${esc(pct)}</span>
+                <span class="briefing-mover-dollar text-${sign}">${esc(dollar)}</span>
+                <i class="bi ${esc(m.icon || "bi-question-circle")} briefing-mover-icon" aria-hidden="true"></i>
+                <span class="briefing-mover-explanation">${esc(m.explanation)}</span>
+            </div>`;
+    }).join("");
+
+    content.innerHTML = `
+        <div class="briefing-local-wrap">
+            <p class="briefing-lead-text">${esc(data.lead)}</p>
+            <div class="briefing-movers">${movers || "<span class='briefing-empty'>No holdings data.</span>"}</div>
+        </div>`;
+}
+
+async function loadPortfolioBriefing(mode, forceRefresh = false) {
+    if (_briefingLoading && !forceRefresh) return;
+
+    const claudeOffline = _isClaudeApiLive === false || _forcedLocalMode;
+    if (mode === null || mode === undefined) {
+        mode = _briefingDefaultMode();
+    }
+    if (claudeOffline) mode = "local";
+
+    _briefingActiveMode = mode;
+    _briefingSyncSegControl(mode, claudeOffline);
+
+    // Instant render from cache if available and not forced
+    if (_cachedBriefing[mode] && !forceRefresh) {
+        _briefingShowSkeleton(false);
+        mode === "ai" ? _briefingRenderAi(_cachedBriefing[mode])
+                      : _briefingRenderLocal(_cachedBriefing[mode]);
+        return;
+    }
+
+    _briefingLoading = true;
+    _briefingShowSkeleton(true);
+
+    const refreshBtn = document.getElementById("briefing-refresh-btn");
+    refreshBtn?.classList.add("is-spinning");
+
+    try {
+        const params = new URLSearchParams({ mode });
+        if (forceRefresh) params.set("force_refresh", "true");
+        const res = await fetch(`/api/ai/portfolio-summary?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        _cachedBriefing[mode] = data;
+        _briefingShowSkeleton(false);
+        mode === "ai" ? _briefingRenderAi(data) : _briefingRenderLocal(data);
+    } catch (err) {
+        console.warn("Portfolio briefing fetch failed:", err);
+        _briefingShowSkeleton(false);
+        const ct = document.getElementById("briefing-content");
+        if (ct) ct.innerHTML = `<span class="briefing-error">Briefing unavailable — refresh to retry.</span>`;
+    } finally {
+        _briefingLoading = false;
+        refreshBtn?.classList.remove("is-spinning");
+    }
+}
+
+function initPortfolioBriefing() {
+    const seg = document.getElementById("briefing-seg");
+    if (!seg) return;
+
+    seg.addEventListener("click", e => {
+        const btn = e.target.closest(".briefing-seg-btn");
+        if (!btn || btn.disabled) return;
+        const newMode = btn.dataset.mode;
+        if (newMode === _briefingActiveMode) return;
+        loadPortfolioBriefing(newMode);
+    });
+}
+
 async function initDashboard() {
     initThemeToggle();
     initTextSizeToggle();
@@ -5861,8 +6319,10 @@ async function initDashboard() {
     initNavOverflow();
     initDashboardPet();
     initPerformanceTabs();
+    initProjectionControls();
     initPortfolioManager();
     initDashboardZones();
+    initPortfolioBriefing();
     // Sync the sliding indicator once layout is settled
     requestAnimationFrame(syncHvtIndicator);
     window.addEventListener("resize", syncHvtIndicator, { passive: true });
@@ -5872,6 +6332,7 @@ async function initDashboard() {
     // Fire without blocking — prices and P&L are already visible
     loadAnalystRecommendations();
     loadWorldMarkets();
+    loadPortfolioBriefing();
     startCountdown();
     initHudPopover();
     startClaudeHeartbeat();

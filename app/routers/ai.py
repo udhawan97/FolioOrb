@@ -3,6 +3,7 @@ app/routers/ai.py
 AI-powered summary endpoints using Claude, plus move-explanation endpoints.
 """
 # pylint: disable=too-many-lines
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -16,7 +17,9 @@ from app.services.ai_service import (
     MODEL,
     claude_api_heartbeat,
     generate_etf_profile_seed,
+    generate_portfolio_briefing,
     generate_stock_summary,
+    next_briefing_canned_quote,
 )
 from app.services.move_explainer import (
     HoldingMoveSummary,
@@ -1360,3 +1363,286 @@ async def get_all_analyst_recommendations(db: Session = Depends(get_db)):
                 "price_signal": None,
             }
     return {"recommendations": results, "count": len(results)}
+
+
+# ── Portfolio Briefing endpoint ───────────────────────────────────────────────
+
+_BRIEFING_CACHE_TYPE = "briefing"
+
+
+def _briefing_snapshot(db: Session) -> tuple[dict, list[dict]]:
+    """
+    Build the compact portfolio snapshot fed to Haiku (and used for the local
+    briefing lead line).  Returns (snapshot_dict, non_watchlist_holdings).
+    """
+    from app.routers.portfolio import _compute_portfolio, _cumulative_realized  # lazy — no circular dep
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(1, db)
+    non_watchlist = [h for h in holdings_rows if not h.get("is_watchlist")]
+
+    total_unrealized = sum(float(h.get("unrealized_gain") or 0) for h in non_watchlist)
+    realized = _cumulative_realized(1, db)
+    total_return_dollar = round(total_unrealized + realized, 2)
+    total_return_pct = (
+        round(total_return_dollar / total_cost_basis * 100, 2) if total_cost_basis > 0 else 0.0
+    )
+    prev_value = total_value - total_daily_change
+    today_pnl_pct = round(total_daily_change / prev_value * 100, 2) if abs(prev_value) > 0 else 0.0
+
+    sorted_by_day = sorted(
+        [h for h in non_watchlist if h.get("day_change_pct") is not None],
+        key=lambda h: float(h.get("day_change_pct") or 0),
+    )
+    best = sorted_by_day[-1] if sorted_by_day else {}
+    worst = sorted_by_day[0] if sorted_by_day else {}
+
+    top_by_alloc = sorted(
+        [h for h in non_watchlist if h.get("allocation_pct")],
+        key=lambda h: float(h.get("allocation_pct") or 0),
+        reverse=True,
+    )[:6]
+
+    top_contributors = sorted(
+        non_watchlist,
+        key=lambda h: abs(float(h.get("daily_value_change") or 0)),
+        reverse=True,
+    )[:4]
+
+    regime = get_market_regime()
+
+    snapshot = {
+        "as_of": today,
+        "total_value": round(total_value, 2),
+        "today_pl": {
+            "dollar": round(total_daily_change, 2),
+            "pct": today_pnl_pct,
+        },
+        "total_return": {
+            "dollar": total_return_dollar,
+            "pct": total_return_pct,
+            "unrealized": round(total_unrealized, 2),
+            "realized": round(realized, 2),
+        },
+        "best_today": {
+            "ticker": best.get("ticker", ""),
+            "day_change_pct": float(best.get("day_change_pct") or 0),
+        },
+        "worst_today": {
+            "ticker": worst.get("ticker", ""),
+            "day_change_pct": float(worst.get("day_change_pct") or 0),
+        },
+        "top_holdings": [
+            {
+                "ticker": h["ticker"],
+                "allocation_pct": float(h.get("allocation_pct") or 0),
+                "day_change_pct": float(h.get("day_change_pct") or 0),
+                "total_return_pct": float(h.get("total_return_pct") or 0),
+            }
+            for h in top_by_alloc
+        ],
+        "today_contributors": [
+            {
+                "ticker": h["ticker"],
+                "contribution_dollar": round(float(h.get("daily_value_change") or 0), 2),
+            }
+            for h in top_contributors
+        ],
+        "market_regime": {
+            "label": regime.get("label", ""),
+            "mood": regime.get("mood", ""),
+        },
+    }
+    return snapshot, non_watchlist
+
+
+def _briefing_local(db: Session) -> dict:
+    """Compute local briefing using move_explainer. Never calls Claude."""
+    snapshot, non_watchlist = _briefing_snapshot(db)
+    active_tickers = [h["ticker"] for h in non_watchlist]
+    quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
+    benchmarks = get_benchmark_data()
+    benchmark_cache: dict = {}
+
+    movers: list[dict] = []
+    rose = fell = 0
+    for h in non_watchlist:
+        ticker = h["ticker"]
+        stock_data = quotes.get(ticker) or {}
+        if stock_data.get("error") or not stock_data:
+            shares = float(h.get("shares") or 1)
+            stock_data = {
+                "ticker": ticker,
+                "day_change_pct": h.get("day_change_pct", 0),
+                "day_change": round(float(h.get("daily_value_change") or 0) / shares, 4),
+            }
+
+        day_chg = float(h.get("day_change_pct") or 0)
+        if day_chg > 0:
+            rose += 1
+        elif day_chg < 0:
+            fell += 1
+
+        try:
+            summary = explain_move(
+                stock_data,
+                shared_benchmarks=benchmarks,
+                _benchmark_cache=benchmark_cache,
+            )
+            icon = summary.drivers[0].icon if summary.drivers else "bi-question-circle"
+            explanation = (summary.explanation_text or "")[:140]
+        except Exception as exc:
+            logger.debug("Briefing explain_move failed; exception_type=%s", type(exc).__name__)
+            icon = "bi-question-circle"
+            explanation = ""
+
+        movers.append({
+            "ticker": ticker,
+            "day_change_pct": day_chg,
+            "day_change_dollar": round(float(h.get("daily_value_change") or 0), 2),
+            "icon": icon,
+            "explanation": explanation,
+        })
+
+    movers.sort(key=lambda m: abs(m["day_change_dollar"]), reverse=True)
+    movers = movers[:6]
+
+    total = rose + fell
+    best = snapshot.get("best_today") or {}
+    best_t = best.get("ticker", "")
+    best_pct = float(best.get("day_change_pct") or 0)
+    worst_snap = snapshot.get("worst_today") or {}
+
+    if rose > 0 and best_t and total > 0:
+        lead = f"{rose} of {total} holdings rose today, led by {best_t} ({best_pct:+.1f}%)."
+    elif fell == total and total > 0:
+        w_t = worst_snap.get("ticker", "")
+        w_pct = float(worst_snap.get("day_change_pct") or 0)
+        lead = (
+            f"All {total} holdings fell today; "
+            f"{w_t} pulled back the most ({w_pct:+.1f}%)." if w_t
+            else f"All {total} holdings fell today."
+        )
+    else:
+        lead = "Holdings were mixed today — no clear directional trend."
+
+    return {
+        "mode": "local",
+        "lead": lead,
+        "movers": movers,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _briefing_fallback(snapshot: dict) -> dict:
+    """Deterministic AI-mode response when Claude is unavailable."""
+    pl = snapshot.get("today_pl") or {}
+    tr = snapshot.get("total_return") or {}
+    best = snapshot.get("best_today") or {}
+    worst = snapshot.get("worst_today") or {}
+
+    direction = "up" if float(pl.get("dollar") or 0) >= 0 else "down"
+    pct = abs(float(pl.get("pct") or 0))
+    ret_pct = float(tr.get("pct") or 0)
+    health = (
+        f"Your portfolio is {direction} {pct:.2f}% today. "
+        f"Total return stands at {ret_pct:+.2f}% overall."
+    )
+    drivers: list[str] = []
+    if best.get("ticker"):
+        drivers.append(
+            f"{best['ticker']} was your best mover today "
+            f"({float(best.get('day_change_pct') or 0):+.1f}%)."
+        )
+    if worst.get("ticker") and worst.get("ticker") != best.get("ticker"):
+        drivers.append(
+            f"{worst['ticker']} pulled back "
+            f"({float(worst.get('day_change_pct') or 0):+.1f}%)."
+        )
+    if not drivers:
+        drivers = ["No standout movers today."]
+
+    return {
+        "mode": "ai",
+        "source": "local-fallback",
+        "health": health,
+        "drivers": drivers,
+        "adjustments": ["No changes needed — the book looks balanced."],
+        "quote": next_briefing_canned_quote(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/portfolio-summary")
+async def get_portfolio_summary(
+    mode: str = "ai",
+    force_refresh: bool = False,
+    db: Session = Depends(get_db),
+):
+    """
+    Portfolio briefing card.
+    mode=local — deterministic move digest, no Claude, always free.
+    mode=ai    — Haiku narrative, cached 24 h in AISummary (ticker=BOOK,
+                 summary_type='briefing'); falls back deterministically.
+    """
+    if mode not in ("ai", "local"):
+        mode = "ai"
+
+    if mode == "local":
+        try:
+            return _briefing_local(db)
+        except Exception as exc:
+            logger.error("Local briefing failed; exception_type=%s", type(exc).__name__)
+            raise HTTPException(status_code=500, detail="Briefing temporarily unavailable.")
+
+    # AI mode — check 24 h cache first
+    if not force_refresh:
+        cached = (
+            db.query(AISummary)
+            .filter(
+                AISummary.ticker == _PORTFOLIO_CACHE_TICKER,
+                AISummary.summary_type == _BRIEFING_CACHE_TYPE,
+            )
+            .order_by(AISummary.generated_at.desc())
+            .first()
+        )
+        if cached and _cache_is_fresh(cached):
+            try:
+                stored = json.loads(getattr(cached, "summary_text", None) or "{}")
+                stored["from_cache"] = True
+                return stored
+            except Exception:
+                pass  # cache corrupted — regenerate below
+
+    # Build snapshot; surface 500 so the card can show a clear error
+    try:
+        snapshot, _ = _briefing_snapshot(db)
+    except Exception as exc:
+        logger.error("Briefing snapshot failed; exception_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Briefing temporarily unavailable.")
+
+    # Call Haiku; fall back deterministically on any failure
+    try:
+        parsed = generate_portfolio_briefing(snapshot)
+        payload: dict = {
+            "mode": "ai",
+            "source": "claude",
+            **parsed,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            db.add(AISummary(
+                ticker=_PORTFOLIO_CACHE_TICKER,
+                summary_type=_BRIEFING_CACHE_TYPE,
+                summary_text=json.dumps(payload),
+                price_when_generated=None,
+                model_used=MODEL,
+            ))
+            db.commit()
+        except Exception as exc:
+            logger.debug("Failed to cache briefing; exception_type=%s", type(exc).__name__)
+        return payload
+
+    except Exception as exc:
+        logger.warning("AI briefing failed; exception_type=%s", type(exc).__name__)
+        return _briefing_fallback(snapshot)

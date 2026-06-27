@@ -1,4 +1,5 @@
 import logging
+import math
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -279,20 +280,29 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
 
     period examples: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
     Returns an empty list if the data cannot be fetched.
+    Rows where any OHLCV field is NaN or non-finite are silently dropped so the
+    caller always receives JSON-safe floats (Starlette serializes with allow_nan=False).
     """
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
         results = []
         for date, row in hist.iterrows():
+            open_ = float(row["Open"])
+            high = float(row["High"])
+            low = float(row["Low"])
+            close = float(row["Close"])
+            volume = float(row["Volume"])
+            if not all(math.isfinite(v) for v in (open_, high, low, close, volume)):
+                continue
             results.append(
                 {
                     "date": date.strftime("%Y-%m-%d"),
-                    "open": round(float(row["Open"]), 2),
-                    "high": round(float(row["High"]), 2),
-                    "low": round(float(row["Low"]), 2),
-                    "close": round(float(row["Close"]), 2),
-                    "volume": int(row["Volume"]),
+                    "open": round(open_, 2),
+                    "high": round(high, 2),
+                    "low": round(low, 2),
+                    "close": round(close, 2),
+                    "volume": int(volume),
                 }
             )
         return results

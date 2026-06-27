@@ -8,11 +8,25 @@
 html {
     font-size: 16px;
     --ui-scale: 1;
+
+    /* ── Type scale — single source of truth for all Holdings table & intel panel text ── */
+    --ts-label:  0.66rem;   /* eyebrow / section labels   (was scattered 0.58–0.62rem) */
+    --ts-xs:     0.70rem;   /* micro stats, sub-labels    (was scattered 0.60–0.66rem) */
+    --ts-sm:     0.75rem;   /* secondary body, drivers    (was 0.74–0.75rem)           */
+    --ts-body:   0.80rem;   /* primary intel body copy    (was --intel-body-size 0.76) */
+    --ts-md:     0.875rem;  /* analyst rec label, prices  (was 0.78–0.84rem)           */
 }
 
 html[data-text-size="comfortable"] {
     font-size: 17px;
     --ui-scale: 1.035;
+
+    /* Comfortable scale bumps the type scale meaningfully throughout */
+    --ts-label:  0.70rem;
+    --ts-xs:     0.73rem;
+    --ts-sm:     0.79rem;
+    --ts-body:   0.85rem;
+    --ts-md:     0.93rem;
 }
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
@@ -464,9 +478,9 @@ body > .navbar {
     position: absolute;
     top: calc(100% + 0.55rem);
     right: 0;
-    width: min(290px, calc(100vw - 1.5rem));
-    padding: 0.4rem;
-    border-radius: 16px;
+    width: min(304px, calc(100vw - 1.5rem));
+    padding: 0.5rem;
+    border-radius: 18px;
     border: 1px solid var(--hairline);
     background: rgba(22, 22, 30, 0.92);
     backdrop-filter: blur(20px) saturate(160%);
@@ -486,58 +500,107 @@ body > .navbar {
 }
 
 .nav-menu-section {
-    font-size: 0.6rem;
+    font-size: 0.625rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-tertiary);
-    padding: 0.5rem 0.6rem 0.22rem;
+    padding: 0.55rem 0.72rem 0.28rem;
+}
+.nav-menu-section:first-child {
+    padding-top: 0.35rem;
 }
 .nav-menu-divider {
     height: 1px;
     background: var(--hairline-soft);
-    margin: 0.3rem 0.5rem;
+    margin: 0.35rem 0.65rem;
 }
 .nav-menu-row {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.7rem;
     width: 100%;
-    padding: 0.5rem 0.6rem;
-    border-radius: 10px;
+    min-height: 2.625rem;
+    padding: 0.42rem 0.72rem;
+    border-radius: 11px;
     background: transparent;
     border: none;
     text-align: left;
     color: var(--text-primary);
-    font-size: 0.84rem;
+    font-family: var(--font-text);
+    font-size: 0.875rem;
     font-weight: 500;
+    line-height: 1.2;
     transition: background 0.14s ease;
 }
 .nav-menu-row--btn { cursor: pointer; }
 .nav-menu-row--btn:hover { background: var(--control-hover, rgba(255, 255, 255, 0.07)); }
+.nav-menu-row:hover .nav-menu-icon,
+.nav-menu-row--btn:hover .nav-menu-icon {
+    color: var(--text-primary);
+}
 .nav-menu-icon {
-    font-size: 0.95rem;
-    color: var(--text-tertiary);
-    width: 1.1rem;
-    text-align: center;
+    flex: 0 0 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
     flex-shrink: 0;
 }
-.nav-menu-label { flex: 1; min-width: 0; }
+.nav-menu-icon i {
+    display: block;
+    font-size: 0.95rem;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+}
+.nav-menu-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    letter-spacing: -0.01em;
+}
+.nav-menu-trailing {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    margin-left: auto;
+}
 .nav-menu-value {
-    font-size: 0.78rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
 }
 .nav-menu-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
     font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-secondary);
     background: var(--surface-strong, rgba(255, 255, 255, 0.08));
     border: 1px solid var(--hairline);
-    border-radius: 6px;
-    min-width: 1.35rem;
-    text-align: center;
-    padding: 0.05rem 0.32rem;
+    border-radius: 7px;
+    flex-shrink: 0;
+    margin-left: auto;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.nav-menu-key i {
+    font-size: 0.72rem;
+    line-height: 1;
+}
+.nav-menu-row--btn:hover .nav-menu-key {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--hairline-hover);
 }
 /* The moved toggle switches keep their own styling; just push them to the right */
 .nav-menu-row .theme-toggle,
@@ -547,11 +610,11 @@ body > .navbar {
 
 /* Reset the AI-cost trigger from a pill back into a flush menu row */
 .nav-menu-row.brand-cost-trigger {
-    padding: 0.5rem 0.6rem;
+    padding: 0.42rem 0.72rem;
     border: none;
-    border-radius: 10px;
+    border-radius: 11px;
     background: transparent;
-    font-size: 0.84rem;
+    font-size: 0.875rem;
     font-weight: 500;
     letter-spacing: 0;
     color: var(--text-primary);
@@ -563,7 +626,7 @@ body > .navbar {
     color: var(--text-primary);
     border: none;
 }
-.nav-menu-row.brand-cost-trigger .brand-cost-notif { position: static; margin-left: 0.15rem; }
+.nav-menu-row.brand-cost-trigger .brand-cost-notif { position: static; margin-left: 0; }
 
 /* AI-cost detail — expands inline within the menu instead of anchoring to brand */
 .nav-overflow-menu .brand-cost-callout {
@@ -595,6 +658,11 @@ body > .navbar {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08), 0 24px 60px rgba(0, 0, 0, 0.16);
 }
 [data-bs-theme="light"] .nav-overflow-trigger { background: rgba(15, 23, 42, 0.03); }
+[data-bs-theme="light"] .nav-menu-icon { color: rgba(15, 23, 42, 0.55); }
+[data-bs-theme="light"] .nav-menu-key {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: rgba(15, 23, 42, 0.1);
+}
 
 @media (prefers-reduced-motion: reduce) {
     .nav-overflow-menu,
@@ -1024,14 +1092,14 @@ body > .navbar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
+    width: 20px;
     height: 18px;
     font-family: var(--font-display);
     font-weight: 750;
     line-height: 1;
 }
 
-.text-size-glyph-small { font-size: 11px; }
+.text-size-glyph-small { font-size: 10px; letter-spacing: -0.04em; }
 .text-size-glyph-large { font-size: 16px; }
 
 .theme-toggle-thumb,
@@ -1340,18 +1408,32 @@ table tbody tr:hover {
 
 .holdings-table {
     table-layout: auto;
-    min-width: 1240px;
+    /* Was 1240px — caused sideways scroll at ≤1280px viewports. Now 840px:
+       7 visible columns at 1024px sum to ~900px; xl columns add Rating+Trend. */
+    min-width: 840px;
 }
 
 .holdings-table thead th {
-    height: 48px;
+    height: 44px;
     vertical-align: middle;
-    padding: 0.92rem 1.15rem;
+    padding: 0.78rem 1rem;
     line-height: 1;
+    /* Hairline with faint cyan glow accent under header */
+    border-bottom: 1px solid rgba(111, 214, 240, 0.18) !important;
+    box-shadow: 0 1px 0 rgba(111, 214, 240, 0.08);
+    font-size: var(--ts-label);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+[data-bs-theme="light"] .holdings-table thead th {
+    border-bottom-color: rgba(10, 120, 180, 0.16) !important;
+    box-shadow: 0 1px 0 rgba(10, 120, 180, 0.06);
 }
 
 .holdings-table tbody td {
-    padding: 1.1rem 1.15rem;
+    padding: 0.95rem 1rem;
     vertical-align: middle;
     background-repeat: no-repeat;
     background-position: -140% 0;
@@ -1359,8 +1441,10 @@ table tbody tr:hover {
 }
 
 .holdings-table tbody tr[data-ticker] {
-    min-height: 68px;
+    min-height: 62px;
     will-change: background-color;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease);
 }
 
 
@@ -2203,32 +2287,34 @@ table tbody tr:hover {
     transform: translateY(0);
 }
 
+/* Column widths — calibrated so 7 visible cols fit ~1024px, all 9 fit ~1400px */
 .holdings-table th:nth-child(1),
-.holdings-table td:nth-child(1) { min-width: 92px; }
+.holdings-table td:nth-child(1) { min-width: 76px; }
 
 .holdings-table th:nth-child(2),
-.holdings-table td:nth-child(2) { min-width: 190px; }
+.holdings-table td:nth-child(2) { min-width: 150px; }
 
 .holdings-table th:nth-child(3),
-.holdings-table td:nth-child(3) { min-width: 96px; }
+.holdings-table td:nth-child(3) { min-width: 84px; }
 
 .holdings-table th:nth-child(4),
-.holdings-table td:nth-child(4) { min-width: 104px; }
+.holdings-table td:nth-child(4) { min-width: 90px; }
 
 .holdings-table th:nth-child(5),
-.holdings-table td:nth-child(5) { min-width: 112px; }
+.holdings-table td:nth-child(5) { min-width: 96px; }
 
 .holdings-table th:nth-child(6),
-.holdings-table td:nth-child(6) { min-width: 88px; }
+.holdings-table td:nth-child(6) { min-width: 74px; }
 
 .holdings-table th:nth-child(7),
-.holdings-table td:nth-child(7) { min-width: 184px; }
+.holdings-table td:nth-child(7) { min-width: 152px; }
 
+/* col 8+9 only visible at ≥xl (1400px) so widths are generous */
 .holdings-table th:nth-child(8),
-.holdings-table td:nth-child(8) { min-width: 226px; }
+.holdings-table td:nth-child(8) { min-width: 170px; }
 
 .holdings-table th:nth-child(9),
-.holdings-table td:nth-child(9) { min-width: 148px; }
+.holdings-table td:nth-child(9) { min-width: 128px; }
 
 .holding-ticker-wrap {
     display: inline-flex;
@@ -2256,26 +2342,41 @@ table tbody tr:hover {
     white-space: nowrap;
 }
 
+/* Tabular nums on ALL numeric cells: Price(3), Today(4), Value(5), Alloc%(6), Trend Sense(7) */
 #holdings-table td:nth-child(3),
+#holdings-table td:nth-child(4),
 #holdings-table td:nth-child(5),
-#holdings-table td:nth-child(6) {
+#holdings-table td:nth-child(6),
+#holdings-table td:nth-child(7) {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+}
+
+/* Today column: % is the hero; move badge sits below as a slim eyebrow */
+.today-cell-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    line-height: 1;
 }
 
 .day-chg-cell {
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
-    font-weight: 600;
+    gap: 0.22rem;
+    font-size: var(--ts-md);
+    font-weight: 650;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    line-height: 1.15;
 }
 .day-chg-cell i {
-    font-size: 0.6rem;
-    opacity: 0.75;
+    font-size: 0.58rem;
+    opacity: 0.72;
     flex-shrink: 0;
     line-height: 1;
+    margin-top: 0.08em;
 }
 
 @media (max-width: 991.98px) {
@@ -4711,29 +4812,41 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .analyst-rec-unavailable { color: var(--text-tertiary); }
 .analyst-rec-etf-quality { color: var(--accent-cyan); }
 
-/* ── Compact attribution badge inside the holdings table "Today" cell ────── */
+/* ── Move attribution dot — sits below the % as a slim eyebrow label ─────── */
+/* Replaced the old pill that crowded the Today % hero number.
+   Now a small dot + micro-label on its own line, keeping % the visual hero. */
 .move-badge {
-    display: inline-block;
-    font-size: 0.57rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 0.24rem;
+    margin-top: 0.22rem;
+    font-size: var(--ts-xs);
+    font-weight: 600;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    padding: 0.06rem 0.32rem;
-    border-radius: 10px;
-    margin-top: 0.15rem;
-    background: rgba(255, 255, 255, .06);
     color: var(--text-tertiary);
-    vertical-align: middle;
+    line-height: 1;
+    opacity: 0.82;
 }
-.move-badge.market-driven    { background: rgba(10, 132, 255, .14); color: #0a84ff; }
-.move-badge.sector-driven    { background: rgba(94, 92, 230, .14);  color: #5e5ce6; }
-.move-badge.holdings-driven  { background: rgba(48, 209, 88,  .14); color: #30d158; }
-.move-badge.macro-driven     { background: rgba(111, 214, 240, .14);  color: var(--accent-cyan); }
-.move-badge.company-specific { background: rgba(255, 159, 10, .14); color: #ff9f0a; }
-.move-badge.earnings-driven  { background: rgba(255, 214, 10, .14); color: #e6c200; }
-.move-badge.filing-driven    { background: rgba(111, 214, 240, .14);  color: var(--accent-cyan); }
-.move-badge.mixed            { background: rgba(191, 90, 242, .14); color: #bf5af2; }
-.move-badge.etf-index        { background: rgba(48, 209, 88,  .14); color: #30d158; }
+.move-badge::before {
+    content: "";
+    flex-shrink: 0;
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+}
+.move-badge.market-driven    { color: #0a84ff; }
+.move-badge.sector-driven    { color: #5e5ce6; }
+.move-badge.holdings-driven  { color: #30d158; }
+.move-badge.macro-driven     { color: var(--accent-cyan); }
+.move-badge.company-specific { color: #ff9f0a; }
+.move-badge.earnings-driven  { color: #e6c200; }
+.move-badge.filing-driven    { color: var(--accent-cyan); }
+.move-badge.mixed            { color: #bf5af2; }
+.move-badge.etf-index        { color: #30d158; }
 
 /* ── Holding Intel button — futuristic AI action ─────────────────────── */
 .btn-holding-intel {
@@ -5731,8 +5844,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     flex: 0 0 34px;
     border: 1px solid var(--hairline);
     border-radius: 999px;
-    color: var(--text-secondary);
+    color: var(--brand-cyan);
     background: var(--control-bg);
+    font-size: 0.95rem;
+    line-height: 1;
     box-shadow:
         0 10px 22px -18px rgba(0, 0, 0, 0.64),
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -5743,6 +5858,10 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
         background 0.2s var(--ease),
         border-color 0.2s var(--ease),
         transform 0.24s var(--spring);
+}
+.pet-nav-toggle i {
+    font-size: 0.95rem;
+    line-height: 1;
 }
 
 .pet-nav-toggle::after {
@@ -6007,18 +6126,24 @@ body > .dashboard-pet {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.28rem;
-    padding: 0.18rem 0.46rem;
-    border: 1px solid rgba(111, 214, 240, 0.28);
-    border-radius: 20px;
+    gap: 0.32rem;
+    padding: 0.28rem 0.58rem;
+    border: 1px solid rgba(111, 214, 240, 0.32);
+    border-radius: 999px;
     background: rgba(111, 214, 240, 0.08);
     color: var(--brand-cyan);
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-family: var(--font-text);
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    line-height: 1;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.18s var(--spring);
+}
+.pet-mode-toggle i {
+    font-size: 0.72rem;
+    line-height: 1;
 }
 
 .pet-mode-toggle:hover {
@@ -6641,6 +6766,200 @@ body > .dashboard-pet {
     z-index: 1;
     width: 100% !important;
     height: 190px !important;
+}
+
+/* ── Growth projection (Analytics) ─────────────────────────────────────── */
+.projection-card-header {
+    gap: 0.5rem;
+}
+
+.projection-card-icon {
+    color: var(--accent-blue);
+    font-size: 0.9rem;
+}
+
+.projection-horizon-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.18rem;
+    padding: 0.14rem;
+    border-radius: 999px;
+    background: var(--control-bg);
+    border: 1px solid var(--hairline-soft);
+}
+
+.projection-horizon-btn {
+    appearance: none;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 0.66rem;
+    font-weight: 750;
+    line-height: 1;
+    min-width: 2.2rem;
+    padding: 0.39rem 0.5rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+    transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.projection-horizon-btn:hover {
+    color: var(--text-secondary);
+    background: var(--control-hover);
+}
+
+.projection-horizon-btn.is-active,
+.projection-horizon-btn[aria-pressed="true"] {
+    color: var(--text-primary);
+    background: var(--surface-strong);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.projection-horizon-btn:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+.projection-summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+}
+
+.projection-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 14px;
+    background: var(--control-bg);
+    border: 1px solid var(--hairline-soft);
+    min-width: 0;
+}
+
+.projection-stat--bench {
+    background: transparent;
+    border-style: dashed;
+}
+
+.projection-stat-label {
+    font-size: 0.62rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.projection-stat-value {
+    font-size: 1.05rem;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    line-height: 1.15;
+}
+
+.projection-stat-value--best { color: #30d158; }
+.projection-stat-value--worst { color: #ff453a; }
+.projection-stat-value--bench { color: var(--text-secondary); }
+
+.projection-stat-delta {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+.projection-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    margin-bottom: 0.55rem;
+    font-size: 0.68rem;
+    color: var(--text-tertiary);
+}
+
+.projection-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.projection-legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+}
+
+.projection-legend-swatch--band {
+    height: 10px;
+    width: 14px;
+    border-radius: 3px;
+    background: rgba(48, 209, 88, 0.18);
+    border: 1px solid rgba(48, 209, 88, 0.35);
+}
+
+.projection-legend-swatch--avg {
+    background: #30d158;
+}
+
+.projection-legend-swatch--spy {
+    background: var(--text-tertiary);
+    opacity: 0.7;
+}
+
+.projection-chart-shell {
+    position: relative;
+    min-height: 220px;
+    overflow: hidden;
+    border-radius: 14px;
+}
+
+.projection-chart-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        rgba(48, 209, 88, 0.06) 0%,
+        transparent 55%
+    );
+    pointer-events: none;
+    animation: chartPanelGlow 10s ease-in-out infinite;
+}
+
+.projection-chart-shell canvas {
+    position: relative;
+    z-index: 1;
+    width: 100% !important;
+    height: 220px !important;
+}
+
+.projection-disclaimer {
+    margin: 0.65rem 0 0;
+    font-size: 0.62rem;
+    line-height: 1.45;
+    color: var(--text-tertiary);
+}
+
+@media (max-width: 767.98px) {
+    .projection-summary-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .projection-horizon-tabs {
+        order: 3;
+        width: 100%;
+        margin-left: 0 !important;
+    }
+
+    .projection-horizon-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding-inline: 0.35rem;
+    }
 }
 
 .realized-table-wrap {
@@ -8270,6 +8589,7 @@ body > .dashboard-pet {
     .market-tile::after,
     .market-tile-flag,
     .performance-chart-shell::before,
+    .projection-chart-shell::before,
     .allocation-chart-shell::before,
     .allocation-chart-shell::after,
     #allocation-table tr[data-ticker] td:first-child .badge,
@@ -11339,3 +11659,315 @@ svg.signal-radar {
     gap: 0.2rem;
 }
 
+/* ── Portfolio Briefing card ─────────────────────────────────────────────────
+   briefing-card / briefing-seg / briefing-quote-chip / briefing-movers
+   ───────────────────────────────────────────────────────────────────────── */
+
+.briefing-card .card-header {
+    border-bottom: 1px solid var(--hairline);
+    padding: 0.6rem 1rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.briefing-card-icon {
+    font-size: 0.95rem;
+    color: var(--color-brand);
+    flex-shrink: 0;
+}
+
+.briefing-card-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+}
+
+/* ── Refresh button ─────────────────────────────── */
+.briefing-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.briefing-refresh-btn:hover {
+    background: var(--surface-strong);
+    color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .briefing-refresh-btn.is-spinning i {
+        animation: briefingSpinIcon 0.6s linear infinite;
+    }
+}
+@keyframes briefingSpinIcon {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Segmented control (Apple pill) ─────────────── */
+.briefing-seg {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 0;
+}
+
+.briefing-seg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.7rem;
+    border: none;
+    border-radius: 16px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.briefing-seg-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+}
+.briefing-seg-btn:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .briefing-seg-btn {
+        transition: color 0.22s var(--ease), background 0.22s var(--spring);
+    }
+}
+
+.briefing-seg-btn--active {
+    background: var(--surface-strong);
+    color: var(--text-primary);
+    border: 1px solid var(--hairline-hover);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .briefing-seg-btn--active {
+        transition: background 0.22s var(--spring),
+                    color 0.22s var(--ease),
+                    box-shadow 0.22s var(--ease),
+                    transform 0.22s var(--spring);
+    }
+}
+
+/* ── Card body ───────────────────────────────────── */
+.briefing-card-body {
+    padding: 0.85rem 1rem;
+    min-height: 5.5rem;
+}
+
+/* ── Skeleton shimmer ────────────────────────────── */
+.briefing-skeleton {
+    padding: 0.15rem 0;
+}
+
+/* ── AI mode layout ──────────────────────────────── */
+.briefing-ai-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.briefing-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.briefing-section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.67rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.briefing-health-text {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.briefing-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.briefing-driver-item,
+.briefing-adj-item {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    padding-left: 0.8rem;
+    position: relative;
+}
+.briefing-driver-item::before,
+.briefing-adj-item::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: var(--color-brand);
+    opacity: 0.7;
+}
+
+/* ── Quote chip ──────────────────────────────────── */
+.briefing-quote-chip {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-brand) 18%, transparent);
+    margin-top: 0.2rem;
+}
+
+.briefing-quote-icon {
+    font-size: 0.7rem;
+    color: var(--color-brand);
+    margin-top: 0.12rem;
+    flex-shrink: 0;
+}
+
+.briefing-quote-text {
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--text-primary);
+    flex: 1;
+    line-height: 1.45;
+}
+
+.briefing-source-note {
+    font-size: 0.62rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    margin-top: 0.1rem;
+    align-self: flex-end;
+}
+
+/* ── Local mode layout ───────────────────────────── */
+.briefing-local-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.briefing-lead-text {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.briefing-movers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.briefing-mover-row {
+    display: grid;
+    grid-template-columns: 3.2rem 3.2rem 3.8rem 1.2rem 1fr;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--hairline-soft);
+    font-size: 0.75rem;
+}
+.briefing-mover-row:last-child {
+    border-bottom: none;
+}
+
+.briefing-mover-ticker {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 0.73rem;
+    letter-spacing: 0.02em;
+}
+
+.briefing-mover-change,
+.briefing-mover-dollar {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+.briefing-mover-icon {
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    text-align: center;
+}
+
+.briefing-mover-explanation {
+    color: var(--text-tertiary);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ── Offline note + error ────────────────────────── */
+.briefing-offline-note {
+    font-size: 0.63rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    padding: 0.15rem 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+}
+
+.briefing-error,
+.briefing-empty {
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+/* ── Reduced-motion gate: strip ALL transitions/animations ── */
+@media (prefers-reduced-motion: reduce) {
+    .briefing-seg-btn,
+    .briefing-seg-btn--active,
+    .briefing-refresh-btn,
+    .briefing-quote-chip {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* ── Light-mode overrides ─────────────────────────── */
+[data-bs-theme="light"] .briefing-seg-btn--active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+[data-bs-theme="light"] .briefing-quote-chip {
+    border-color: color-mix(in srgb, var(--color-brand) 25%, transparent);
+}

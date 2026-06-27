@@ -24,7 +24,7 @@ app = FastAPI(
         "FolioSenseAI helps explain portfolio movement by surfacing "
         "market context and AI-generated insights for holdings."
     ),
-    version="2.4.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 

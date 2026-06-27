@@ -69,7 +69,15 @@ async def get_batch_history(
     )
     result = {}
     for ticker in ticker_list:
-        result[ticker] = get_historical_prices(ticker, period)
+        try:
+            result[ticker] = get_historical_prices(ticker, period)
+        except Exception as exc:
+            logger.warning(
+                "Batch history skipped ticker; ticker=%s exception_type=%s",
+                ticker,
+                type(exc).__name__,
+            )
+            result[ticker] = []
     return {"period": period, "data": result}
 
 

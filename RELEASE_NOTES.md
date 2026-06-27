@@ -1,3 +1,73 @@
+# FolioSenseAI v3 Release Notes
+
+Release date: June 27, 2026
+
+## Headline
+
+FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" release: richer local intelligence, Claude that can disagree on purpose, and a dashboard that finally learned negative space. Exposure overlap, market mood, peer context, earnings risk, three scenarios, and — when Claude is connected — a probability bar for which future is least delusional.
+
+## What's New
+
+- **Look-through portfolio exposure**: sector, country, theme overlap, duplicate detection, and HHI concentration via `/api/ai/portfolio-exposure`.
+- **Market regime context**: SPY/TLT/VIX/UUP backdrop with cached daily component weight shifts.
+- **Peer-relative positioning**: own-range percentile vs peer median on each verdict card.
+- **Earnings event awareness**: names with earnings inside 14 days get capped confidence and a risk note.
+- **Time horizons**: `auto` / `trade` / `core` / `anchor` with a cycle pill on the verdict card and Manage Holdings support.
+- **Confidence ranges**: `range_low` / `range_high` beside the headline score.
+- **Base / Bull / Bear scenarios**: local paths plus Claude probability splits (`likely`, `sc_p`, `sc_w`) when AI is connected.
+- **Claude tension gating**: nudges only when inputs conflict (`agrees`, `tension`, `flip_if`); agreement does not get performative drama.
+- **Verdict calibration snapshots**: logged to SQLite with bucket summaries via `/api/ai/verdict-calibration`.
+- **Deep intelligence on expand**: `/api/ai/intelligence/{ticker}/deep` loads richer holding context async when a row opens.
+- **Navbar overflow menu**: theme, text size, pet mode, and AI-cost controls in one settings sheet.
+- **Semantic color tokens**: `--color-gain/loss/neutral/state/brand` so green always means money up.
+- **Global state hardening**: mode toggles, sync HUD, and verdict rendering no longer step on each other.
+
+## Developer Notes
+
+- Bumped FastAPI metadata version to `3.0.0`.
+- Updated the dashboard intro badge to `v3`.
+- Added services: `portfolio_exposure.py`, `market_regime.py`, `peer_relative.py`, `event_calendar.py`, `verdict_calibration.py`, `verdict_ai_enhancement.py`.
+- Extended `investment_signal.py` with horizon weights, confidence ranges, scenario builders, and modifier hooks.
+- Extended Claude prompts in `ai_service.py` for disagreement and scenario-probability fields.
+- Added `VerdictSnapshot` model and startup migration for `verdict_snapshots`.
+- Extended `hold_class` schema to accept `trade` and `core` alongside `auto` and `anchor`.
+- Extended `/api/ai/investment-signals/all` with `portfolio_exposure`, `regime`, `calibration_summary`, and per-signal context fields.
+- Large `dashboard.js` / `style.css` pass for exposure strips, regime chips, scenario UI, and nav overflow.
+- Bumped static asset cache keys to `v=77`.
+- **247 tests passing**, including new coverage for nav overflow, semantic tokens, scenario normalization, and calibration logging.
+
+## Upgrade Notes
+
+Existing installs pick up a new `verdict_snapshots` table automatically on startup via `ensure_startup_migrations()`. No `.env` change is required.
+
+`force_local=true` still skips Claude; all local intelligence features work offline.
+
+Install v3 from the latest `main` branch:
+
+```bash
+curl -L -o FolioSenseAI-main.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/heads/main.zip
+unzip FolioSenseAI-main.zip
+cd FolioSenseAI-main
+./scripts/setup.sh
+```
+
+Windows PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/heads/main.zip" -OutFile "FolioSenseAI-main.zip"
+Expand-Archive -Path "FolioSenseAI-main.zip" -DestinationPath .
+cd FolioSenseAI-main
+.\scripts\setup.ps1
+```
+
+Prefer a frozen zip? [release-v2.4](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v2.4) still works — you just miss everything above.
+
+## Final Word
+
+v3 still is not financial advice. It is a more honest briefing layer that treats your portfolio like a system with overlap, mood, and timelines — not a bag of tickers wearing a diversification costume.
+
+---
+
 # FolioSenseAI v2.4 Release Notes
 
 Release date: June 25, 2026

@@ -7,6 +7,7 @@ from app.models import Portfolio, Holding, RealizedTrade, PortfolioSnapshot
 from app.schemas import HoldingCreate, HoldingUpdate, PortfolioCreate
 from app.config import settings
 from app.services.stock_service import get_all_quotes, get_stock_data, validate_ticker_symbol
+from app.services.portfolio_projection import get_cached_projection
 
 # All routes in this file are grouped under the /api/portfolio prefix
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -559,3 +560,14 @@ async def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
             for s in snapshots
         ],
     }
+
+
+@router.get("/projection")
+async def get_portfolio_projection(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    """
+    Growth scenarios (avg / best / worst) for 30D–10Y horizons, benchmarked
+    against S&P 500. Uses 3-year historical volatility; cached for 5 minutes.
+    """
+    _get_portfolio_or_404(portfolio_id, db)
+    result, total_value, _daily, _cost = _compute_portfolio(portfolio_id, db)
+    return get_cached_projection(result, total_value)

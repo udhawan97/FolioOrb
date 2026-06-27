@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite"/>
   <img src="https://img.shields.io/badge/Bootstrap-5-7952B3?style=flat-square&logo=bootstrap&logoColor=white" alt="Bootstrap 5"/>
   <img src="https://img.shields.io/badge/Chart.js-FF6384?style=flat-square&logo=chartdotjs&logoColor=white" alt="Chart.js"/>
-  <img src="https://img.shields.io/badge/release-v2.4-brightgreen?style=flat-square" alt="Release v2.4"/>
+  <img src="https://img.shields.io/badge/release-v3-brightgreen?style=flat-square" alt="Release v3"/>
 </p>
 
 <p align="center">
@@ -27,9 +27,9 @@
 
 ---
 
-> **v2.4 is here: FolioSenseAI now lets Claude and Local Intelligence take turns without making it weird.**
+> **v3 is here: FolioSenseAI finally admits your portfolio has overlap, a mood, and a preferred timeline.**
 >
-> FolioSenseAI tracks your holdings, pulls live prices from Yahoo Finance, validates tickers before they enter the portfolio, and lets you choose between Claude-backed quips or deterministic Local Intelligence for verdicts. v2.4 adds a polished mode toggle, snappier quote caching, and a last-sync HUD that keeps its composure when market data has a little moment. Very adult. Still hot.
+> FolioSenseAI still tracks your holdings, pulls live prices from Yahoo Finance, and lets Claude and Local Intelligence argue politely over Add/Hold/Trim. v3 adds look-through exposure, market-regime context, peer comparisons, earnings risk flags, Base/Bull/Bear scenarios with probability bars, and a verdict card that breathes instead of screaming in a grid. The navbar got an overflow menu so the top bar stops looking like an aircraft cockpit. Very composed. Still judging you.
 
 ---
 
@@ -48,13 +48,14 @@
 
 ### 📊 Live Dashboard
 - Real-time prices and daily gain/loss for all holdings
-- Total portfolio value and daily P&L *(color-coded — green good, red bad, you know the drill)*
+- Total portfolio value and daily P&L *(semantic color tokens — green means up, red means down, not "we liked this palette")*
 - Allocation, return, and performance-history views
 - Market open/closed indicator with auto-refresh countdown — so you can watch it drop in real time
+- **Navbar overflow menu** — theme, text size, pet mode, and AI-cost controls tucked into one Apple-style settings sheet
 - **Live feed HUD** with refresh state, force-refresh control, and Claude API heartbeat
 - **Claude offline guidance** with direct setup steps when AI features are paused
 - **Last-sync resilience** that keeps the last good market-data timestamp visible if a refresh fails
-- **Portfolio Butler companion** — a lightweight dashboard pet with witty market reactions and a polished top-bar toggle
+- **Portfolio Butler companion** — a lightweight dashboard pet with witty market reactions; animates on hover so it doesn't fidget while you're trying to read losses
 
 ### 🧠 Portfolio Intelligence *(the whole point)*
 - **Movement explanations** — macro, sector, benchmark, volume, earnings, and company context for each holding
@@ -64,6 +65,16 @@
 - **Local Intelligence labels** that make offline verdicts clear when Claude is not connected
 - **Claude / Local Intelligence toggle** — choose deterministic local quips without disconnecting your API key
 - **Anchor Hold** — mark any position as a long-term anchor; FolioSense never trims it, instead surfaces better add moments when price dips below its own trend; toggleable from the verdict card or Manage Holdings
+- **Time horizons** — cycle Auto → Trade → Core so the same signals weigh differently depending on whether you're flirting or marrying the position
+- **Confidence ranges** — low/high band around the score, because certainty is a lifestyle brand, not a portfolio metric
+- **Base / Bull / Bear scenarios** — three plausible paths with pills, probability bars, and Claude's "most likely" pick when AI is connected
+- **Book exposure strip** — look-through sector, country, and theme overlap, duplicate tickers, and concentration (HHI) so you can't pretend diversification is just owning five tech ETFs
+- **Market backdrop chip** — regime read from SPY/TLT/VIX/UUP with component weight shifts
+- **Vs-peers line** — where the holding sits in its own range versus peer median *(humble brag or humble bruise)*
+- **Earnings event chip** — flags names with earnings inside 14 days and caps overconfidence accordingly
+- **Claude tension flags** — when local math and Claude disagree, the card says so instead of smiling through it
+- **Verdict calibration footnotes** — snapshots logged over time so confidence buckets can eventually be held accountable
+- **Deep read on expand** — richer holding intelligence loads async when you open a row, not while the whole table is already late for something
 - **Market-mood awareness** — live price momentum now tempers marginal calls before the app gets too enthusiastic
 - **Portfolio health quip** — a coarse read on the whole book, including concentration and dominant action mix
 - **ETF holdings fallback** — optional Claude-seeded holdings when market data providers leave an ETF's top holdings blank
@@ -111,23 +122,23 @@ You do not need to be a developer to run FolioSenseAI locally. Think of this lik
 
 The Anthropic API key is optional. Without it, FolioSenseAI still runs with live market data and portfolio tracking; AI explanations stay disabled until you add a key from [console.anthropic.com](https://console.anthropic.com/).
 
-These commands install the GitHub release [v2.4](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v2.4).
+These commands install the latest `main` branch (v3). Prefer a frozen zip? Grab [release-v2.4](https://github.com/udhawan97/FolioSenseAI/releases/tag/release-v2.4) and accept that you're living in the past with excellent sync-state hygiene.
 
 **Mac / Linux**
 
 ```bash
-curl -L -o FolioSenseAI-v2.4.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v2.4.zip
-unzip FolioSenseAI-v2.4.zip
-cd FolioSenseAI-release-v2.4
+curl -L -o FolioSenseAI-main.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/heads/main.zip
+unzip FolioSenseAI-main.zip
+cd FolioSenseAI-main
 ./scripts/setup.sh
 ```
 
 **Windows PowerShell**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v2.4.zip" -OutFile "FolioSenseAI-v2.4.zip"
-Expand-Archive -Path "FolioSenseAI-v2.4.zip" -DestinationPath .
-cd FolioSenseAI-release-v2.4
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/heads/main.zip" -OutFile "FolioSenseAI-main.zip"
+Expand-Archive -Path "FolioSenseAI-main.zip" -DestinationPath .
+cd FolioSenseAI-main
 .\scripts\setup.ps1
 ```
 
@@ -260,6 +271,36 @@ pip install --upgrade certifi
 
 ---
 
+## 🪄 What's New In v3
+
+**FolioSenseAI v3 is the "your portfolio is a system, not a bag of tickers" release: richer local intelligence, Claude that can disagree on purpose, and a dashboard that finally learned negative space.**
+
+- Added **look-through portfolio exposure** — sector, country, theme overlap, duplicate detection, and HHI concentration so "diversified" has to earn the title.
+- Added **market regime context** from SPY/TLT/VIX/UUP with cached daily weight shifts for the backdrop chip.
+- Added **peer-relative positioning** — own-range percentile vs peer median, for when you need to know if you're early, late, or merely emotional.
+- Added **earnings event awareness** — names with earnings inside 14 days get capped confidence and a polite panic note.
+- Added **time horizons** (`auto` / `trade` / `core` / `anchor`) with a cycle pill on the verdict card and Manage Holdings support.
+- Added **confidence ranges** (`range_low` / `range_high`) beside the headline score.
+- Added **Base / Bull / Bear scenarios** with local paths plus Claude probability splits (`likely`, `sc_p`, `sc_w`) when AI is connected.
+- Added **Claude tension gating** — nudges only when inputs conflict (`agrees`, `tension`, `flip_if`); agreement does not get performative drama.
+- Added **verdict calibration snapshots** — logged to SQLite with bucket summaries *(hit-rate reporting matures when forward prices catch up)*.
+- Added API endpoints for **`/api/ai/portfolio-exposure`**, **`/api/ai/verdict-calibration`**, and **`/api/ai/intelligence/{ticker}/deep`**.
+- Extended **`/api/ai/investment-signals/all`** with `portfolio_exposure`, `regime`, `calibration_summary`, and per-signal `regime_context`, `peer_relative`, `events`, `exposure_context`, `calibration_footnote`.
+- Polished the **verdict card layout** — flex spacing, roomier confidence panel, scenario pills that don't feel like compressed fortune cookies.
+- Added a **navbar overflow menu** for theme, text size, pet mode, and inline AI-cost detail — fewer buttons fighting for oxygen.
+- Introduced **semantic color tokens** (`--color-gain/loss/neutral/state/brand`) so green always means money up, not "design liked it."
+- Renamed **Timing signal → Time horizon** in tooltips because words should mean things.
+- Tightened **global state** so mode toggles, sync HUD, and verdict rendering stop stepping on each other's toes.
+- **247 tests passing** — including coverage for nav overflow wiring, semantic tokens, scenario normalization, and calibration logging.
+
+### v3 Release Notes
+
+**For users:** v3 makes verdicts feel less like a single hot take and more like a briefing: exposure overlap, market mood, peer context, earnings risk, three scenarios, and — when Claude is connected — a probability bar for which future is least delusional. The dashboard also got calmer: settings live in the overflow menu, colors mean what they say, and the pet only wiggles when you hover like a normal companion.
+
+**For developers:** v3 bumps the FastAPI app to `3.0.0`, adds `portfolio_exposure.py`, `market_regime.py`, `peer_relative.py`, `event_calendar.py`, and `verdict_calibration.py`; extends `investment_signal.py` with horizon weights, confidence ranges, scenario builders, and modifier hooks; extends Claude prompts in `ai_service.py` for disagreement and scenario-probability fields; adds `VerdictSnapshot` persistence; ships a large `dashboard.js` / `style.css` pass for exposure strips, regime chips, scenario UI, and nav overflow; bumps static asset cache keys to `v=77`. `force_local=true` still skips Claude; all local intelligence features work offline.
+
+---
+
 ## 🪄 What's New In v2.4
 
 **FolioSenseAI v2.4 is the mode-control release: Claude when you want the charm, Local Intelligence when you want deterministic quiet, and fresher-feeling market data without extra drama.**
@@ -357,7 +398,10 @@ Full interactive docs at `/docs` when running locally. Here's the cheat sheet:
 | `GET` | `/api/ai/intelligence/{ticker}` | Coverage and benchmark context for one holding |
 | `GET` | `/api/ai/intelligence/all/batch` | Coverage and benchmark context for all holdings |
 | `GET` | `/api/ai/investment-signal/{ticker}` | FolioSense × Claude verdict for one holding |
-| `GET` | `/api/ai/investment-signals/all` | FolioSense × Claude verdicts for all holdings; add `?force_local=true` for deterministic local quips |
+| `GET` | `/api/ai/investment-signals/all` | FolioSense × Claude verdicts for all holdings; add `?force_local=true` for deterministic local quips; includes exposure, regime, and calibration context in v3 |
+| `GET` | `/api/ai/portfolio-exposure` | Look-through sector/country/theme overlap, duplicates, and concentration (v3) |
+| `GET` | `/api/ai/verdict-calibration` | Verdict snapshot buckets and calibration summary (v3) |
+| `GET` | `/api/ai/intelligence/{ticker}/deep` | Deep holding intelligence loaded on demand (v3) |
 | `GET` | `/api/ai/analyst-recommendation/{ticker}` | Analyst take and ETF quality label for one holding |
 | `GET` | `/api/ai/analyst-recommendations/all` | Analyst takes and ETF quality labels for all holdings |
 | `GET` | `/api/ai/cache/stats` | Cache stats and estimated API cost |
