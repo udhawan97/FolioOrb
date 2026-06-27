@@ -10,7 +10,7 @@
 <p align="center"><em>Your folio, finally making sense.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v3.0-brightgreen?style=flat-square" alt="Release v3.0"/>
+  <img src="https://img.shields.io/badge/release-v3.1-brightgreen?style=flat-square" alt="Release v3.1"/>
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/FastAPI-0.136.3-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/Claude-optional-D4A853?style=flat-square&logo=anthropic&logoColor=white" alt="Claude optional"/>
@@ -27,7 +27,7 @@
 
 ---
 
-> **v3.0** — FolioSenseAI turns a local portfolio into a live analytics cockpit: prices, P&L, exposure overlap, risk, market regime, AI/local verdicts, and scenario thinking. Still not financial advice. Slightly better at side-eye.
+> **v3.1** — FolioSenseAI turns a local portfolio into a live analytics cockpit: prices, P&L, exposure overlap, risk, market regime, AI/local verdicts, and scenario thinking. Now with a shared data cache that stops Yahoo Finance from explaining itself three times per load, an instant-paint holdings table from localStorage, and a background warmup thread so the first real fetch hits warm data. Still not financial advice. Slightly faster at the side-eye.
 
 <p align="center">
   <img src="docs/dashboard.png" alt="FolioSenseAI dashboard" width="860"/>
@@ -61,7 +61,16 @@ FolioSenseAI is a self-hosted FastAPI dashboard for investors who want more than
 
 ---
 
-## 🧠 v3 Highlights
+## 🧠 v3.1 Highlights
+
+**New in v3.1**
+
+- **Instant holdings table** — `localStorage` snapshot of the last good portfolio response paints the table immediately on load; fresh prices replace it in place as they arrive
+- **Shared `.info` cache** — all services (quotes, analyst recs, holding intelligence, earnings calendar, move explainer, ETF price signal) draw from one cached Yahoo Finance scrape per ticker instead of each making their own network call
+- **Background startup warmup** — a daemon thread pre-fetches quotes, price history, and world markets for active holdings so the first real request hits warm caches
+- **Analytics Signals O(1) lookups** — watchlist filter and allocation-weight accumulation use a `Set` and `Map` respectively instead of repeated `Array.find` calls
+
+**From v3.0**
 
 - **Overview / Holdings / Analytics zones** with persistent tab state and cleaner navigation
 - **Portfolio briefing card** powered by Claude or Local Intelligence
@@ -136,9 +145,9 @@ FolioSenseAI runs locally at [`http://localhost:8000`](http://localhost:8000). Y
 <summary>🍎 Mac / Linux</summary>
 
 ```bash
-curl -L -o FolioSenseAI-v3.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v3.zip
-unzip FolioSenseAI-v3.zip
-cd FolioSenseAI-release-v3
+curl -L -o FolioSenseAI-v3.1.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v3.1.zip
+unzip FolioSenseAI-v3.1.zip
+cd FolioSenseAI-release-v3.1
 ./scripts/setup.sh
 ```
 
@@ -148,9 +157,9 @@ cd FolioSenseAI-release-v3
 <summary>🪟 Windows PowerShell</summary>
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v3.zip" -OutFile "FolioSenseAI-v3.zip"
-Expand-Archive -Path "FolioSenseAI-v3.zip" -DestinationPath .
-cd FolioSenseAI-release-v3
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v3.1.zip" -OutFile "FolioSenseAI-v3.1.zip"
+Expand-Archive -Path "FolioSenseAI-v3.1.zip" -DestinationPath .
+cd FolioSenseAI-release-v3.1
 .\scripts\setup.ps1
 ```
 
@@ -209,7 +218,7 @@ git pull --ff-only
 
 </details>
 
-v3 creates the `verdict_snapshots` table automatically on startup. No new `.env` fields are required for v2.x users.
+v3.1 has no database schema changes and no new `.env` fields — drop in your existing `database/` and `.env` and start. The `verdict_snapshots` table from v3.0 carries over as-is.
 
 <details>
 <summary>🤖 Claude API setup (optional)</summary>
