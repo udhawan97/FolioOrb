@@ -2057,6 +2057,63 @@ function updateProjectionSummary(data) {
     setDelta("proj-delta-best", endPort.best);
     setDelta("proj-delta-worst", endPort.worst);
     setDelta("proj-delta-spy", endSpy);
+
+    // Populate "why" captions and tip-trigger popovers
+    const why = data.scenario_why || {};
+    const m   = data.metrics || {};
+    const pm  = m.portfolio || {};
+    const sm  = m.sp500 || {};
+    const mu  = (pm.annual_return_pct ?? 0).toFixed(1);
+    const sig = (pm.annual_vol_pct    ?? 0).toFixed(1);
+    const spR = (sm.annual_return_pct ?? 0).toFixed(1);
+
+    const setWhy = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+
+    setWhy("proj-why-avg",   `${mu}% 3-yr avg return, no vol adjustment`);
+    setWhy("proj-why-best",  `+1\u03c3 upside \u2014 ${mu}% + ${sig}% vol = ${(+mu + +sig).toFixed(1)}% ann.`);
+    setWhy("proj-why-worst", `\u22121\u03c3 downside \u2014 ${mu}% \u2212 ${sig}% vol = ${(+mu - +sig).toFixed(1)}% ann.`);
+    setWhy("proj-why-spy",   `SPY 3-yr avg ${spR}% \u2014 ${+mu >= +spR ? "you lead" : "index leads"} by ${Math.abs(+mu - +spR).toFixed(1)}%`);
+
+    const tipHint = "~68% of outcomes fall within the best\u2013worst range";
+    const cards = [
+        {
+            id:    "proj-stat-avg",
+            title: "Average scenario",
+            body:  why.avg  || `Your portfolio\u2019s 3-year annualised return is ${mu}%. The average path applies this rate with no volatility adjustment \u2014 steady-state compound growth assuming history repeats.`,
+            hint:  tipHint,
+        },
+        {
+            id:    "proj-stat-best",
+            title: "Best case (+1\u03c3)",
+            body:  why.best || `Returns run one standard deviation above average: ${mu}% + ${sig}% vol = ${(+mu + +sig).toFixed(1)}% annualised. This happens roughly 16% of the time.`,
+            hint:  tipHint,
+        },
+        {
+            id:    "proj-stat-worst",
+            title: "Worst case (\u22121\u03c3)",
+            body:  why.worst || `Returns run one standard deviation below average: ${mu}% \u2212 ${sig}% vol = ${(+mu - +sig).toFixed(1)}% annualised. Also ~16% probable \u2014 a rough year, but within normal range.`,
+            hint:  tipHint,
+        },
+        {
+            id:    "proj-stat-spy",
+            title: "S\u0026P 500 benchmark",
+            body:  why.sp500 || `SPY 3-year average return: ${spR}% at ${(sm.annual_vol_pct ?? 0).toFixed(1)}% volatility. ${+mu >= +spR ? "Your portfolio leads" : "The index leads"} by ${Math.abs(+mu - +spR).toFixed(1)}% annually.`,
+            hint:  "Used as the market benchmark across all horizons",
+        },
+    ];
+
+    cards.forEach(({ id, title, body, hint }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.dataset.tipTitle = title;
+        el.dataset.tipBody  = body;
+        el.dataset.tipHint  = hint;
+        el.dataset.tipIcon  = "bi-info-circle";
+        el.classList.add("tip-trigger");
+    });
 }
 
 function _shortProjectionLabel(isoDate, total) {
@@ -2307,21 +2364,23 @@ function holdingBadgeHtml(h) {
 
 function moveBadgeHtml(ticker) {
     const exp = cachedExplanations[ticker];
-    return exp
-        ? `<div class="move-badge ${exp.attribution_type}" title="${exp.confidence} confidence">${ATTRIBUTION_SHORT[exp.attribution_type] || "?"}</div>`
-        : ``;
+    if (!exp) return "";
+    const label = ATTRIBUTION_SHORT[exp.attribution_type] || "?";
+    return `<div class="move-badge ${exp.attribution_type}" title="${exp.confidence} confidence · ${label}">${label}</div>`;
 }
 
 function dayChangeHtml(h) {
     if (!isFiniteNumber(h.day_change_pct)) {
-        return `<span class="day-chg-cell text-secondary" title="Today's change unavailable">—</span>`;
+        return `<div class="today-cell-wrap"><span class="day-chg-cell text-secondary" title="Today's change unavailable">—</span></div>`;
     }
     const up = h.day_change_pct >= 0;
     return `
-        <div class="day-chg-cell ${colorClass(h.day_change_pct)}">
-            <i class="bi ${up ? "bi-caret-up-fill" : "bi-caret-down-fill"}"></i>${formatPct(h.day_change_pct)}
+        <div class="today-cell-wrap">
+            <div class="day-chg-cell ${colorClass(h.day_change_pct)}">
+                <i class="bi ${up ? "bi-caret-up-fill" : "bi-caret-down-fill"}"></i>${formatPct(h.day_change_pct)}
+            </div>
+            ${moveBadgeHtml(h.ticker)}
         </div>
-        ${moveBadgeHtml(h.ticker)}
     `;
 }
 
@@ -2330,14 +2389,14 @@ function createHoldingRow(h) {
     row.dataset.ticker = h.ticker;
     row.innerHTML = `
         <td class="fw-bold holding-ticker-cell" data-field="ticker"></td>
-        <td class="d-none d-md-table-cell text-secondary small holding-name-cell" data-field="name"></td>
+        <td class="d-none d-md-table-cell holding-name-cell" data-field="name"></td>
         <td class="text-end" data-field="price"></td>
         <td class="text-end" data-field="day"></td>
         <td class="text-end d-none d-md-table-cell" data-field="value"></td>
         <td class="text-end" data-field="allocation"></td>
         <td class="text-end d-none d-sm-table-cell" data-field="target" id="target-cell-${h.ticker}"></td>
-        <td class="text-center d-none d-lg-table-cell" data-field="rec" id="rec-cell-${h.ticker}"></td>
-        <td class="text-center d-none d-lg-table-cell trend-cell" data-field="trend"></td>
+        <td class="text-center d-none d-xl-table-cell" data-field="rec" id="rec-cell-${h.ticker}"></td>
+        <td class="text-center d-none d-xxl-table-cell trend-cell" data-field="trend"></td>
     `;
     row.addEventListener("click", event => {
         if (event.target.closest(".tip-trigger")) return;
@@ -6185,11 +6244,21 @@ function _briefingRenderAi(data) {
     if (!content) return;
 
     const esc = s => escapeHtml(String(s || ""));
+
     const driverItems = (data.drivers || [])
-        .map(d => `<li class="briefing-driver-item">${esc(d)}</li>`)
+        .map(d => `
+            <li class="briefing-bullet-item">
+                <i class="bi bi-caret-right-fill briefing-bullet-icon briefing-bullet-icon--driver" aria-hidden="true"></i>
+                <span>${esc(d)}</span>
+            </li>`)
         .join("");
+
     const adjItems = (data.adjustments || [])
-        .map(a => `<li class="briefing-adj-item">${esc(a)}</li>`)
+        .map(a => `
+            <li class="briefing-bullet-item">
+                <i class="bi bi-lightbulb-fill briefing-bullet-icon briefing-bullet-icon--obs" aria-hidden="true"></i>
+                <span>${esc(a)}</span>
+            </li>`)
         .join("");
 
     const sourceNote = data.source === "local-fallback"
@@ -6199,22 +6268,25 @@ function _briefingRenderAi(data) {
     content.innerHTML = `
         <div class="briefing-ai-wrap">
             <div class="briefing-section">
-                <div class="briefing-section-label">
-                    <i class="bi bi-activity" aria-hidden="true"></i> Health
+                <div class="briefing-section-badge briefing-section-badge--health">
+                    <i class="bi bi-activity" aria-hidden="true"></i>
+                    Health
                 </div>
                 <p class="briefing-health-text">${esc(data.health)}</p>
             </div>
             <div class="briefing-section">
-                <div class="briefing-section-label">
-                    <i class="bi bi-arrow-left-right" aria-hidden="true"></i> What moved
+                <div class="briefing-section-badge briefing-section-badge--movers">
+                    <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                    What moved
                 </div>
-                <ul class="briefing-list">${driverItems}</ul>
+                <ul class="briefing-bullet-list">${driverItems}</ul>
             </div>
             <div class="briefing-section">
-                <div class="briefing-section-label">
-                    <i class="bi bi-sliders2" aria-hidden="true"></i> Observations
+                <div class="briefing-section-badge briefing-section-badge--obs">
+                    <i class="bi bi-lightbulb" aria-hidden="true"></i>
+                    Observations
                 </div>
-                <ul class="briefing-list">${adjItems}</ul>
+                <ul class="briefing-bullet-list">${adjItems}</ul>
             </div>
             <div class="briefing-quote-chip">
                 <i class="bi bi-chat-quote-fill briefing-quote-icon" aria-hidden="true"></i>
@@ -6230,24 +6302,30 @@ function _briefingRenderLocal(data) {
 
     const esc = s => escapeHtml(String(s || ""));
     const movers = (data.movers || []).map(m => {
-        const sign = m.day_change_pct >= 0 ? "gain" : "loss";
-        const pct  = (m.day_change_pct >= 0 ? "+" : "") + Number(m.day_change_pct).toFixed(2) + "%";
-        const dollar = (m.day_change_dollar >= 0 ? "+$" : "-$") +
+        const isGain = m.day_change_pct >= 0;
+        const sign   = isGain ? "gain" : "loss";
+        const pct    = (isGain ? "+" : "") + Number(m.day_change_pct).toFixed(2) + "%";
+        const dollar = (m.day_change_dollar >= 0 ? "+$" : "–$") +
             Math.abs(m.day_change_dollar).toFixed(2);
+        const icon   = esc(m.icon || "bi-question-circle");
         return `
-            <div class="briefing-mover-row">
-                <span class="briefing-mover-ticker">${esc(m.ticker)}</span>
-                <span class="briefing-mover-change text-${sign}">${esc(pct)}</span>
-                <span class="briefing-mover-dollar text-${sign}">${esc(dollar)}</span>
-                <i class="bi ${esc(m.icon || "bi-question-circle")} briefing-mover-icon" aria-hidden="true"></i>
-                <span class="briefing-mover-explanation">${esc(m.explanation)}</span>
-            </div>`;
+            <li class="briefing-mover-item">
+                <div class="briefing-mover-header">
+                    <span class="briefing-mover-bullet">
+                        <i class="bi ${icon} briefing-mover-icon text-${sign}" aria-hidden="true"></i>
+                    </span>
+                    <span class="briefing-mover-ticker">${esc(m.ticker)}</span>
+                    <span class="briefing-mover-change text-${sign}">${esc(pct)}</span>
+                    <span class="briefing-mover-dollar text-${sign}">${esc(dollar)}</span>
+                </div>
+                ${m.explanation ? `<p class="briefing-mover-desc">${esc(m.explanation)}</p>` : ""}
+            </li>`;
     }).join("");
 
     content.innerHTML = `
         <div class="briefing-local-wrap">
             <p class="briefing-lead-text">${esc(data.lead)}</p>
-            <div class="briefing-movers">${movers || "<span class='briefing-empty'>No holdings data.</span>"}</div>
+            <ul class="briefing-movers">${movers || "<li class='briefing-empty'>No holdings data.</li>"}</ul>
         </div>`;
 }
 

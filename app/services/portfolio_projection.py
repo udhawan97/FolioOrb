@@ -128,6 +128,40 @@ def _growth_path(
     ]
 
 
+def _build_scenario_why(
+    mu: float, sigma: float, sp_mu: float, sp_sigma: float
+) -> dict[str, str]:
+    port_ret = mu * 100
+    port_vol = sigma * 100
+    sp_ret = sp_mu * 100
+
+    best_rate = (mu + sigma) * 100
+    worst_rate = (mu - sigma) * 100
+    diff = abs(port_ret - sp_ret)
+    leader = "Portfolio leads" if mu >= sp_mu else "Index leads"
+
+    return {
+        "avg": (
+            f"Based on your 3-year annualised return of {port_ret:.1f}%. "
+            f"No volatility adjustment — pure historical mean compounded forward."
+        ),
+        "best": (
+            f"Applies +1 standard deviation to your return: "
+            f"{port_ret:.1f}% + {port_vol:.1f}% vol = {best_rate:.1f}% annualised. "
+            f"Occurs roughly 16% of the time."
+        ),
+        "worst": (
+            f"Applies \u22121 standard deviation: "
+            f"{port_ret:.1f}% \u2212 {port_vol:.1f}% vol = {worst_rate:.1f}% annualised. "
+            f"Also ~16% probable \u2014 rough, but within normal range."
+        ),
+        "sp500": (
+            f"SPY 3-year average: {sp_ret:.1f}% at {sp_sigma * 100:.1f}% volatility. "
+            f"{leader} by {diff:.1f}% annually."
+        ),
+    }
+
+
 def _end_summary(paths: dict[str, list[dict[str, Any]]]) -> dict[str, float]:
     return {key: (pts[-1]["value"] if pts else 0.0) for key, pts in paths.items()}
 
@@ -215,6 +249,7 @@ def compute_portfolio_projection(
                 "annual_vol_pct": round(spy_sigma * 100, 2),
             },
         },
+        "scenario_why": _build_scenario_why(port_mu, port_sigma, spy_mu, spy_sigma),
         "horizons": horizons_out,
         "disclaimer": (
             "Projections use 3-year historical returns and volatility. "

@@ -638,25 +638,29 @@
                             </button>
                         </div>
                         <div class="projection-summary-row" id="projection-summary-row">
-                            <div class="projection-stat">
+                            <div class="projection-stat" id="proj-stat-avg" tabindex="0" role="button" aria-label="Average scenario explanation">
                                 <span class="projection-stat-label">Average</span>
                                 <span class="projection-stat-value" id="proj-end-avg">—</span>
                                 <span class="projection-stat-delta" id="proj-delta-avg"></span>
+                                <span class="projection-stat-why" id="proj-why-avg"></span>
                             </div>
-                            <div class="projection-stat">
+                            <div class="projection-stat" id="proj-stat-best" tabindex="0" role="button" aria-label="Best case scenario explanation">
                                 <span class="projection-stat-label">Best case</span>
                                 <span class="projection-stat-value projection-stat-value--best" id="proj-end-best">—</span>
                                 <span class="projection-stat-delta" id="proj-delta-best"></span>
+                                <span class="projection-stat-why" id="proj-why-best"></span>
                             </div>
-                            <div class="projection-stat">
+                            <div class="projection-stat" id="proj-stat-worst" tabindex="0" role="button" aria-label="Worst case scenario explanation">
                                 <span class="projection-stat-label">Worst case</span>
                                 <span class="projection-stat-value projection-stat-value--worst" id="proj-end-worst">—</span>
                                 <span class="projection-stat-delta" id="proj-delta-worst"></span>
+                                <span class="projection-stat-why" id="proj-why-worst"></span>
                             </div>
-                            <div class="projection-stat projection-stat--bench">
+                            <div class="projection-stat projection-stat--bench" id="proj-stat-spy" tabindex="0" role="button" aria-label="S&amp;P 500 benchmark explanation">
                                 <span class="projection-stat-label">S&amp;P 500 avg</span>
                                 <span class="projection-stat-value projection-stat-value--bench" id="proj-end-spy">—</span>
                                 <span class="projection-stat-delta" id="proj-delta-spy"></span>
+                                <span class="projection-stat-why" id="proj-why-spy"></span>
                             </div>
                         </div>
                         <div class="projection-legend" id="projection-legend" aria-hidden="true">
@@ -860,7 +864,7 @@
                                         </button>
                                     </span>
                                 </th>
-                                <th class="text-center d-none d-lg-table-cell">
+                                <th class="text-center d-none d-xl-table-cell">
                                     <span class="holdings-th-label justify-content-center">
                                         Rating
                                         <button class="tip-trigger target-tip-trigger" type="button"
@@ -872,7 +876,7 @@
                                         </button>
                                     </span>
                                 </th>
-                                <th class="text-center d-none d-lg-table-cell">
+                                <th class="text-center d-none d-xxl-table-cell">
                                     <span class="holdings-th-label justify-content-center">
                                         7-Day Trend
                                         <button class="tip-trigger target-tip-trigger" type="button"
@@ -903,7 +907,7 @@
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=77"></script>
+    <script defer src="/static/js/dashboard.js?v=78"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>

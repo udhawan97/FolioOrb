@@ -1490,7 +1490,7 @@ def _briefing_local(db: Session) -> dict:
                 _benchmark_cache=benchmark_cache,
             )
             icon = summary.drivers[0].icon if summary.drivers else "bi-question-circle"
-            explanation = (summary.explanation_text or "")[:140]
+            explanation = (summary.explanation_text or "")[:240]
         except Exception as exc:
             logger.debug("Briefing explain_move failed; exception_type=%s", type(exc).__name__)
             icon = "bi-question-circle"
