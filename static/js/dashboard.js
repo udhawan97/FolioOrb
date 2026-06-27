@@ -767,7 +767,7 @@ async function loadPortfolioValue() {
 
             renderHoldings();
             latestTrendData = await trendPromise;
-            repaintAllTrendSparklines();
+            renderHoldings();
             repaintOpenVerdictSparklines();
         } catch (renderErr) {
             console.warn("Portfolio render error (data is current):", renderErr);
@@ -1850,10 +1850,20 @@ async function loadTrendData(tickers) {
 function repaintAllTrendSparklines() {
     document.querySelectorAll("#holdings-table tr[data-ticker]").forEach(row => {
         const ticker = row.dataset.ticker;
-        const canvas = row.querySelector("canvas.trend-sparkline");
-        if (!canvas) return;
+        const history = latestTrendData[ticker] || [];
+        const trendCell = row.querySelector(".trend-cell");
+        if (!trendCell) return;
+
+        const canvas = trendCell.querySelector("canvas.trend-sparkline");
+        if (!canvas) {
+            if (history.length < 2) return;
+            const holding = latestHoldings.find(h => h.ticker === ticker);
+            if (holding) updateHoldingRow(row, holding, 0, latestTrendData);
+            return;
+        }
+
         delete canvas.dataset.trendSig;
-        drawTrend(canvas, latestTrendData[ticker] || []);
+        drawTrend(canvas, history);
     });
 }
 
