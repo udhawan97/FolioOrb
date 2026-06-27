@@ -757,8 +757,11 @@ async function loadPortfolioValue() {
                 el.innerHTML = `${largest.ticker} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
             }
 
-            renderHoldings();
-            latestTrendData = await trendPromise;
+            // Render the holdings table once, after trend (sparkline) data resolves.
+            // The loading shimmer / prior content stays visible until then, so we
+            // avoid a double render (and the partial-table flash) on every load.
+            // `.catch` guarantees a render even if trend data fails to load.
+            latestTrendData = await trendPromise.catch(() => ({}));
             renderHoldings();
             repaintOpenVerdictSparklines();
         } catch (renderErr) {
@@ -1139,6 +1142,8 @@ function renderAllocation() {
             },
             plugins: [segmentGlowPlugin, centerHaloPlugin, centerTotalPlugin],
         });
+        // If we booted into a non-Overview zone, keep the halo paused until shown.
+        if (dashboardZone !== "overview") allocationChart.$haloPause?.();
     }
 }
 
@@ -1159,19 +1164,62 @@ const centerHaloPlugin = {
     afterInit(chart) {
         if (chart.config.type !== "doughnut") return;
         chart.$centerHaloStart = performance.now();
-        if (prefersReducedMotion()) return;
+        chart.$haloFrameCount = 0;
+        chart.$haloInView = true;     // toggled by IntersectionObserver (offscreen)
+        chart.$haloZoneActive = true; // toggled by the dashboard zone switcher
 
+        // Self-suspending rAF loop. When any pause condition is hit the loop drops
+        // its frame handle and returns; it is restarted by the events below. This
+        // means a hidden / offscreen / inactive-tab chart schedules zero frames.
         const tick = () => {
             if (!chart.$centerHaloFrame) return;
-            if (document.visibilityState !== "hidden") chart.draw();
+            if (document.visibilityState === "hidden" ||
+                !chart.$haloInView ||
+                !chart.$haloZoneActive) {
+                chart.$centerHaloFrame = null; // suspend; resume() re-arms
+                return;
+            }
+            chart.$haloFrameCount++;
+            // Cap at ~30fps by drawing on every other animation frame.
+            if (chart.$haloFrameCount % 2 === 0) chart.draw();
             chart.$centerHaloFrame = requestAnimationFrame(tick);
         };
 
-        chart.$centerHaloFrame = requestAnimationFrame(tick);
+        const resume = () => {
+            if (chart.$centerHaloFrame || prefersReducedMotion()) return;
+            if (document.visibilityState === "hidden" ||
+                !chart.$haloInView || !chart.$haloZoneActive) return;
+            chart.$centerHaloFrame = requestAnimationFrame(tick);
+        };
+
+        // Public hooks for the zone switcher to pause/resume an inactive-tab chart.
+        chart.$haloResume = () => { chart.$haloZoneActive = true; resume(); };
+        chart.$haloPause  = () => { chart.$haloZoneActive = false; };
+
+        // Pause when the document is hidden, resume when it returns to the front.
+        chart.$haloVisHandler = resume;
+        document.addEventListener("visibilitychange", chart.$haloVisHandler);
+
+        // Pause when the chart card scrolls out of the viewport.
+        if (typeof IntersectionObserver !== "undefined") {
+            chart.$haloObserver = new IntersectionObserver((entries) => {
+                chart.$haloInView = entries[0]?.isIntersecting ?? true;
+                if (chart.$haloInView) resume();
+            }, { threshold: 0 });
+            const target = chart.canvas?.closest(".card") || chart.canvas?.parentElement;
+            if (target) chart.$haloObserver.observe(target);
+        }
+
+        resume();
     },
     afterDestroy(chart) {
         if (chart.$centerHaloFrame) cancelAnimationFrame(chart.$centerHaloFrame);
         chart.$centerHaloFrame = null;
+        if (chart.$haloObserver) { chart.$haloObserver.disconnect(); chart.$haloObserver = null; }
+        if (chart.$haloVisHandler) {
+            document.removeEventListener("visibilitychange", chart.$haloVisHandler);
+            chart.$haloVisHandler = null;
+        }
     },
     afterDraw(chart) {
         if (chart.config.type !== "doughnut") return;
@@ -1472,6 +1520,76 @@ function syncHvtIndicator() {
     const pad = 3; // track padding-left
     indicator.style.width = activeBtn.offsetWidth + "px";
     indicator.style.transform = `translateX(${activeBtn.offsetLeft - pad}px)`;
+}
+
+// ── Dashboard zones (Overview / Holdings / Analytics) ──────────────────────
+const DASHBOARD_ZONES = ["overview", "holdings", "analytics"];
+const DASHBOARD_ZONE_KEY = "foliosense-dashboard-zone";
+let dashboardZone = "overview";
+
+function syncDztIndicator() {
+    const track = document.getElementById("dashboard-zone-tabs");
+    if (!track) return;
+    const indicator = track.querySelector(".dzt-indicator");
+    const activeBtn = track.querySelector(".dzt-tab--active");
+    if (!indicator || !activeBtn) return;
+    const pad = 4; // track padding
+    indicator.style.width = activeBtn.offsetWidth + "px";
+    indicator.style.transform = `translateX(${activeBtn.offsetLeft - pad}px)`;
+}
+
+function setDashboardZone(zone, opts = {}) {
+    const { persist = true } = opts;
+    if (!DASHBOARD_ZONES.includes(zone)) zone = "overview";
+    dashboardZone = zone;
+
+    document.querySelectorAll(".dzt-tab").forEach(btn => {
+        const active = btn.dataset.zone === zone;
+        btn.classList.toggle("dzt-tab--active", active);
+        btn.setAttribute("aria-selected", String(active));
+    });
+    const track = document.getElementById("dashboard-zone-tabs");
+    if (track) track.dataset.activeZone = zone;
+
+    document.querySelectorAll(".dashboard-zone-pane").forEach(pane => {
+        pane.classList.toggle("dashboard-zone-pane--active", pane.dataset.zonePane === zone);
+    });
+
+    syncDztIndicator();
+
+    if (persist) {
+        try { localStorage.setItem(DASHBOARD_ZONE_KEY, zone); } catch (_) {}
+    }
+
+    // Doughnut halo only runs while Overview is visible. Resize the relevant
+    // chart once its pane is back in flow (canvases were kept sized, not hidden
+    // with display:none, so this is a cheap correctness pass — not a rebuild).
+    if (zone === "overview") {
+        allocationChart?.$haloResume?.();
+        requestAnimationFrame(() => {
+            if (allocationChart) { allocationChart.resize(); allocationChart.update("none"); }
+        });
+    } else {
+        allocationChart?.$haloPause?.();
+    }
+    if (zone === "analytics") {
+        requestAnimationFrame(() => {
+            if (pnlChart) { pnlChart.resize(); pnlChart.update("none"); }
+        });
+    }
+}
+
+function initDashboardZones() {
+    const track = document.getElementById("dashboard-zone-tabs");
+    if (!track) return;
+    let initial = "overview";
+    try {
+        const stored = localStorage.getItem(DASHBOARD_ZONE_KEY);
+        if (DASHBOARD_ZONES.includes(stored)) initial = stored;
+    } catch (_) {}
+    setDashboardZone(initial, { persist: false });
+    requestAnimationFrame(syncDztIndicator);
+    window.addEventListener("resize", syncDztIndicator, { passive: true });
 }
 
 function popHvtCount(el, value) {
@@ -2047,7 +2165,8 @@ function updateHoldingsTable(holdings, trendData = {}) {
             : null;
         if (row === cursor) {
             cursor = row.nextSibling;
-            if (cursor?.classList.contains("summary-expand-row")) cursor = cursor.nextSibling;
+            // cursor may be a text node (no classList) — optional-chain through it.
+            if (cursor?.classList?.contains("summary-expand-row")) cursor = cursor.nextSibling;
             return;
         }
 
@@ -5116,14 +5235,26 @@ function initDashboardPet() {
     try { savedVisible = localStorage.getItem(DASHBOARD_PET_KEY) !== "0"; } catch (_) {}
     setVisible(savedVisible, false);
 
+    const isMobilePet = () =>
+        window.matchMedia?.("(max-width: 575.98px)").matches ?? false;
+
     toggle.addEventListener("click", () => {
         if (pet.classList.contains("is-hidden")) {
             setVisible(true);
             return;
         }
+        // On mobile the orb is a corner dot: tapping it expands/collapses the
+        // bubble rather than hiding the whole pet (use the menu toggle to hide).
+        if (isMobilePet()) {
+            pet.classList.toggle("is-expanded");
+            return;
+        }
         setVisible(false);
     });
-    navToggle.addEventListener("click", () => setVisible(!isVisible()));
+    navToggle.addEventListener("click", () => {
+        pet.classList.remove("is-expanded");
+        setVisible(!isVisible());
+    });
     bubble.addEventListener("click", () => {
         showQuote(null, { withEmoticon: true });
         schedulePetQuote();
@@ -5277,6 +5408,53 @@ function initBrandCostCallout() {
     setInterval(loadAiCostStats, 60_000);
 }
 
+function initNavOverflow() {
+    const trigger = document.getElementById("nav-overflow-trigger");
+    const menu = document.getElementById("nav-overflow-menu");
+    if (!trigger || !menu) return;
+
+    const closeCostDetail = () => {
+        const callout = document.getElementById("brand-cost-callout");
+        const costTrigger = document.getElementById("brand-cost-trigger");
+        callout?.classList.remove("is-visible");
+        callout?.setAttribute("aria-hidden", "true");
+        costTrigger?.setAttribute("aria-expanded", "false");
+    };
+
+    const open = () => {
+        menu.classList.add("is-visible");
+        menu.setAttribute("aria-hidden", "false");
+        trigger.setAttribute("aria-expanded", "true");
+    };
+    const close = () => {
+        if (!menu.classList.contains("is-visible")) return;
+        menu.classList.remove("is-visible");
+        menu.setAttribute("aria-hidden", "true");
+        trigger.setAttribute("aria-expanded", "false");
+        closeCostDetail();
+    };
+
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.classList.contains("is-visible") ? close() : open();
+    });
+
+    // Clicks on the menu's own controls (toggles, AI cost) keep it open.
+    menu.addEventListener("click", (e) => e.stopPropagation());
+
+    // The shortcuts row navigates to the overlay — close the menu when it fires.
+    menu.querySelector('[onclick*="showKeyboardHelp"]')
+        ?.addEventListener("click", close);
+
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && menu.classList.contains("is-visible")) {
+            close();
+            trigger.focus();
+        }
+    });
+}
+
 function initBrandIntro() {
     const trigger = document.getElementById("brand-intro-trigger");
     const callout = document.getElementById("brand-intro-callout");
@@ -5420,11 +5598,12 @@ async function updateMarketStatus() {
         const el = document.getElementById("market-status");
         if (el) {
             el.textContent = data.status;
-            el.className = data.is_open ? "stat-value text-success" : "stat-value text-secondary";
+            // Market-open is a *state*, not a gain — use cyan/state, not green.
+            el.className = "hero-pill-text " + (data.is_open ? "text-state" : "text-secondary");
         }
         const icon = document.getElementById("market-icon");
         if (icon) {
-            icon.style.color = data.is_open ? "var(--accent-green)" : "";
+            icon.style.color = data.is_open ? "var(--color-state)" : "";
             icon.classList.toggle("market-open", !!data.is_open);
         }
     } catch(e) {}
@@ -5667,7 +5846,11 @@ document.addEventListener("keydown", (e) => {
         openPortfolioManager();
         return;
     }
-    if (e.key === "i" || e.key === "I") { loadHoldingIntelligence(); return; }
+    if (e.key === "i" || e.key === "I") {
+        setDashboardZone("holdings");
+        loadHoldingIntelligence();
+        return;
+    }
 });
 
 async function initDashboard() {
@@ -5675,9 +5858,11 @@ async function initDashboard() {
     initTextSizeToggle();
     initBrandIntro();
     initBrandCostCallout();
+    initNavOverflow();
     initDashboardPet();
     initPerformanceTabs();
     initPortfolioManager();
+    initDashboardZones();
     // Sync the sliding indicator once layout is settled
     requestAnimationFrame(syncHvtIndicator);
     window.addEventListener("resize", syncHvtIndicator, { passive: true });
@@ -6652,7 +6837,10 @@ function flashValue(el) {
 // Scroll to and briefly highlight a holding row
 function highlightHolding(ticker) {
     if (!ticker || ticker === "--") return;
-    const row = document.querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
+    // Scope to the holdings table — the allocation breakdown table also carries
+    // data-ticker rows and sits earlier in the DOM (in a different zone).
+    const tableBody = document.getElementById("holdings-table");
+    const row = (tableBody || document).querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
     if (!row) return;
     row.scrollIntoView({ behavior: "smooth", block: "center" });
     const tds = Array.from(row.querySelectorAll("td"));
@@ -6671,7 +6859,11 @@ function highlightHolding(ticker) {
 // Called by stat cards — reads ticker from the element's data attribute
 function highlightHoldingFromCard(elId) {
     const ticker = document.getElementById(elId)?.dataset?.ticker;
-    if (ticker) highlightHolding(ticker);
+    if (!ticker) return;
+    // The summary cards live in Overview; the holdings table is in its own zone.
+    // Switch there first, then highlight once the pane is laid out.
+    setDashboardZone("holdings");
+    requestAnimationFrame(() => highlightHolding(ticker));
 }
 
 // Open portfolio manager from the Holdings count card click

@@ -26,6 +26,14 @@ html[data-text-size="comfortable"] {
     /* Brand palette — derived from folio-orbit-icon.svg */
     --brand-cyan:       #6fd6f0;
     --brand-periwinkle: #97acec;
+    /* Semantic roles — use these for meaning, not raw accents.
+       gain/loss = money up/down, neutral = plain numbers,
+       state = live/open/AI-active, brand = chrome only. */
+    --color-gain:    var(--accent-green);
+    --color-loss:    var(--accent-red);
+    --color-neutral: var(--text-secondary);
+    --color-state:   var(--accent-cyan);
+    --color-brand:   var(--brand-periwinkle);
     --font-display: -apple-system, "SF Pro Display", BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-text: -apple-system, "SF Pro Text", BlinkMacSystemFont, "Segoe UI", sans-serif;
 
@@ -429,6 +437,170 @@ body > .navbar {
     border-color: rgba(224, 82, 82, 0.38);
 }
 
+/* ── Navbar overflow menu — Apple-style settings sheet ───────────────────── */
+.nav-overflow { position: relative; display: inline-flex; }
+.nav-overflow-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.nav-overflow-trigger:hover,
+.nav-overflow-trigger[aria-expanded="true"] {
+    background: var(--surface-strong);
+    color: var(--text-primary);
+    border-color: var(--hairline-hover);
+}
+
+.nav-overflow-menu {
+    position: absolute;
+    top: calc(100% + 0.55rem);
+    right: 0;
+    width: min(290px, calc(100vw - 1.5rem));
+    padding: 0.4rem;
+    border-radius: 16px;
+    border: 1px solid var(--hairline);
+    background: rgba(22, 22, 30, 0.92);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 24px 60px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    transform-origin: top right;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s var(--ease);
+    z-index: 1060;
+}
+.nav-overflow-menu.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.nav-menu-section {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 0.5rem 0.6rem 0.22rem;
+}
+.nav-menu-divider {
+    height: 1px;
+    background: var(--hairline-soft);
+    margin: 0.3rem 0.5rem;
+}
+.nav-menu-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border-radius: 10px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    color: var(--text-primary);
+    font-size: 0.84rem;
+    font-weight: 500;
+    transition: background 0.14s ease;
+}
+.nav-menu-row--btn { cursor: pointer; }
+.nav-menu-row--btn:hover { background: var(--control-hover, rgba(255, 255, 255, 0.07)); }
+.nav-menu-icon {
+    font-size: 0.95rem;
+    color: var(--text-tertiary);
+    width: 1.1rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+.nav-menu-label { flex: 1; min-width: 0; }
+.nav-menu-value {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.nav-menu-key {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: var(--surface-strong, rgba(255, 255, 255, 0.08));
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    min-width: 1.35rem;
+    text-align: center;
+    padding: 0.05rem 0.32rem;
+}
+/* The moved toggle switches keep their own styling; just push them to the right */
+.nav-menu-row .theme-toggle,
+.nav-menu-row .text-size-toggle,
+.nav-menu-row .pet-mode-toggle,
+.nav-menu-row .pet-nav-toggle { margin-left: auto; flex-shrink: 0; }
+
+/* Reset the AI-cost trigger from a pill back into a flush menu row */
+.nav-menu-row.brand-cost-trigger {
+    padding: 0.5rem 0.6rem;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    font-size: 0.84rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--text-primary);
+    white-space: normal;
+}
+.nav-menu-row.brand-cost-trigger:hover,
+.nav-menu-row.brand-cost-trigger[aria-expanded="true"] {
+    background: var(--control-hover, rgba(255, 255, 255, 0.07));
+    color: var(--text-primary);
+    border: none;
+}
+.nav-menu-row.brand-cost-trigger .brand-cost-notif { position: static; margin-left: 0.15rem; }
+
+/* AI-cost detail — expands inline within the menu instead of anchoring to brand */
+.nav-overflow-menu .brand-cost-callout {
+    position: static;
+    width: auto;
+    margin: 0 0.2rem 0.2rem;
+    transform: none;
+    box-shadow: none;
+    border-color: var(--hairline-soft);
+    background: var(--surface);
+    max-height: 0;
+    padding: 0 0.7rem;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: max-height 0.2s var(--ease), opacity 0.18s ease, padding 0.2s var(--ease);
+}
+.nav-overflow-menu .brand-cost-callout.is-visible {
+    max-height: 220px;
+    padding: 0.6rem 0.7rem;
+    opacity: 1;
+    pointer-events: auto;
+}
+.nav-overflow-menu .brand-cost-callout::before { display: none; }
+
+[data-bs-theme="light"] .nav-overflow-menu {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(15, 23, 42, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08), 0 24px 60px rgba(0, 0, 0, 0.16);
+}
+[data-bs-theme="light"] .nav-overflow-trigger { background: rgba(15, 23, 42, 0.03); }
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-overflow-menu,
+    .nav-overflow-menu .brand-cost-callout { transition: opacity 0.12s ease; transform: none; }
+}
+
 .brand-cost-notif {
     position: absolute;
     top: -4px;
@@ -583,6 +755,11 @@ body > .navbar {
 .brand-character {
     position: relative;
     overflow: visible;
+}
+
+/* Brand "listening" motion is interaction-only — no idle loop while reading data. */
+.brand-lockup:hover .brand-character,
+.brand-lockup:focus-visible .brand-character {
     animation: brandListen 4.8s ease-in-out infinite;
 }
 
@@ -599,6 +776,10 @@ body > .navbar {
     border: 1px solid rgba(111, 214, 240, 0.18);
     opacity: 0;
     transform: scale(0.92);
+}
+
+.brand-lockup:hover .brand-character::before,
+.brand-lockup:focus-visible .brand-character::before {
     animation: brandSignal 4.8s ease-in-out infinite;
 }
 
@@ -1069,6 +1250,12 @@ body > .navbar {
 .card-header .d-flex > .bi:first-child,
 .performance-card-icon {
     filter: drop-shadow(0 0 5px rgba(111, 214, 240, 0.22));
+}
+
+/* Header glyph signal is hover-only — idle cards stay calm. */
+.card:hover .card-header > .bi:first-child,
+.card:hover .card-header .d-flex > .bi:first-child,
+.card:hover .performance-card-icon {
     animation: headerGlyphSignal 5.4s ease-in-out infinite;
 }
 
@@ -1612,6 +1799,18 @@ table tbody tr:hover {
     0%   { opacity: 0;    transform: scale(0.78); border-color: rgba(0, 102, 204, 0); }
     12%  { opacity: 0.45; border-color: rgba(0, 102, 204, 0.45); }
     100% { opacity: 0;    transform: scale(1.65); border-color: rgba(0, 102, 204, 0); }
+}
+
+/* AI-state-only: the scan rings + icon breathe run only while the scan is
+   active. While idle the panel is invisible, so these stay paused (zero CPU)
+   rather than animating behind an opacity:0 layer. */
+.ai-scan-ring,
+.ai-scan-orbit img {
+    animation-play-state: paused;
+}
+#holdings-card.is-ai-checking .ai-scan-ring,
+#holdings-card.is-ai-checking .ai-scan-orbit img {
+    animation-play-state: running;
 }
 
 /* ── Copy block ──────────────────────────────────────────────────────────── */
@@ -2213,10 +2412,12 @@ table tbody tr:hover {
     box-shadow: 0 0 0 3px var(--subtle-ring);
 }
 
-/* ── Status colors — Apple system palette ────────────────────────────────── */
-.text-success { color: var(--accent-green) !important; }
-.text-danger  { color: var(--accent-red)   !important; }
-.text-info    { color: var(--accent-cyan)  !important; }
+/* ── Status colors — Apple system palette, mapped to semantic roles ──────── */
+.text-success { color: var(--color-gain)  !important; }  /* gains / profit       */
+.text-danger  { color: var(--color-loss)  !important; }  /* losses / negative    */
+.text-info    { color: var(--color-state) !important; }  /* informational/state  */
+.text-state   { color: var(--color-state) !important; }  /* live / open / active */
+.text-neutral { color: var(--color-neutral) !important; }/* plain numbers/labels */
 .text-warning { color: var(--accent-yellow)!important; }
 
 /* ── Buttons — pill-shaped, gentle spring on press ───────────────────────── */
@@ -2376,6 +2577,117 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
 [data-bs-theme="light"] .portfolio-manager-table thead th {
     background: rgba(255, 255, 255, 0.96);
 }
+
+/* ── Manage modal — Apple-caliber refinement ─────────────────────────────── */
+.portfolio-manager-header { padding: 1.1rem 1.3rem; align-items: center; }
+.portfolio-manager-header .modal-title { font-size: 1.18rem; font-weight: 650; letter-spacing: -0.01em; }
+.portfolio-manager-body { padding: 1.25rem 1.3rem 1.4rem; }
+
+.manage-section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.7rem;
+}
+.manage-section-label i { font-size: 0.82rem; }
+.manage-section-label--list { margin-top: 1.5rem; padding-left: 0.05rem; }
+
+.manage-add-card {
+    padding: 1.05rem 1.1rem;
+    border-radius: 14px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+}
+
+/* Inputs — softer surface, rounded, clear focus ring (overrides bootstrap bg-dark) */
+.portfolio-manager-body .form-control {
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--hairline) !important;
+    border-radius: 10px !important;
+    color: var(--text-primary) !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.portfolio-manager-body .form-control::placeholder { color: var(--text-tertiary); opacity: 1; }
+.portfolio-manager-body .form-control:focus {
+    background: var(--surface-strong) !important;
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18) !important;
+    outline: none;
+}
+
+/* Table rhythm */
+.portfolio-manager-table thead th {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    border-bottom: 1px solid var(--hairline) !important;
+    padding: 0.55rem 0.75rem;
+}
+.portfolio-manager-table tbody td {
+    vertical-align: middle;
+    padding: 0.62rem 0.75rem;
+    border-bottom: 1px solid var(--hairline-soft) !important;
+    background: transparent !important;
+}
+.portfolio-manager-table tbody tr { transition: background 0.14s ease; }
+.portfolio-manager-table tbody tr:hover td { background: var(--control-hover, rgba(255, 255, 255, 0.035)) !important; }
+.portfolio-manager-table tbody tr:last-child td { border-bottom: none !important; }
+.portfolio-manager-table td.fw-bold { font-size: 0.9rem; letter-spacing: -0.01em; }
+.portfolio-manager-table input.form-control { font-variant-numeric: tabular-nums; }
+
+/* Save / remove buttons */
+.portfolio-manager-table .btn {
+    border-radius: 9px;
+    font-size: 0.76rem;
+    font-weight: 550;
+    padding: 0.32rem 0.62rem;
+}
+.portfolio-manager-table .btn-outline-primary {
+    color: var(--accent-blue);
+    border-color: rgba(10, 132, 255, 0.35);
+    background: rgba(10, 132, 255, 0.08);
+}
+.portfolio-manager-table .btn-outline-primary:hover {
+    background: var(--accent-blue);
+    color: #fff;
+    border-color: transparent;
+}
+.portfolio-manager-table .btn-outline-danger,
+.portfolio-manager-table .btn-outline-warning { padding: 0.32rem 0.52rem; }
+
+/* Anchor checkbox — refined accent */
+.portfolio-manager-table .anchor-hold-check {
+    width: 1.15rem;
+    height: 1.15rem;
+    cursor: pointer;
+    border-radius: 6px;
+    border: 1px solid var(--hairline-hover);
+    background-color: var(--surface-strong);
+}
+.portfolio-manager-table .anchor-hold-check:checked {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+.portfolio-manager-table .anchor-hold-check:focus {
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+}
+
+/* Add-holding submit — pill, confident */
+#add-holding-form .btn-success {
+    border-radius: 980px;
+    font-weight: 600;
+    padding: 0.42rem 1rem;
+}
+
+[data-bs-theme="light"] .manage-add-card { background: rgba(15, 23, 42, 0.025); }
+[data-bs-theme="light"] .portfolio-manager-body .form-control { background: rgba(15, 23, 42, 0.03) !important; }
 
 .add-msg-with-suggestions {
     display: flex;
@@ -2606,6 +2918,11 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
     position: relative;
     z-index: 1;
     filter: drop-shadow(0 3px 8px color-mix(in srgb, currentColor 24%, transparent));
+}
+
+/* Stat glyph float is hover-only — no idle bobbing while reading numbers. */
+.summary-segment:hover .stat-icon i,
+.card:hover .stat-icon i {
     animation: statGlyphFloat 4.8s ease-in-out infinite;
 }
 
@@ -2832,17 +3149,15 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
     height: 10px;
     border-radius: 5px;
     background: linear-gradient(90deg,
-        rgba(255,255,255,.03) 0%,
-        rgba(255,255,255,.03) 38%,
-        rgba(255,255,255,.11) 50%,
-        rgba(255,255,255,.03) 62%,
-        rgba(255,255,255,.03) 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.6s ease-in-out infinite;
+        rgba(255,255,255,.04) 0%,
+        rgba(255,255,255,.10) 50%,
+        rgba(255,255,255,.04) 100%);
+    /* opacity pulse instead of background-position pan — compositor-only, no repaint */
+    animation: shimmerPulse 1.5s ease-in-out infinite;
 }
-@keyframes shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+@keyframes shimmerPulse {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 0.95; }
 }
 
 /* ── Card header icon alignment ─────────────────────────────────────────── */
@@ -5406,115 +5721,6 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.4; }
 .toast-apple.toast-danger  .toast-icon { color: var(--accent-red); }
 .toast-apple.toast-info    .toast-icon { color: var(--accent-blue); }
 
-/* ── Keyboard shortcut access ────────────────────────────────────────────── */
-.shortcut-pill {
-    position: relative;
-    height: 34px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.48rem;
-    padding: 0 0.72rem 0 0.42rem;
-    border: 1px solid var(--hairline);
-    border-radius: 999px;
-    color: var(--text-secondary);
-    background: var(--control-bg);
-    box-shadow:
-        0 10px 22px -18px rgba(0, 0, 0, 0.64),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    cursor: pointer;
-    overflow: hidden;
-    transform: translateY(0) translateZ(0);
-    -webkit-tap-highlight-color: transparent;
-    animation: shortcutPillIn 0.4s var(--spring) 0.12s both;
-    transition:
-        color 0.2s var(--ease),
-        background 0.2s var(--ease),
-        border-color 0.2s var(--ease),
-        box-shadow 0.2s var(--ease),
-        transform 0.24s var(--spring);
-}
-
-.shortcut-pill::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(110deg, transparent 0%, rgba(111, 214, 240, 0.14) 44%, transparent 72%);
-    opacity: 0;
-    transform: translateX(-75%);
-    pointer-events: none;
-}
-
-.shortcut-pill:hover,
-.shortcut-pill:focus-visible {
-    color: var(--text-primary);
-    background: var(--control-hover);
-    border-color: var(--hairline-hover);
-    box-shadow:
-        0 14px 26px -20px rgba(111, 214, 240, 0.55),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transform: translateY(-2px) translateZ(0);
-}
-
-.shortcut-pill:hover::before,
-.shortcut-pill:focus-visible::before {
-    animation: shortcutPillSheen 0.7s var(--ease) both;
-}
-
-.shortcut-pill:active {
-    transform: translateY(0) scale(0.96);
-}
-
-.shortcut-pill:focus-visible {
-    outline: 2px solid var(--accent-blue);
-    outline-offset: 3px;
-}
-
-.shortcut-pill-key {
-    width: 24px;
-    height: 24px;
-    display: grid;
-    place-items: center;
-    flex: 0 0 24px;
-    border-radius: 999px;
-    border: 1px solid var(--hairline);
-    background: var(--control-bg);
-    color: inherit;
-    font-family: var(--font-display);
-    font-size: 0.76rem;
-    font-weight: 740;
-    line-height: 1;
-    animation: shortcutPillHint 5.8s var(--ease) 1.2s infinite;
-}
-
-.shortcut-pill-label {
-    position: relative;
-    z-index: 1;
-    white-space: nowrap;
-    color: inherit;
-    font-size: 0.68rem;
-    font-weight: 650;
-    letter-spacing: 0.02em;
-}
-
-@keyframes shortcutPillIn {
-    0% { opacity: 0; transform: translateY(8px) scale(0.92); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes shortcutPillHint {
-    0%, 78%, 100% { transform: translateY(0) scale(1); }
-    82% { transform: translateY(-1px) scale(1.06); }
-    86% { transform: translateY(0) scale(0.98); }
-    90% { transform: translateY(-0.5px) scale(1.02); }
-}
-
-@keyframes shortcutPillSheen {
-    0% { opacity: 0; transform: translateX(-75%); }
-    35% { opacity: 1; }
-    100% { opacity: 0; transform: translateX(75%); }
-}
-
 /* ── Top-bar pet launcher ───────────────────────────────────────────────── */
 .pet-nav-toggle {
     position: relative;
@@ -5702,6 +5908,38 @@ body > .dashboard-pet {
     opacity: 0;
     pointer-events: none;
     transform: translateY(18px) scale(0.88);
+}
+
+/* ── Mobile: pet collapses to a corner orb; bubble expands on tap or message ─
+   Selectors are prefixed with `body > .dashboard-pet` so they outrank the base
+   .dashboard-pet-bubble rule that follows them in source order. */
+@media (max-width: 575.98px) {
+    body > .dashboard-pet {
+        grid-template-columns: 54px;
+        right: 14px;
+        bottom: 14px;
+        gap: 0;
+    }
+    body > .dashboard-pet .dashboard-pet-bubble {
+        position: fixed;
+        right: 14px;
+        bottom: 78px;
+        left: auto;
+        width: min(80vw, 268px);
+        z-index: 1041;
+        transform-origin: bottom right;
+        transform: scale(0.62);
+        opacity: 0;
+        pointer-events: none;
+        animation: none; /* no idle float on mobile — clean scale/fade instead */
+        transition: opacity 0.18s ease, transform 0.22s var(--spring);
+    }
+    body > .dashboard-pet.is-expanded .dashboard-pet-bubble,
+    body > .dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-bubble {
+        transform: scale(1);
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .dashboard-pet-bubble {
@@ -6528,8 +6766,6 @@ body > .dashboard-pet {
     opacity: 0;
     transform: translateX(-120%);
     pointer-events: none;
-    animation: marketTileTrace 6.8s ease-in-out infinite;
-    animation-delay: calc(0.45s + var(--tile-index, 0) * 220ms);
 }
 .market-tile::after {
     content: "";
@@ -6543,8 +6779,6 @@ body > .dashboard-pet {
     opacity: 0.34;
     transform: scaleX(0.42);
     transform-origin: left;
-    animation: marketTileMeter 4.2s ease-in-out infinite;
-    animation-delay: calc(var(--tile-index, 0) * 180ms);
 }
 .market-tile.is-positive { --market-tile-tone: var(--accent-green); }
 .market-tile.is-negative { --market-tile-tone: var(--accent-red); }
@@ -6553,6 +6787,16 @@ body > .dashboard-pet {
     border-color: var(--hairline-hover);
     transform: translateY(-3px);
     box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.6);
+}
+/* Tile trace / meter / flag motion are hover-only — the strip stays still at rest. */
+.market-tile:hover::before {
+    animation: marketTileTrace 6.8s ease-in-out infinite;
+}
+.market-tile:hover::after {
+    animation: marketTileMeter 4.2s ease-in-out infinite;
+}
+.market-tile:hover .market-tile-flag {
+    animation: marketFlagFloat 5.2s ease-in-out infinite;
 }
 .market-tile-top {
     display: flex;
@@ -6563,7 +6807,6 @@ body > .dashboard-pet {
 .market-tile-flag {
     font-size: 1.05rem;
     line-height: 1;
-    animation: marketFlagFloat 5.2s ease-in-out infinite;
     animation-delay: calc(var(--tile-index, 0) * 170ms);
 }
 .market-tile-region {
@@ -6631,14 +6874,12 @@ body > .dashboard-pet {
 
 /* Shimmer state for loading */
 .market-tile.market-shimmer {
-    animation: shimmer 1.6s ease-in-out infinite;
+    /* opacity pulse instead of background-position pan — compositor-only, no repaint */
+    animation: shimmerPulse 1.5s ease-in-out infinite;
     background: linear-gradient(90deg,
-        rgba(255,255,255,.03) 0%,
-        rgba(255,255,255,.03) 38%,
-        rgba(255,255,255,.11) 50%,
-        rgba(255,255,255,.03) 62%,
-        rgba(255,255,255,.03) 100%);
-    background-size: 200% 100%;
+        rgba(255,255,255,.04) 0%,
+        rgba(255,255,255,.10) 50%,
+        rgba(255,255,255,.04) 100%);
     pointer-events: none;
     height: 100px;
 }
@@ -6677,6 +6918,9 @@ body > .dashboard-pet {
     -webkit-mask: radial-gradient(circle, transparent 61%, black 62%, black 64%, transparent 65%);
     mask: radial-gradient(circle, transparent 61%, black 62%, black 64%, transparent 65%);
     opacity: 0.62;
+}
+/* Rotating orbit trace is hover-only — the JS center halo carries the donut at rest. */
+.allocation-chart-shell:hover::after {
     animation: allocOrbitTrace 12s linear infinite;
 }
 .allocation-chart-shell canvas {
@@ -6849,8 +7093,11 @@ body > .dashboard-pet {
     transform: translateX(-16px) scaleX(0.4);
     transform-origin: right;
     pointer-events: none;
-    animation: allocationRowMeter 6.4s ease-in-out infinite;
     animation-delay: calc(var(--row-index, 0) * 180ms + 0.9s);
+}
+/* Row meter sweeps on hover only — the breakdown table is static at rest. */
+#allocation-table tr[data-ticker]:hover td:last-child::after {
+    animation: allocationRowMeter 6.4s ease-in-out infinite;
 }
 #allocation-table tr.alloc-selected td {
     background: rgba(111, 214, 240, 0.09) !important;
@@ -7633,26 +7880,6 @@ body > .dashboard-pet {
     border-color: rgba(0,122,255,0.24);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 14px 30px rgba(15,23,42,0.10);
 }
-
-[data-bs-theme="light"] .shortcut-pill {
-    background: rgba(255, 255, 255, 0.82);
-    border-color: rgba(60, 60, 67, 0.12);
-    box-shadow:
-        0 18px 36px -24px rgba(15, 23, 42, 0.34),
-        inset 0 1px 0 rgba(255, 255, 255, 0.92);
-}
-
-[data-bs-theme="light"] .shortcut-pill:hover,
-[data-bs-theme="light"] .shortcut-pill:focus-visible {
-    background: rgba(255, 255, 255, 0.96);
-    border-color: rgba(0, 122, 255, 0.2);
-}
-
-[data-bs-theme="light"] .shortcut-pill-key {
-    background: rgba(15, 23, 42, 0.045);
-    border-color: rgba(15, 23, 42, 0.12);
-}
-
 [data-bs-theme="light"] .navbar,
 [data-bs-theme="light"] .navbar.bg-dark {
     color: var(--text-primary);
@@ -7771,25 +7998,90 @@ body > .dashboard-pet {
     [data-bs-theme="light"] .theme-toggle-thumb,
     [data-text-size="comfortable"] .text-size-toggle-thumb {
         left: 27px;
-    }
-
-    .shortcut-pill {
-        width: 34px;
-        padding: 0;
-        gap: 0;
-    }
-
-    .shortcut-pill-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-    }
-}
+    }}
 
 /* ── Summary Panel — single segmented card ───────────────────────────────── */
 .summary-panel { overflow: hidden; }
+
+/* ── Overview hero panel — Total Value dominant, P&L prominent, pills below ─ */
+.hero-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 1.05rem;
+    padding: 1.4rem 1.55rem;
+}
+.hero-primary {
+    display: flex;
+    align-items: stretch;
+    gap: 1.6rem;
+}
+.hero-stat { flex: 1 1 0; min-width: 0; }
+.hero-divider {
+    width: 1px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, transparent, var(--hairline), transparent);
+}
+.hero-value {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    line-height: 1.02;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.15rem;
+}
+.hero-value--total {
+    font-size: clamp(2rem, 5.2vw, 3rem);
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+}
+.hero-value--pnl {
+    font-size: clamp(1.55rem, 3.8vw, 2.2rem);
+    letter-spacing: -0.02em;
+}
+.hero-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+.hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.42rem 0.78rem;
+    border-radius: 980px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--hairline);
+    font-size: 0.82rem;
+    line-height: 1;
+}
+.hero-pill-icon { font-size: 0.84rem; color: var(--text-tertiary); }
+.hero-pill-num {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+.hero-pill-text { color: var(--text-secondary); font-weight: 550; }
+.hero-pill-dot { display: inline-flex; align-items: center; color: var(--text-tertiary); }
+.hero-pill-dot i { font-size: 0.5rem; }
+.hero-pill .tip-trigger { margin-left: 0.05rem; }
+.hero-pill--clickable {
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+.hero-pill--clickable:hover {
+    background: var(--control-hover, rgba(255, 255, 255, 0.09));
+    border-color: var(--hairline-hover);
+    transform: translateY(-1px);
+}
+
+[data-bs-theme="light"] .hero-pill { background: rgba(15, 23, 42, 0.04); }
+
+@media (max-width: 575.98px) {
+    .hero-primary { flex-direction: column; gap: 0.85rem; }
+    .hero-divider { display: none; }
+    .hero-panel-inner { padding: 1.15rem 1.2rem; }
+}
 
 .summary-panel-inner {
     display: flex;
@@ -7813,7 +8105,6 @@ body > .dashboard-pet {
     opacity: 0;
     transform: translateX(-120%);
     pointer-events: none;
-    animation: summarySegmentTrace 8.5s ease-in-out infinite;
     animation-delay: calc(var(--summary-index, 0) * 520ms + 0.8s);
 }
 
@@ -7829,8 +8120,15 @@ body > .dashboard-pet {
     transform: scaleX(0.35);
     transform-origin: left;
     pointer-events: none;
-    animation: summarySegmentMeter 5.6s ease-in-out infinite;
     animation-delay: calc(var(--summary-index, 0) * 420ms);
+}
+
+/* Segment trace / meter are hover-only — the hero panel is calm at rest. */
+.summary-segment:hover::before {
+    animation: summarySegmentTrace 8.5s ease-in-out infinite;
+}
+.summary-segment:hover::after {
+    animation: summarySegmentMeter 5.6s ease-in-out infinite;
 }
 
 .summary-segment:nth-child(1) { --summary-index: 0; }
@@ -8630,6 +8928,113 @@ tr.research-holding-row:hover {
 }
 
 /* ── Holdings View Filter Tabs ───────────────────────────────────────────── */
+/* ── Dashboard zone tabs (Overview / Holdings / Analytics) ───────────────── */
+.dashboard-zone-tabs-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.1rem;
+}
+.dashboard-zone-tabs {
+    display: inline-flex;
+    position: relative;
+    background: rgba(255, 255, 255, 0.048);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    border-radius: 13px;
+    padding: 4px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+/* GPU-accelerated sliding pill (mirrors .hvt-indicator) */
+.dzt-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    bottom: 4px;
+    width: 0; /* set by JS on init and each zone switch */
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.13);
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.4),
+        0 0 0 0.5px rgba(255, 255, 255, 0.14),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
+    transform: translateX(0);
+    pointer-events: none;
+    will-change: transform, width;
+    transition:
+        transform 240ms cubic-bezier(0.34, 1.15, 0.64, 1),
+        width 240ms cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+.dzt-tab {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    border-radius: 9px;
+    padding: 7px 18px;
+    font-size: 0.84rem;
+    font-weight: 550;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: color 0.16s ease;
+    white-space: nowrap;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.dzt-tab:hover:not(.dzt-tab--active) { color: var(--text-secondary); }
+.dzt-tab--active { color: var(--text-primary); font-weight: 650; }
+.dzt-icon {
+    font-size: 0.82rem;
+    opacity: 0.72;
+    transition: transform 250ms cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.16s ease;
+}
+.dzt-tab--active .dzt-icon { opacity: 1; transform: scale(1.1); }
+
+/* Panes: only the active one is in flow. Inactive panes stay laid out (so their
+   Chart.js canvases keep correct dimensions) but are visually hidden — no
+   display:none, which would zero-size the charts. */
+.dashboard-zone-panes { position: relative; }
+.dashboard-zone-pane { opacity: 1; transition: opacity 150ms ease; }
+.dashboard-zone-pane:not(.dashboard-zone-pane--active) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+.dashboard-zone-pane--active {
+    position: relative;
+    opacity: 1;
+    visibility: visible;
+}
+
+[data-bs-theme="light"] .dashboard-zone-tabs {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+[data-bs-theme="light"] .dzt-indicator {
+    background: #fff;
+    box-shadow:
+        0 1px 3px rgba(15, 23, 42, 0.14),
+        0 0 0 0.5px rgba(15, 23, 42, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-zone-pane,
+    .dzt-indicator,
+    .dzt-icon { transition: none; }
+}
+
+@media (max-width: 575.98px) {
+    .dashboard-zone-tabs { width: 100%; }
+    .dzt-tab { flex: 1; justify-content: center; padding: 7px 8px; font-size: 0.8rem; }
+}
+
 .holdings-view-tabs {
     display: flex;
     position: relative;

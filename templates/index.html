@@ -20,7 +20,7 @@
     <link rel="apple-touch-icon" href="/static/img/brand/folio-orbit-icon-1024.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=76" rel="stylesheet">
+    <link href="/static/css/style.css?v=77" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -49,24 +49,6 @@
                     <span class="brand-intro-title">Portfolio butler, at your service</span>
                     <span class="brand-intro-copy">Folio Sense and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.</span>
                 </div>
-                <button class="brand-cost-trigger" id="brand-cost-trigger" type="button"
-                        aria-expanded="false" aria-controls="brand-cost-callout" title="View AI token cost">
-                    <i class="bi bi-stars" aria-hidden="true"></i>
-                    <span id="brand-cost-trigger-label">AI cost</span>
-                    <span class="brand-cost-notif" id="brand-cost-notif" aria-hidden="true" aria-label="Cost updated"></span>
-                </button>
-                <div class="brand-cost-callout" id="brand-cost-callout" role="tooltip" aria-hidden="true">
-                    <span class="brand-cost-kicker">AI token cost</span>
-                    <span class="brand-cost-value" id="brand-cost-value">Checking...</span>
-                    <span class="brand-cost-meta" id="brand-cost-meta">Estimated from cached summaries</span>
-                    <span class="brand-cost-breakdown" id="brand-cost-breakdown"></span>
-                </div>
-                <button class="pet-mode-toggle" id="pet-mode-toggle" type="button"
-                        aria-pressed="false"
-                        title="Switch to Local Intelligence — skip Claude for this session">
-                    <span class="pet-mode-label-claude"><i class="bi bi-stars" aria-hidden="true"></i> Claude AI</span>
-                    <span class="pet-mode-label-local"><i class="bi bi-cpu-fill" aria-hidden="true"></i> Local Intel</span>
-                </button>
             </div>
             <div class="d-flex align-items-center gap-3">
                 <button class="hud-status-pill" id="hud-status-pill" type="button"
@@ -131,120 +113,187 @@
                         </button>
                     </div>
                 </div>
-                <button class="shortcut-pill" type="button" onclick="showKeyboardHelp()"
-                        aria-label="View keyboard shortcuts" title="Keyboard shortcuts">
-                    <span class="shortcut-pill-key" aria-hidden="true">?</span>
-                    <span class="shortcut-pill-label">Shortcuts</span>
-                </button>
-                <button class="pet-nav-toggle" id="pet-nav-toggle" type="button"
-                        aria-label="Hide dashboard pet" aria-pressed="true" title="Hide dashboard pet">
-                    <i class="bi bi-chat-heart" aria-hidden="true"></i>
-                </button>
-                <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" aria-pressed="true">
-                    <span class="theme-toggle-track" aria-hidden="true">
-                        <span class="theme-toggle-thumb">
-                            <i id="theme-toggle-icon" class="bi bi-moon-stars-fill theme-toggle-thumb-icon theme-toggle-thumb-icon-dark"></i>
-                        </span>
-                    </span>
-                </button>
-                <button class="text-size-toggle" id="text-size-toggle" type="button" aria-label="Switch to comfortable text size" aria-pressed="false">
-                    <span class="text-size-toggle-track" aria-hidden="true">
-                        <span class="text-size-glyph text-size-glyph-small">A</span>
-                        <span class="text-size-glyph text-size-glyph-large">A</span>
-                        <span class="text-size-toggle-thumb">
-                            <i class="bi bi-type"></i>
-                        </span>
-                    </span>
-                </button>
                 <button class="btn btn-sm btn-outline-secondary" id="portfolio-manager-trigger"
                         type="button" aria-expanded="false" aria-controls="portfolioModal"
                         onclick="openPortfolioManager()">
                     <i class="bi bi-gear"></i> Manage
                 </button>
+
+                <!-- ── Overflow menu — secondary controls ──────────────────── -->
+                <div class="nav-overflow" id="nav-overflow">
+                    <button class="nav-overflow-trigger" id="nav-overflow-trigger" type="button"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="nav-overflow-menu"
+                            aria-label="More options" title="More options">
+                        <i class="bi bi-three-dots" aria-hidden="true"></i>
+                    </button>
+                    <div class="nav-overflow-menu" id="nav-overflow-menu" role="menu" aria-hidden="true">
+
+                        <div class="nav-menu-section">Appearance</div>
+                        <div class="nav-menu-row" role="menuitem">
+                            <i class="bi bi-circle-half nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-label">Theme</span>
+                            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" aria-pressed="true">
+                                <span class="theme-toggle-track" aria-hidden="true">
+                                    <span class="theme-toggle-thumb">
+                                        <i id="theme-toggle-icon" class="bi bi-moon-stars-fill theme-toggle-thumb-icon theme-toggle-thumb-icon-dark"></i>
+                                    </span>
+                                </span>
+                            </button>
+                        </div>
+                        <div class="nav-menu-row" role="menuitem">
+                            <i class="bi bi-fonts nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-label">Text size</span>
+                            <button class="text-size-toggle" id="text-size-toggle" type="button" aria-label="Switch to comfortable text size" aria-pressed="false">
+                                <span class="text-size-toggle-track" aria-hidden="true">
+                                    <span class="text-size-glyph text-size-glyph-small">A</span>
+                                    <span class="text-size-glyph text-size-glyph-large">A</span>
+                                    <span class="text-size-toggle-thumb">
+                                        <i class="bi bi-type"></i>
+                                    </span>
+                                </span>
+                            </button>
+                        </div>
+
+                        <div class="nav-menu-divider" aria-hidden="true"></div>
+                        <div class="nav-menu-section">Intelligence</div>
+                        <div class="nav-menu-row" role="menuitem">
+                            <i class="bi bi-cpu nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-label">Engine</span>
+                            <button class="pet-mode-toggle" id="pet-mode-toggle" type="button"
+                                    aria-pressed="false"
+                                    title="Switch to Local Intelligence — skip Claude for this session">
+                                <span class="pet-mode-label-claude"><i class="bi bi-stars" aria-hidden="true"></i> Claude AI</span>
+                                <span class="pet-mode-label-local"><i class="bi bi-cpu-fill" aria-hidden="true"></i> Local Intel</span>
+                            </button>
+                        </div>
+                        <button class="nav-menu-row nav-menu-row--btn brand-cost-trigger" id="brand-cost-trigger" type="button"
+                                aria-expanded="false" aria-controls="brand-cost-callout" title="View AI token cost">
+                            <i class="bi bi-stars nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-label">AI cost</span>
+                            <span class="nav-menu-value" id="brand-cost-trigger-label">—</span>
+                            <span class="brand-cost-notif" id="brand-cost-notif" aria-hidden="true" aria-label="Cost updated"></span>
+                        </button>
+                        <div class="brand-cost-callout" id="brand-cost-callout" role="tooltip" aria-hidden="true">
+                            <span class="brand-cost-kicker">AI token cost</span>
+                            <span class="brand-cost-value" id="brand-cost-value">Checking...</span>
+                            <span class="brand-cost-meta" id="brand-cost-meta">Estimated from cached summaries</span>
+                            <span class="brand-cost-breakdown" id="brand-cost-breakdown"></span>
+                        </div>
+
+                        <div class="nav-menu-divider" aria-hidden="true"></div>
+                        <div class="nav-menu-section">Dashboard</div>
+                        <div class="nav-menu-row" role="menuitem">
+                            <i class="bi bi-chat-heart nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-label">Dashboard pet</span>
+                            <button class="pet-nav-toggle" id="pet-nav-toggle" type="button"
+                                    aria-label="Hide dashboard pet" aria-pressed="true" title="Hide dashboard pet">
+                                <i class="bi bi-chat-heart" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <button class="nav-menu-row nav-menu-row--btn" type="button" onclick="showKeyboardHelp()"
+                                aria-label="View keyboard shortcuts">
+                            <i class="bi bi-keyboard nav-menu-icon" aria-hidden="true"></i>
+                            <span class="nav-menu-label">Keyboard shortcuts</span>
+                            <span class="nav-menu-key" aria-hidden="true">?</span>
+                        </button>
+
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
 
     <div class="container-fluid py-3" id="main-content">
 
+        <!-- ── Dashboard zone tabs ───────────────────────────────────── -->
+        <div class="dashboard-zone-tabs-wrap">
+            <div class="dashboard-zone-tabs" id="dashboard-zone-tabs" role="tablist"
+                 aria-label="Dashboard zones" data-active-zone="overview">
+                <div class="dzt-indicator" aria-hidden="true"></div>
+                <button class="dzt-tab dzt-tab--active" type="button" data-zone="overview"
+                        role="tab" aria-selected="true" onclick="setDashboardZone('overview')">
+                    <i class="bi bi-grid-1x2-fill dzt-icon" aria-hidden="true"></i>
+                    <span class="dzt-label">Overview</span>
+                </button>
+                <button class="dzt-tab" type="button" data-zone="holdings"
+                        role="tab" aria-selected="false" onclick="setDashboardZone('holdings')">
+                    <i class="bi bi-table dzt-icon" aria-hidden="true"></i>
+                    <span class="dzt-label">Holdings</span>
+                </button>
+                <button class="dzt-tab" type="button" data-zone="analytics"
+                        role="tab" aria-selected="false" onclick="setDashboardZone('analytics')">
+                    <i class="bi bi-bar-chart-line-fill dzt-icon" aria-hidden="true"></i>
+                    <span class="dzt-label">Analytics</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="dashboard-zone-panes">
+
+        <!-- ═══════════════ OVERVIEW ═══════════════ -->
+        <section class="dashboard-zone-pane dashboard-zone-pane--active"
+                 data-zone-pane="overview" role="tabpanel" aria-label="Overview">
+
         <!-- ── Summary Panel ─────────────────────────────────────────── -->
         <div class="row mb-3">
             <div class="col-12">
-                <div class="card bg-dark border-secondary summary-panel">
-                    <div class="summary-panel-inner">
+                <div class="card bg-dark border-secondary summary-panel hero-panel">
+                    <div class="hero-panel-inner">
 
-                        <div class="summary-segment">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
-                                <div style="min-width:0">
-                                    <div class="stat-label">Total value
-                                        <button class="tip-trigger" onclick="event.stopPropagation()"
-                                            data-tip-title="Portfolio Value"
-                                            data-tip-body="Combined market value of all your positions, refreshed every 5 minutes."
-                                            data-tip-hint="Press R to refresh now"
-                                            data-tip-icon="bi-wallet2">
-                                            <i class="bi bi-info-circle"></i>
-                                        </button>
-                                    </div>
-                                    <div class="stat-value" id="total-value">--</div>
+                        <div class="hero-primary">
+                            <div class="hero-stat">
+                                <div class="stat-label">Total value
+                                    <button class="tip-trigger" onclick="event.stopPropagation()"
+                                        data-tip-title="Portfolio Value"
+                                        data-tip-body="Combined market value of all your positions, refreshed every 5 minutes."
+                                        data-tip-hint="Press R to refresh now"
+                                        data-tip-icon="bi-wallet2">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
                                 </div>
+                                <div class="stat-value hero-value hero-value--total" id="total-value">--</div>
+                            </div>
+                            <div class="hero-divider" aria-hidden="true"></div>
+                            <div class="hero-stat">
+                                <div class="stat-label">Today's P&amp;L
+                                    <button class="tip-trigger" onclick="event.stopPropagation()"
+                                        data-tip-title="Today's P&amp;L"
+                                        data-tip-body="Dollar and percentage change across all positions since yesterday's close."
+                                        data-tip-hint="Green = portfolio gained today"
+                                        data-tip-icon="bi-graph-up-arrow">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="stat-value hero-value hero-value--pnl" id="daily-pnl">--</div>
                             </div>
                         </div>
 
-                        <div class="summary-segment">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
-                                <div style="min-width:0">
-                                    <div class="stat-label">Today's P&amp;L
-                                        <button class="tip-trigger" onclick="event.stopPropagation()"
-                                            data-tip-title="Today's P&amp;L"
-                                            data-tip-body="Dollar and percentage change across all positions since yesterday's close."
-                                            data-tip-hint="Green = portfolio gained today"
-                                            data-tip-icon="bi-graph-up-arrow">
-                                            <i class="bi bi-info-circle"></i>
-                                        </button>
-                                    </div>
-                                    <div class="stat-value" id="daily-pnl">--</div>
-                                </div>
+                        <div class="hero-pills">
+                            <div class="hero-pill hero-pill--clickable stat-clickable" id="holdings-count-card"
+                                 onclick="openManageFromCard()" title="Click to manage holdings"
+                                 tabindex="0" role="button">
+                                <i class="bi bi-briefcase hero-pill-icon" aria-hidden="true"></i>
+                                <span class="hero-pill-num" id="holding-count">10</span>
+                                <span class="hero-pill-text">Holdings</span>
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Active Holdings"
+                                    data-tip-body="Number of positions in your portfolio. Click this pill to open the portfolio manager."
+                                    data-tip-hint="Click to manage"
+                                    data-tip-icon="bi-briefcase">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
                             </div>
-                        </div>
-
-                        <div class="summary-segment stat-clickable" id="holdings-count-card"
-                             onclick="openManageFromCard()" title="Click to manage holdings"
-                             tabindex="0" role="button">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="stat-icon"><i class="bi bi-briefcase"></i></div>
-                                <div style="min-width:0">
-                                    <div class="stat-label">Holdings
-                                        <button class="tip-trigger" onclick="event.stopPropagation()"
-                                            data-tip-title="Active Holdings"
-                                            data-tip-body="Number of positions in your portfolio. Click this card to open the portfolio manager."
-                                            data-tip-hint="Click card to manage"
-                                            data-tip-icon="bi-briefcase">
-                                            <i class="bi bi-info-circle"></i>
-                                        </button>
-                                    </div>
-                                    <div class="stat-value" id="holding-count">10</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="summary-segment">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="stat-icon" id="market-icon">
-                                    <i class="bi bi-circle-fill" id="market-dot" style="font-size:.55rem"></i>
-                                </div>
-                                <div style="min-width:0">
-                                    <div class="stat-label">Market
-                                        <button class="tip-trigger" onclick="event.stopPropagation()"
-                                            data-tip-title="Market Status"
-                                            data-tip-body="NYSE trading hours: 9:30 AM – 4:00 PM ET on weekdays. The dot pulses when markets are open."
-                                            data-tip-icon="bi-building">
-                                            <i class="bi bi-info-circle"></i>
-                                        </button>
-                                    </div>
-                                    <div class="stat-value text-success" id="market-status">Open</div>
-                                </div>
+                            <div class="hero-pill hero-pill--market">
+                                <span class="hero-pill-dot" id="market-icon">
+                                    <i class="bi bi-circle-fill" id="market-dot"></i>
+                                </span>
+                                <span class="hero-pill-text text-state" id="market-status">Open</span>
+                                <button class="tip-trigger" onclick="event.stopPropagation()"
+                                    data-tip-title="Market Status"
+                                    data-tip-body="NYSE trading hours: 9:30 AM – 4:00 PM ET on weekdays. The dot pulses when markets are open."
+                                    data-tip-icon="bi-building">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -253,9 +302,9 @@
             </div>
         </div>
 
-        <!-- ── Allocation ──────────────────────────────────────────────── -->
+        <!-- ── Allocation (mini preview — donut only in Overview) ──────── -->
         <div class="row g-3 g-md-4 mb-3">
-            <div class="col-12 col-md-5">
+            <div class="col-12 col-md-7 col-lg-6 mx-auto">
                 <div class="card bg-dark border-secondary h-100">
                     <div class="card-header d-flex align-items-center gap-2">
                         <i class="bi bi-pie-chart" style="font-size:.9rem"></i>
@@ -263,7 +312,7 @@
                         <button class="tip-trigger ms-auto"
                             data-tip-title="Portfolio Allocation"
                             data-tip-body="Each segment represents one holding's share of total portfolio value. Hover segments for details."
-                            data-tip-hint="Hover chart segments to explore"
+                            data-tip-hint="Full breakdown lives in Analytics"
                             data-tip-icon="bi-pie-chart">
                             <i class="bi bi-info-circle"></i>
                         </button>
@@ -272,39 +321,6 @@
                         <div class="allocation-chart-shell">
                             <canvas id="allocation-chart"></canvas>
                         </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-md-7">
-                <div class="card bg-dark border-secondary h-100">
-                    <div class="card-header d-flex align-items-center gap-2">
-                        <i class="bi bi-bar-chart-steps" style="color:var(--text-tertiary);font-size:.9rem"></i>
-                        <span>Allocation breakdown</span>
-                        <button class="tip-trigger ms-auto"
-                            data-tip-title="Allocation Breakdown"
-                            data-tip-body="Sortable table showing each holding's shares, current value, and % of portfolio."
-                            data-tip-hint="Click ↑↓ column headers to sort"
-                            data-tip-icon="bi-bar-chart-steps">
-                            <i class="bi bi-info-circle"></i>
-                        </button>
-                    </div>
-                    <div class="card-body p-0">
-                        <table class="table table-dark table-sm mb-0 allocation-table">
-                            <thead class="text-secondary small">
-                                <tr>
-                                    <th>Ticker</th>
-                                    <th>Shares</th>
-                                    <th class="text-end">Value</th>
-                                    <th class="text-end" role="button" id="alloc-sort"
-                                        onclick="toggleAllocationSort()"
-                                        title="Sort by allocation">
-                                        Allocation
-                                        <i id="alloc-sort-caret" class="bi bi-caret-down-fill small"></i>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody id="allocation-table"></tbody>
-                        </table>
                     </div>
                 </div>
             </div>
@@ -376,7 +392,7 @@
                                     <i class="bi bi-info-circle"></i>
                                 </button>
                             </div>
-                            <div class="stat-value text-info" id="largest-holding">--</div>
+                            <div class="stat-value" id="largest-holding">--</div>
                         </div>
                     </div>
                 </div>
@@ -412,6 +428,12 @@
                 </div>
             </div>
         </div>
+
+        </section><!-- /overview pane -->
+
+        <!-- ═══════════════ ANALYTICS ═══════════════ -->
+        <section class="dashboard-zone-pane" data-zone-pane="analytics"
+                 role="tabpanel" aria-label="Analytics">
 
         <!-- ── Performance / Cumulative P&L ───────────────────────────── -->
         <div class="row g-3 g-md-4 mb-3">
@@ -530,6 +552,49 @@
                 </div>
             </div>
         </div>
+
+        <!-- ── Allocation breakdown table (full detail in Analytics) ───── -->
+        <div class="row g-3 g-md-4 mb-3">
+            <div class="col-12">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <i class="bi bi-bar-chart-steps" style="color:var(--text-tertiary);font-size:.9rem"></i>
+                        <span>Allocation breakdown</span>
+                        <button class="tip-trigger ms-auto"
+                            data-tip-title="Allocation Breakdown"
+                            data-tip-body="Sortable table showing each holding's shares, current value, and % of portfolio."
+                            data-tip-hint="Click ↑↓ column headers to sort"
+                            data-tip-icon="bi-bar-chart-steps">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-dark table-sm mb-0 allocation-table">
+                            <thead class="text-secondary small">
+                                <tr>
+                                    <th>Ticker</th>
+                                    <th>Shares</th>
+                                    <th class="text-end">Value</th>
+                                    <th class="text-end" role="button" id="alloc-sort"
+                                        onclick="toggleAllocationSort()"
+                                        title="Sort by allocation">
+                                        Allocation
+                                        <i id="alloc-sort-caret" class="bi bi-caret-down-fill small"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="allocation-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </section><!-- /analytics pane -->
+
+        <!-- ═══════════════ HOLDINGS ═══════════════ -->
+        <section class="dashboard-zone-pane" data-zone-pane="holdings"
+                 role="tabpanel" aria-label="Holdings">
 
         <!-- ── Holdings Table ──────────────────────────────────────────── -->
         <div class="card bg-dark border-secondary" id="holdings-card">
@@ -711,10 +776,14 @@
             </div>
         </div>
 
+        </section><!-- /holdings pane -->
+
+        </div><!-- /dashboard-zone-panes -->
+
     </div><!-- /container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/static/js/dashboard.js?v=76"></script>
+    <script defer src="/static/js/dashboard.js?v=77"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>
@@ -774,8 +843,9 @@
                         aria-label="Close portfolio manager" onclick="closePortfolioManager()"></button>
             </div>
             <div class="portfolio-manager-body">
-                    <h6 class="text-secondary mb-3">Add New Holding</h6>
-                    <form id="add-holding-form" class="row g-2 mb-4">
+                <div class="manage-add-card">
+                    <div class="manage-section-label"><i class="bi bi-plus-circle"></i> Add new holding</div>
+                    <form id="add-holding-form" class="row g-2">
                         <div class="col-12 col-sm-4">
                             <input type="text" class="form-control form-control-sm bg-dark
                                 border-secondary text-white"
@@ -810,9 +880,10 @@
                             <span id="add-msg" class="small"></span>
                         </div>
                     </form>
+                </div>
 
-                    <h6 class="text-secondary mb-2">Current Holdings</h6>
-                    <div class="manage-holdings-table-wrap">
+                <div class="manage-section-label manage-section-label--list"><i class="bi bi-collection"></i> Current holdings</div>
+                <div class="manage-holdings-table-wrap">
                         <table class="table table-dark table-sm portfolio-manager-table">
                             <thead><tr>
                                 <th>Ticker</th><th>Shares</th>
