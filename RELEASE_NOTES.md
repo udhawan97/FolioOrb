@@ -4,11 +4,13 @@
 
 ---
 
-## ✦ Instant On, Zero Redundant Scrapes
+## ✦ Warm on Arrival
 
-> *v3.1 is the release where the dashboard stopped making Yahoo Finance explain itself three times per load. One shared cache, one warm-up thread, one instant paint from localStorage — the data was already there; we just stopped throwing it away.*
+> *v3.1 is the release where the dashboard stopped treating every page load like the first time it had ever heard of your portfolio. The data was already there — it just needed somewhere to live between refreshes.*
 
-The holdings table now appears immediately from the last saved snapshot while fresh prices reload in the background. Behind the scenes every service that previously made its own `.info` network call now draws from a single shared cache with market-hours-aware TTLs. On startup a background thread pre-warms all caches so the first real fetch hits warm data. The Analytics Signals pane got an O(n) → O(1) rewrite in two hot paths. And a polish pass tightened up the verdict mix bar, signal board tiles, and confidence spectrum.
+Your holdings table now paints from the last saved snapshot the moment the page opens, before a single network request has left the building. Behind the scenes, every service that once scraped Yahoo Finance independently — quotes, analyst recommendations, holding intelligence, earnings dates, move explanations, ETF price signals — now shares a single cached response per ticker, with TTLs that stretch to an hour when the market is closed. A background thread warms those caches on startup so the first real fetch is never cold. Two O(n) hot paths in the Analytics Signals pane became O(1). And a quiet design pass made the verdict mix bar, signal board tiles, and confidence spectrum feel more considered.
+
+v3.1 is a tightening, not a reinvention. The same cockpit, now ready before you sit down.
 
 ---
 
@@ -16,26 +18,25 @@ The holdings table now appears immediately from the last saved snapshot while fr
 
 ### Performance
 
-- **Shared `.info` cache** (`stock_service.get_ticker_info`) — quotes, analyst recs, holding intelligence, earnings calendar, move explainer, and ETF price-zone signal all draw from one cached blob per ticker instead of each triggering their own Yahoo scrape. TTL is 5 min while the market is open, 1 hr while closed.
-- **Background startup warmup** — on server start a daemon thread pre-fetches quotes, 1-year history closes, and world market data for all active holdings so the first dashboard load sees warm caches.
-- **Stale-while-revalidate portfolio cache** — `localStorage` snapshot of the last good `/api/portfolio/value` response; the holdings table and summary cards paint instantly on page load while fresh prices fetch in the background. The cache key is `foliosense-portfolio-value-v1`.
-- **Analytics Signals O(1) lookups** — watchlist filtering and allocation-weight accumulation now use a pre-built `Set` and `Map` respectively instead of `Array.find` inside hot loops.
+- **Shared `.info` cache** — six previously independent callers (quotes, analyst recs, holding intelligence, earnings calendar, move explainer, ETF price-zone signal) now draw from one cached Yahoo Finance scrape per ticker via `get_ticker_info()`. TTL is 5 minutes during market hours, 1 hour when closed. Redundant round-trips on a typical dashboard load: gone.
+- **Stale-while-revalidate portfolio cache** — on every successful `/api/portfolio/value` response the full payload is written to `localStorage`. On the next page open the holdings table and summary cards render instantly from that snapshot; live prices replace them in place as they arrive.
+- **Background startup warmup** — a daemon thread fires immediately on server start, pre-fetching quotes, 1-year history closes, and world market data for all active holdings. The first real dashboard request hits a warm cache rather than a cold scrape.
+- **Analytics Signals O(1) lookups** — watchlist filtering and allocation-weight accumulation rebuilt with a `Set` and `Map` respectively, replacing `Array.find` calls inside hot iteration loops.
 
 ### UI Polish
 
-- **Verdict mix bar** — taller (12 → 18 px), segment gaps with individually rounded end-caps, inset shadow for depth.
-- **Signal board tiles** — wider minimum (88 → 104 px), taller (min-height 72 px), bigger ticker label (0.72 → 0.95 rem), smoother lift-on-hover with `will-change: transform`.
-- **Confidence spectrum** — band rows separated by hairlines, dot enlarged with a glow ring via `color-mix`, ticker pills now show a hover state, average confidence value enlarged (0.82 → 1.15 rem), `+N more` badge simplified.
+- **Verdict mix bar** — taller at 18 px (up from 12), segment gaps with individual rounded end-caps, inset shadow for depth.
+- **Signal board tiles** — wider minimum footprint (104 px), taller minimum height (72 px), larger ticker label (0.95 rem), smoother `will-change` lift on hover with border and shadow transition.
+- **Confidence spectrum** — band rows separated by hairlines, indicator dot enlarged with a `color-mix` glow ring, ticker pills show a hover state, average confidence value enlarged and set in tabular numerals, `+N more` badge simplified.
 
 ### Code Quality
 
-- Removed misleading `_normalize_expense_ratio` helper in `analyst_recommendation.py`; expense-ratio normalization is now inline with an explanatory comment.
-- Simplified `_compute_fcf_yield` — single exit point, no redundant `return None` inside the except block.
-- Fixed `data_quality` field in `holding_intelligence.py` — previously stayed `"static"` when only live country weights or top holdings were fetched (no live sectors). Now correctly set to `"live"` whenever any live data is returned.
-- Moved buried local imports in `holding_intelligence.py` to module top; neither creates a circular dependency.
-- `etf_price_signal.py`: `yfinance` import promoted to module level; added clarifying comment on the intentional `range_position` / `percentile` equality when the 52W-range fallback is active.
-- Removed dead `holdingAllocPct()` function in `analytics-charts.js` — superseded by the `allocByTicker` Map.
-- `stock_service.py` restructured: module docstring added, constants and helpers now appear before the functions that reference them, `_parallel_fetch()` extracted to deduplicate `get_all_quotes` / `get_portfolio_quotes`, `_r()` closure promoted to module-level `_round_or_none()`.
+- **Bug fix** — `data_quality` in `holding_intelligence.py` was stuck at `"static"` whenever live country weights or top holdings arrived but live sectors did not. It now correctly reflects `"live"` whenever any live data is present.
+- Removed `_normalize_expense_ratio` — the function only cast to `float` and did not perform the normalization its name and docstring claimed; logic is now inline with an accurate comment.
+- `stock_service.py` restructured end-to-end: module docstring added, constants and helpers appear before the functions that reference them, `_parallel_fetch()` extracted to deduplicate `get_all_quotes` / `get_portfolio_quotes`, closure `_r()` promoted to module-level `_round_or_none()`.
+- Dead function `holdingAllocPct()` in `analytics-charts.js` removed — fully superseded by the `allocByTicker` Map.
+- Buried local imports in `holding_intelligence.py` moved to module top (no circular dependency); lazy `import yfinance` inside `etf_price_signal.fetch_etf_price_signal` promoted to module level.
+- `event_calendar.py` and `move_explainer.py` migrated to `get_ticker_info()` — they now benefit from the shared cache automatically.
 
 ---
 
@@ -45,7 +46,7 @@ The holdings table now appears immediately from the last saved snapshot while fr
 - Static cache keys: `style.css?v=97`, `dashboard.js?v=90`, `analytics-charts.js?v=13`
 - No database schema changes — no migration required.
 - No `.env` changes required.
-- **`297 tests passing`**
+- **297 tests passing**
 
 ---
 
@@ -77,15 +78,15 @@ cd FolioSenseAI-release-v3.1
 2. Back up `database/` and `.env`.
 3. Download v3.1 into a **new folder** — do not overwrite in place.
 4. Copy `database/` and `.env` into the new tree.
-5. Run setup once, then `start.sh` / `start.ps1` going forward.
+5. Run setup once, then use `start.sh` / `start.ps1` going forward.
 
-No database migration or `.env` change required.
+No schema migration or `.env` change required. Your `verdict_snapshots` table carries over as-is.
 
 ---
 
 ## Final Word
 
-v3.1 is still not financial advice. It is just faster at telling you things you probably already suspected.
+v3.1 is still not financial advice. It is just ready before you finish opening the tab.
 
 ---
 
