@@ -35,6 +35,10 @@
   <sub><em>Demo numbers. Real anxiety simulation.</em></sub>
 </p>
 
+<p align="center">
+  <img src="docs/architecture.svg" alt="FolioSenseAI architecture diagram" width="860"/>
+</p>
+
 ---
 
 ## Contents

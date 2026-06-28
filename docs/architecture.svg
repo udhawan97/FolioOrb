@@ -1,0 +1,118 @@
+<svg width="860" height="488" viewBox="0 0 860 488" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#C7C7CC"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#FF9500" fill-opacity="0.55"/>
+    </marker>
+    <filter id="s" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000010"/>
+    </filter>
+  </defs>
+
+  <!-- ── Canvas ── -->
+  <rect width="860" height="488" rx="16" fill="#F5F5F7"/>
+
+  <!-- ── Title ── -->
+  <text x="430" y="27" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#1C1C1E" text-anchor="middle" letter-spacing="-0.2">FolioSenseAI — Architecture at a Glance</text>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       LAYER 1 · BROWSER
+  ════════════════════════════════════════════════════════════ -->
+  <rect x="16" y="38" width="828" height="112" rx="12" fill="#FFFFFF" stroke="#E5E5EA" stroke-width="1.5" filter="url(#s)"/>
+  <text x="36" y="57" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" font-weight="600" fill="#8E8E93" letter-spacing="0.9">YOUR BROWSER  ·  what you see &amp; interact with</text>
+
+  <!-- Overview -->
+  <rect x="36"  y="65" width="180" height="70" rx="10" fill="#F2F2F7" stroke="#E5E5EA" stroke-width="1"/>
+  <text x="126" y="91"  font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13" font-weight="600" fill="#1C1C1E" text-anchor="middle">Overview</text>
+  <text x="126" y="109" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Portfolio · Sectors · P&amp;L</text>
+
+  <!-- Holdings -->
+  <rect x="228" y="65" width="180" height="70" rx="10" fill="#F2F2F7" stroke="#E5E5EA" stroke-width="1"/>
+  <text x="318" y="91"  font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13" font-weight="600" fill="#1C1C1E" text-anchor="middle">Holdings</text>
+  <text x="318" y="109" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Verdicts · Live prices</text>
+
+  <!-- Analytics -->
+  <rect x="420" y="65" width="180" height="70" rx="10" fill="#F2F2F7" stroke="#E5E5EA" stroke-width="1"/>
+  <text x="510" y="91"  font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13" font-weight="600" fill="#1C1C1E" text-anchor="middle">Analytics</text>
+  <text x="510" y="109" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Charts · Risk · Signals</text>
+
+  <!-- News -->
+  <rect x="612" y="65" width="180" height="70" rx="10" fill="#F2F2F7" stroke="#E5E5EA" stroke-width="1"/>
+  <text x="702" y="91"  font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13" font-weight="600" fill="#1C1C1E" text-anchor="middle">News</text>
+  <text x="702" y="109" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Headlines · Themes</text>
+
+  <!-- ── Arrow 1 ── -->
+  <line x1="430" y1="150" x2="430" y2="168" stroke="#C7C7CC" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="446" y="162" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9" fill="#AEAEB2">HTTP · JSON</text>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       LAYER 2 · FASTAPI SERVER
+  ════════════════════════════════════════════════════════════ -->
+  <rect x="16" y="172" width="828" height="190" rx="12" fill="#EDF4FF" stroke="#C7D9F7" stroke-width="1.5" filter="url(#s)"/>
+  <text x="36" y="192" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" font-weight="600" fill="#3478F6" letter-spacing="0.9">FASTAPI SERVER  ·  runs entirely on your computer  ·  localhost:8000</text>
+
+  <!-- Router boxes — y=201, h=52 -->
+  <rect x="36"  y="201" width="180" height="52" rx="8" fill="#FFFFFF" stroke="#D1E3FF" stroke-width="1" filter="url(#s)"/>
+  <text x="126" y="223" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">Market Data</text>
+  <text x="126" y="241" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#8E8E93" text-anchor="middle">/api/stocks/*</text>
+
+  <rect x="228" y="201" width="180" height="52" rx="8" fill="#FFFFFF" stroke="#D1E3FF" stroke-width="1" filter="url(#s)"/>
+  <text x="318" y="223" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">Portfolio</text>
+  <text x="318" y="241" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#8E8E93" text-anchor="middle">/api/portfolio/*</text>
+
+  <rect x="420" y="201" width="180" height="52" rx="8" fill="#FFFFFF" stroke="#D1E3FF" stroke-width="1" filter="url(#s)"/>
+  <text x="510" y="223" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">AI + Intelligence</text>
+  <text x="510" y="241" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#8E8E93" text-anchor="middle">/api/ai/*</text>
+
+  <rect x="612" y="201" width="180" height="52" rx="8" fill="#FFFFFF" stroke="#D1E3FF" stroke-width="1" filter="url(#s)"/>
+  <text x="702" y="223" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">News</text>
+  <text x="702" y="241" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#8E8E93" text-anchor="middle">/api/news/*</text>
+
+  <!-- Intelligence Engine outer box — y=265, h=86 -->
+  <rect x="36" y="265" width="756" height="86" rx="8" fill="#FFFFFF" stroke="#D1E3FF" stroke-width="1" filter="url(#s)"/>
+  <text x="414" y="282" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" font-weight="600" fill="#3478F6" text-anchor="middle" letter-spacing="0.7">INTELLIGENCE ENGINE</text>
+
+  <!-- Local inner box -->
+  <rect x="48" y="288" width="358" height="52" rx="7" fill="#F0FFF4" stroke="#34C759" stroke-width="1"/>
+  <circle cx="68" cy="314" r="4" fill="#34C759"/>
+  <text x="82" y="310" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" font-weight="600" fill="#1A7031">Local Intelligence  ·  always on, no key needed</text>
+  <text x="82" y="328" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#3A8A3A">Signals · Verdicts · Scenarios · Exposure · Market Regime</text>
+
+  <!-- Claude inner box -->
+  <rect x="418" y="288" width="362" height="52" rx="7" fill="#FFF8ED" stroke="#FF9500" stroke-width="1"/>
+  <circle cx="438" cy="314" r="4" fill="#FF9500"/>
+  <text x="452" y="310" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" font-weight="600" fill="#B84E00">Claude AI  ·  optional</text>
+  <text x="452" y="328" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#996600">Action Plan · Briefing · News Themes · Analytics narrative</text>
+
+  <!-- ── Arrows 2 (server → external) ── -->
+  <line x1="142" y1="362" x2="142" y2="383" stroke="#C7C7CC" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <line x1="430" y1="362" x2="430" y2="383" stroke="#C7C7CC" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <line x1="718" y1="362" x2="718" y2="383" stroke="#FF9500" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-orange)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       LAYER 3 · EXTERNAL / STORAGE
+  ════════════════════════════════════════════════════════════ -->
+
+  <!-- SQLite — x=16, w=252 -->
+  <rect x="16" y="383" width="252" height="86" rx="12" fill="#FFFFFF" stroke="#E5E5EA" stroke-width="1.5" filter="url(#s)"/>
+  <text x="142" y="411" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">SQLite Database</text>
+  <text x="142" y="430" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Holdings · Verdicts · AI cache</text>
+  <text x="142" y="455" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" font-weight="600" fill="#34C759" text-anchor="middle">Stays on your machine</text>
+
+  <!-- Yahoo Finance — x=304, w=252 -->
+  <rect x="304" y="383" width="252" height="86" rx="12" fill="#FFFFFF" stroke="#E5E5EA" stroke-width="1.5" filter="url(#s)"/>
+  <text x="430" y="411" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">Yahoo Finance</text>
+  <text x="430" y="430" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Prices · News · Analyst data</text>
+  <text x="430" y="455" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#6E6E73" text-anchor="middle">Cached  ·  free  ·  via yfinance</text>
+
+  <!-- Anthropic Claude — x=592, w=252 -->
+  <rect x="592" y="383" width="252" height="86" rx="12" fill="#FFFAF2" stroke="#FFD88D" stroke-width="1.5" filter="url(#s)"/>
+  <text x="718" y="411" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12.5" font-weight="600" fill="#1C1C1E" text-anchor="middle">Anthropic Claude</text>
+  <text x="718" y="430" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6E6E73" text-anchor="middle">Action Plans · Smart briefings</text>
+  <text x="718" y="455" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" font-weight="600" fill="#CC6600" text-anchor="middle">Optional  ·  bring your own key</text>
+
+  <!-- ── Footer ── -->
+  <text x="430" y="480" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#AEAEB2" text-anchor="middle">No cloud account required  ·  no data leaves your machine unless you add a Claude key</text>
+</svg>
