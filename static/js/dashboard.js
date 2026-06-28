@@ -9233,8 +9233,22 @@ async function setHoldMode(event, holdingId, ticker, mode) {
     }
     const nextClass = _HOLD_MODE_META[mode] ? mode : "auto";
     const holding = latestHoldings.find(h => h.id === holdingId || h.ticker === ticker) || {};
-    const current = holding.hold_class || "auto";
-    if (current === nextClass) return;
+    const prevClass = holding.hold_class || "auto";
+    if (prevClass === nextClass) return;
+
+    // Optimistic update — apply immediately so the UI responds without waiting for the network
+    latestHoldings = latestHoldings.map(h => (
+        h.id === holdingId || h.ticker === ticker ? { ...h, hold_class: nextClass } : h
+    ));
+    if (cachedVerdicts[ticker]) {
+        cachedVerdicts[ticker] = { ...cachedVerdicts[ticker], hold_class: nextClass };
+    }
+    _syncHoldModeStrip(ticker, nextClass);
+    _syncManageHoldModeCard(holdingId, nextClass);
+
+    // Lock the grid during the PUT to prevent double-tap
+    const grid = document.querySelector(`#manage-row-${holdingId} .manage-hold-mode-grid`);
+    grid?.classList.add("is-saving");
 
     try {
         const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
@@ -9244,23 +9258,24 @@ async function setHoldMode(event, holdingId, ticker, mode) {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        latestHoldings = latestHoldings.map(h => (
-            h.id === holdingId || h.ticker === ticker ? { ...h, hold_class: nextClass } : h
-        ));
-        if (cachedVerdicts[ticker]) {
-            cachedVerdicts[ticker] = { ...cachedVerdicts[ticker], hold_class: nextClass };
-        }
-
-        _syncHoldModeStrip(ticker, nextClass);
-        _syncManageHoldModeCard(holdingId, nextClass);
-
         const label = _HOLD_MODE_META[nextClass]?.label || nextClass;
         showToast(`${ticker}: ${label} mode`, "success");
         refreshPortfolioMutationInBackground({ includeRecommendations: false });
         refreshAiVerdicts();
     } catch (err) {
+        // Rollback to the previous mode on failure
+        latestHoldings = latestHoldings.map(h => (
+            h.id === holdingId || h.ticker === ticker ? { ...h, hold_class: prevClass } : h
+        ));
+        if (cachedVerdicts[ticker]) {
+            cachedVerdicts[ticker] = { ...cachedVerdicts[ticker], hold_class: prevClass };
+        }
+        _syncHoldModeStrip(ticker, prevClass);
+        _syncManageHoldModeCard(holdingId, prevClass);
         console.warn("Unable to set hold mode:", err);
         showToast("Mode update failed", "danger");
+    } finally {
+        grid?.classList.remove("is-saving");
     }
 }
 

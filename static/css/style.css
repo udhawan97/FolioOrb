@@ -3444,30 +3444,31 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.18rem;
+    gap: 0.22rem;
     flex: 1;
     min-width: 56px;
-    min-height: 50px;
-    padding: 0.42rem 0.45rem;
+    min-height: 56px;
+    padding: 0.5rem 0.5rem;
     border-radius: 9px;
     border: none;
     background: transparent;
     color: var(--text-tertiary);
-    font-size: 0.615rem;
+    font-size: 0.63rem;
     font-weight: 600;
     line-height: 1.2;
     text-align: center;
     cursor: pointer;
     transition:
         color      0.15s var(--ease),
-        background 0.15s var(--ease);
+        background 0.15s var(--ease),
+        box-shadow 0.15s var(--ease);
     -webkit-tap-highlight-color: transparent;
 }
 
 .manage-hold-mode-box i {
-    font-size: 0.92rem;
-    opacity: 0.45;
-    transition: opacity 0.2s var(--ease), transform 0.22s var(--spring);
+    font-size: 1.05rem;
+    opacity: 0.62;
+    transition: opacity 0.15s var(--ease), transform 0.18s var(--spring);
 }
 
 .manage-hold-mode-box-label {
@@ -3538,6 +3539,7 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
     font-size: 0.67rem;
     line-height: 1.5;
     color: var(--text-secondary);
+    transition: border-left-color 0.15s var(--ease), background 0.15s var(--ease);
 }
 
 .manage-hold-mode-detail strong {
@@ -3576,6 +3578,13 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
         min-height: 46px;
         padding: 0.38rem 0.32rem;
     }
+}
+
+/* ── Saving state — block double-tap during PUT in-flight ── */
+.manage-hold-mode-grid.is-saving .manage-hold-mode-box {
+    pointer-events: none;
+    opacity: 0.72;
+    transition: opacity 0.12s var(--ease);
 }
 
 /* Skeleton cards */
