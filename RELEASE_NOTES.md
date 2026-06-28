@@ -72,33 +72,31 @@ v4.1 is a tightening: the same cockpit, now easier to configure and harder to mi
 
 ## Install & Upgrade
 
-### Fresh install
+**Prerequisite:** Python 3.11+ from [python.org](https://www.python.org/downloads/). Windows: check "Add Python to PATH" during install.
 
-**Mac / Linux**
+### Mac — one command
+
+Open Terminal (⌘ Space → "Terminal"), paste, and press Enter:
 
 ```bash
-curl -L -o FolioSenseAI-v4.1.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip
-unzip FolioSenseAI-v4.1.zip
-cd FolioSenseAI-release-v4.1
-./scripts/setup.sh
+curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioSenseAI/release-v4.1/scripts/install-mac.sh | bash
 ```
 
-**Windows PowerShell**
+Downloads, installs, and places a **FolioSenseAI** shortcut on your Desktop. Browser opens automatically. Next time: double-click the Desktop shortcut.
+
+### Windows — one command
+
+Open PowerShell (Win+R → "powershell"), paste, and press Enter:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip" -OutFile "FolioSenseAI-v4.1.zip"
-Expand-Archive -Path "FolioSenseAI-v4.1.zip" -DestinationPath .
-cd FolioSenseAI-release-v4.1
-.\scripts\setup.ps1
+irm https://raw.githubusercontent.com/udhawan97/FolioSenseAI/release-v4.1/scripts/install-win.ps1 | iex
 ```
 
-### Upgrade from v4.0
+Downloads, installs, and places a **FolioSenseAI** shortcut on your Desktop. Browser opens automatically. Next time: double-click the Desktop shortcut.
 
-1. Stop the app (`Ctrl+C`).
-2. Back up `database/` and `.env`.
-3. Download v4.1 into a **new folder** — do not overwrite in place.
-4. Copy `database/` and `.env` into the new tree.
-5. Run setup once, then use `start.sh` / `start.ps1` going forward.
+### Upgrading from v4.0
+
+Run the same install command above — it detects your existing `database/` and `.env`, preserves them, and starts the updated app. No manual backup or file copying required.
 
 No schema migration or `.env` change required. All v4.0 data carries over as-is.
 

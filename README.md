@@ -138,124 +138,96 @@ Each tab has an insight bar and per-widget tip cards via `/api/ai/analytics-insi
 
 ---
 
-## 🚀 Install, Run, Update
+## 🚀 Install & Run
 
-FolioSenseAI runs locally at [`http://localhost:8000`](http://localhost:8000). Your holdings stay on your machine unless you personally teach them to leave.
+FolioSenseAI runs entirely on your computer. No account needed, no data leaves your machine.
 
-### Prerequisites
+**One prerequisite:** Python 3.11+ — [download here](https://www.python.org/downloads/), click the yellow button, run the installer.
+> **Windows only:** on the first installer screen, check **"Add Python to PATH"** before clicking Install.
 
-| Requirement | Notes |
-| --- | --- |
-| Python 3.11+ | [python.org](https://www.python.org/downloads/) — reopen your terminal after installing |
-| Git or a release ZIP | For cloning or downloading a release archive |
-| A terminal | bash, zsh, or PowerShell |
-| Anthropic API key | **Optional** — [console.anthropic.com](https://console.anthropic.com/). Market data and Local Intelligence work without it. |
+---
 
-### Fresh Install
+### 🍎 Mac — one command
 
-<details open>
-<summary>🍎 Mac / Linux</summary>
+Open **Terminal** (press **⌘ Space**, type *Terminal*, press **Enter**), paste the line below, and press **Enter**:
 
 ```bash
-curl -L -o FolioSenseAI-v4.1.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip
-unzip FolioSenseAI-v4.1.zip
-cd FolioSenseAI-release-v4.1
-./scripts/setup.sh
+curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioSenseAI/release-v4.1/scripts/install-mac.sh | bash
 ```
 
-</details>
+That's it. The script downloads FolioSenseAI, installs dependencies, and puts a **FolioSenseAI** shortcut on your Desktop. Your browser opens automatically when the app is ready.
 
-<details>
-<summary>🪟 Windows PowerShell</summary>
+**Next time:** double-click the **FolioSenseAI** icon on your Desktop.
+
+---
+
+### 🪟 Windows — one command
+
+Open **PowerShell** (press **Win+R**, type `powershell`, press **Enter**), paste the line below, and press **Enter**:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip" -OutFile "FolioSenseAI-v4.1.zip"
-Expand-Archive -Path "FolioSenseAI-v4.1.zip" -DestinationPath .
-cd FolioSenseAI-release-v4.1
-.\scripts\setup.ps1
+irm https://raw.githubusercontent.com/udhawan97/FolioSenseAI/release-v4.1/scripts/install-win.ps1 | iex
 ```
 
-</details>
+That's it. The script downloads FolioSenseAI, installs dependencies, and puts a **FolioSenseAI** shortcut on your Desktop. Your browser opens automatically when the app is ready.
 
-The setup script creates `venv/`, installs pinned dependencies, creates `database/`, writes `.env` if missing, and starts the app. Keep the terminal open while using the dashboard — it is the engine room, not decorative clutter.
+**Next time:** double-click the **FolioSenseAI** icon on your Desktop.
 
-### Daily Start
+---
 
-```bash
-./scripts/start.sh          # Mac / Linux
-.\scripts\start.ps1         # Windows PowerShell
-```
+**Keep the Terminal / console window open while using the app — closing it stops the server.** Press **Ctrl+C** to stop.
 
-### Update
+---
 
-<details open>
-<summary>🧳 From a release ZIP</summary>
+### Claude API key (optional)
 
-1. Stop the app (`Ctrl+C`).
-2. Back up `database/` and `.env`.
-3. Download the new release into a **new folder** — do not overwrite in place.
-4. Copy your backed-up `database/` and `.env` into the new folder.
-5. Run setup once, then use the start script going forward.
+The app works fully offline with Local Intelligence. For Claude AI features (action plans, news briefings), click the **brand mark** in the top-left of the dashboard, paste your `sk-ant-*` key, and save — no restart needed.
 
-```bash
-# Mac / Linux
-./scripts/setup.sh --no-start
-./scripts/start.sh
-```
+Get a key at [console.anthropic.com](https://console.anthropic.com/). Action Plan responses are cached 24 h so you won't be re-billed on every refresh.
 
-```powershell
-# Windows
-.\scripts\setup.ps1 -NoStart
-.\scripts\start.ps1
-```
+---
 
-</details>
+### Updating to a new version
+
+Run the install command again — it preserves your portfolio data and settings automatically, then starts the updated app.
+
+---
 
 <details>
-<summary>🌿 From git</summary>
-
-```bash
-# Mac / Linux
-git pull --ff-only
-./scripts/setup.sh --no-start
-./scripts/start.sh
-```
-
-```powershell
-# Windows
-git pull --ff-only
-.\scripts\setup.ps1 -NoStart
-.\scripts\start.ps1
-```
-
-</details>
-
-v4.1 has no database schema changes and no new `.env` fields — drop in your existing `database/` and `.env` and start. All tables from v4.0 carry over as-is.
-
-<details>
-<summary>🤖 Claude API setup (optional)</summary>
-
-Add to `.env`, then restart:
-
-```env
-ANTHROPIC_API_KEY=sk-ant-your-real-key-goes-here
-```
-
-Claude API usage is billed separately from Claude Pro. Action Plan responses are cached 24 hours; news themes cache by headline signature. Billing anxiety is a design smell.
-
-</details>
-
-<details>
-<summary>🩹 Common fixes</summary>
+<summary>🩹 Something not working?</summary>
 
 | Symptom | Fix |
 | --- | --- |
-| `Python 3.11+ is required` | Install Python from [python.org](https://www.python.org/downloads/) and reopen the terminal. |
-| PowerShell blocks scripts | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`. |
-| `Permission denied` on Mac/Linux | Run `chmod +x scripts/setup.sh scripts/start.sh`. |
-| `localhost:8000` will not load | Keep the terminal running and confirm the app did not crash. |
-| Port `8000` is busy | Stop the other app using that port, or change the port in `run.py`. |
-| AI features are disabled | Add `ANTHROPIC_API_KEY` to `.env` and restart. |
+| `Python not found` | Install Python from [python.org](https://www.python.org/downloads/) and open a **new** terminal window. |
+| Windows: `winget` fails | Install Python manually, check "Add to PATH", then re-run the command. |
+| Mac: `curl: command not found` | This shouldn't happen on any modern Mac — reinstall macOS command-line tools: `xcode-select --install`. |
+| Browser doesn't open | Navigate to [http://localhost:8000](http://localhost:8000) manually. |
+| `localhost:8000` won't load | The terminal window must stay open — it is the server. |
+| Port 8000 is busy | Stop the other app on that port, or change the port in `run.py`. |
+| AI shows "Local" mode | Click the brand mark in the dashboard and paste your API key. |
+
+</details>
+
+<details>
+<summary>⚙️ Manual install (advanced)</summary>
+
+If you prefer to manage the files yourself:
+
+```bash
+# Mac / Linux
+curl -L -o FolioSenseAI.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip
+unzip FolioSenseAI.zip && cd FolioSenseAI-release-v4.1
+./scripts/setup.sh
+```
+
+```powershell
+# Windows PowerShell
+Invoke-WebRequest "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip" -OutFile FolioSenseAI.zip
+Expand-Archive FolioSenseAI.zip; cd FolioSenseAI-release-v4.1
+.\scripts\setup.ps1
+```
+
+Daily start: `./scripts/start.sh` (Mac) or `.\scripts\start.ps1` (Windows).
 
 </details>
 
