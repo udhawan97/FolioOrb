@@ -29,12 +29,12 @@ _TOKEN_USAGE: dict[str, int] = {"total_in": 0, "total_out": 0}
 def reinitialize_client(new_key: str) -> None:
     """Swap in a new API key at runtime without restarting the server."""
     global client, _HEARTBEAT_CACHE  # pylint: disable=global-statement
-    settings.ANTHROPIC_API_KEY = new_key
+    setattr(settings, "ANTHROPIC_API_KEY", new_key)
     client = anthropic.Anthropic(api_key=new_key)
     _HEARTBEAT_CACHE = None  # force next poll to do a live check
 
 
-def _track_usage(model: str, usage) -> None:  # noqa: ARG001
+def _track_usage(_model: str, usage) -> None:
     _TOKEN_USAGE["total_in"] += getattr(usage, "input_tokens", 0) or 0
     _TOKEN_USAGE["total_out"] += getattr(usage, "output_tokens", 0) or 0
 
