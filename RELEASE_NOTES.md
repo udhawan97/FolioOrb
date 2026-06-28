@@ -1,3 +1,115 @@
+# FolioSenseAI v4.1 Release Notes
+
+**Release date:** June 28, 2026
+
+---
+
+## ✦ The Dashboard Finally Knows Its Own Key
+
+> *v4.1 is the release where setup stopped requiring a text editor. You can now hand Claude your API key from the dashboard itself — and watch it spend every token in real time.*
+
+FolioSenseAI now has an **in-dashboard API key panel**. Click the brand mark, paste your `sk-ant-*` key, and the dashboard validates it, writes it to `.env`, and reconnects Claude without a restart. No terminal. No `.env` file hunting. Input is validated client-side and server-side against the canonical Anthropic key format before a single character touches disk.
+
+The cost HUD in the nav got honest. Instead of estimating from cache occupancy, the dashboard now tracks **real token counts** across every Claude call made in the session. The nav breakdown shows actual input and output tokens, a live cost figure, and a predicted per-run annotation derived from backend constants — so you always know what a full scan costs before you click refresh again.
+
+The holdings table got faster and more responsive. Rows now expand on the **first click**, latency on the expand path was cut, and an **auto-refresh** keeps prices current without manual intervention. The Overview sector graph was refactored to render weighted bars with proper proportional fills and a clean overflow note.
+
+v4.1 is a tightening: the same cockpit, now easier to configure and harder to misread.
+
+---
+
+## What's New
+
+### In-Dashboard API Key Configuration
+
+- **`POST /api/ai/configure-key`** — accepts an `api_key` body, validates against `^sk-ant-[A-Za-z0-9_\-]{20,300}$`, writes a single `ANTHROPIC_API_KEY=…` line to `.env` (creating the file if absent), and reloads the Anthropic client in-process. No restart required.
+- **API Key panel** — accessible from the brand mark in the nav. Password-type input with show/hide toggle, live keystroke validation (strips paste garbage, checks format character-by-character), a save button that activates only when the key is structurally valid, and an inline status message on success or failure. Closes on click-outside and Escape.
+- **Heartbeat reconnect** — on a successful key save the panel triggers a fresh `/api/ai/heartbeat` call so the HUD mode chip updates from Local → Claude AI without reloading the page.
+- **`reinitialize_client()`** in `ai_service.py` — hot-swaps the module-level Anthropic client with a new key, allowing the server to pick up a key change without process restart.
+
+### Live Token Cost Tracking
+
+- **`_track_usage()`** in `ai_service.py` — called after every `client.messages.create()`, accumulates `total_in` / `total_out` across the process lifetime in a module-level counter.
+- **`get_accumulated_usage()`** — exposes the live totals for the cache stats route.
+- **`/api/ai/cache/stats`** now returns:
+  - `actual_input_tokens` / `actual_output_tokens` / `actual_cost_usd` — real tracked tokens from this session
+  - `predicted_per_run.cost_usd` — computed from `_PREDICTED_IN/OUT_PER_RUN` constants using live pricing, so updating the constants or rates reflects immediately on next poll
+  - `pricing` block — input/output rates the frontend reads directly; rates are no longer hardcoded in JS
+- **Cost HUD** — frontend prefers actual tracked tokens when available, falls back to cache estimate when none have been spent. Appends `~$0.0003 / full scan (~5,600 tok)` to the breakdown line derived from backend constants.
+
+### Holdings Table
+
+- **Auto-refresh** — the holdings table now refreshes live prices on an interval without a manual trigger. A subtle CSS indicator marks the refresh cycle.
+- **First-click expand** — rows now inject the summary expansion via `injectSummaryRows` before attempting to open, so the detail pane appears on the very first click. The previous two-click flow is gone.
+- **Latency patch** — the expand path was rescheduled to reduce perceived latency; the scanning animation fires immediately while intelligence loads asynchronously behind it.
+
+### Overview Sector Graph
+
+- **Proportional fills** — sector bars now render weighted fills using `--snapshot-fill` CSS custom properties, scaled relative to the top sector rather than absolute percentages, so a single-dominant-sector portfolio does not show every bar at 100%.
+- **Overflow note** — when more sectors are held than the strip can display, a `+N more` note appears below the visible bars.
+- **Dot + track layout** — each row now has a leading coloured dot, a labelled track, and a fill bar, replacing the previous plain-text list.
+
+### Bug Fixes
+
+- **Font resize regression** — a resize event was causing text scaling to clamp incorrectly when the panel container had not yet fully painted; the measurement is now deferred past the layout tick.
+- **Scrolling bug** — a competing `overflow` rule on the holdings container was intercepting scroll events on the inner panel; specificity corrected.
+- **Ticker management** — adding a ticker through the manage modal now correctly triggers a fresh quote load for the newly added position without requiring a full page reload.
+
+---
+
+## Developer Notes
+
+- FastAPI metadata version still **`4.0.0`** — no API contract changes, only additions.
+- New endpoint: `POST /api/ai/configure-key` — in `app/routers/ai.py`
+- New helper: `_update_env_file(key, value)` — writes a single `KEY=VALUE` line to `.env` atomically; creates the file if absent
+- New functions in `ai_service.py`: `_track_usage()`, `get_accumulated_usage()`, `reinitialize_client()`
+- Static cache keys: `style.css?v=99`, `dashboard.js?v=91`, `analytics-charts.js?v=14`
+- **361 tests passing** (up from 356 in v4.0)
+- No database schema changes — no migration required.
+- No `.env` changes required; the key panel writes `.env` for you.
+
+---
+
+## Install & Upgrade
+
+### Fresh install
+
+**Mac / Linux**
+
+```bash
+curl -L -o FolioSenseAI-v4.1.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip
+unzip FolioSenseAI-v4.1.zip
+cd FolioSenseAI-release-v4.1
+./scripts/setup.sh
+```
+
+**Windows PowerShell**
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip" -OutFile "FolioSenseAI-v4.1.zip"
+Expand-Archive -Path "FolioSenseAI-v4.1.zip" -DestinationPath .
+cd FolioSenseAI-release-v4.1
+.\scripts\setup.ps1
+```
+
+### Upgrade from v4.0
+
+1. Stop the app (`Ctrl+C`).
+2. Back up `database/` and `.env`.
+3. Download v4.1 into a **new folder** — do not overwrite in place.
+4. Copy `database/` and `.env` into the new tree.
+5. Run setup once, then use `start.sh` / `start.ps1` going forward.
+
+No schema migration or `.env` change required. All v4.0 data carries over as-is.
+
+---
+
+## Final Word
+
+v4.1 is still not financial advice. It is just the first version that will let you configure Claude from the dashboard while watching exactly how much each opinion costs.
+
+---
+
 # FolioSenseAI v4.0 Release Notes
 
 **Release date:** June 27, 2026

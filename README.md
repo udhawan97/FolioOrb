@@ -10,7 +10,7 @@
 <p align="center"><em>Your folio, finally making sense.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v4.0-brightgreen?style=flat-square" alt="Release v4.0"/>
+  <img src="https://img.shields.io/badge/release-v4.1-brightgreen?style=flat-square" alt="Release v4.1"/>
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/FastAPI-0.136.3-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/Claude-optional-D4A853?style=flat-square&logo=anthropic&logoColor=white" alt="Claude optional"/>
@@ -27,7 +27,7 @@
 
 ---
 
-> **v4.0** — FolioSenseAI now knows what happened, what to do about it, and what the headlines say. A new Portfolio Action Plan breaks your book into Hold / Add / Trim / Exit buckets with a Claude thesis and regime-aware context — or a deterministic local plan when you'd rather not involve the AI. A new News tab pulls live headlines for every holding and clusters them by cross-portfolio theme, with a Claude-narrated portfolio briefing on top. The cockpit now has four zones. Still not financial advice. Now significantly harder to ignore.
+> **v4.1** — FolioSenseAI now lets you configure Claude from the dashboard itself. Paste your API key into the new in-UI key panel, and the app validates, saves, and reconnects without a restart. Real token counts accumulate in-session and surface in the cost HUD — you see what every Claude call actually spent, not an estimate. The holdings table auto-refreshes, expands on first click, and loads faster. The Overview sector graph renders proportional fills with proper overflow handling.
 
 <p align="center">
   <img src="docs/dashboard.png" alt="FolioSenseAI dashboard" width="860"/>
@@ -40,7 +40,7 @@
 ## Contents
 
 - [Why It Exists](#-why-it-exists)
-- [v4 Highlights](#-v4-highlights)
+- [v4.1 Highlights](#-v41-highlights)
 - [Tech Stack](#️-tech-stack)
 - [Install, Run, Update](#-install-run-update)
 - [Developer Notes](#-developer-notes)
@@ -61,14 +61,21 @@ FolioSenseAI is a self-hosted FastAPI dashboard for investors who want more than
 
 ---
 
-## 🧠 v4 Highlights
+## 🧠 v4.1 Highlights
 
-**New in v4.0**
+**New in v4.1**
+
+- **In-dashboard API key panel** — click the brand mark, paste your `sk-ant-*` key, and the dashboard validates, writes it to `.env`, and reconnects Claude without a restart. No terminal required. The key is validated client-side and server-side against the canonical Anthropic format before touching disk.
+- **Live token cost tracking** — every Claude call accumulates real token counts session-wide. The cost HUD shows actual input/output tokens, a live cost figure, and a predicted per-run annotation — so you see exactly what each scan costs, not an estimate from cache occupancy.
+- **Holdings table auto-refresh + first-click expand** — prices refresh on an interval automatically; rows now expand on the very first click without the previous two-click workaround.
+- **Overview sector graph refactor** — proportional fills scaled relative to the top sector, leading dot + track layout, and an overflow note for portfolios with more sectors than the strip can show.
+- **361 tests** — up from 356 in v4.0.
+
+**From v4.0**
 
 - **Portfolio Action Plan** — Claude reads your full book and returns a prioritized Hold / Add / Trim / Exit bucket plan with a thesis and top moves per bucket. Cached 24 h with portfolio-state drift invalidation so it stays fresh without re-billing you every refresh. Falls back to a deterministic local plan instantly when Claude is unavailable or when you'd prefer the quiet.
 - **Regime-aware context** — the Action Plan surfaces the current market regime (risk-on / risk-off / neutral) alongside the Claude thesis so bucket decisions have macro backdrop, not just holding-level math.
 - **News tab** — a fourth dashboard zone pulls live headlines for every active holding via yfinance, deduped, cached, and grouped by ticker. Claude-mode adds a portfolio-wide briefing and cross-holding theme clusters (one Haiku call) so you can see which macro story is hitting three positions at once.
-- **356 tests** — up from 297 in v3.1, covering the full action-plan pipeline (Claude path, local fallback, cache invalidation, regime injection) and news service (fetch, dedup, theme snapshot).
 
 **From v3.1**
 
@@ -150,9 +157,9 @@ FolioSenseAI runs locally at [`http://localhost:8000`](http://localhost:8000). Y
 <summary>🍎 Mac / Linux</summary>
 
 ```bash
-curl -L -o FolioSenseAI-v4.0.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.0.zip
-unzip FolioSenseAI-v4.0.zip
-cd FolioSenseAI-release-v4.0
+curl -L -o FolioSenseAI-v4.1.zip https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip
+unzip FolioSenseAI-v4.1.zip
+cd FolioSenseAI-release-v4.1
 ./scripts/setup.sh
 ```
 
@@ -162,9 +169,9 @@ cd FolioSenseAI-release-v4.0
 <summary>🪟 Windows PowerShell</summary>
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.0.zip" -OutFile "FolioSenseAI-v4.0.zip"
-Expand-Archive -Path "FolioSenseAI-v4.0.zip" -DestinationPath .
-cd FolioSenseAI-release-v4.0
+Invoke-WebRequest -Uri "https://github.com/udhawan97/FolioSenseAI/archive/refs/tags/release-v4.1.zip" -OutFile "FolioSenseAI-v4.1.zip"
+Expand-Archive -Path "FolioSenseAI-v4.1.zip" -DestinationPath .
+cd FolioSenseAI-release-v4.1
 .\scripts\setup.ps1
 ```
 
@@ -223,7 +230,7 @@ git pull --ff-only
 
 </details>
 
-v4.0 has no database schema changes and no new `.env` fields — drop in your existing `database/` and `.env` and start. All tables from v3.x carry over as-is.
+v4.1 has no database schema changes and no new `.env` fields — drop in your existing `database/` and `.env` and start. All tables from v4.0 carry over as-is.
 
 <details>
 <summary>🤖 Claude API setup (optional)</summary>
@@ -301,7 +308,7 @@ scripts/             — setup and start scripts for Mac/Linux and Windows
 | **Market data** | `/api/stocks/prices`, `/api/stocks/history/{ticker}`, `/api/stocks/world-markets`, `/api/stocks/market-status` |
 | **Portfolio** | `/api/portfolio/holdings`, `/api/portfolio/value`, `/api/portfolio/pnl`, `/api/portfolio/projection`, `/api/portfolio/risk-metrics`, `/api/portfolio/correlation` |
 | **Analytics** | `/api/portfolio/drawdown`, `/api/portfolio/beta`, `/api/portfolio/rolling-volatility`, `/api/portfolio/sector-tilt`, `/api/portfolio/conviction-gaps`, `/api/portfolio/market-context` |
-| **AI / Intelligence** | `/api/ai/investment-signals/all`, `/api/ai/portfolio-summary`, `/api/ai/portfolio-exposure`, `/api/ai/verdict-calibration`, `/api/ai/analytics-insights`, `/api/ai/intelligence/{ticker}/deep`, `/api/ai/action-plan` |
+| **AI / Intelligence** | `/api/ai/investment-signals/all`, `/api/ai/portfolio-summary`, `/api/ai/portfolio-exposure`, `/api/ai/verdict-calibration`, `/api/ai/analytics-insights`, `/api/ai/intelligence/{ticker}/deep`, `/api/ai/action-plan`, `/api/ai/configure-key` |
 | **News** | `/api/news/feed`, `/api/news/themes` |
 
 Open [`/docs`](http://localhost:8000/docs) locally for the full interactive FastAPI reference.
