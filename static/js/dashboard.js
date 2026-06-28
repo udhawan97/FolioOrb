@@ -3849,21 +3849,27 @@ function toggleSummaryRow(mainRow) {
             _lastExpandedHoldingTicker = ticker;
             const needsIntel = !cachedVerdicts[ticker] || !holdingIntelSettled(ticker);
             if (needsIntel && !intelligenceRetryingTickers.has(ticker)) {
-                const hub = document.getElementById("holdings-intel-hub");
-                if (hub) {
-                    hub.classList.add("is-scanning");
-                    hub.classList.remove("is-ready", "is-idle");
+                if (!intelligenceLoaded && !intelligenceLoading) {
+                    // Full batch hasn't run yet — trigger the same scanning animation
+                    // as the Local/AI Intel button so the user sees the check in progress.
+                    loadHoldingIntelligence();
+                } else {
+                    // Batch already ran; this ticker needs a targeted retry.
+                    const hub = document.getElementById("holdings-intel-hub");
+                    if (hub) {
+                        hub.classList.add("is-scanning");
+                        hub.classList.remove("is-ready", "is-idle");
+                    }
+                    loadTargetedHoldingIntelligence(ticker).finally(() => {
+                        updateHoldingsIntelHub({ scanning: intelligenceLoading, ready: intelligenceLoaded });
+                    });
+                    window.setTimeout(() => {
+                        if (holdingIntelSettled(ticker)) return;
+                        const expandRow = mainRow.nextElementSibling;
+                        const hint = expandRow?.querySelector(".intel-slow-hint");
+                        if (hint) hint.hidden = false;
+                    }, 1000);
                 }
-                loadTargetedHoldingIntelligence(ticker).finally(() => {
-                    updateHoldingsIntelHub({ scanning: intelligenceLoading, ready: intelligenceLoaded });
-                });
-                window.setTimeout(() => {
-                    if (holdingIntelSettled(ticker)) return;
-                    const expandRow = mainRow.nextElementSibling;
-                    const hint = expandRow?.querySelector(".intel-slow-hint");
-                    if (hint) hint.hidden = false;
-                    if (!intelligenceLoading && !_aiSummariesLoading) onHoldingsIntelHubClick();
-                }, 1000);
             } else {
                 renderExpandedTicker(ticker);
             }
