@@ -10417,6 +10417,30 @@ body > .dashboard-pet {
     gap: 0.42rem;
     padding: 0.42rem 0.5rem;
 }
+
+/* snapshot-sector-item doubles as a tip-trigger — keep its row shape, not the
+   default circular icon-button shape from the base .tip-trigger rule. */
+.snapshot-sector-item.tip-trigger {
+    display: flex;
+    width: auto;
+    height: auto;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    margin-left: 0;
+    top: 0;
+    cursor: help;
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.2s var(--spring);
+}
+.snapshot-sector-item.tip-trigger:hover {
+    color: inherit;
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--snapshot-color) 45%, transparent);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--snapshot-color) 16%, transparent);
+}
+.snapshot-sector-item.tip-trigger:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--snapshot-color) 70%, transparent);
+    outline-offset: 2px;
+}
 .snapshot-sector-item::before {
     content: "";
     position: absolute;

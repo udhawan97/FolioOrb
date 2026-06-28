@@ -1781,20 +1781,33 @@ function renderAllocation() {
 }
 
 const SNAPSHOT_SECTOR_THEMES = [
-    { match: /tech/i,                        color: "#007AFF", icon: "bi-cpu-fill" },
-    { match: /health/i,                      color: "#FF2D55", icon: "bi-heart-pulse-fill" },
-    { match: /financ/i,                      color: "#5856D6", icon: "bi-bank" },
-    { match: /energy/i,                      color: "#FF9500", icon: "bi-lightning-charge-fill" },
-    { match: /industri/i,                    color: "#00C7BE", icon: "bi-gear-wide-connected" },
-    { match: /consumer disc|discretionary/i, color: "#FF6B35", icon: "bi-bag-fill" },
-    { match: /consumer stap|staples/i,       color: "#34C759", icon: "bi-cart-fill" },
-    { match: /real estate|reit/i,            color: "#AC8E68", icon: "bi-building" },
-    { match: /utilit/i,                      color: "#FFD60A", icon: "bi-plug-fill" },
-    { match: /material/i,                    color: "#BF5AF2", icon: "bi-box-seam" },
-    { match: /communi/i,                     color: "#5AC8FA", icon: "bi-broadcast" },
-    { match: /aero|defense|defence/i,        color: "#06D6A0", icon: "bi-airplane-fill" },
+    { match: /tech/i,                        color: "#007AFF", icon: "bi-cpu-fill",
+      blurb: "Think software, semiconductors, cloud, hardware, and IT services — the folks who quietly run the world and never let you forget it." },
+    { match: /health/i,                      color: "#FF2D55", icon: "bi-heart-pulse-fill",
+      blurb: "Likely pharma, biotech, medical devices, hospitals, and health insurers — the people keeping you alive and the bill alive too." },
+    { match: /financ/i,                      color: "#5856D6", icon: "bi-bank",
+      blurb: "Probably banks, insurers, asset managers, payment networks, and exchanges — they make money making money. Cute, right?" },
+    { match: /energy/i,                      color: "#FF9500", icon: "bi-lightning-charge-fill",
+      blurb: "Mostly oil & gas, drillers, refiners, pipelines, and oilfield services — the stuff that powers your portfolio and your road trips." },
+    { match: /industri/i,                    color: "#00C7BE", icon: "bi-gear-wide-connected",
+      blurb: "Machinery, airlines, railroads, logistics, and construction — the unglamorous gears that keep the economy from seizing up." },
+    { match: /consumer disc|discretionary/i, color: "#FF6B35", icon: "bi-bag-fill",
+      blurb: "Retail, autos, restaurants, travel, and luxury — basically everything you buy when you're feeling optimistic (or impulsive)." },
+    { match: /consumer stap|staples/i,       color: "#34C759", icon: "bi-cart-fill",
+      blurb: "Food, beverages, household goods, and groceries — the stuff people buy in a boom, a bust, and a zombie apocalypse." },
+    { match: /real estate|reit/i,            color: "#AC8E68", icon: "bi-building",
+      blurb: "REITs, property landlords, and developers — they own the building you're standing in and rent it back to you." },
+    { match: /utilit/i,                      color: "#FFD60A", icon: "bi-plug-fill",
+      blurb: "Electric, gas, and water utilities — boring, reliable, and the reason your lights turn on. The dependable friend of the market." },
+    { match: /material/i,                    color: "#BF5AF2", icon: "bi-box-seam",
+      blurb: "Chemicals, metals & mining, packaging, and paper — the raw ingredients everything else is literally made out of." },
+    { match: /communi/i,                     color: "#5AC8FA", icon: "bi-broadcast",
+      blurb: "Telecom, media, streaming, social, gaming, and advertising — where your attention goes to get sold to the highest bidder." },
+    { match: /aero|defense|defence/i,        color: "#06D6A0", icon: "bi-airplane-fill",
+      blurb: "Aircraft makers and defense contractors — they build the things that fly, and occasionally the things that go boom." },
 ];
-const SNAPSHOT_SECTOR_FALLBACK = { color: "#8E8E93", icon: "bi-diagram-3" };
+const SNAPSHOT_SECTOR_FALLBACK = { color: "#8E8E93", icon: "bi-diagram-3",
+    blurb: "The mystery box. Could be anything we haven't sorted into a tidy sector yet — odds, ends, and the occasional surprise. Industry-level detail is on the way." };
 
 function snapshotSectorTheme(name) {
     const n = String(name || "").toLowerCase();
@@ -1908,7 +1921,17 @@ function renderSnapshotSectors(active) {
         const theme = snapshotSectorTheme(s.name);
         const pct = toNumber(s.weight_pct).toFixed(1);
         const normalizedPct = (toNumber(s.weight_pct) / Math.max(maxPct, 1) * 100).toFixed(1);
-        return `<div class="snapshot-sector-item" style="--snapshot-color:${theme.color};--snapshot-pct:${normalizedPct}%;--snapshot-delay:${index * 35}ms">
+        const isOther = !SNAPSHOT_SECTOR_THEMES.some(t => t.match.test(String(s.name || "").toLowerCase()));
+        const tipTitle = `${s.name} · ${pct}%`;
+        const tipHint = isOther
+            ? "Industry-level breakdown coming soon"
+            : "Industries this sector may include";
+        return `<div class="snapshot-sector-item tip-trigger" tabindex="0"
+            style="--snapshot-color:${theme.color};--snapshot-pct:${normalizedPct}%;--snapshot-delay:${index * 35}ms"
+            data-tip-title="${escapeHtml(tipTitle)}"
+            data-tip-body="${escapeHtml(theme.blurb || "")}"
+            data-tip-hint="${escapeHtml(tipHint)}"
+            data-tip-icon="${escapeHtml(theme.icon)}">
             <span class="snapshot-sector-dot"><i class="bi ${theme.icon}" aria-hidden="true"></i></span>
             <span class="snapshot-sector-name">${escapeHtml(s.name)}</span>
             <span class="snapshot-sector-pct">${pct}%</span>
