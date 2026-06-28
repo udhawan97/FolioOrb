@@ -2,16 +2,17 @@
 Tests for app/services/news_service.py — normalization, dedup, and
 feed-route integration.  No real network calls: yfinance is monkeypatched.
 """
+# pylint: disable=protected-access
 import asyncio
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.models import Base, Holding, Portfolio
+from app.routers import news as news_router
 from app.services import news_service
 from app.services.news_service import (
     _normalize_item,
@@ -29,6 +30,7 @@ def _make_raw_item(
     title="AAPL Surges on Earnings",
     article_id="art-001",
     pub_date="2026-06-27T14:00:00Z",
+    *,
     summary="Apple reported strong quarterly results.",
     source_name="Reuters",
     url="https://example.com/aapl-surge",
@@ -259,7 +261,7 @@ class TestFetchTickerNews:
 class TestFetchPortfolioNews:
     def test_empty_tickers_returns_empty(self):
         result = fetch_portfolio_news([])
-        assert result == {}
+        assert not result
 
     def test_dedup_across_tickers(self, monkeypatch):
         """An article returned under two tickers should appear only once."""
@@ -267,7 +269,7 @@ class TestFetchPortfolioNews:
 
         shared_item = _make_raw_item(title="Shared story", article_id="shared-001")
 
-        def fake_ticker(t):
+        def fake_ticker(_):
             mock = MagicMock()
             mock.news = [shared_item]  # same article for both tickers
             return mock
@@ -360,8 +362,6 @@ class TestBuildThemesSnapshot:
 
 
 # ── GET /api/news/feed ─────────────────────────────────────────────────────────
-
-from app.routers import news as news_router  # noqa: E402
 
 
 class TestNewsFeedEndpoint:

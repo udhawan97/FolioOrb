@@ -99,18 +99,21 @@ def test_enable_claude_ai_button_persists_mode():
     init_start = dash_js.index("function initDashboardPet()")
     init_block = dash_js[init_start:init_start + 12_000]
     assert "localStorage.getItem(PET_MODE_KEY)" in init_block, (
-        "initDashboardPet() must read PET_MODE_KEY from localStorage to restore the mode after reload"
+        "initDashboardPet() must read PET_MODE_KEY from localStorage "
+        "to restore the mode after reload"
     )
 
     # The restored value must gate _forcedLocalMode (not "0" means claude mode)
     assert '!== "0"' in init_block, (
-        "initDashboardPet() must set _forcedLocalMode = false when PET_MODE_KEY is '0'"
+        "initDashboardPet() must set _forcedLocalMode = false "
+        "when PET_MODE_KEY is '0'"
     )
 
     # enableClaudeAiAndReload() must still write "0" to persist the claude preference
     enable_fn = dash_js.split("function enableClaudeAiAndReload()")[1].split("function ")[0]
     assert 'localStorage.setItem(PET_MODE_KEY, "0")' in enable_fn, (
-        "enableClaudeAiAndReload() must persist PET_MODE_KEY='0' so the next load starts in Claude mode"
+        "enableClaudeAiAndReload() must persist PET_MODE_KEY='0' "
+        "so the next load starts in Claude mode"
     )
 
     # applyForcedLocalMode must still write back when the user switches modes
@@ -127,7 +130,6 @@ def test_mode_toggle_button_structure():
 
     # Nav toggle button — aria-pressed lives on the same element as the id
     assert 'id="pet-mode-toggle"' in html
-    toggle_tag = html.split('id="pet-mode-toggle"')[0].rsplit("<button", 1)[1]
     # aria-pressed may appear before or after the id attribute within the same tag
     tag_end = html.index(">", html.index('id="pet-mode-toggle"'))
     toggle_full = html[html.rindex("<button", 0, html.index('id="pet-mode-toggle"')):tag_end]
