@@ -76,9 +76,14 @@ if [[ ! -f .env ]]; then
 fi
 
 # ── Desktop shortcut ─────────────────────────────────────────────────────────
-cp "$INSTALL_DIR/FolioSenseAI.command" "$SHORTCUT"
+# Write a launcher that knows the absolute install path, so double-clicking
+# from the Desktop doesn't cd to ~/Desktop and lose the scripts/ directory.
+cat > "$SHORTCUT" <<LAUNCHER
+#!/usr/bin/env bash
+cd "$INSTALL_DIR"
+exec bash FolioSenseAI.command
+LAUNCHER
 chmod +x "$SHORTCUT"
-# Files installed via curl (not browser) are not quarantined, but remove just in case.
 xattr -d com.apple.quarantine "$SHORTCUT" 2>/dev/null || true
 
 echo ""

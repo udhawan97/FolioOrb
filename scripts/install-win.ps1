@@ -64,7 +64,6 @@ if (Test-Path "$installDir\.env") {
 # ── Install ───────────────────────────────────────────────────────────────────
 if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
 Move-Item "$tmp\$extractName" $installDir
-Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 
 if (Test-Path "$tmp\db_backup") {
     Copy-Item "$tmp\db_backup" "$installDir\database" -Recurse
@@ -74,6 +73,8 @@ if (Test-Path "$tmp\env_backup") {
     Copy-Item "$tmp\env_backup" "$installDir\.env"
     Write-Host "  OK Settings restored"
 }
+
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 Write-Host "  Installing dependencies (one-time, ~60 s)..."
