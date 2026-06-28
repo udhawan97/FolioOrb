@@ -19398,6 +19398,24 @@ body > .correlation-cell-tip {
 /* ── Skeleton ─── */
 .action-plan-skeleton {
     padding: 0.2rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.ap-sk-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.1rem;
+}
+
+.ap-sk-buckets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.25rem;
 }
 
 .action-plan-skeleton .shimmer-line {
@@ -19406,76 +19424,182 @@ body > .correlation-cell-tip {
 
 .action-plan-skeleton .shimmer-line:nth-child(1) { animation-delay: 0ms; }
 .action-plan-skeleton .shimmer-line:nth-child(2) { animation-delay: 80ms; }
-.action-plan-skeleton .shimmer-line:nth-child(3),
-.action-plan-skeleton .shimmer-line:nth-child(4),
-.action-plan-skeleton .shimmer-line:nth-child(5) { animation-delay: 160ms; }
-.action-plan-skeleton .shimmer-line:nth-child(6) { animation-delay: 240ms; }
+.ap-sk-header .shimmer-line:last-child           { animation-delay: 40ms; }
+.ap-sk-buckets .shimmer-line:nth-child(1)        { animation-delay: 120ms; }
+.ap-sk-buckets .shimmer-line:nth-child(2)        { animation-delay: 160ms; }
+.ap-sk-buckets .shimmer-line:nth-child(3)        { animation-delay: 200ms; }
+.ap-sk-buckets .shimmer-line:nth-child(4)        { animation-delay: 240ms; }
 
 /* ── Content area ─── */
 .action-plan-content {
     min-height: 1rem;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   AP CONTENT — Apple-grade executive layout
+   ═══════════════════════════════════════════════════════════ */
+
 .ap-wrap {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.8rem;
 }
 
-/* ── Headline ─── */
+/* ── Header row: headline + meta chips ───────────────────── */
+.ap-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+}
+
+.ap-headline-group {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.ap-meta-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    padding-top: 0.06rem;
+}
+
+/* ── Headline ─────────────────────────────────────────────── */
 .ap-headline {
-    font-size: 0.9rem;
+    font-size: 0.925rem;
     font-weight: 700;
     color: var(--text-primary);
-    line-height: 1.35;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
 }
 
-/* ── Thesis ─── */
+/* ── Thesis ───────────────────────────────────────────────── */
 .ap-thesis {
     font-size: var(--ts-sm);
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: 1.55;
+    margin: 0;
 }
 
-/* ── Bucket grid ─── */
+/* ── Regime chip ──────────────────────────────────────────── */
+.ap-regime-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.14rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.ap-regime-chip.is-risk-on {
+    color: var(--accent-green);
+    background: color-mix(in srgb, var(--accent-green) 13%, transparent);
+    border-color: color-mix(in srgb, var(--accent-green) 28%, transparent);
+}
+
+.ap-regime-chip.is-risk-off {
+    color: var(--accent-red);
+    background: color-mix(in srgb, var(--accent-red) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent-red) 26%, transparent);
+}
+
+.ap-regime-chip.is-neutral {
+    color: var(--accent-yellow);
+    background: color-mix(in srgb, var(--accent-yellow) 13%, transparent);
+    border-color: color-mix(in srgb, var(--accent-yellow) 28%, transparent);
+}
+
+/* ── Mode badge ───────────────────────────────────────────── */
+.ap-mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.12rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.ap-mode-badge.is-ai {
+    color: var(--color-brand);
+    background: color-mix(in srgb, var(--color-brand) 14%, transparent);
+    border-color: color-mix(in srgb, var(--color-brand) 28%, transparent);
+}
+
+.ap-mode-badge.is-local {
+    color: var(--accent-cyan);
+    background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent-cyan) 24%, transparent);
+}
+
+/* ── Bucket grid (4-col) ─────────────────────────────────── */
 .ap-buckets {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.6rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
 }
 
 .ap-bucket {
     background: var(--surface);
     border: 1px solid var(--hairline);
-    border-radius: 8px;
-    padding: 0.55rem 0.65rem;
+    border-top-width: 2px;            /* accent overridden per-bucket below */
+    border-top-color: var(--hairline);
+    border-radius: 10px;
+    padding: 0.6rem 0.65rem;
     min-width: 0;
+    transition: border-color 0.15s var(--ease);
 }
 
-/* ── Bucket header strip ─── */
+/* Action-colour top accents */
+.ap-bucket.has-hold { border-top-color: var(--accent-yellow); }
+.ap-bucket.has-add  { border-top-color: var(--accent-green); }
+.ap-bucket.has-trim { border-top-color: var(--accent-red); }
+.ap-bucket.has-exit {
+    border-top-color: color-mix(in srgb, var(--accent-red) 65%, black);
+}
+
+/* Dim buckets that have no positions */
+.ap-bucket--empty {
+    opacity: 0.55;
+}
+
+/* ── Bucket header strip ──────────────────────────────────── */
 .ap-bucket-hdr {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    margin-bottom: 0.45rem;
-    font-size: var(--ts-xs);
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    gap: 0.3rem;
+    margin-bottom: 0.48rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-tertiary);
 }
 
 .ap-bucket-hdr i {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
 }
 
 .ap-bucket-count {
     margin-left: auto;
     background: var(--surface-strong);
     border-radius: 10px;
-    padding: 0.05rem 0.45rem;
-    font-size: var(--ts-xs);
-    font-weight: 500;
+    padding: 0.04rem 0.42rem;
+    font-size: 0.63rem;
+    font-weight: 600;
+    line-height: 1.4;
     color: var(--text-tertiary);
 }
 
@@ -19487,59 +19611,70 @@ body > .correlation-cell-tip {
     color: color-mix(in srgb, var(--accent-red) 70%, var(--text-tertiary));
 }
 
-/* ── Chips ─── */
+/* ── Chips ────────────────────────────────────────────────── */
 .ap-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.3rem;
+    gap: 0.28rem;
 }
 
 .ap-chip {
     display: inline-flex;
     align-items: center;
-    padding: 0.12rem 0.5rem;
-    border-radius: 20px;
-    font-size: var(--ts-xs);
+    padding: 0.14rem 0.52rem;
+    border-radius: 6px;
+    font-size: 0.68rem;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.025em;
     border: 1px solid transparent;
     cursor: default;
-    transition: background 0.15s var(--ease), color 0.15s var(--ease);
-    /* Default — no action colour yet */
-    background: var(--surface-strong);
-    color: var(--text-secondary);
+    transition: opacity 0.15s var(--ease);
 }
 
+.ap-chip:hover { opacity: 0.75; }
+
 .ap-chip.is-hold {
-    background: color-mix(in srgb, var(--accent-yellow) 14%, transparent);
+    background: color-mix(in srgb, var(--accent-yellow) 15%, transparent);
     color: var(--accent-yellow);
-    border-color: color-mix(in srgb, var(--accent-yellow) 28%, transparent);
+    border-color: color-mix(in srgb, var(--accent-yellow) 30%, transparent);
 }
 
 .ap-chip.is-add {
-    background: color-mix(in srgb, var(--accent-green) 14%, transparent);
+    background: color-mix(in srgb, var(--accent-green) 15%, transparent);
     color: var(--accent-green);
-    border-color: color-mix(in srgb, var(--accent-green) 28%, transparent);
+    border-color: color-mix(in srgb, var(--accent-green) 30%, transparent);
 }
 
 .ap-chip.is-trim {
-    background: color-mix(in srgb, var(--accent-red) 14%, transparent);
+    background: color-mix(in srgb, var(--accent-red) 15%, transparent);
     color: var(--accent-red);
-    border-color: color-mix(in srgb, var(--accent-red) 28%, transparent);
+    border-color: color-mix(in srgb, var(--accent-red) 30%, transparent);
 }
 
 .ap-chip.is-exit {
     background: color-mix(in srgb, var(--accent-red) 22%, transparent);
-    color: color-mix(in srgb, var(--accent-red) 80%, white);
+    color: color-mix(in srgb, var(--accent-red) 85%, white);
     border-color: color-mix(in srgb, var(--accent-red) 40%, transparent);
-    font-style: italic;
 }
 
-/* ── Priority moves ─── */
+.ap-chip-none {
+    font-size: var(--ts-xs);
+    color: var(--text-tertiary);
+    padding: 0.14rem 0;
+}
+
+/* ── Section label ────────────────────────────────────────── */
+.ap-section-label {
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.3rem;
+}
+
+/* ── Priority moves — card rows ───────────────────────────── */
 .ap-moves {
-    margin: 0;
-    padding: 0;
-    list-style: none;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -19548,10 +19683,17 @@ body > .correlation-cell-tip {
 .ap-move {
     display: flex;
     align-items: flex-start;
-    gap: 0.55rem;
-    font-size: var(--ts-sm);
-    color: var(--text-secondary);
-    line-height: 1.45;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.ap-move:hover {
+    background: var(--surface-hover, var(--surface-strong));
+    border-color: var(--hairline-hover);
 }
 
 .ap-move-num {
@@ -19559,72 +19701,183 @@ body > .correlation-cell-tip {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.3rem;
-    height: 1.3rem;
+    width: 1.35rem;
+    height: 1.35rem;
     border-radius: 50%;
     background: color-mix(in srgb, var(--color-brand) 18%, transparent);
     color: var(--color-brand);
-    font-size: 0.67rem;
+    font-size: 0.65rem;
     font-weight: 700;
     line-height: 1;
-    margin-top: 0.08rem;
+    margin-top: 0.05rem;
+    flex-shrink: 0;
 }
 
-/* ── Best-return note ─── */
+.ap-move-text {
+    font-size: var(--ts-sm);
+    color: var(--text-secondary);
+    line-height: 1.48;
+}
+
+/* ── Best-return note — callout box ───────────────────────── */
 .ap-note {
-    font-size: var(--ts-xs);
-    color: var(--text-tertiary);
     display: flex;
     align-items: flex-start;
-    gap: 0.4rem;
+    gap: 0.5rem;
+    padding: 0.5rem 0.7rem;
+    background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-brand) 16%, transparent);
+    border-radius: 8px;
+    font-size: var(--ts-xs);
+    color: var(--text-secondary);
+    line-height: 1.48;
+}
+
+.ap-note > i {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    font-size: 0.8rem;
+    color: var(--color-brand);
+}
+
+/* ── Local upgrade prompt ─────────────────────────────────── */
+.ap-upgrade-prompt {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.7rem;
+    background: color-mix(in srgb, var(--color-brand) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-brand) 16%, transparent);
+    border-radius: 8px;
+    font-size: var(--ts-xs);
+    color: var(--text-secondary);
     line-height: 1.45;
 }
 
-.ap-note i {
+.ap-upgrade-prompt > i {
     flex-shrink: 0;
-    margin-top: 0.1rem;
-    color: color-mix(in srgb, var(--color-brand) 70%, transparent);
+    color: var(--color-brand);
+    font-size: 0.78rem;
 }
 
-/* ── Disclaimer ─── */
-.ap-disclaimer {
-    font-size: var(--ts-xs);
-    color: var(--text-tertiary);
-    opacity: 0.7;
+.ap-upgrade-prompt > span {
+    flex: 1;
+    min-width: 0;
+}
+
+.ap-upgrade-btn {
+    flex-shrink: 0;
+    padding: 0.22rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--color-brand) 35%, transparent);
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--color-brand) 14%, transparent);
+    color: var(--color-brand);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s var(--ease);
+}
+
+.ap-upgrade-btn:hover {
+    background: color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+
+/* ── Footer row: CTA + disclaimer ────────────────────────── */
+.ap-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding-top: 0.15rem;
     border-top: 1px solid var(--hairline);
-    padding-top: 0.55rem;
-    margin-top: 0.1rem;
+    margin-top: 0.05rem;
+    flex-wrap: wrap;
 }
 
-/* ── Error state ─── */
+.ap-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    padding: 0.38rem 0.9rem;
+    border: 1px solid var(--hairline-hover);
+    border-radius: 20px;
+    background: var(--surface-strong);
+    color: var(--text-secondary);
+    font-size: var(--ts-sm);
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s var(--ease), color 0.15s var(--ease),
+                border-color 0.15s var(--ease);
+    flex-shrink: 0;
+}
+
+.ap-cta-btn:hover {
+    background: color-mix(in srgb, var(--color-brand) 12%, var(--surface-strong));
+    border-color: color-mix(in srgb, var(--color-brand) 38%, var(--hairline));
+    color: var(--color-brand);
+}
+
+.ap-cta-arrow {
+    font-size: 0.9rem;
+    transition: transform 0.15s var(--ease);
+}
+
+.ap-cta-btn:hover .ap-cta-arrow {
+    transform: translateX(2px);
+}
+
+/* ── Disclaimer ───────────────────────────────────────────── */
+.ap-disclaimer {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.62rem;
+    color: var(--text-tertiary);
+    opacity: 0.75;
+    line-height: 1.4;
+}
+
+/* ── Error state ──────────────────────────────────────────── */
 .ap-error {
     font-size: var(--ts-sm);
     color: var(--text-tertiary);
+    padding: 0.5rem 0;
 }
 
-/* ── Light-mode overrides ─── */
+/* ── Light-mode overrides ─────────────────────────────────── */
 [data-bs-theme="light"] .ap-bucket {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: rgba(0, 0, 0, 0.09);
+}
+
+[data-bs-theme="light"] .ap-move {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-bs-theme="light"] .ap-move:hover {
     background: rgba(255, 255, 255, 0.96);
-    border-color: rgba(0, 0, 0, 0.10);
 }
 
 [data-bs-theme="light"] .ap-chip.is-hold {
-    background: color-mix(in srgb, var(--accent-yellow) 10%, white);
-    border-color: color-mix(in srgb, var(--accent-yellow) 22%, rgba(0,0,0,0.06));
+    background: color-mix(in srgb, var(--accent-yellow) 12%, white);
+    border-color: color-mix(in srgb, var(--accent-yellow) 24%, rgba(0,0,0,0.06));
 }
 
 [data-bs-theme="light"] .ap-chip.is-add {
-    background: color-mix(in srgb, var(--accent-green) 10%, white);
-    border-color: color-mix(in srgb, var(--accent-green) 22%, rgba(0,0,0,0.06));
+    background: color-mix(in srgb, var(--accent-green) 12%, white);
+    border-color: color-mix(in srgb, var(--accent-green) 24%, rgba(0,0,0,0.06));
 }
 
 [data-bs-theme="light"] .ap-chip.is-trim,
 [data-bs-theme="light"] .ap-chip.is-exit {
-    background: color-mix(in srgb, var(--accent-red) 10%, white);
-    border-color: color-mix(in srgb, var(--accent-red) 22%, rgba(0,0,0,0.06));
+    background: color-mix(in srgb, var(--accent-red) 12%, white);
+    border-color: color-mix(in srgb, var(--accent-red) 24%, rgba(0,0,0,0.06));
 }
 
-/* ── Reduced motion ─── */
+/* ── Reduced motion ───────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
     .action-plan-card::before,
     .action-plan-card-icon,
@@ -19632,15 +19885,27 @@ body > .correlation-cell-tip {
         animation: none !important;
     }
 
-    .action-plan-refresh-btn {
+    .action-plan-refresh-btn,
+    .ap-cta-btn,
+    .ap-move,
+    .ap-chip {
         transition: none !important;
-        animation: none !important;
     }
 }
 
-/* ── Responsive: stack to 2-col on narrow viewports ─── */
-@media (max-width: 480px) {
+/* ── Responsive: 2-col buckets on narrow viewports ────────── */
+@media (max-width: 520px) {
     .ap-buckets {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .ap-sk-buckets {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .ap-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.55rem;
     }
 }

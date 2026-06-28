@@ -1961,7 +1961,7 @@ def _action_plan_snapshot(db: Session, core: dict) -> dict:  # pylint: disable=t
             for t in (sector_tilt_data.get("tilt") or [])[:3]
         ],
         "conviction_gaps": [
-            {"t": g["ticker"], "type": g["gap_type"]}
+            {"t": g["ticker"], "type": g["gap_type"].replace("_", " ")}
             for g in gap_items
         ],
     }
@@ -1970,7 +1970,7 @@ def _action_plan_snapshot(db: Session, core: dict) -> dict:  # pylint: disable=t
 
 def _action_plan_fallback(core: dict) -> dict:
     """
-    Deterministic fallback when Claude is unavailable.
+    Deterministic fallback when Claude is unavailable or force_local=True.
     Buckets holdings purely from their existing verdict actions.
     """
     signals = core["signals"]
@@ -1996,13 +1996,35 @@ def _action_plan_fallback(core: dict) -> dict:
 
         buckets[bucket_key].append({"ticker": ticker, "reason": reason})
 
-    dominant = max(buckets, key=lambda k: len(buckets[k]))
-    mood = regime.get("mood", "neutral")
+    n_hold = len(buckets["hold"])
+    n_add  = len(buckets["add"])
+    n_trim = len(buckets["trim"])
+    n_exit = len(buckets["exit"])
+    mood = (regime.get("mood") or "neutral").title()
+    regime_label = regime.get("label") or mood
+
+    # Build a plain-language headline from the dominant signal
+    if n_trim or n_exit:
+        headline = (
+            f"{n_trim + n_exit} position{'s' if n_trim + n_exit != 1 else ''} flagged for "
+            f"trim/exit — {n_hold} anchors steady"
+        )
+    elif n_add:
+        headline = (
+            f"{n_add} add signal{'s' if n_add != 1 else ''} surfaced — "
+            f"{n_hold} core position{'s' if n_hold != 1 else ''} holding"
+        )
+    else:
+        headline = (
+            f"All {n_hold} position{'s' if n_hold != 1 else ''} on hold — "
+            "no urgent action from local signals"
+        )
+
     thesis = (
-        f"Local signals read: {len(buckets['hold'])} hold, "
-        f"{len(buckets['add'])} add, {len(buckets['trim'])} trim, "
-        f"{len(buckets['exit'])} exit. Market mood: {mood}. "
-        "Sorted by existing verdict — Claude unavailable for deeper read."
+        f"FolioSense local signals: {n_hold} hold · {n_add} add · "
+        f"{n_trim} trim · {n_exit} exit. "
+        f"Market: {regime_label}. "
+        "Enable Claude AI in Settings for a cross-holding, risk-adjusted plan."
     )
 
     alloc_sorted = sorted(
@@ -2014,28 +2036,35 @@ def _action_plan_fallback(core: dict) -> dict:
     largest_alloc = alloc_sorted[0][1] if alloc_sorted else 0
 
     priority: list[str] = []
-    if buckets["add"]:
-        first_add = buckets["add"][0]["ticker"]
-        priority.append(f"Consider sizing into {first_add} — local signal says add.")
     if buckets["trim"]:
         first_trim = buckets["trim"][0]["ticker"]
-        priority.append(f"Lighten {first_trim} — local signal says trim.")
+        priority.append(
+            f"Review {first_trim} — local signal suggests trimming the position."
+        )
     if buckets["exit"]:
         first_exit = buckets["exit"][0]["ticker"]
-        priority.append(f"Review {first_exit} for exit — watchlist or deteriorating signal.")
+        priority.append(
+            f"Evaluate {first_exit} for exit — watchlist flag or deteriorating signal."
+        )
+    if buckets["add"]:
+        first_add = buckets["add"][0]["ticker"]
+        priority.append(
+            f"Consider building into {first_add} — local signal rates it a buy."
+        )
 
     return {
         "source": "local-fallback",
-        "headline": f"Book reads {dominant} — Claude offline for deeper view.",
-        "thesis": thesis[:280],
+        "headline": headline,
+        "thesis": thesis[:300],
         "buckets": buckets,
         "priority_moves": priority[:3],
         "best_return_note": (
-            f"{largest_ticker} at {largest_alloc:.0f}% is the largest lever; "
-            "right-sizing concentration could close the gap to optimal mix."
+            f"{largest_ticker} is your largest position at {largest_alloc:.0f}% — "
+            "right-sizing concentration is the highest-impact lever."
             if largest_ticker else
             "Diversify concentration to close the gap to the optimal mix."
         ),
+        "regime": regime,
         "disclaimer": _VERDICT_DISCLAIMER,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -2044,6 +2073,7 @@ def _action_plan_fallback(core: dict) -> dict:
 @router.get("/action-plan")
 async def get_action_plan(
     force_refresh: bool = False,
+    force_local: bool = False,
     db: Session = Depends(get_db),
 ):
     """
@@ -2052,10 +2082,15 @@ async def get_action_plan(
 
     Cached 24 h in AISummary (ticker=BOOK, summary_type='action_plan').
     Invalidated on portfolio-state drift (dominant action + concentration shift).
-    Falls back deterministically when Claude is unavailable.
+    Falls back deterministically when Claude is unavailable or force_local=True.
     """
     # Build portfolio state signature for cache invalidation
     core = _collect_portfolio_signals_core(db)
+
+    # Local-only path: skip Claude entirely — return deterministic buckets instantly
+    if force_local:
+        return _action_plan_fallback(core)
+
     alloc_map = core["alloc_map"]
     raw_signals = core["signals"]
     # Strip internal flags before portfolio_state_signature
@@ -2100,6 +2135,7 @@ async def get_action_plan(
         payload: dict = {
             "source": "claude",
             **parsed,
+            "regime": core["regime"],
             "disclaimer": _VERDICT_DISCLAIMER,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }

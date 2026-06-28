@@ -7731,6 +7731,8 @@ async function onIntelligenceModeChanged(local, { notify = false } = {}) {
     }
 
     loadPortfolioBriefing(null, true);
+    _cachedActionPlan = null;
+    loadActionPlan();
     window.AnalyticsCharts?.onIntelligenceModeChanged?.();
     if (_newsLoaded) {
         if (local) {
@@ -8013,7 +8015,9 @@ function initDashboardPet() {
         }
     }
 
-    _forcedLocalMode = true;
+    let savedMode = "1";
+    try { savedMode = localStorage.getItem(PET_MODE_KEY) ?? "1"; } catch (_) {}
+    _forcedLocalMode = savedMode !== "0";
     applyForcedLocalMode(_forcedLocalMode, false);
 
     modeToggle?.addEventListener("click", (e) => {
@@ -8941,16 +8945,31 @@ async function loadPortfolioBriefing(mode, forceRefresh = false) {
 // ── Portfolio Action Plan ─────────────────────────────────────────────────────
 
 let _actionPlanLoading = false;
-let _cachedActionPlan = null;
+let _cachedActionPlan  = null;
 
 const _AP_BUCKET_COLOR = { hold: "is-hold", add: "is-add", trim: "is-trim", exit: "is-exit" };
 const _AP_BUCKET_LABEL = { hold: "Hold", add: "Add", trim: "Trim", exit: "Exit" };
 const _AP_BUCKET_ICON  = {
-    hold: "bi-pause-circle",
-    add:  "bi-plus-circle",
+    hold: "bi-pause-circle-fill",
+    add:  "bi-plus-circle-fill",
     trim: "bi-scissors",
-    exit: "bi-door-open",
+    exit: "bi-door-open-fill",
 };
+
+// Regime mood → CSS class for the regime chip
+const _AP_REGIME_CLS = {
+    risk_on:  "is-risk-on",
+    warm:     "is-risk-on",
+    hot:      "is-risk-on",
+    risk_off: "is-risk-off",
+    cold:     "is-risk-off",
+    cooling:  "is-risk-off",
+    neutral:  "is-neutral",
+};
+
+function _apJumpToHoldings() {
+    setDashboardZone("holdings");
+}
 
 function _actionPlanShowSkeleton(show) {
     const sk = document.getElementById("action-plan-skeleton");
@@ -8961,57 +8980,109 @@ function _actionPlanShowSkeleton(show) {
 
 function _renderActionPlan(data) {
     const content = document.getElementById("action-plan-content");
-    if (!content) return;
+    if (!content || !data) return;
 
+    const isLocal  = data.source === "local-fallback";
     const headline = escapeHtml(data.headline || "");
     const thesis   = escapeHtml(data.thesis   || "");
+    const regime   = data.regime || {};
 
+    // ── Regime chip ──────────────────────────────────────────────────────────
+    const rawMood     = (regime.mood || "neutral").toLowerCase().replace(/[^a-z_]/g, "");
+    const regimeCls   = _AP_REGIME_CLS[rawMood] || "is-neutral";
+    const regimeLabel = regime.label || "";
+    const regimeHtml  = regimeLabel
+        ? `<span class="ap-regime-chip ${regimeCls}">${escapeHtml(regimeLabel)}</span>`
+        : "";
+
+    // ── Mode badge ───────────────────────────────────────────────────────────
+    const modeBadge = isLocal
+        ? `<span class="ap-mode-badge is-local"><i class="bi bi-cpu-fill" aria-hidden="true"></i> Local</span>`
+        : `<span class="ap-mode-badge is-ai"><i class="bi bi-stars" aria-hidden="true"></i> Claude AI</span>`;
+
+    // ── Buckets ───────────────────────────────────────────────────────────────
     const bucketOrder = ["hold", "add", "trim", "exit"];
-    const buckets = data.buckets || {};
-
+    const buckets     = data.buckets || {};
     const bucketsHtml = bucketOrder.map(bucket => {
-        const items = buckets[bucket] || [];
-        if (!items.length) return "";
+        const items    = buckets[bucket] || [];
         const colorCls = _AP_BUCKET_COLOR[bucket] || "";
-        const label    = _AP_BUCKET_LABEL[bucket] || bucket;
-        const icon     = _AP_BUCKET_ICON[bucket]  || "";
-        const chips    = items.map(item => {
-            const ticker = escapeHtml(item.ticker || "");
-            const reason = escapeHtml(item.reason || "");
-            return `<span class="ap-chip ${colorCls}" title="${reason}">${ticker}</span>`;
-        }).join("");
-        return `<div class="ap-bucket">
+        const label    = _AP_BUCKET_LABEL[bucket]  || bucket;
+        const icon     = _AP_BUCKET_ICON[bucket]   || "";
+        const isEmpty  = !items.length;
+        const chipsHtml = isEmpty
+            ? `<span class="ap-chip-none">—</span>`
+            : items.map(item => {
+                const t = escapeHtml(item.ticker || "");
+                const r = escapeHtml(item.reason || "");
+                return `<span class="ap-chip ${colorCls}" title="${r}">${t}</span>`;
+              }).join("");
+        return `<div class="ap-bucket has-${bucket}${isEmpty ? " ap-bucket--empty" : ""}">
             <div class="ap-bucket-hdr ${colorCls}">
                 <i class="bi ${icon}" aria-hidden="true"></i>
                 <span class="ap-bucket-label">${label}</span>
                 <span class="ap-bucket-count">${items.length}</span>
             </div>
-            <div class="ap-chips">${chips}</div>
+            <div class="ap-chips">${chipsHtml}</div>
         </div>`;
-    }).filter(Boolean).join("");
+    }).join("");
 
-    const movesHtml = (data.priority_moves || []).map((move, i) =>
-        `<li class="ap-move"><span class="ap-move-num">${i + 1}</span>${escapeHtml(move)}</li>`
-    ).join("");
+    // ── Priority moves ────────────────────────────────────────────────────────
+    const moves = (data.priority_moves || []).slice(0, 3);
+    const movesHtml = moves.length
+        ? `<div class="ap-section-label">Priority moves</div>
+           <div class="ap-moves">${moves.map((m, i) => `
+               <div class="ap-move">
+                   <div class="ap-move-num">${i + 1}</div>
+                   <div class="ap-move-text">${escapeHtml(m)}</div>
+               </div>`).join("")}</div>`
+        : "";
 
+    // ── Best-return note ──────────────────────────────────────────────────────
     const noteHtml = data.best_return_note
-        ? `<div class="ap-note"><i class="bi bi-bullseye" aria-hidden="true"></i> ${escapeHtml(data.best_return_note)}</div>`
+        ? `<div class="ap-note">
+               <i class="bi bi-bullseye" aria-hidden="true"></i>
+               <span>${escapeHtml(data.best_return_note)}</span>
+           </div>`
+        : "";
+
+    // ── Local upgrade callout ─────────────────────────────────────────────────
+    const upgradeHtml = isLocal
+        ? `<div class="ap-upgrade-prompt">
+               <i class="bi bi-stars" aria-hidden="true"></i>
+               <span>Enable Claude AI for a cross-holding, risk-adjusted read with concrete trade sizing.</span>
+               <button class="ap-upgrade-btn" onclick="enableClaudeAiAndReload()">Enable Claude AI</button>
+           </div>`
         : "";
 
     const disclaimer = data.disclaimer || FOLIO_SENSE_VERDICT_COPY.disclaimer;
 
     content.innerHTML = `<div class="ap-wrap">
-        ${headline ? `<div class="ap-headline">${headline}</div>` : ""}
-        ${thesis   ? `<div class="ap-thesis">${thesis}</div>`     : ""}
+        <div class="ap-header">
+            <div class="ap-headline-group">
+                ${headline ? `<div class="ap-headline">${headline}</div>` : ""}
+                ${thesis   ? `<p class="ap-thesis">${thesis}</p>`         : ""}
+            </div>
+            <div class="ap-meta-stack">
+                ${regimeHtml}
+                ${modeBadge}
+            </div>
+        </div>
         <div class="ap-buckets">${bucketsHtml}</div>
-        ${movesHtml ? `<ol class="ap-moves">${movesHtml}</ol>` : ""}
+        ${movesHtml}
         ${noteHtml}
-        <div class="ap-disclaimer">${escapeHtml(disclaimer)}</div>
+        ${upgradeHtml}
+        <div class="ap-footer">
+            <button class="ap-cta-btn" onclick="_apJumpToHoldings()">
+                <i class="bi bi-table" aria-hidden="true"></i>
+                View position details
+                <i class="bi bi-arrow-right-short ap-cta-arrow" aria-hidden="true"></i>
+            </button>
+            <span class="ap-disclaimer">${escapeHtml(disclaimer)}</span>
+        </div>
     </div>`;
 }
 
 async function loadActionPlan(forceRefresh = false) {
-    if (isLocalIntelligenceMode() || _isClaudeApiLive === false) return;
     if (_actionPlanLoading && !forceRefresh) return;
 
     if (_cachedActionPlan && !forceRefresh) {
@@ -9027,10 +9098,13 @@ async function loadActionPlan(forceRefresh = false) {
     refreshBtn?.classList.add("is-spinning");
 
     try {
-        const url = forceRefresh
-            ? "/api/ai/action-plan?force_refresh=true"
-            : "/api/ai/action-plan";
-        const res = await fetch(url);
+        const params = new URLSearchParams();
+        if (forceRefresh) params.set("force_refresh", "true");
+        // In local mode (or when Claude is offline) use the fast deterministic path
+        if (isLocalIntelligenceMode() || _isClaudeApiLive === false) {
+            params.set("force_local", "true");
+        }
+        const res = await fetch(`/api/ai/action-plan?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
@@ -9041,7 +9115,7 @@ async function loadActionPlan(forceRefresh = false) {
         console.warn("Action plan fetch failed:", err);
         _actionPlanShowSkeleton(false);
         const ct = document.getElementById("action-plan-content");
-        if (ct) ct.innerHTML = `<span class="ap-error">Action plan temporarily unavailable — refresh to retry.</span>`;
+        if (ct) ct.innerHTML = `<div class="ap-error">Action plan temporarily unavailable — refresh to retry.</div>`;
     } finally {
         _actionPlanLoading = false;
         refreshBtn?.classList.remove("is-spinning");
