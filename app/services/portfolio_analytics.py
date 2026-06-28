@@ -861,10 +861,13 @@ def compute_sector_tilt(holdings: list[dict]) -> dict[str, Any]:
             "tilt_pct": tilt,
         })
 
+    holding_contributions = exposure.get("holding_sector_contributions") or {}
+
     return {
         "has_data": bool(sectors),
         "sectors": sectors,
         "benchmark_label": "S&P 500",
+        "holding_contributions": holding_contributions,
     }
 
 

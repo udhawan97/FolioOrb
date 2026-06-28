@@ -39,6 +39,11 @@ const AnalyticsCharts = (() => {
     let _portfolioExposureCache = null;
     let _portfolioExposurePromise = null;
 
+    // Sector tilt live-selection state
+    let _sectorTiltFull = [];
+    let _sectorHoldingContribs = {};
+    let _sectorTiltSelectedTicker = null;
+
     async function fetchPortfolioExposure({ refresh = false } = {}) {
         if (!refresh && _portfolioExposureCache) return _portfolioExposureCache;
         if (!refresh && typeof cachedPortfolioExposure !== "undefined" && cachedPortfolioExposure) {
@@ -1695,17 +1700,50 @@ const AnalyticsCharts = (() => {
         }
     }
 
-    function renderSectorTilt(sectors) {
-        const root = $("sector-tilt-chart");
-        if (!root) return;
-        const rows = (sectors || [])
+    function _buildSectorTiltListHTML(rows, maxTilt, esc, portLabel) {
+        return rows.map((s, index) => {
+            const side = s.tilt >= 0 ? "over" : "under";
+            const absTilt = Math.abs(s.tilt);
+            const w = Math.max(4, Math.round(absTilt / maxTilt * 50));
+            const theme = sectorTheme(s.name);
+            return `<div class="sector-tilt-row sector-tilt-row--${side}"
+                style="--tilt-width:${w}%;--sector-accent:${theme.color};--row-index:${index}"
+                data-sector="${esc(s.name)}"
+                data-port-full="${s.portFull ?? s.port}"
+                data-bench="${s.bench}"
+                data-side="${side}">
+                <div class="sector-tilt-sector">
+                    <span class="sector-tilt-icon" aria-hidden="true"><i class="bi ${theme.icon}"></i></span>
+                    <span class="sector-tilt-name">${esc(s.name)}</span>
+                </div>
+                <div class="sector-tilt-track" aria-label="${esc(s.name)} ${side === "over" ? "overweight" : "underweight"} by ${absTilt.toFixed(1)} percentage points">
+                    <span class="sector-tilt-baseline"></span>
+                    <span class="sector-tilt-bar"></span>
+                </div>
+                <div class="sector-tilt-values">
+                    <span><small>${esc(portLabel)}</small>${s.port.toFixed(1)}%</span>
+                    <span><small>S&amp;P</small>${s.bench.toFixed(1)}%</span>
+                    <strong>${s.tilt >= 0 ? "+" : ""}${s.tilt.toFixed(1)}pp</strong>
+                </div>
+            </div>`;
+        }).join("");
+    }
+
+    function _makeSectorTiltRows(sectors) {
+        return (sectors || [])
             .map(s => ({
-                ...s,
+                name: s.name,
                 tilt: Number(s.tilt_pct) || 0,
                 port: Number(s.portfolio_pct) || 0,
                 bench: Number(s.benchmark_pct) || 0,
             }))
             .sort((a, b) => Math.abs(b.tilt) - Math.abs(a.tilt));
+    }
+
+    function renderSectorTilt(sectors) {
+        const root = $("sector-tilt-chart");
+        if (!root) return;
+        const rows = _makeSectorTiltRows(sectors);
         if (!rows.length) {
             root.innerHTML = "";
             return;
@@ -1760,33 +1798,149 @@ const AnalyticsCharts = (() => {
             <span>Overweight</span>
         </div>`;
 
-        const list = rows.map((s, index) => {
-            const tilt = Number(s.tilt_pct) || 0;
-            const port = Number(s.portfolio_pct) || 0;
-            const bench = Number(s.benchmark_pct) || 0;
-            const theme = sectorTheme(s.name);
-            const w = Math.max(4, Math.round(Math.abs(tilt) / maxTilt * 50));
-            const side = tilt >= 0 ? "over" : "under";
-            const absTilt = Math.abs(tilt);
-            return `<div class="sector-tilt-row sector-tilt-row--${side}"
-                style="--tilt-width:${w}%;--sector-accent:${theme.color};--row-index:${index}">
-                <div class="sector-tilt-sector">
-                    <span class="sector-tilt-icon" aria-hidden="true"><i class="bi ${theme.icon}"></i></span>
-                    <span class="sector-tilt-name">${esc(s.name)}</span>
-                </div>
-                <div class="sector-tilt-track" aria-label="${esc(s.name)} ${side === "over" ? "overweight" : "underweight"} by ${absTilt.toFixed(1)} percentage points">
-                    <span class="sector-tilt-baseline"></span>
-                    <span class="sector-tilt-bar"></span>
-                </div>
-                <div class="sector-tilt-values">
-                    <span><small>Port</small>${port.toFixed(1)}%</span>
-                    <span><small>S&amp;P</small>${bench.toFixed(1)}%</span>
-                    <strong>${tilt >= 0 ? "+" : ""}${tilt.toFixed(1)}pp</strong>
-                </div>
-            </div>`;
-        }).join("");
+        const listHTML = _buildSectorTiltListHTML(rows, maxTilt, esc, "Port");
 
-        root.innerHTML = `${summary}${stats}${legend}<div class="sector-tilt-list">${list}</div>`;
+        root.innerHTML = `${summary}${stats}${legend}<div class="sector-tilt-list">${listHTML}</div>`;
+
+        // Reapply any active selection (e.g. user was on overview tab, then switched here)
+        if (_sectorTiltSelectedTicker) {
+            applySectorTiltSelection(_sectorTiltSelectedTicker, { skipFade: true });
+        }
+    }
+
+    function updateSectorTiltModePill(root, ticker) {
+        let pill = root.querySelector(".sector-tilt-mode-pill");
+        if (!pill) {
+            pill = document.createElement("div");
+            pill.className = "sector-tilt-mode-pill";
+            root.prepend(pill);
+        }
+
+        if (ticker) {
+            pill.innerHTML = `<i class="bi bi-funnel-fill" aria-hidden="true"></i>
+                <span>Viewing <strong>${ticker}</strong> contribution only</span>
+                <button class="sector-tilt-mode-clear" aria-label="Clear selection"
+                    onclick="if(typeof selectAllocationTicker==='function')selectAllocationTicker(null)">
+                    <i class="bi bi-x-lg"></i>
+                </button>`;
+            pill.style.display = "";
+        } else {
+            pill.style.display = "none";
+        }
+    }
+
+    function applySectorTiltSelection(ticker, { skipFade = false } = {}) {
+        const root = $("sector-tilt-chart");
+        if (!root || !_sectorTiltFull.length) return;
+
+        const esc = typeof escapeHtml === "function" ? escapeHtml : escapeText;
+        const useContribs = ticker ? (_sectorHoldingContribs[ticker] || null) : null;
+
+        // Compute new rows using either full portfolio or holding contribution data
+        const modRows = _makeSectorTiltRows(_sectorTiltFull).map(r => {
+            const port = useContribs ? (useContribs[r.name] || 0) : r.port;
+            return {
+                name: r.name,
+                port,
+                portFull: r.port,
+                bench: r.bench,
+                tilt: port - r.bench,
+            };
+        }).sort((a, b) => Math.abs(b.tilt) - Math.abs(a.tilt));
+
+        const maxTilt = Math.max(...modRows.map(r => Math.abs(r.tilt)), 5);
+        const largest = modRows[0];
+        const portLabel = ticker || "Port";
+
+        const doUpdate = () => {
+            // Rebuild the list with updated values
+            const list = root.querySelector(".sector-tilt-list");
+            if (list) {
+                list.innerHTML = _buildSectorTiltListHTML(modRows, maxTilt, esc, portLabel);
+
+                // Dim rows where the selected holding has zero contribution
+                if (useContribs) {
+                    list.querySelectorAll(".sector-tilt-row").forEach(row => {
+                        const sectorName = row.dataset.sector;
+                        const contrib = useContribs[sectorName] || 0;
+                        row.style.opacity = contrib === 0 ? "0.28" : "";
+                    });
+                }
+            }
+
+            // Update summary card
+            const summaryEl = root.querySelector(".sector-tilt-summary");
+            if (summaryEl && largest) {
+                const largestTheme = sectorTheme(largest.name);
+                const tone = largest.tilt >= 0 ? "over" : "under";
+                summaryEl.className = `sector-tilt-summary sector-tilt-summary--${tone}`;
+                summaryEl.style.setProperty("--sector-accent", largestTheme.color);
+
+                const orbEl = summaryEl.querySelector(".sector-tilt-orb i");
+                if (orbEl) orbEl.className = `bi ${largestTheme.icon}`;
+
+                const nameEl = summaryEl.querySelector(".sector-tilt-summary-main strong");
+                if (nameEl) nameEl.textContent = largest.name;
+
+                const detailEl = summaryEl.querySelector(".sector-tilt-summary-main span:last-child");
+                if (detailEl) {
+                    detailEl.innerHTML = `${esc(portLabel)} ${largest.port.toFixed(1)}% vs S&amp;P ${largest.bench.toFixed(1)}%`;
+                }
+
+                const deltaEl = summaryEl.querySelector(".sector-tilt-summary-delta");
+                if (deltaEl) {
+                    deltaEl.innerHTML = `${largest.tilt >= 0 ? "+" : ""}${largest.tilt.toFixed(1)}pp<small>${largest.tilt >= 0 ? "Overweight" : "Underweight"}</small>`;
+                }
+            }
+
+            // Update artifact stats
+            const overCount = modRows.filter(r => r.tilt > 0.25).length;
+            const underCount = modRows.filter(r => r.tilt < -0.25).length;
+            const activeTilt = modRows.reduce((sum, r) => sum + Math.abs(r.tilt), 0) / 2;
+            const artifactEls = root.querySelectorAll(".sector-tilt-artifact strong");
+            if (artifactEls[0]) artifactEls[0].textContent = `${activeTilt.toFixed(1)}pp`;
+            if (artifactEls[1]) artifactEls[1].textContent = overCount;
+            if (artifactEls[2]) artifactEls[2].textContent = underCount;
+
+            // Update eyebrow label
+            const eyebrow = root.querySelector(".sector-tilt-eyebrow");
+            if (eyebrow) {
+                eyebrow.textContent = ticker ? `${ticker} benchmark contribution` : "Largest benchmark tilt";
+            }
+
+            updateSectorTiltModePill(root, ticker);
+        };
+
+        if (skipFade) {
+            doUpdate();
+            return;
+        }
+
+        // Smooth fade-out → update → fade-in
+        const list = root.querySelector(".sector-tilt-list");
+        const summaryEl = root.querySelector(".sector-tilt-summary");
+        const els = [list, summaryEl].filter(Boolean);
+
+        els.forEach(el => {
+            el.style.transition = "opacity 0.13s ease";
+            el.style.opacity = "0";
+        });
+
+        setTimeout(() => {
+            doUpdate();
+            els.forEach(el => {
+                el.style.opacity = "1";
+                el.addEventListener("transitionend", () => {
+                    el.style.transition = "";
+                    el.style.opacity = "";
+                }, { once: true });
+            });
+        }, 140);
+    }
+
+    function updateSectorTiltForTicker(ticker) {
+        _sectorTiltSelectedTicker = ticker || null;
+        applySectorTiltSelection(_sectorTiltSelectedTicker);
     }
 
     async function loadSectorTilt() {
@@ -1801,7 +1955,9 @@ const AnalyticsCharts = (() => {
                 if (root) root.innerHTML = "";
                 return;
             }
-            renderSectorTilt(data.sectors || []);
+            _sectorTiltFull = data.sectors || [];
+            _sectorHoldingContribs = data.holding_contributions || {};
+            renderSectorTilt(_sectorTiltFull);
         } catch (err) {
             console.warn("Sector tilt failed:", err);
             showEmpty("sector-tilt-empty", true);
@@ -2937,6 +3093,7 @@ const AnalyticsCharts = (() => {
         loadAiWidgetInsights,
         refreshMarketsTape,
         renderMarketsContext,
+        updateSectorTiltForTicker,
     };
 })();
 

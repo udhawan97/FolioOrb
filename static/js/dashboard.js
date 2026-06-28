@@ -1272,6 +1272,9 @@ function selectAllocationTicker(ticker) {
     }
 
     renderAllocationFocusPanel(ticker);
+
+    // Live-update the sector tilt benchmark chart to show this holding's effect
+    AnalyticsCharts?.updateSectorTiltForTicker?.(ticker);
 }
 
 function allocationImpactForHolding(holding) {

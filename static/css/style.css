@@ -3432,6 +3432,7 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
     border-radius: 11px;
     padding: 2px;
     gap: 2px;
+    overflow: visible;
 }
 
 [data-bs-theme="light"] .manage-hold-mode-grid {
@@ -3577,6 +3578,17 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
         min-width: 48px;
         min-height: 46px;
         padding: 0.38rem 0.32rem;
+    }
+
+    .manage-hold-mode-grid .manage-hold-mode-box.tip-trigger {
+        min-width: 48px;
+        min-height: 46px;
+        padding: 0.38rem 0.32rem;
+        font-size: 0.57rem;
+    }
+
+    .manage-hold-mode-grid .manage-hold-mode-box.tip-trigger i {
+        font-size: 0.92rem;
     }
 }
 
@@ -13336,6 +13348,23 @@ svg.signal-radar {
     border-color: color-mix(in srgb, var(--accent-purple, #bf5af2) 48%, transparent);
 }
 
+/* ── (0,3,0) fix: stop group .tip-trigger rule from zeroing min-height ──── */
+.hold-mode-strip .hold-mode-seg.tip-trigger {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    height: auto;
+    top: auto;
+    vertical-align: unset;
+}
+
+.hold-mode-strip .hold-mode-seg.tip-trigger i {
+    font-size: 0.75rem;
+    line-height: 1;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
 .briefing-headline {
     grid-area: headline;
     margin: 0;
@@ -14389,21 +14418,31 @@ svg.signal-radar {
     cursor: help;
 }
 
-.manage-hold-mode-box.tip-trigger {
+/* ── Higher-specificity (0,3,0) override so the group .tip-trigger rule
+   (0,2,0) cannot stomp min-height, justify-content, or display ─────────── */
+.manage-hold-mode-grid .manage-hold-mode-box.tip-trigger {
     display: flex;
     flex-direction: column;
-    width: 100%;
-    height: auto;
-    margin-left: 0;
-    border-radius: 9px;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 60px;
+    min-height: 56px;
+    height: auto;
+    padding: 0.5rem 0.5rem;
+    border-radius: 9px;
+    margin-left: 0;
+    top: auto;
+    vertical-align: unset;
+    overflow: visible;
 }
 
-/* Restore full icon size — don't let the group .tip-trigger i rule shrink it */
-.manage-hold-mode-box.tip-trigger i {
-    font-size: 0.92rem;
+.manage-hold-mode-grid .manage-hold-mode-box.tip-trigger i {
+    font-size: 1.05rem;
+    line-height: 1;
     flex-shrink: 0;
+    display: block;
+    overflow: visible;
 }
 
 .verdict-scenario-pill:hover {
@@ -17511,6 +17550,12 @@ body > .correlation-cell-tip {
         animation: none;
         opacity: 1;
     }
+    .sector-tilt-list,
+    .sector-tilt-summary,
+    .sector-tilt-row,
+    .sector-tilt-mode-clear {
+        transition: none;
+    }
 }
 
 /* ── Vol level badge & zones ──────────────────────────────────── */
@@ -17959,6 +18004,70 @@ body > .correlation-cell-tip {
 
 .sector-tilt-row--under .sector-tilt-values strong {
     color: var(--tilt-under);
+}
+
+/* ── Sector tilt live-selection ─────────────────────────────── */
+.sector-tilt-row {
+    transition: opacity 0.22s ease;
+}
+
+.sector-tilt-list {
+    transition: opacity 0.14s ease;
+}
+
+.sector-tilt-summary {
+    transition: opacity 0.14s ease;
+}
+
+.sector-tilt-mode-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.65rem;
+    margin-bottom: 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-cyan) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent-cyan) 28%, var(--hairline-soft));
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    animation: sector-tilt-in 0.18s var(--ease) both;
+}
+
+.sector-tilt-mode-pill i.bi-funnel-fill {
+    color: var(--accent-cyan);
+    font-size: 0.65rem;
+}
+
+.sector-tilt-mode-pill span {
+    flex: 1;
+    min-width: 0;
+}
+
+.sector-tilt-mode-pill strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.sector-tilt-mode-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    border: none;
+    background: color-mix(in srgb, var(--text-tertiary) 14%, transparent);
+    color: var(--text-tertiary);
+    font-size: 0.6rem;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sector-tilt-mode-clear:hover {
+    background: color-mix(in srgb, var(--accent-red) 16%, transparent);
+    color: var(--accent-red);
 }
 
 /* ── Top underlying ─────────────────────────────────────────── */

@@ -193,6 +193,23 @@ def build_portfolio_exposure(
     if len(duplicate_flags) >= 2:
         flags.append("Hidden duplication detected across holdings")
 
+    # Per-holding sector contributions: {ticker: {sector_name: contribution_pct}}
+    holding_sector_contributions: dict[str, dict[str, float]] = {}
+    for item in enriched:
+        ticker = item["ticker"]
+        alloc = float(item.get("allocation_pct") or 0)
+        sectors = (item.get("intelligence") or {}).get("sectors") or []
+        contribs: dict[str, float] = {}
+        for s in sectors:
+            name = str(s.get("name") or "").strip()
+            weight = float(s.get("weight") or 0)
+            if not name or weight <= 0:
+                continue
+            contribution = round(alloc * min(weight, 100.0) / 100.0, 2)
+            if contribution > 0:
+                contribs[name] = round(contribs.get(name, 0.0) + contribution, 2)
+        holding_sector_contributions[ticker] = contribs
+
     return {
         "sector_exposure": sector_exposure[:11],
         "country_exposure": country_exposure[:12],
@@ -201,6 +218,7 @@ def build_portfolio_exposure(
         "concentration_hhi": hhi,
         "flags": flags,
         "holding_count": len(enriched),
+        "holding_sector_contributions": holding_sector_contributions,
     }
 
 
