@@ -1836,6 +1836,13 @@ async def get_analytics_insights(
 
 _ACTION_PLAN_CACHE_TYPE = "action_plan"
 
+_GAP_TYPE_LABEL: dict[str, str] = {
+    "heavy_hold":    "large position on hold",
+    "large_trim":    "oversized position flagged for trim",
+    "small_add":     "undersized position with buy signal",
+    "uncertain_hold": "low-confidence hold",
+}
+
 
 def _action_plan_snapshot(db: Session, core: dict) -> dict:  # pylint: disable=too-many-locals
     """
@@ -1961,7 +1968,7 @@ def _action_plan_snapshot(db: Session, core: dict) -> dict:  # pylint: disable=t
             for t in (sector_tilt_data.get("tilt") or [])[:3]
         ],
         "conviction_gaps": [
-            {"t": g["ticker"], "type": g["gap_type"].replace("_", " ")}
+            {"t": g["ticker"], "type": _GAP_TYPE_LABEL.get(g["gap_type"], g["gap_type"].replace("_", " "))}
             for g in gap_items
         ],
     }
