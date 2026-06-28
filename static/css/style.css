@@ -6558,11 +6558,11 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
 
 .local-intel-guide {
     margin: 0 0 1rem;
-    padding: 0.72rem 0.85rem;
-    border-radius: 14px;
-    border: 1px solid rgba(111, 214, 240, 0.28);
-    background: linear-gradient(135deg, rgba(111, 214, 240, 0.1), rgba(48, 209, 88, 0.06));
-    box-shadow: 0 10px 28px -22px rgba(111, 214, 240, 0.85);
+    padding: 1rem 1.1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(111, 214, 240, 0.3);
+    background: linear-gradient(135deg, rgba(111, 214, 240, 0.08) 0%, rgba(191, 90, 242, 0.06) 50%, rgba(48, 209, 88, 0.05) 100%);
+    box-shadow: 0 12px 32px -20px rgba(111, 214, 240, 0.6), inset 0 1px 0 rgba(111, 214, 240, 0.12);
 }
 
 .local-intel-guide[hidden] {
@@ -6571,8 +6571,15 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
 
 .local-intel-guide-inner {
     display: flex;
-    align-items: flex-start;
-    gap: 0.65rem;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* ── Header row ──────────────────────────────────────────────── */
+.lig-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
 }
 
 .local-intel-guide-icon {
@@ -6583,74 +6590,21 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    background: rgba(111, 214, 240, 0.14);
+    background: rgba(111, 214, 240, 0.16);
     color: var(--brand-cyan, #6fd6f0);
     font-size: 1rem;
 }
 
-.local-intel-guide-copy {
-    flex: 1;
-    min-width: 0;
-}
-
 .local-intel-guide-title {
-    display: block;
-    font-size: 0.82rem;
+    flex: 1;
+    font-size: 0.84rem;
     font-weight: 650;
     color: var(--text-primary);
-    margin-bottom: 0.2rem;
-}
-
-.local-intel-guide-text {
-    margin: 0;
-    font-size: 0.74rem;
-    line-height: 1.45;
-    color: var(--text-secondary);
-}
-
-.local-intel-guide-link {
-    display: inline;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--brand-cyan, #6fd6f0);
-    font: inherit;
-    font-weight: 650;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    cursor: pointer;
-    vertical-align: baseline;
-}
-
-.local-intel-guide-link:hover {
-    color: #9de8f8;
-}
-
-.local-intel-guide-dots {
-    font-size: 0.72rem;
-    opacity: 0.85;
-    vertical-align: -0.05em;
-}
-
-.local-intel-guide-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex-shrink: 0;
-}
-
-.local-intel-guide-enable {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    white-space: nowrap;
-    border: 1px solid rgba(191, 90, 242, 0.45) !important;
-    background: linear-gradient(135deg, rgba(191, 90, 242, 0.2), rgba(111, 214, 240, 0.12)) !important;
-    color: #f3ecff !important;
-    font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 .local-intel-guide-dismiss {
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -6662,11 +6616,116 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
     background: transparent;
     color: var(--text-tertiary);
     cursor: pointer;
+    margin-left: auto;
 }
 
 .local-intel-guide-dismiss:hover {
     background: rgba(255, 255, 255, 0.06);
     color: var(--text-secondary);
+}
+
+/* ── Bullet list ─────────────────────────────────────────────── */
+.lig-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.42rem;
+}
+
+.lig-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.lig-list-icon {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    margin-top: 0.05em;
+}
+
+.lig-list-icon--green  { color: #34d058; }
+.lig-list-icon--cyan   { color: var(--brand-cyan, #6fd6f0); }
+.lig-list-icon--purple { color: #bf5af2; }
+.lig-list-icon--gold   { color: #f5c542; }
+
+.local-intel-guide-link {
+    color: var(--brand-cyan, #6fd6f0);
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.local-intel-guide-link:hover {
+    color: #9de8f8;
+}
+
+/* ── Step flow ───────────────────────────────────────────────── */
+.lig-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    padding-top: 0.25rem;
+    border-top: 1px solid rgba(111, 214, 240, 0.12);
+}
+
+.lig-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.lig-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    background: rgba(111, 214, 240, 0.18);
+    color: var(--brand-cyan, #6fd6f0);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.lig-step-label {
+    color: var(--text-secondary);
+}
+
+.lig-step-arrow {
+    color: var(--text-tertiary);
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+
+.local-intel-guide-enable {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    border: 1px solid rgba(191, 90, 242, 0.45) !important;
+    background: linear-gradient(135deg, rgba(191, 90, 242, 0.22), rgba(111, 214, 240, 0.12)) !important;
+    color: #f3ecff !important;
+    font-weight: 600;
+    transition: opacity 0.2s, filter 0.2s;
+}
+
+.local-intel-guide-enable.lig-enable--locked,
+.local-intel-guide-enable:disabled {
+    opacity: 0.38;
+    filter: saturate(0.4);
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .nav-menu-row.local-intel-guide-highlight {
@@ -6682,13 +6741,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
 }
 
 @media (max-width: 767.98px) {
-    .local-intel-guide-inner {
-        flex-wrap: wrap;
-    }
-
-    .local-intel-guide-actions {
-        width: 100%;
-        justify-content: flex-end;
+    .lig-steps {
+        gap: 0.3rem;
     }
 }
 

@@ -20,7 +20,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=99" rel="stylesheet">
+    <link href="/static/css/style.css?v=100" rel="stylesheet">
 </head>
 <body>
 
@@ -305,31 +305,61 @@
 
         <div class="local-intel-guide" id="local-intel-guide" role="status" aria-live="polite" hidden data-engine-local-only>
             <div class="local-intel-guide-inner">
-                <span class="local-intel-guide-icon" aria-hidden="true"><i class="bi bi-cpu-fill"></i></span>
-                <div class="local-intel-guide-copy">
+
+                <div class="lig-header">
+                    <span class="local-intel-guide-icon" aria-hidden="true"><i class="bi bi-cpu-fill"></i></span>
                     <strong class="local-intel-guide-title">Local Intelligence — fast, private, always on</strong>
-                    <p class="local-intel-guide-text">
-                        Signals, charts, and Holdings run on-device: instant, token-free, no strings attached.
-                        Want Claude's take — verdict quips, AI briefings, <strong>Claude Summaries</strong>?
-                        The API key is free; Claude's opinions run about $0.0002 a pop (cheaper than your last trade fee, probably).
-                        Grab a key at
-                        <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="local-intel-guide-link">console.anthropic.com</a>
-                        → <strong>API Keys → Create Key</strong>, then paste it in via the
-                        <i class="bi bi-key local-intel-guide-dots" aria-hidden="true"></i>
-                        <strong>key icon</strong> in the top-left logo.
-                        Or just hit <strong>Enable Claude AI</strong> below.
-                    </p>
-                </div>
-                <div class="local-intel-guide-actions">
-                    <button type="button" class="btn btn-sm local-intel-guide-enable" id="local-intel-guide-enable">
-                        <i class="bi bi-stars" aria-hidden="true"></i>
-                        Enable Claude AI
-                    </button>
                     <button type="button" class="local-intel-guide-dismiss" id="local-intel-guide-dismiss"
                             aria-label="Dismiss local intelligence notice">
                         <i class="bi bi-x-lg" aria-hidden="true"></i>
                     </button>
                 </div>
+
+                <ul class="lig-list">
+                    <li>
+                        <i class="bi bi-lightning-charge-fill lig-list-icon lig-list-icon--green" aria-hidden="true"></i>
+                        <span>Signals, charts &amp; Holdings run <strong>on-device</strong> — instant, token-free, no API key needed</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-lock-fill lig-list-icon lig-list-icon--cyan" aria-hidden="true"></i>
+                        <span><strong>Fully private</strong> — your portfolio data never leaves your machine in local mode</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-stars lig-list-icon lig-list-icon--purple" aria-hidden="true"></i>
+                        <span>Unlock <strong>Claude AI</strong> for narrative briefings, verdict quips, action plans &amp; portfolio summaries</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-coin lig-list-icon lig-list-icon--gold" aria-hidden="true"></i>
+                        <span>~$0.0002 per scan — get a free key at
+                            <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="local-intel-guide-link">console.anthropic.com</a>
+                            → <strong>API Keys → Create Key</strong>
+                        </span>
+                    </li>
+                </ul>
+
+                <div class="lig-steps">
+                    <span class="lig-step">
+                        <span class="lig-step-num">1</span>
+                        <span class="lig-step-label">Get free API key</span>
+                    </span>
+                    <i class="bi bi-arrow-right lig-step-arrow" aria-hidden="true"></i>
+                    <span class="lig-step">
+                        <span class="lig-step-num">2</span>
+                        <span class="lig-step-label"><i class="bi bi-key" aria-hidden="true"></i> Click logo → paste key</span>
+                    </span>
+                    <i class="bi bi-arrow-right lig-step-arrow" aria-hidden="true"></i>
+                    <span class="lig-step">
+                        <span class="lig-step-num">3</span>
+                        <span class="lig-step-label">Key validated ✓</span>
+                    </span>
+                    <i class="bi bi-arrow-right lig-step-arrow" aria-hidden="true"></i>
+                    <button type="button" class="btn btn-sm local-intel-guide-enable" id="local-intel-guide-enable"
+                            title="Enter a valid Anthropic API key first — click the key icon in the top-left logo">
+                        <i class="bi bi-stars" aria-hidden="true"></i>
+                        Enable Claude AI
+                    </button>
+                </div>
+
             </div>
         </div>
 
@@ -2032,7 +2062,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.0.0/dist/chartjs-chart-treemap.min.js"></script>
     <script defer src="/static/js/analytics-charts.js?v=14"></script>
-    <script defer src="/static/js/dashboard.js?v=91"></script>
+    <script defer src="/static/js/dashboard.js?v=92"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>

@@ -7703,7 +7703,7 @@ function applyIntelligenceModeUi() {
 }
 
 function enableClaudeAiAndReload() {
-    if (_isClaudeApiLive === false) {
+    if (_isClaudeApiLive !== true) {
         document.getElementById("brand-intro-trigger")?.click();
         return;
     }
@@ -7723,6 +7723,16 @@ function updateLocalIntelGuide() {
         && !dismissed;
     guide.hidden = !show;
     guide.style.display = show ? "" : "none";
+
+    const enableBtn = document.getElementById("local-intel-guide-enable");
+    if (enableBtn) {
+        const keyReady = _isClaudeApiLive === true;
+        enableBtn.disabled = !keyReady;
+        enableBtn.title = keyReady
+            ? "Switch to Claude AI mode"
+            : "Enter a valid Anthropic API key first — click the key icon in the top-left logo";
+        enableBtn.classList.toggle("lig-enable--locked", !keyReady);
+    }
 }
 
 function maybeShowLocalIntelGuideToast() {
@@ -8035,7 +8045,7 @@ function initDashboardPet() {
 
     function applyForcedLocalMode(local, announce) {
         const enablingClaude = !local && _forcedLocalMode;
-        if (enablingClaude && _isClaudeApiLive !== false) {
+        if (enablingClaude && _isClaudeApiLive === true) {
             if (announce) {
                 showToast("Claude AI enabled — refreshing the dashboard.", "info");
             }
