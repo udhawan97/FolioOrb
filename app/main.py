@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from starlette.middleware.gzip import GZipMiddleware
 from app.routers import stocks, portfolio, ai
 from app.routers import news
@@ -79,6 +79,9 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # Files at static/css/style.css → URL: /static/css/style.css
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+with open("templates/index.html", encoding="utf-8") as _f:
+    _dashboard_html = _f.read()
+
 # Register the route groups defined in our router files
 app.include_router(stocks.router)
 app.include_router(portfolio.router)
@@ -89,7 +92,7 @@ app.include_router(news.router)
 @app.get("/")
 async def dashboard():
     """Serve the main dashboard HTML page."""
-    return FileResponse("templates/index.html")
+    return HTMLResponse(_dashboard_html)
 
 @app.get("/health")
 async def health_check():
