@@ -46,6 +46,7 @@ FolioSenseAI is a **self-hosted portfolio intelligence dashboard** built on Fast
 ## Contents
 
 - [What This Is](#-what-this-is)
+- [Architecture at a Glance](#-architecture-at-a-glance)
 - [Engineering Highlights](#-engineering-highlights)
 - [Features](#-features)
 - [Tech Stack](#️-tech-stack)
@@ -65,6 +66,33 @@ FolioSenseAI is a **self-hosted portfolio intelligence dashboard** built on Fast
 | **Investors** | Live market context, a prioritised action plan, and Hold / Add / Trim / Exit verdicts with a thesis — not just a sparkline and a prayer |
 | **Developers** | A production-patterned Python + FastAPI + SQLite project: 14+ modular services, mocked-service tests, a clean REST API, and no frontend framework tax. React was not harmed because it was never invited. |
 | **Recruiters** | A full-stack AI/data product demonstrating API design, multi-layer caching, Anthropic SDK integration, analytics UX, CI/CD, and security hygiene — from scratch, in one repo |
+
+---
+
+## 🧭 Architecture at a Glance
+
+```mermaid
+flowchart LR
+    user["User opens local dashboard"]
+    ui["Vanilla JS + Bootstrap UI<br/>Holdings, Analytics, News"]
+    api["FastAPI backend<br/>REST endpoints"]
+    intelligence["Portfolio intelligence engine<br/>signals, risk, exposure, regimes"]
+    storage["Local SQLite database<br/>holdings, snapshots, AI cache"]
+    market["Yahoo Finance via yfinance<br/>prices, history, headlines"]
+    claude["Optional Claude layer<br/>action plans and narration"]
+
+    user --> ui
+    ui --> api
+    api --> intelligence
+    api <--> storage
+    intelligence <--> market
+    intelligence --> claude
+    claude --> intelligence
+    intelligence --> api
+    api --> ui
+```
+
+In plain English: the browser talks to a local FastAPI server, the server pulls market data and portfolio records, the analytics engine turns that into verdicts and charts, and Claude can optionally add richer explanations. The product still works without Claude because the core investment logic runs locally.
 
 <details>
 <summary>📋 What's new in v4.1</summary>
