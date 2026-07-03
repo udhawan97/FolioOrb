@@ -191,7 +191,7 @@ def compute_correlation_matrix(holdings: list[dict]) -> dict[str, Any]:
     history = get_batched_history_closes(tickers, period="1y")
     aligned_tickers, mat = _aligned_daily_returns(history)
 
-    if mat.size == 0 or mat.shape[1] < 5:
+    if mat.size == 0 or mat.ndim < 2 or mat.shape[0] < 2 or mat.shape[1] < 5:
         n = len(aligned_tickers) or len(tickers)
         identity = [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
         return _cache_set(cache_key, {
@@ -801,7 +801,7 @@ def compute_rolling_volatility(holdings: list[dict], *, window: int = 30) -> dic
 
     series: list[dict] = []
     today = date.today()
-    for i in range(window, port_rets.size):
+    for i in range(window, port_rets.size + 1):
         chunk = port_rets[i - window:i]
         vol = float(np.std(chunk, ddof=1)) * math.sqrt(TRADING_DAYS) * 100
         offset = port_rets.size - i

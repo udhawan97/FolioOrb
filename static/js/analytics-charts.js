@@ -1251,8 +1251,10 @@ const AnalyticsCharts = (() => {
             }
 
             const ann = $("drawdown-annotation");
-            if (ann && data.max_drawdown_pct < 0) {
-                ann.textContent = `Max drawdown: ${data.max_drawdown_pct.toFixed(1)}%${data.max_drawdown_date ? ` on ${data.max_drawdown_date}` : ""}`;
+            if (ann) {
+                ann.textContent = data.max_drawdown_pct < 0
+                    ? `Max drawdown: ${data.max_drawdown_pct.toFixed(1)}%${data.max_drawdown_date ? ` on ${data.max_drawdown_date}` : ""}`
+                    : "";
             }
 
             const theme = chartTheme();

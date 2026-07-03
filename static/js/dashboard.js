@@ -3079,7 +3079,7 @@ function renderRealizedTable(trades) {
         const tickerArg = inlineJsString(t.ticker);
         row.innerHTML = `
             <td class="text-secondary small">${day}</td>
-            <td class="fw-bold">${t.ticker}</td>
+            <td class="fw-bold">${escapeHtml(t.ticker)}</td>
             <td class="text-end">${toNumber(t.shares_sold).toFixed(3)}</td>
             <td class="text-end">${formatCurrency(t.sale_price)}</td>
             <td class="text-end">${formatCurrency(t.avg_cost)}</td>
@@ -3512,7 +3512,7 @@ function moveBadgeHtml(ticker) {
     const exp = cachedExplanations[ticker];
     if (!exp) return "";
     const label = ATTRIBUTION_SHORT[exp.attribution_type] || "?";
-    return `<div class="move-badge ${exp.attribution_type}" title="${exp.confidence} confidence · ${label}">${label}</div>`;
+    return `<div class="move-badge ${escapeHtml(exp.attribution_type)}" title="${escapeHtml(String(exp.confidence))} confidence · ${escapeHtml(label)}">${escapeHtml(label)}</div>`;
 }
 
 function dayChangeHtml(h) {
@@ -4258,8 +4258,9 @@ function renderMoveExplainer(section, data, coverageData = null) {
             macroPills.push({ label: `QQQ ${formatPct(macro.qqq_change_pct)}`, pos: macro.qqq_change_pct >= 0 });
         }
     }
-    if (data.volume_vs_avg !== null && data.volume_vs_avg !== undefined) {
-        macroPills.push({ label: `Vol ${data.volume_vs_avg.toFixed(1)}× avg`, pos: data.volume_vs_avg >= 1.5 });
+    if (isFiniteNumber(data.volume_vs_avg)) {
+        const volVsAvg = Number(data.volume_vs_avg);
+        macroPills.push({ label: `Vol ${volVsAvg.toFixed(1)}× avg`, pos: volVsAvg >= 1.5 });
     }
 
     const driversHtml = drivers.map(d => `
@@ -6819,6 +6820,7 @@ async function requestDeepIntel(ticker, coverageSection) {
         _syncDeepIntelSection(coverageSection, ticker);
         return;
     }
+    if (deepIntelLoadingTickers.has(ticker)) return;
     deepIntelLoadingTickers.add(ticker);
     _syncDeepIntelSection(coverageSection, ticker);
     await loadDeepIntelligence(ticker);

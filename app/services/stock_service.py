@@ -146,6 +146,7 @@ def get_stock_data(ticker: str) -> dict:
     On failure returns a dict with an ``"error"`` key so callers never raise.
     Results are cached for `_QUOTE_TTL` seconds.
     """
+    ticker = normalize_ticker(ticker)
     now = time.monotonic()
     cached = _QUOTE_CACHE.get(ticker)
     if cached and cached[0] > now:

@@ -131,8 +131,9 @@ def _detect_duplicates(holdings: list[dict]) -> list[dict]:
             ),
         })
 
+    held_tickers = {h.get("ticker", "").upper() for h in holdings}
     for sym, pct in sorted(underlying.items(), key=lambda x: -x[1]):
-        if pct >= 8 and sym not in {h.get("ticker", "").upper() for h in holdings}:
+        if pct >= 8 and sym not in held_tickers:
             duplicates.append({
                 "type": "hidden_single_name",
                 "ticker": sym,

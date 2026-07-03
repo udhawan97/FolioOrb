@@ -79,6 +79,7 @@ from app.services.portfolio_state import portfolio_state_signature
 from app.services.verdict_calibration import (
     calibration_footnote,
     calibration_summary,
+    compute_calibration_buckets,
     log_verdict_snapshot,
 )
 
@@ -484,6 +485,7 @@ async def get_stock_summary(
     Cache expires after 24 hours. Use force_refresh=true to bypass.
     """
     ticker = ticker.upper()
+    stock_data = get_stock_data(ticker)
 
     if not force_refresh:
         cached = (
@@ -492,7 +494,8 @@ async def get_stock_summary(
             .order_by(AISummary.generated_at.desc())
             .first()
         )
-        if cached and _cache_is_fresh(cached):
+        current_price = stock_data.get("current_price") if not stock_data.get("error") else None
+        if cached and _cache_is_fresh(cached, current_price=current_price):
             return {
                 "ticker": ticker,
                 "summary": cached.summary_text,
@@ -501,7 +504,6 @@ async def get_stock_summary(
                 "price_when_generated": cached.price_when_generated,
             }
 
-    stock_data = get_stock_data(ticker)
     if stock_data.get("error"):
         raise HTTPException(status_code=404, detail=QUOTE_FETCH_ERROR)
 
@@ -1135,6 +1137,9 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
     signals: dict[str, dict] = {}
     missing_quip_tickers: list[str] = []
     scan_snapshot_changed = False
+    # Calibration buckets are portfolio-wide (not ticker-specific), so compute them
+    # once here instead of re-querying/re-aggregating on every loop iteration below.
+    calibration_buckets = compute_calibration_buckets(db, window="1m")
 
     for ticker in active_tickers:
         try:
@@ -1157,7 +1162,9 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
             confidence = sig_dict.get("confidence", 0)
             quote_data = quotes.get(ticker) or {}
 
-            footnote = calibration_footnote(db, action=action, confidence=confidence)
+            footnote = calibration_footnote(
+                db, action=action, confidence=confidence, buckets=calibration_buckets
+            )
             if footnote:
                 sig_dict["calibration_footnote"] = footnote
             log_verdict_snapshot(
@@ -1461,10 +1468,14 @@ async def get_all_analyst_recommendations(db: Session = Depends(get_db)):
     Return analyst consensus for all portfolio holdings.
     Iterates active portfolio holdings; ETFs resolve to ETF quality.
     """
+    active_tickers = _active_portfolio_tickers(db)
+    # Pre-fetch history in one batched/parallel call so per-ticker ETF price-signal
+    # lookups (below) reuse it instead of each issuing its own yfinance history call.
+    history_map = get_batched_history_closes(active_tickers)
     results: dict[str, dict] = {}
-    for ticker in _active_portfolio_tickers(db):
+    for ticker in active_tickers:
         try:
-            rec = get_analyst_recommendation(ticker)
+            rec = get_analyst_recommendation(ticker, closes=history_map.get(ticker))
             results[ticker] = rec_to_dict(rec)
         except Exception as exc:
             logger.error(

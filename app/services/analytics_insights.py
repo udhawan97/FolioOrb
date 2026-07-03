@@ -588,12 +588,17 @@ def fetch_world_markets_sync() -> list[dict]:
     return results
 
 
-def _signals_snapshot(db, non_watchlist: list[dict]) -> dict[str, Any]:
+def _cached_verdict_signals(db, non_watchlist: list[dict]) -> dict[str, dict | None]:
+    """Fetch the latest cached verdict per ticker (single query/decode pass).
+
+    Returns a dict of ticker -> {"action", "confidence"} for tickers with a
+    decodable cached verdict, or ticker -> None for tickers with no cache
+    (or an undecodable one). Callers apply their own default for the None case.
+    """
     from app.models import AISummary
-    from app.services.portfolio_state import portfolio_state_signature
     from app.services.verdict_ai_enhancement import decode_verdict_cache
 
-    signals_dict: dict[str, dict] = {}
+    raw: dict[str, dict | None] = {}
     for h in non_watchlist:
         ticker = h["ticker"]
         cached = (
@@ -608,14 +613,29 @@ def _signals_snapshot(db, non_watchlist: list[dict]) -> dict[str, Any]:
         if cached:
             try:
                 v = decode_verdict_cache(getattr(cached, "summary_text", ""))
-                signals_dict[ticker] = {
+                raw[ticker] = {
                     "action": v.get("action", "hold"),
                     "confidence": v.get("confidence", 50),
                 }
             except Exception:
-                signals_dict[ticker] = {"action": "hold", "confidence": 50}
+                raw[ticker] = {"action": "hold", "confidence": 50}
         else:
-            signals_dict[ticker] = {"action": "needs-data", "confidence": 50}
+            raw[ticker] = None
+    return raw
+
+
+def _signals_snapshot(
+    db, non_watchlist: list[dict], cached_signals: dict[str, dict | None] | None = None
+) -> dict[str, Any]:
+    from app.services.portfolio_state import portfolio_state_signature
+
+    if cached_signals is None:
+        cached_signals = _cached_verdict_signals(db, non_watchlist)
+
+    signals_dict: dict[str, dict] = {
+        ticker: (sig if sig is not None else {"action": "needs-data", "confidence": 50})
+        for ticker, sig in cached_signals.items()
+    }
 
     alloc_map = {h["ticker"]: float(h.get("allocation_pct") or 0) for h in non_watchlist}
     state = portfolio_state_signature(signals_dict, alloc_map)
@@ -707,30 +727,13 @@ def build_analytics_snapshot(db) -> dict[str, Any]:
     )
     world = fetch_world_markets_sync()
     market_ctx = compute_market_context(holdings_rows, world)
-    signals = _signals_snapshot(db, non_watchlist)
+    cached_signals = _cached_verdict_signals(db, non_watchlist)
+    signals = _signals_snapshot(db, non_watchlist, cached_signals=cached_signals)
 
-    signals_dict = {}
-    for h in non_watchlist:
-        ticker = h["ticker"]
-        from app.models import AISummary
-        from app.services.verdict_ai_enhancement import decode_verdict_cache
-        cached = (
-            db.query(AISummary)
-            .filter(AISummary.ticker == ticker, AISummary.summary_type.like("verdict%"))
-            .order_by(AISummary.generated_at.desc())
-            .first()
-        )
-        if cached:
-            try:
-                v = decode_verdict_cache(getattr(cached, "summary_text", ""))
-                signals_dict[ticker] = {
-                    "action": v.get("action", "hold"),
-                    "confidence": v.get("confidence", 50),
-                }
-            except Exception:
-                signals_dict[ticker] = {"action": "hold", "confidence": 50}
-        else:
-            signals_dict[ticker] = {"action": "hold", "confidence": 50}
+    signals_dict = {
+        ticker: (sig if sig is not None else {"action": "hold", "confidence": 50})
+        for ticker, sig in cached_signals.items()
+    }
 
     benchmark = compute_benchmark_comparison(holdings_rows, history)
     return_cal = compute_return_calendar(history)

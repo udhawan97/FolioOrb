@@ -113,10 +113,18 @@ def calibration_footnote(
     *,
     action: str,
     confidence: int,
+    buckets: Optional[list[dict]] = None,
 ) -> dict | None:
-    """Return footnote when enough samples exist for similar calls."""
+    """Return footnote when enough samples exist for similar calls.
+
+    Pass `buckets` (from `compute_calibration_buckets(db, window="1m")`) when
+    calling this repeatedly in a loop (e.g. once per holding) to avoid
+    re-running the same portfolio-wide query/aggregation for every ticker —
+    the buckets don't depend on which ticker is being scored.
+    """
     band = _predicted_band(confidence)
-    buckets = compute_calibration_buckets(db, window="1m")
+    if buckets is None:
+        buckets = compute_calibration_buckets(db, window="1m")
     match = next((b for b in buckets if b["predicted_band"] == band), None)
     if not match or match["sample_size"] < _MIN_SAMPLE_FOR_FOOTNOTE:
         return None
