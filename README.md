@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="static/img/brand/folio-orbit-mark-light.svg">
-    <source media="(prefers-color-scheme: light)" srcset="static/img/brand/folio-orbit-mark-dark.svg">
-    <img src="static/img/brand/folio-orbit-mark-dark.svg" alt="FolioSenseAI" width="285">
+    <source media="(prefers-color-scheme: dark)" srcset="static/img/brand/folio-orbit-mark-light-animated.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/img/brand/folio-orbit-mark-dark-animated.svg">
+    <img src="static/img/brand/folio-orbit-mark-dark-animated.svg" alt="FolioSenseAI" width="285">
   </picture>
 </p>
 
