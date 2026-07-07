@@ -36,5 +36,7 @@ stale enough to warrant a fresh one.
 
 ## Model
 
-FolioSenseAI currently calls `claude-haiku-3-5` via the Anthropic SDK, chosen for the
-latency and cost profile of a dashboard that expects frequent refreshes.
+FolioSenseAI calls `claude-haiku-4-5` via the Anthropic SDK for most narration —
+summaries, briefings, news themes, and verdict quips — chosen for the latency and cost
+profile of a dashboard that expects frequent refreshes. The portfolio action plan uses
+`claude-sonnet-4-5`, which does the heavier cross-holding reasoning.

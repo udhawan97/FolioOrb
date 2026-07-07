@@ -265,12 +265,20 @@ def get_fast_quote(ticker: str) -> dict:
     if cached and cached[0] > now:
         return cached[1]
 
+    def _fallback() -> dict:
+        # Cache the full-quote fallback under the fast key too, so a ticker whose
+        # fast_info never carries a price doesn't re-run the fast_info network call
+        # on every dashboard valuation refresh.
+        result = get_stock_data(ticker)
+        _QUOTE_CACHE[cache_key] = (now + _quote_ttl(), result)
+        return result
+
     try:
         fi = yf.Ticker(ticker).fast_info
         current_price = _fast_float(getattr(fi, "last_price", None))
         prev_close = _fast_float(getattr(fi, "previous_close", None))
         if current_price <= 0:
-            return get_stock_data(ticker)
+            return _fallback()
 
         if prev_close > 0:
             day_change = current_price - prev_close
@@ -341,7 +349,7 @@ def get_fast_quote(ticker: str) -> dict:
             ticker,
             type(exc).__name__,
         )
-        return get_stock_data(ticker)
+        return _fallback()
 
 
 # ── Search and validation ──────────────────────────────────────────────────────

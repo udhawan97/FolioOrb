@@ -8502,6 +8502,7 @@ async function updateMarketStatus() {
 const HUD_TOTAL = 300;
 const CLAUDE_HEARTBEAT_TOTAL = 120;
 let _hudCountdown = HUD_TOTAL;
+let _hudCountdownTimer = null;
 let _claudeHeartbeatCountdown = CLAUDE_HEARTBEAT_TOTAL;
 let _claudeHeartbeatInFlight = false;
 let _claudeHeartbeatTimer = null;
@@ -8618,6 +8619,10 @@ async function loadClaudeHeartbeat() {
 }
 
 function startCountdown() {
+    // Track the handle so a second call can't leave a previous ticker running.
+    // Without this, any re-entry (e.g. re-init after a key reconnect) would stack
+    // independent countdowns, each firing its own recursive loadPortfolioValue chain.
+    if (_hudCountdownTimer) clearInterval(_hudCountdownTimer);
     _hudCountdown = HUD_TOTAL;
     const initialCountdownEl = document.getElementById("countdown");
     if (initialCountdownEl) {
@@ -8625,7 +8630,7 @@ function startCountdown() {
         initialCountdownEl.classList.remove("is-soon");
     }
     updateHudPillSummary();
-    const interval = setInterval(() => {
+    _hudCountdownTimer = setInterval(() => {
         _hudCountdown--;
         const el = document.getElementById("countdown");
         if (el) {
@@ -8635,7 +8640,8 @@ function startCountdown() {
         }
         updateHudPopoverCountdown();
         if (_hudCountdown <= 0) {
-            clearInterval(interval);
+            clearInterval(_hudCountdownTimer);
+            _hudCountdownTimer = null;
             loadPortfolioValue().then(() => {
                 Promise.all([loadPnl(), updateMarketStatus()]);
                 startCountdown();
