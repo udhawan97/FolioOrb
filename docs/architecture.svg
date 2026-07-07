@@ -94,7 +94,7 @@
   <circle cx="439" cy="330" r="4" fill="#F59E0B"/>
   <text x="453" y="332" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" font-weight="600" fill="#F59E0B">Claude AI  ·  optional</text>
   <text x="453" y="351" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"   fill="#996600">ai_service.py  ·  action_plan()  ·  generate_news_themes()</text>
-  <text x="453" y="369" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"   fill="#7A5200">claude-haiku-3-5  ·  24h SQLite cache  ·  live token cost tracking</text>
+  <text x="453" y="369" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"   fill="#7A5200">claude-haiku-4-5  ·  24h SQLite cache  ·  live token cost tracking</text>
 
   <!-- ── Arrows 2 (server → external) ── -->
   <line x1="142" y1="409" x2="142" y2="433" stroke="#48484A" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
@@ -123,7 +123,7 @@
   <rect x="592" y="437" width="252" height="94" rx="12" fill="#180F00" stroke="#7A4E00" stroke-width="1.5"/>
   <text x="718" y="462" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12.5" font-weight="600" fill="#F4F4F5" text-anchor="middle">Anthropic Claude</text>
   <text x="718" y="479" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10"   fill="#8E8E93"  text-anchor="middle">Action Plans · Briefings · Themes</text>
-  <text x="718" y="493" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"    fill="#A87020"  text-anchor="middle">Anthropic SDK 0.105 · claude-haiku-3-5</text>
+  <text x="718" y="493" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"    fill="#A87020"  text-anchor="middle">Anthropic SDK 0.105 · claude-haiku-4-5</text>
   <text x="718" y="515" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"    font-weight="600" fill="#F59E0B" text-anchor="middle">optional · bring your own key</text>
 
   <!-- ── Footer ── -->

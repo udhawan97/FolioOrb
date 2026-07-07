@@ -89,7 +89,7 @@ class AISummary(Base):
     summary_text = Column(Text, nullable=False)
     price_when_generated = Column(Float, nullable=True)     # Stock price at generation time
     generated_at = Column(DateTime, default=func.now())
-    model_used = Column(String(50), default="claude-3-haiku-20240307")
+    model_used = Column(String(50), default="claude-haiku-4-5-20251001")
 
 
 class RealizedTrade(Base):

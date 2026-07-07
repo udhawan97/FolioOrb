@@ -10,6 +10,7 @@ assert the invariant that makes the code safe: the accumulator dict is only ever
 mutated while the lock is held. This fails on the unlocked version and passes once
 the read-modify-write is guarded.
 """
+# pylint: disable=protected-access
 import threading
 
 from app.services import ai_service

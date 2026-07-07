@@ -8,6 +8,7 @@ fallback must now be cached so a second call is a pure cache hit.
 
 No real network calls — yfinance's fast_info is faked.
 """
+# pylint: disable=protected-access
 from app.services import stock_service
 
 

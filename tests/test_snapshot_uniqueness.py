@@ -7,6 +7,7 @@ Two paths are covered:
   2. _upsert_daily_snapshot refreshes today's row in place instead of inserting a
      second row for the same day.
 """
+# pylint: disable=protected-access
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -33,7 +34,10 @@ def test_migration_dedupes_snapshots_and_adds_unique_index():
             "total_value FLOAT, total_cost_basis FLOAT, unrealized_gain FLOAT, "
             "realized_gain FLOAT, total_return FLOAT, created_at DATETIME)"
         ))
-        conn.execute(text("CREATE TABLE holdings (id INTEGER PRIMARY KEY, portfolio_id INTEGER, is_active BOOLEAN)"))
+        conn.execute(text(
+            "CREATE TABLE holdings "
+            "(id INTEGER PRIMARY KEY, portfolio_id INTEGER, is_active BOOLEAN)"
+        ))
         # Three duplicate rows for the same day; the row with the highest id must win.
         for value in (100, 200, 300):
             conn.execute(text(
