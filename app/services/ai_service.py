@@ -6,6 +6,7 @@ Claude AI integration for generating stock and portfolio summaries.
 import json
 import logging
 import re
+import threading
 import time
 from itertools import cycle
 from time import perf_counter
@@ -22,8 +23,11 @@ MODEL = "claude-haiku-4-5-20251001"
 _HEARTBEAT_CACHE: tuple[float, dict] | None = None
 _HEARTBEAT_TTL = 120  # seconds — matches frontend poll interval
 
-# Lifetime token accumulator — reset on process restart, updated after every API call
+# Lifetime token accumulator — reset on process restart, updated after every API call.
+# Sync FastAPI handlers run in a threadpool, so concurrent dashboard requests can call
+# _track_usage() from several threads at once; guard the read-modify-write with a lock.
 _TOKEN_USAGE: dict[str, int] = {"total_in": 0, "total_out": 0}
+_USAGE_LOCK = threading.Lock()
 
 
 def reinitialize_client(new_key: str) -> None:
@@ -35,12 +39,16 @@ def reinitialize_client(new_key: str) -> None:
 
 
 def _track_usage(_model: str, usage) -> None:
-    _TOKEN_USAGE["total_in"] += getattr(usage, "input_tokens", 0) or 0
-    _TOKEN_USAGE["total_out"] += getattr(usage, "output_tokens", 0) or 0
+    in_tokens = getattr(usage, "input_tokens", 0) or 0
+    out_tokens = getattr(usage, "output_tokens", 0) or 0
+    with _USAGE_LOCK:
+        _TOKEN_USAGE["total_in"] += in_tokens
+        _TOKEN_USAGE["total_out"] += out_tokens
 
 
 def get_accumulated_usage() -> dict:
-    return dict(_TOKEN_USAGE)
+    with _USAGE_LOCK:
+        return dict(_TOKEN_USAGE)
 
 
 def _compact_json(payload: dict) -> str:
@@ -129,8 +137,9 @@ _FALLBACK_CYCLE: dict[str, int] = {}
 def fallback_quip(action: str) -> str:
     """Return a rotating deterministic quip for the given action (no API required)."""
     options = _FALLBACK_QUIPS.get(action, _FALLBACK_QUIPS["needs-data"])
-    idx = _FALLBACK_CYCLE.get(action, 0) % len(options)
-    _FALLBACK_CYCLE[action] = idx + 1
+    with _USAGE_LOCK:
+        idx = _FALLBACK_CYCLE.get(action, 0) % len(options)
+        _FALLBACK_CYCLE[action] = idx + 1
     return options[idx]
 
 
