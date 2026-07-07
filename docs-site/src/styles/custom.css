@@ -32,3 +32,37 @@
   -webkit-background-clip: text;
   color: transparent;
 }
+
+/* ── Senpai tip callout (docs-site/src/components/SenpaiTip.astro) ────────── */
+.fs-senpaitip {
+  position: relative;
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  border-radius: 8px;
+  border-left: 3px solid var(--fs-brand-cyan);
+  background: var(--sl-color-accent-low);
+  padding: 0.85rem 1rem;
+  margin-block: 1rem;
+  font-size: 0.95rem;
+}
+.fs-senpaitip-mark {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: block;
+  margin-top: 0.05rem;
+}
+.fs-senpaitip-body > :first-child {
+  margin-top: 0;
+}
+.fs-senpaitip-body > :last-child {
+  margin-bottom: 0;
+}
+.fs-senpaitip-label {
+  display: block;
+  font-weight: 650;
+  font-size: 0.8rem;
+  color: var(--sl-color-gray-2);
+  margin-bottom: 0.15rem;
+}

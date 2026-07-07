@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-labelledby="title desc">
+  <title id="title">FolioSenseAI animated orbit mark</title>
+  <desc id="desc">A portfolio orbit logo with a slowly moving satellite and pulsing center.</desc>
+  <defs>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.5"></feGaussianBlur>
+    </filter>
+    <filter id="trailSoft" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="0.55"></feGaussianBlur>
+    </filter>
+  </defs>
+  <g>
+    <animateTransform attributeName="transform" type="rotate" values="0 50 50; 360 50 50" dur="18s" repeatCount="indefinite"></animateTransform>
+    <ellipse cx="50" cy="50" rx="32" ry="16" transform="rotate(-22 50 50)" fill="none" stroke="#97acec" stroke-opacity="0.26" stroke-width="1.5"></ellipse>
+    <ellipse cx="50" cy="50" rx="32" ry="16" transform="rotate(-22 50 50)" fill="none" stroke="#6fd6f0" stroke-opacity="0.18" stroke-width="3" stroke-linecap="round" stroke-dasharray="10 118" filter="url(#trailSoft)"></ellipse>
+  </g>
+  <circle cx="50" cy="50" r="28" fill="none" stroke="#97acec" stroke-opacity="0.55" stroke-width="2">
+    <animate attributeName="stroke-opacity" values="0.42;0.72;0.42" dur="4.8s" repeatCount="indefinite"></animate>
+  </circle>
+  <circle cx="50" cy="50" r="28" fill="none" stroke="#6fd6f0" stroke-opacity="0" stroke-width="1.2">
+    <animate attributeName="r" values="26;31;26" dur="4.8s" repeatCount="indefinite"></animate>
+    <animate attributeName="stroke-opacity" values="0;0.34;0" dur="4.8s" repeatCount="indefinite"></animate>
+  </circle>
+  <g>
+    <animateTransform attributeName="transform" type="rotate" values="0 50 50; 360 50 50" dur="8s" repeatCount="indefinite"></animateTransform>
+    <circle cx="50" cy="22" r="5.5" fill="#6fd6f0" opacity="0.5" filter="url(#soft)">
+      <animate attributeName="opacity" values="0.3;0.72;0.3" dur="2.6s" repeatCount="indefinite"></animate>
+    </circle>
+    <circle cx="50" cy="22" r="4" fill="#6fd6f0">
+      <animate attributeName="r" values="3.5;4.5;3.5" dur="2.6s" repeatCount="indefinite"></animate>
+    </circle>
+  </g>
+  <circle cx="50" cy="50" r="8.5" fill="#6fd6f0" opacity="0.55" filter="url(#soft)">
+    <animate attributeName="opacity" values="0.34;0.72;0.34" dur="3.2s" repeatCount="indefinite"></animate>
+  </circle>
+  <circle cx="50" cy="50" r="6" fill="#6fd6f0">
+    <animate attributeName="r" values="5.4;6.8;5.4" dur="3.2s" repeatCount="indefinite"></animate>
+  </circle>
+</svg>

@@ -5,7 +5,8 @@ template: splash
 hero:
   tagline: Your folio, finally making sense.
   image:
-    file: ../../assets/folio-orbit-icon.svg
+    dark: ../../assets/folio-orbit-mark-dark-animated.svg
+    light: ../../assets/folio-orbit-mark-light-animated.svg
   actions:
     - text: Get Started
       link: get-started/introduction/
@@ -17,10 +18,16 @@ hero:
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
+import SenpaiTip from '../../components/SenpaiTip.astro';
 
 FolioSenseAI turns holdings, live market data, risk signals, and news into plain-English
 portfolio context — running entirely on your machine, with Claude as an optional layer
 on top, never a requirement.
+
+<SenpaiTip>
+	That's me in the corner of the dashboard — I watch your portfolio and drop the occasional
+	tip once you're in. [Meet Senpai](meet-senpai/) for the full introduction.
+</SenpaiTip>
 
 <CardGrid stagger>
 	<Card title="Local-first" icon="approve-check">

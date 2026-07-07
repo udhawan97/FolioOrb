@@ -1,0 +1,18 @@
+---
+/**
+ * A documentation callout in Senpai's voice — modeled on Orifold's PetTip
+ * component (github.com/udhawan97/Orifold). Use sparingly: at most one per
+ * page, in normal document flow (never floating/fixed). The mark is
+ * decorative (aria-hidden); identity is carried by the label.
+ */
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const mark = `${base}/assets/folio-orbit-icon.svg`;
+---
+
+<div class="fs-senpaitip" role="note" aria-label="Senpai's tip">
+	<img class="fs-senpaitip-mark" src={mark} alt="" aria-hidden="true" loading="lazy" width="40" height="40" />
+	<div class="fs-senpaitip-body">
+		<span class="fs-senpaitip-label">Senpai's tip</span>
+		<slot />
+	</div>
+</div>

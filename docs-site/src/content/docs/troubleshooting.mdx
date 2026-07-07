@@ -3,6 +3,8 @@ title: Troubleshooting & FAQ
 description: Common setup and runtime issues, and how to fix them.
 ---
 
+import SenpaiTip from '../../components/SenpaiTip.astro';
+
 | Symptom | Try this |
 | --- | --- |
 | `Python not found` | Install Python 3.11+ from [python.org](https://www.python.org/downloads/) and open a new terminal |
@@ -15,6 +17,11 @@ description: Common setup and runtime issues, and how to fix them.
 | Claude request fails | Confirm the key starts with `sk-ant-`, has account credit/access, and restart if you edited `.env` manually |
 | Pylint command fails on Windows | Use Git Bash, WSL, or run `pylint app tests run.py` |
 | Senpai stopped talking | It's probably hidden — check the overflow menu's Intelligence section and toggle it back on |
+
+<SenpaiTip>
+	Menu → Documentation opens this site in a new tab any time, and `?` pulls up the full
+	keyboard shortcut list right in the dashboard — no need to come back here for those.
+</SenpaiTip>
 
 ## FAQ
 
