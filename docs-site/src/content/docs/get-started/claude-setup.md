@@ -29,7 +29,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 - Action plans get Claude-written thesis text on top of the local buckets
 - Portfolio briefings and news themes become available
 - The cost HUD starts tracking real token usage and live spend for the session
-- [Senpai](/meet-senpai/) gets noticeably more pleased with itself
+- [Senpai](../../meet-senpai/) gets noticeably more pleased with itself
 
 ## What stays the same either way
 

@@ -91,8 +91,8 @@ const TEXT_SIZE_LABELS = {
     standard: "normal",
     comfortable: "large",
 };
-const DASHBOARD_PET_KEY = "foliosense-dashboard-pet-visible";
-const PET_MODE_KEY = "foliosense-force-local-mode";
+const DASHBOARD_SENPAI_KEY = "foliosense-dashboard-senpai-visible";
+const SENPAI_MODE_KEY = "foliosense-force-local-mode";
 const LOCAL_INTEL_GUIDE_DISMISS_KEY = "foliosense-local-guide-dismissed";
 const LOCAL_INTEL_GUIDE_TOAST_KEY = "foliosense-local-guide-toast";
 const PERFORMANCE_RANGE_KEY = "foliosense-performance-range";
@@ -1041,7 +1041,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     const panel = document.getElementById("ai-scan-panel");
     const title = document.getElementById("ai-scan-title");
     const subtitle = document.getElementById("ai-scan-subtitle");
-    const dashboardPet = document.getElementById("dashboard-pet");
+    const dashboardSenpai = document.getElementById("dashboard-senpai");
 
     if (aiCheckInterval) {
         clearInterval(aiCheckInterval);
@@ -1052,7 +1052,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
 
     if (!active) {
         card.classList.remove("is-ai-checking");
-        dashboardPet?.classList.remove("is-texting");
+        dashboardSenpai?.classList.remove("is-texting");
         if (panel) panel.setAttribute("aria-hidden", "true");
         // Clear extraction chips + reset active-row state
         document.getElementById("ai-scan-chips-emitter")?.replaceChildren();
@@ -1070,7 +1070,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     const local = isLocalIntelligenceMode();
     let messageIndex = 0;
     card.classList.add("is-ai-checking");
-    dashboardPet?.classList.add("is-texting");
+    dashboardSenpai?.classList.add("is-texting");
     // Drive engine variant (colors + motion personality)
     if (panel) panel.dataset.engine = local ? "local" : "ai";
     if (title) title.textContent = local ? "FolioSense checking holdings" : "AI checking holdings";
@@ -3720,7 +3720,7 @@ function animateSummaryBody(body, opening) {
     }
 }
 
-const HOLDING_PET_QUOTES = {
+const HOLDING_SENPAI_QUOTES = {
     up: {
         low: [
             ({ ticker, pct }) => `${ticker} is up ${pct}. A polite green candle. We accept the compliment.`,
@@ -3803,9 +3803,9 @@ function stableHoldingQuoteIndex(ticker, pctValue, tier, quoteCount) {
     return Math.abs(hash) % quoteCount;
 }
 
-function holdingPetReaction(mainRow) {
+function holdingSenpaiReaction(mainRow) {
     const ticker = mainRow?.dataset?.ticker;
-    if (!ticker || typeof _dashboardPetSpeak !== "function") return;
+    if (!ticker || typeof _dashboardSenpaiSpeak !== "function") return;
 
     const holding = latestHoldings.find(h => h.ticker === ticker);
     if (!holding || !isFiniteNumber(holding.day_change_pct)) return;
@@ -3819,18 +3819,18 @@ function holdingPetReaction(mainRow) {
     };
     let message;
     if (direction === "up") {
-        const quotes = HOLDING_PET_QUOTES.up[tier];
+        const quotes = HOLDING_SENPAI_QUOTES.up[tier];
         const pick = quotes[stableHoldingQuoteIndex(ticker, pctValue, tier, quotes.length)];
         message = pick(payload);
     } else if (direction === "down") {
-        const quotes = HOLDING_PET_QUOTES.down[tier];
+        const quotes = HOLDING_SENPAI_QUOTES.down[tier];
         const pick = quotes[stableHoldingQuoteIndex(ticker, pctValue, tier, quotes.length)];
         message = pick(payload);
     } else {
         message = `${ticker} is flat today. Calm, composed, and refusing to provide plot development.`;
     }
 
-    _dashboardPetSpeak(message, { reveal: true, persist: false });
+    _dashboardSenpaiSpeak(message, { reveal: true, persist: false });
 }
 
 function toggleSummaryRow(mainRow) {
@@ -3848,7 +3848,7 @@ function toggleSummaryRow(mainRow) {
     syncHoldingExpandFab();
     if (!isOpen) {
         mainRow.classList.remove("has-intel-ready");
-        holdingPetReaction(mainRow);
+        holdingSenpaiReaction(mainRow);
         const ticker = mainRow.dataset.ticker;
         if (ticker) {
             _lastExpandedHoldingTicker = ticker;
@@ -7544,15 +7544,15 @@ function renderAiVerdict(section, verdict, ticker, options = {}) {
 let _lastAiCostUsd = null;
 let _brandIntroTimer = null;
 let _brandIntroAnimTimer = null;
-let _dashboardPetQuoteIndex = 0;
-let _dashboardPetTimer = null;
-let _dashboardPetSheenTimer = null;
-let _dashboardPetSpeak = null;
-let _dashboardPetOfflineQuoteIndex = 0;
-const DASHBOARD_PET_REACTION_RE = /[\u{2600}-\u{27BF}\u{1F300}-\u{1FAFF}]/u;
-const DASHBOARD_PET_TAP_EMOTICONS = ["✨", "👀", "💅", "📈", "☕", "💬", "🧠", "😌", "🫶", "💎"];
+let _dashboardSenpaiQuoteIndex = 0;
+let _dashboardSenpaiTimer = null;
+let _dashboardSenpaiSheenTimer = null;
+let _dashboardSenpaiSpeak = null;
+let _dashboardSenpaiOfflineQuoteIndex = 0;
+const DASHBOARD_SENPAI_REACTION_RE = /[\u{2600}-\u{27BF}\u{1F300}-\u{1FAFF}]/u;
+const DASHBOARD_SENPAI_TAP_EMOTICONS = ["✨", "👀", "💅", "📈", "☕", "💬", "🧠", "😌", "🫶", "💎"];
 
-const DASHBOARD_PET_QUOTES = [
+const DASHBOARD_SENPAI_QUOTES = [
     "Claude, your context window and my cash-flow model should get coffee.",
     "FolioSense asked Claude for alpha; the confidence intervals started behaving suspiciously well.",
     "Claude's boundaries and token efficiency are respected. Professionally, perhaps too much.",
@@ -7579,7 +7579,7 @@ const DASHBOARD_PET_QUOTES = [
     "A tidy risk model is basically a handwritten note, but with fewer audit problems.",
 ];
 
-const DASHBOARD_PET_LOCAL_QUOTES = [
+const DASHBOARD_SENPAI_LOCAL_QUOTES = [
     "Quietly overperforming by keeping every basis point documented.",
     "A tidy risk model is basically a handwritten note, but with fewer audit problems.",
     "Compliance asked me to cite the candle before making mysterious eye contact with the thesis.",
@@ -7597,7 +7597,7 @@ const DASHBOARD_PET_LOCAL_QUOTES = [
     "Local intelligence is doing the math while I maintain financial composure.",
 ];
 
-const DASHBOARD_PET_OFFLINE_QUOTES = [
+const DASHBOARD_SENPAI_OFFLINE_QUOTES = [
     "Claude is not connecting. FolioSense is refreshing with unnecessary dignity :')",
     "Local mode is steady, but the Claude-shaped silence has excellent dramatic timing :-/",
     "Claude stepped away, so I am running local signals and pretending this is character development :|",
@@ -7612,9 +7612,27 @@ const DASHBOARD_PET_OFFLINE_QUOTES = [
     "Local signals are on duty. Claude's chair remains professionally reserved.",
 ];
 
-function nextDashboardPetOfflineQuote() {
-    const message = DASHBOARD_PET_OFFLINE_QUOTES[_dashboardPetOfflineQuoteIndex % DASHBOARD_PET_OFFLINE_QUOTES.length];
-    _dashboardPetOfflineQuoteIndex += 1;
+// Helpful asides — genuinely useful tips, not banter. Woven into rotation at a lower
+// frequency (see SENPAI_TIP_QUOTE_CHANCE) so they read as an occasional nudge rather
+// than replacing Senpai's usual personality.
+const DASHBOARD_SENPAI_TIP_QUOTES = [
+    "Toggle Research mode when adding a holding to track it without touching your P&L.",
+    "Anchor mode means I'll never suggest trimming it — only tell you when it's a good moment to add.",
+    "Core mode weighs quality and fair price over day-to-day noise — good for long builds.",
+    "Trade mode leans on recent price trend — expect more Add/Trim nudges when the chart moves.",
+    "Press M any time to open the portfolio manager — no need to hunt for the button.",
+    "Press ? for the full keyboard shortcut list.",
+    "Local Intelligence runs every verdict for free — Claude just adds the narration on top.",
+    "The cost HUD tracks real token spend once Claude is connected, not just an estimate.",
+    "Menu → Documentation has the full guide if you want the deep version of anything I say.",
+];
+
+// Roughly 1 in 4 quote cycles surfaces a tip instead of the mode-appropriate quote.
+const SENPAI_TIP_QUOTE_CHANCE = 0.25;
+
+function nextDashboardSenpaiOfflineQuote() {
+    const message = DASHBOARD_SENPAI_OFFLINE_QUOTES[_dashboardSenpaiOfflineQuoteIndex % DASHBOARD_SENPAI_OFFLINE_QUOTES.length];
+    _dashboardSenpaiOfflineQuoteIndex += 1;
     return message;
 }
 
@@ -7709,7 +7727,7 @@ function enableClaudeAiAndReload() {
         document.getElementById("brand-intro-trigger")?.click();
         return;
     }
-    try { localStorage.setItem(PET_MODE_KEY, "0"); } catch (_) {}
+    try { localStorage.setItem(SENPAI_MODE_KEY, "0"); } catch (_) {}
     window.location.reload();
 }
 
@@ -7814,9 +7832,9 @@ async function onIntelligenceModeChanged(local, { notify = false } = {}) {
 function applyClaudeApiStatus(claudeLive) {
     _isClaudeApiLive = claudeLive;
     const brand = document.getElementById("brand-intro-trigger");
-    const navToggle = document.getElementById("pet-nav-toggle");
-    const pet = document.getElementById("dashboard-pet");
-    const bubble = document.getElementById("dashboard-pet-bubble");
+    const navToggle = document.getElementById("senpai-nav-toggle");
+    const senpai = document.getElementById("dashboard-senpai");
+    const bubble = document.getElementById("dashboard-senpai-bubble");
     const callout = document.getElementById("brand-intro-callout");
 
     if (claudeLive === false) {
@@ -7824,12 +7842,12 @@ function applyClaudeApiStatus(claudeLive) {
         brand?.classList.add("claude-offline");
         navToggle?.classList.remove("claude-live");
         navToggle?.classList.add("claude-offline");
-        pet?.classList.add("claude-offline");
+        senpai?.classList.add("claude-offline");
 
-        if (bubble && !bubble.querySelector(".pet-offline-note")) {
+        if (bubble && !bubble.querySelector(".senpai-offline-note")) {
             const note = document.createElement("span");
-            note.className = "pet-offline-note";
-            note.id = "pet-offline-note";
+            note.className = "senpai-offline-note";
+            note.id = "senpai-offline-note";
             note.textContent = "Local Intelligence is running the numbers for now. Add an Anthropic API key in .env to enable cloud AI quips and richer commentary.";
             bubble.appendChild(note);
         }
@@ -7849,18 +7867,18 @@ function applyClaudeApiStatus(claudeLive) {
             callout.appendChild(note);
         }
 
-        const modeToggleEl = document.getElementById("pet-mode-toggle");
+        const modeToggleEl = document.getElementById("senpai-mode-toggle");
         if (modeToggleEl) {
             modeToggleEl.classList.add("claude-offline");
             modeToggleEl.title = "Claude is offline — click to see how to add your API key";
         }
 
-        if (typeof _dashboardPetSpeak === "function") {
-            const offlineQuote = DASHBOARD_PET_LOCAL_QUOTES[
-                _dashboardPetOfflineQuoteIndex % DASHBOARD_PET_LOCAL_QUOTES.length
+        if (typeof _dashboardSenpaiSpeak === "function") {
+            const offlineQuote = DASHBOARD_SENPAI_LOCAL_QUOTES[
+                _dashboardSenpaiOfflineQuoteIndex % DASHBOARD_SENPAI_LOCAL_QUOTES.length
             ];
-            _dashboardPetOfflineQuoteIndex += 1;
-            _dashboardPetSpeak(offlineQuote, { reveal: false, persist: false });
+            _dashboardSenpaiOfflineQuoteIndex += 1;
+            _dashboardSenpaiSpeak(offlineQuote, { reveal: false, persist: false });
         }
         applyIntelligenceModeUi();
         window.AnalyticsCharts?.onIntelligenceModeChanged?.();
@@ -7870,11 +7888,11 @@ function applyClaudeApiStatus(claudeLive) {
         brand?.classList.remove("claude-offline");
         navToggle?.classList.add("claude-live");
         navToggle?.classList.remove("claude-offline");
-        pet?.classList.remove("claude-offline");
-        document.getElementById("pet-offline-note")?.remove();
+        senpai?.classList.remove("claude-offline");
+        document.getElementById("senpai-offline-note")?.remove();
         document.getElementById("brand-intro-offline-note")?.remove();
 
-        const modeToggleEl = document.getElementById("pet-mode-toggle");
+        const modeToggleEl = document.getElementById("senpai-mode-toggle");
         if (modeToggleEl) {
             modeToggleEl.classList.remove("claude-offline");
             modeToggleEl.title = _forcedLocalMode
@@ -7889,44 +7907,44 @@ function applyClaudeApiStatus(claudeLive) {
     updateLocalIntelGuide();
 }
 
-function initDashboardPet() {
-    const pet = document.getElementById("dashboard-pet");
-    const toggle = document.getElementById("dashboard-pet-toggle");
-    const navToggle = document.getElementById("pet-nav-toggle");
-    const bubble = document.getElementById("dashboard-pet-bubble");
-    const quote = document.getElementById("dashboard-pet-quote");
-    const modeToggle = document.getElementById("pet-mode-toggle");
-    const iconShell = pet?.querySelector(".dashboard-pet-icon-shell");
-    if (!pet || !toggle || !navToggle || !bubble || !quote) return;
+function initDashboardSenpai() {
+    const senpai = document.getElementById("dashboard-senpai");
+    const toggle = document.getElementById("dashboard-senpai-toggle");
+    const navToggle = document.getElementById("senpai-nav-toggle");
+    const bubble = document.getElementById("dashboard-senpai-bubble");
+    const quote = document.getElementById("dashboard-senpai-quote");
+    const modeToggle = document.getElementById("senpai-mode-toggle");
+    const iconShell = senpai?.querySelector(".dashboard-senpai-icon-shell");
+    if (!senpai || !toggle || !navToggle || !bubble || !quote) return;
 
     function storeVisible(visible) {
-        try { localStorage.setItem(DASHBOARD_PET_KEY, visible ? "1" : "0"); } catch (_) {}
+        try { localStorage.setItem(DASHBOARD_SENPAI_KEY, visible ? "1" : "0"); } catch (_) {}
     }
 
     function isVisible() {
-        return !pet.classList.contains("is-hidden");
+        return !senpai.classList.contains("is-hidden");
     }
 
-    function clearPetQuoteTimer() {
-        if (!_dashboardPetTimer) return;
-        window.clearTimeout(_dashboardPetTimer);
-        _dashboardPetTimer = null;
+    function clearSenpaiQuoteTimer() {
+        if (!_dashboardSenpaiTimer) return;
+        window.clearTimeout(_dashboardSenpaiTimer);
+        _dashboardSenpaiTimer = null;
     }
 
-    function schedulePetQuote() {
-        clearPetQuoteTimer();
+    function scheduleSenpaiQuote() {
+        clearSenpaiQuoteTimer();
         if (prefersReducedMotion() || document.hidden || !isVisible()) return;
-        _dashboardPetTimer = window.setTimeout(() => {
-            _dashboardPetTimer = null;
+        _dashboardSenpaiTimer = window.setTimeout(() => {
+            _dashboardSenpaiTimer = null;
             if (!document.hidden && isVisible()) {
                 showQuote();
-                schedulePetQuote();
+                scheduleSenpaiQuote();
             }
         }, 14_000);
     }
 
-    function animatePetForLine(message) {
-        if (!iconShell || prefersReducedMotion() || !DASHBOARD_PET_REACTION_RE.test(message)) return;
+    function animateSenpaiForLine(message) {
+        if (!iconShell || prefersReducedMotion() || !DASHBOARD_SENPAI_REACTION_RE.test(message)) return;
         iconShell.classList.remove("is-reacting");
         window.requestAnimationFrame(() => {
             iconShell.classList.add("is-reacting");
@@ -7934,31 +7952,37 @@ function initDashboardPet() {
     }
 
     function randomTapEmoticon() {
-        return DASHBOARD_PET_TAP_EMOTICONS[Math.floor(Math.random() * DASHBOARD_PET_TAP_EMOTICONS.length)];
+        return DASHBOARD_SENPAI_TAP_EMOTICONS[Math.floor(Math.random() * DASHBOARD_SENPAI_TAP_EMOTICONS.length)];
     }
 
-    function currentPetQuotes() {
-        if (isLocalIntelligenceMode()) return DASHBOARD_PET_LOCAL_QUOTES;
-        return DASHBOARD_PET_QUOTES;
+    function currentSenpaiQuotes() {
+        if (isLocalIntelligenceMode()) return DASHBOARD_SENPAI_LOCAL_QUOTES;
+        return DASHBOARD_SENPAI_QUOTES;
     }
 
     function showQuote(nextIndex = null, { withEmoticon = false } = {}) {
-        const quotes = currentPetQuotes();
+        const quotes = currentSenpaiQuotes();
         if (nextIndex === null) {
-            _dashboardPetQuoteIndex = (_dashboardPetQuoteIndex + 1) % quotes.length;
+            _dashboardSenpaiQuoteIndex = (_dashboardSenpaiQuoteIndex + 1) % quotes.length;
         } else {
-            _dashboardPetQuoteIndex = nextIndex % quotes.length;
+            _dashboardSenpaiQuoteIndex = nextIndex % quotes.length;
         }
-        const baseMessage = quotes[_dashboardPetQuoteIndex];
+        // Only substitute a tip on natural auto-rotation ticks (nextIndex === null) —
+        // rotation state above still advances normally either way, so the mode-quote
+        // sequence never desyncs; this just occasionally swaps what's displayed.
+        const showTip = nextIndex === null && Math.random() < SENPAI_TIP_QUOTE_CHANCE;
+        const baseMessage = showTip
+            ? DASHBOARD_SENPAI_TIP_QUOTES[Math.floor(Math.random() * DASHBOARD_SENPAI_TIP_QUOTES.length)]
+            : quotes[_dashboardSenpaiQuoteIndex];
         const message = withEmoticon ? `${baseMessage} ${randomTapEmoticon()}` : baseMessage;
         quote.textContent = message;
-        animatePetForLine(message);
+        animateSenpaiForLine(message);
         if (!prefersReducedMotion() && !bubble.classList.contains("is-talking")) {
             bubble.classList.add("is-talking");
-            window.clearTimeout(_dashboardPetSheenTimer);
-            _dashboardPetSheenTimer = window.setTimeout(() => {
+            window.clearTimeout(_dashboardSenpaiSheenTimer);
+            _dashboardSenpaiSheenTimer = window.setTimeout(() => {
                 bubble.classList.remove("is-talking");
-                _dashboardPetSheenTimer = null;
+                _dashboardSenpaiSheenTimer = null;
             }, 840);
         }
     }
@@ -7966,84 +7990,84 @@ function initDashboardPet() {
     function speak(message, { reveal = true, persist = false } = {}) {
         if (reveal && !isVisible()) setVisible(true, persist);
         quote.textContent = message;
-        animatePetForLine(message);
+        animateSenpaiForLine(message);
         if (!prefersReducedMotion() && !bubble.classList.contains("is-talking")) {
             bubble.classList.add("is-talking");
-            window.clearTimeout(_dashboardPetSheenTimer);
-            _dashboardPetSheenTimer = window.setTimeout(() => {
+            window.clearTimeout(_dashboardSenpaiSheenTimer);
+            _dashboardSenpaiSheenTimer = window.setTimeout(() => {
                 bubble.classList.remove("is-talking");
-                _dashboardPetSheenTimer = null;
+                _dashboardSenpaiSheenTimer = null;
             }, 840);
         }
-        schedulePetQuote();
+        scheduleSenpaiQuote();
     }
 
     function setVisible(visible, persist = true) {
-        pet.classList.toggle("is-hidden", !visible);
-        pet.setAttribute("aria-hidden", String(!visible));
+        senpai.classList.toggle("is-hidden", !visible);
+        senpai.setAttribute("aria-hidden", String(!visible));
         toggle.setAttribute("aria-expanded", String(visible));
-        toggle.setAttribute("aria-label", visible ? "Hide dashboard pet" : "Show dashboard pet");
-        toggle.title = visible ? "Hide dashboard pet" : "Show dashboard pet";
+        toggle.setAttribute("aria-label", visible ? "Hide Senpai" : "Show Senpai");
+        toggle.title = visible ? "Hide Senpai" : "Show Senpai";
         navToggle.setAttribute("aria-pressed", String(visible));
-        navToggle.setAttribute("aria-label", visible ? "Hide dashboard pet" : "Show dashboard pet");
-        navToggle.title = visible ? "Hide dashboard pet" : "Show dashboard pet";
+        navToggle.setAttribute("aria-label", visible ? "Hide Senpai" : "Show Senpai");
+        navToggle.title = visible ? "Hide Senpai" : "Show Senpai";
         if (persist) storeVisible(visible);
         if (visible) {
-            showQuote(Math.floor(Math.random() * currentPetQuotes().length));
-            schedulePetQuote();
+            showQuote(Math.floor(Math.random() * currentSenpaiQuotes().length));
+            scheduleSenpaiQuote();
         } else {
-            clearPetQuoteTimer();
-            window.clearTimeout(_dashboardPetSheenTimer);
-            _dashboardPetSheenTimer = null;
+            clearSenpaiQuoteTimer();
+            window.clearTimeout(_dashboardSenpaiSheenTimer);
+            _dashboardSenpaiSheenTimer = null;
             bubble.classList.remove("is-talking");
             iconShell?.classList.remove("is-reacting");
         }
     }
 
     let savedVisible = true;
-    try { savedVisible = localStorage.getItem(DASHBOARD_PET_KEY) !== "0"; } catch (_) {}
+    try { savedVisible = localStorage.getItem(DASHBOARD_SENPAI_KEY) !== "0"; } catch (_) {}
     setVisible(savedVisible, false);
 
-    const isMobilePet = () =>
+    const isMobileSenpai = () =>
         window.matchMedia?.("(max-width: 575.98px)").matches ?? false;
 
     toggle.addEventListener("click", () => {
-        if (pet.classList.contains("is-hidden")) {
+        if (senpai.classList.contains("is-hidden")) {
             setVisible(true);
             return;
         }
         // On mobile the orb is a corner dot: tapping it expands/collapses the
-        // bubble rather than hiding the whole pet (use the menu toggle to hide).
-        if (isMobilePet()) {
-            pet.classList.toggle("is-expanded");
+        // bubble rather than hiding all of Senpai (use the menu toggle to hide).
+        if (isMobileSenpai()) {
+            senpai.classList.toggle("is-expanded");
             return;
         }
         setVisible(false);
     });
     navToggle.addEventListener("click", () => {
-        pet.classList.remove("is-expanded");
+        senpai.classList.remove("is-expanded");
         setVisible(!isVisible());
     });
     bubble.addEventListener("click", () => {
         showQuote(null, { withEmoticon: true });
-        schedulePetQuote();
+        scheduleSenpaiQuote();
     });
     iconShell?.addEventListener("animationend", (event) => {
-        if (event.animationName === "petIconReact") {
+        if (event.animationName === "senpaiIconReact") {
             iconShell.classList.remove("is-reacting");
         }
     });
 
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
-            clearPetQuoteTimer();
+            clearSenpaiQuoteTimer();
             return;
         }
-        schedulePetQuote();
+        scheduleSenpaiQuote();
     });
 
-    _dashboardPetSpeak = speak;
-    window.dashboardPetSpeak = speak;
+    _dashboardSenpaiSpeak = speak;
+    window.dashboardSenpaiSpeak = speak;
 
     function applyForcedLocalMode(local, announce) {
         const enablingClaude = !local && _forcedLocalMode;
@@ -8056,7 +8080,7 @@ function initDashboardPet() {
         }
 
         _forcedLocalMode = local;
-        try { localStorage.setItem(PET_MODE_KEY, local ? "1" : "0"); } catch (_) {}
+        try { localStorage.setItem(SENPAI_MODE_KEY, local ? "1" : "0"); } catch (_) {}
         if (modeToggle) {
             modeToggle.setAttribute("aria-pressed", String(local));
             modeToggle.title = local
@@ -8071,13 +8095,13 @@ function initDashboardPet() {
                 : "Claude enabled. Tap Claude Summaries on Holdings when you're ready to spend tokens.";
             speak(msg, { reveal: true, persist: false });
         } else {
-            const quotes = local ? DASHBOARD_PET_LOCAL_QUOTES : DASHBOARD_PET_QUOTES;
-            quote.textContent = quotes[_dashboardPetQuoteIndex % quotes.length];
+            const quotes = local ? DASHBOARD_SENPAI_LOCAL_QUOTES : DASHBOARD_SENPAI_QUOTES;
+            quote.textContent = quotes[_dashboardSenpaiQuoteIndex % quotes.length];
         }
     }
 
     let savedMode = "1";
-    try { savedMode = localStorage.getItem(PET_MODE_KEY) ?? "1"; } catch (_) {}
+    try { savedMode = localStorage.getItem(SENPAI_MODE_KEY) ?? "1"; } catch (_) {}
     _forcedLocalMode = savedMode !== "0";
     applyForcedLocalMode(_forcedLocalMode, false);
 
@@ -8241,7 +8265,7 @@ function initNavOverflow() {
         menu.setAttribute("aria-hidden", "true");
         trigger.setAttribute("aria-expanded", "false");
         closeCostDetail();
-        document.getElementById("pet-mode-toggle")
+        document.getElementById("senpai-mode-toggle")
             ?.closest(".nav-menu-row")
             ?.classList.remove("local-intel-guide-highlight");
     };
@@ -8249,10 +8273,10 @@ function initNavOverflow() {
     window.openNavOverflowMenu = (options = {}) => {
         open();
         if (options.focusEngine) {
-            const row = document.getElementById("pet-mode-toggle")?.closest(".nav-menu-row");
+            const row = document.getElementById("senpai-mode-toggle")?.closest(".nav-menu-row");
             row?.classList.add("local-intel-guide-highlight");
             window.setTimeout(() => {
-                document.getElementById("pet-mode-toggle")?.focus({ preventScroll: true });
+                document.getElementById("senpai-mode-toggle")?.focus({ preventScroll: true });
             }, 0);
         }
     };
@@ -8547,7 +8571,7 @@ function updateHudPopoverCountdown() {
 function updateClaudeHeartbeatUi(data, checking = false) {
     const pill = document.getElementById("hud-status-pill");
     const brand = document.getElementById("brand-intro-trigger");
-    const navToggle = document.getElementById("pet-nav-toggle");
+    const navToggle = document.getElementById("senpai-nav-toggle");
     const label = document.getElementById("claude-heartbeat");
     const popValue = document.getElementById("hud-pop-claude");
     const popSub = document.getElementById("hud-pop-claude-sub");
@@ -9403,6 +9427,59 @@ function initApiKeyPanel() {
     });
 }
 
+const SENPAI_WELCOME_SEEN_KEY = "foliosense-senpai-welcome-seen";
+
+// Fed directly from _HOLD_MODE_META (the same source the per-holding hold-mode
+// tooltips use) so this list can never drift out of sync with the real tooltips.
+function renderSenpaiWelcomeHoldModes() {
+    const list = document.getElementById("senpai-welcome-hold-modes");
+    if (!list) return;
+    list.innerHTML = _HOLD_MODE_ORDER.map(mode => {
+        const meta = _HOLD_MODE_META[mode];
+        if (!meta) return "";
+        return `<li><i class="bi ${meta.icon} lig-list-icon lig-list-icon--cyan" aria-hidden="true"></i>` +
+            `<span><strong>${escapeHtml(meta.label)}</strong> — ${escapeHtml(meta.tipBody)}</span></li>`;
+    }).join("");
+}
+
+function initSenpaiWelcomeGuide() {
+    const guide = document.getElementById("senpai-welcome-guide");
+    if (!guide) return;
+
+    renderSenpaiWelcomeHoldModes();
+
+    function close() {
+        guide.classList.remove("is-visible");
+        guide.setAttribute("aria-hidden", "true");
+        try { localStorage.setItem(SENPAI_WELCOME_SEEN_KEY, "1"); } catch (_) {}
+    }
+
+    document.getElementById("senpai-welcome-dismiss")?.addEventListener("click", close);
+
+    guide.addEventListener("click", (e) => {
+        if (!guide.classList.contains("is-visible")) return;
+        const panel = guide.querySelector(".portfolio-manager-panel");
+        if (!panel?.contains(e.target)) close();
+    });
+
+    document.getElementById("senpai-welcome-add-holding")?.addEventListener("click", () => {
+        close();
+        openPortfolioManager();
+    });
+}
+
+// Called only after the live holdings fetch resolves (see initDashboard), so this
+// reflects real portfolio state rather than a stale cache hydration.
+function maybeShowSenpaiWelcomeGuide() {
+    const guide = document.getElementById("senpai-welcome-guide");
+    if (!guide) return;
+    let seen = false;
+    try { seen = localStorage.getItem(SENPAI_WELCOME_SEEN_KEY) === "1"; } catch (_) {}
+    if (seen || latestHoldings.length > 0) return;
+    guide.classList.add("is-visible");
+    guide.setAttribute("aria-hidden", "false");
+}
+
 async function initDashboard() {
     initThemeToggle();
     initTextSizeToggle();
@@ -9423,7 +9500,8 @@ async function initDashboard() {
     initBrandCostCallout();
     initApiKeyPanel();
     initNavOverflow();
-    initDashboardPet();
+    initDashboardSenpai();
+    initSenpaiWelcomeGuide();
     initLocalIntelGuide();
     updateAgentStatus({ scanning: false, ready: false, message: "Watching holdings" });
     updateHoldingsRefreshButton();
@@ -9436,6 +9514,7 @@ async function initDashboard() {
 
     await criticalData;
 
+    maybeShowSenpaiWelcomeGuide();
     startCountdown();
     initHudPopover();
     initTips();

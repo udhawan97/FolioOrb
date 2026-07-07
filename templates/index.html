@@ -20,7 +20,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/static/css/style.css?v=100" rel="stylesheet">
+    <link href="/static/css/style.css?v=101" rel="stylesheet">
 </head>
 <body>
 
@@ -219,11 +219,11 @@
                         <div class="nav-menu-row" role="menuitem">
                             <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-cpu"></i></span>
                             <span class="nav-menu-label">Engine</span>
-                            <button class="pet-mode-toggle" id="pet-mode-toggle" type="button"
+                            <button class="senpai-mode-toggle" id="senpai-mode-toggle" type="button"
                                     aria-pressed="true"
                                     title="Enable Claude AI — opt in to Claude narratives and summaries">
-                                <span class="pet-mode-label-claude"><i class="bi bi-stars" aria-hidden="true"></i> Claude AI</span>
-                                <span class="pet-mode-label-local"><i class="bi bi-cpu-fill" aria-hidden="true"></i> Local Intel</span>
+                                <span class="senpai-mode-label-claude"><i class="bi bi-stars" aria-hidden="true"></i> Claude AI</span>
+                                <span class="senpai-mode-label-local"><i class="bi bi-cpu-fill" aria-hidden="true"></i> Local Intel</span>
                             </button>
                         </div>
                         <button class="nav-menu-row nav-menu-row--btn brand-cost-trigger" id="brand-cost-trigger" type="button"
@@ -254,12 +254,19 @@
                         <div class="nav-menu-section">Dashboard</div>
                         <div class="nav-menu-row" role="menuitem">
                             <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-chat-heart"></i></span>
-                            <span class="nav-menu-label">Dashboard pet</span>
-                            <button class="pet-nav-toggle" id="pet-nav-toggle" type="button"
-                                    aria-label="Hide dashboard pet" aria-pressed="true" title="Hide dashboard pet">
+                            <span class="nav-menu-label">Senpai</span>
+                            <button class="senpai-nav-toggle" id="senpai-nav-toggle" type="button"
+                                    aria-label="Hide Senpai" aria-pressed="true" title="Hide Senpai">
                                 <i class="bi bi-chat-heart" aria-hidden="true"></i>
                             </button>
                         </div>
+                        <a class="nav-menu-row nav-menu-row--btn" href="https://udhawan97.github.io/FolioSenseAI/"
+                                target="_blank" rel="noopener noreferrer"
+                                aria-label="Open documentation (opens in a new tab)">
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-book"></i></span>
+                            <span class="nav-menu-label">Documentation</span>
+                            <span class="nav-menu-key" aria-hidden="true"><i class="bi bi-box-arrow-up-right"></i></span>
+                        </a>
                         <button class="nav-menu-row nav-menu-row--btn" type="button" onclick="showKeyboardHelp()"
                                 aria-label="View keyboard shortcuts">
                             <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-keyboard"></i></span>
@@ -2062,38 +2069,89 @@
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.0.0/dist/chartjs-chart-treemap.min.js"></script>
     <script defer src="/static/js/analytics-charts.js?v=14"></script>
-    <script defer src="/static/js/dashboard.js?v=92"></script>
+    <script defer src="/static/js/dashboard.js?v=94"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>
 
-    <!-- Living dashboard pet -->
-    <div class="dashboard-pet" id="dashboard-pet" aria-live="polite">
-        <div class="dashboard-pet-bubble" id="dashboard-pet-bubble">
-            <span class="dashboard-pet-kicker">Portfolio Butler</span>
-            <span class="dashboard-pet-quote" id="dashboard-pet-quote">Portfolio butler mode: crisp charts, calm reads, no drama in the thesis.</span>
+    <!-- Senpai -->
+    <div class="dashboard-senpai" id="dashboard-senpai" aria-live="polite">
+        <div class="dashboard-senpai-bubble" id="dashboard-senpai-bubble">
+            <span class="dashboard-senpai-kicker">Senpai</span>
+            <span class="dashboard-senpai-quote" id="dashboard-senpai-quote">Portfolio butler mode: crisp charts, calm reads, no drama in the thesis.</span>
         </div>
-        <button class="dashboard-pet-orb" id="dashboard-pet-toggle" type="button"
-                aria-expanded="true" aria-controls="dashboard-pet-bubble"
-                aria-label="Hide dashboard pet" title="Hide dashboard pet">
-            <span class="dashboard-pet-icon-shell" aria-hidden="true">
+        <button class="dashboard-senpai-orb" id="dashboard-senpai-toggle" type="button"
+                aria-expanded="true" aria-controls="dashboard-senpai-bubble"
+                aria-label="Hide Senpai" title="Hide Senpai">
+            <span class="dashboard-senpai-icon-shell" aria-hidden="true">
                 <img src="/static/img/brand/folio-orbit-icon.svg" alt="">
             </span>
-            <span class="dashboard-pet-texting" aria-hidden="true">
-                <span class="dashboard-pet-phone">
-                    <span class="dashboard-pet-phone-notch"></span>
-                    <span class="dashboard-pet-message dashboard-pet-message-out"></span>
-                    <span class="dashboard-pet-message dashboard-pet-message-in"></span>
-                    <span class="dashboard-pet-typing">
+            <span class="dashboard-senpai-texting" aria-hidden="true">
+                <span class="dashboard-senpai-phone">
+                    <span class="dashboard-senpai-phone-notch"></span>
+                    <span class="dashboard-senpai-message dashboard-senpai-message-out"></span>
+                    <span class="dashboard-senpai-message dashboard-senpai-message-in"></span>
+                    <span class="dashboard-senpai-typing">
                         <span></span><span></span><span></span>
                     </span>
                 </span>
-                <span class="dashboard-pet-send-ping dashboard-pet-send-ping-one"></span>
-                <span class="dashboard-pet-send-ping dashboard-pet-send-ping-two"></span>
+                <span class="dashboard-senpai-send-ping dashboard-senpai-send-ping-one"></span>
+                <span class="dashboard-senpai-send-ping dashboard-senpai-send-ping-two"></span>
             </span>
-            <span class="dashboard-pet-status" aria-hidden="true"></span>
+            <span class="dashboard-senpai-status" aria-hidden="true"></span>
         </button>
     </div>
+
+    <!-- Senpai's first-run welcome guide -->
+    <div class="portfolio-manager-popover" id="senpai-welcome-guide" role="dialog"
+         aria-modal="false" aria-labelledby="senpai-welcome-title" aria-hidden="true">
+        <div class="portfolio-manager-panel bg-dark border-secondary" style="width:min(560px,100%)">
+            <div class="portfolio-manager-header border-secondary">
+                <div class="portfolio-manager-header-main">
+                    <div class="portfolio-manager-title-row">
+                        <img src="/static/img/brand/folio-orbit-icon.svg" alt="" width="22" height="22" aria-hidden="true">
+                        <h5 class="modal-title" id="senpai-welcome-title">Hi, I'm Senpai</h5>
+                    </div>
+                    <div class="portfolio-manager-subtitle">A 30-second tour before you dive in.</div>
+                </div>
+                <button type="button" class="manage-close-btn" id="senpai-welcome-dismiss"
+                        aria-label="Close welcome guide">
+                    <svg class="manage-lucide" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+            <div class="portfolio-manager-body">
+                <div class="mb-3">
+                    <div class="lig-header mb-2">
+                        <span class="local-intel-guide-icon" aria-hidden="true"><i class="bi bi-plus-circle"></i></span>
+                        <strong class="local-intel-guide-title">Add your first holding</strong>
+                    </div>
+                    <p class="portfolio-manager-subtitle mb-0">Open the portfolio manager — press <kbd class="kbd-key">M</kbd> or use the manage button — and add a ticker, shares, and an optional average cost.</p>
+                </div>
+                <div class="mb-3">
+                    <div class="lig-header mb-2">
+                        <span class="local-intel-guide-icon" aria-hidden="true"><i class="bi bi-journal-text"></i></span>
+                        <strong class="local-intel-guide-title">Research mode</strong>
+                    </div>
+                    <p class="portfolio-manager-subtitle mb-0">Toggle Research mode on a holding to track it without affecting your P&amp;L — good for watchlist tickers you haven't bought yet.</p>
+                </div>
+                <div class="mb-3">
+                    <div class="lig-header mb-2">
+                        <span class="local-intel-guide-icon" aria-hidden="true"><i class="bi bi-sliders2"></i></span>
+                        <strong class="local-intel-guide-title">Hold-type icons</strong>
+                    </div>
+                    <ul class="lig-list" id="senpai-welcome-hold-modes"></ul>
+                </div>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <button type="button" class="btn btn-success btn-sm" id="senpai-welcome-add-holding">
+                        <i class="bi bi-plus-circle" aria-hidden="true"></i> Add your first holding
+                    </button>
+                    <a href="https://udhawan97.github.io/FolioSenseAI/" target="_blank" rel="noopener noreferrer"
+                       class="local-intel-guide-link small">Read the full docs</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Keyboard Shortcut Overlay -->
     <div id="kbd-overlay" role="dialog" aria-label="Keyboard shortcuts" aria-hidden="true">
         <div class="kbd-panel">

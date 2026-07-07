@@ -31,4 +31,4 @@ without one. A key unlocks narration, action plan thesis text, and news themes o
 **Where is my data stored?**
 Locally, in SQLite under `database/`, and in a local `.env` file. Neither leaves your
 machine except for the explicit Yahoo Finance and (optional) Anthropic calls described in
-[Privacy & Data Handling](/privacy/).
+[Privacy & Data Handling](../privacy/).

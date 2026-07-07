@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v4.1-brightgreen?style=flat-square" alt="Release v4.1">
+  <img src="https://img.shields.io/badge/release-v4.2-brightgreen?style=flat-square" alt="Release v4.2">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/FastAPI-0.136.3-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI 0.136.3">
   <img src="https://img.shields.io/badge/SQLite-local-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite local database">
@@ -255,7 +255,7 @@ Security-oriented defaults in the repo:
 
 ## Release And Project Status
 
-Current repo status: **v4.1**.
+Current repo status: **v4.2**.
 
 Implemented highlights:
 

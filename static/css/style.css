@@ -627,8 +627,8 @@ body > .navbar {
 /* The moved toggle switches keep their own styling; just push them to the right */
 .nav-menu-row .theme-toggle,
 .nav-menu-row .text-size-toggle,
-.nav-menu-row .pet-mode-toggle,
-.nav-menu-row .pet-nav-toggle { margin-left: auto; flex-shrink: 0; }
+.nav-menu-row .senpai-mode-toggle,
+.nav-menu-row .senpai-nav-toggle { margin-left: auto; flex-shrink: 0; }
 
 /* Reset the AI-cost trigger from a pill back into a flush menu row */
 .nav-menu-row.brand-cost-trigger {
@@ -7771,8 +7771,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
 .toast-apple.toast-danger  .toast-icon { color: var(--accent-red); }
 .toast-apple.toast-info    .toast-icon { color: var(--accent-blue); }
 
-/* ── Top-bar pet launcher ───────────────────────────────────────────────── */
-.pet-nav-toggle {
+/* ── Top-bar Senpai launcher ───────────────────────────────────────────────── */
+.senpai-nav-toggle {
     position: relative;
     width: 34px;
     height: 34px;
@@ -7796,12 +7796,12 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
         border-color 0.2s var(--ease),
         transform 0.24s var(--spring);
 }
-.pet-nav-toggle i {
+.senpai-nav-toggle i {
     font-size: 0.95rem;
     line-height: 1;
 }
 
-.pet-nav-toggle::after {
+.senpai-nav-toggle::after {
     content: "";
     position: absolute;
     right: 7px;
@@ -7815,18 +7815,18 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
     transition: opacity 0.18s var(--ease), transform 0.2s var(--spring);
 }
 
-.pet-nav-toggle[aria-pressed="true"] {
+.senpai-nav-toggle[aria-pressed="true"] {
     color: var(--brand-cyan);
     background: var(--control-hover);
     border-color: var(--hairline-hover);
 }
 
-.pet-nav-toggle[aria-pressed="true"]::after {
+.senpai-nav-toggle[aria-pressed="true"]::after {
     opacity: 0.86;
     transform: scale(1);
 }
 
-.pet-nav-toggle.claude-live::after {
+.senpai-nav-toggle.claude-live::after {
     background: var(--accent-green);
     opacity: 0.9;
     transform: scale(1);
@@ -7834,7 +7834,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
                 0 0 10px rgba(48, 209, 88, 0.42);
 }
 
-.pet-nav-toggle.claude-checking::after {
+.senpai-nav-toggle.claude-checking::after {
     background: var(--accent-yellow);
     opacity: 0.86;
     transform: scale(1);
@@ -7842,31 +7842,31 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
                 0 0 9px rgba(255, 214, 10, 0.34);
 }
 
-.pet-nav-toggle:hover,
-.pet-nav-toggle:focus-visible {
+.senpai-nav-toggle:hover,
+.senpai-nav-toggle:focus-visible {
     color: var(--text-primary);
     background: var(--control-hover);
     border-color: var(--hairline-hover);
     transform: translateY(-2px);
 }
 
-.pet-nav-toggle:active {
+.senpai-nav-toggle:active {
     transform: translateY(0) scale(0.96);
 }
 
-.pet-nav-toggle:focus-visible {
+.senpai-nav-toggle:focus-visible {
     outline: 2px solid var(--accent-blue);
     outline-offset: 3px;
 }
 
-.pet-nav-toggle.claude-offline,
-.pet-nav-toggle.claude-offline[aria-pressed="true"] {
+.senpai-nav-toggle.claude-offline,
+.senpai-nav-toggle.claude-offline[aria-pressed="true"] {
     color: #e05252;
     background: rgba(224, 82, 82, 0.08);
     border-color: rgba(224, 82, 82, 0.35);
 }
 
-.pet-nav-toggle.claude-offline::after {
+.senpai-nav-toggle.claude-offline::after {
     background: #e05252;
     opacity: 0.9;
     transform: scale(1);
@@ -7874,7 +7874,7 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
                 0 0 10px rgba(224, 82, 82, 0.42);
 }
 
-.pet-offline-note {
+.senpai-offline-note {
     display: block;
     margin-top: 0.45rem;
     padding-top: 0.38rem;
@@ -7936,8 +7936,8 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
     line-height: 1.4;
 }
 
-/* ── Living dashboard pet ───────────────────────────────────────────────── */
-body > .dashboard-pet {
+/* ── Living Senpai ───────────────────────────────────────────────── */
+body > .dashboard-senpai {
     position: fixed;
     right: 18px;
     bottom: 18px;
@@ -7960,23 +7960,23 @@ body > .dashboard-pet {
         transform 0.32s var(--spring);
 }
 
-.dashboard-pet.is-hidden {
+.dashboard-senpai.is-hidden {
     opacity: 0;
     pointer-events: none;
     transform: translateY(18px) scale(0.88);
 }
 
-/* ── Mobile: pet collapses to a corner orb; bubble expands on tap or message ─
-   Selectors are prefixed with `body > .dashboard-pet` so they outrank the base
-   .dashboard-pet-bubble rule that follows them in source order. */
+/* ── Mobile: Senpai collapses to a corner orb; bubble expands on tap or message ─
+   Selectors are prefixed with `body > .dashboard-senpai` so they outrank the base
+   .dashboard-senpai-bubble rule that follows them in source order. */
 @media (max-width: 575.98px) {
-    body > .dashboard-pet {
+    body > .dashboard-senpai {
         grid-template-columns: 54px;
         right: 14px;
         bottom: 14px;
         gap: 0;
     }
-    body > .dashboard-pet .dashboard-pet-bubble {
+    body > .dashboard-senpai .dashboard-senpai-bubble {
         position: fixed;
         right: 14px;
         bottom: 78px;
@@ -7990,15 +7990,15 @@ body > .dashboard-pet {
         animation: none; /* no idle float on mobile — clean scale/fade instead */
         transition: opacity 0.18s ease, transform 0.22s var(--spring);
     }
-    body > .dashboard-pet.is-expanded .dashboard-pet-bubble,
-    body > .dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-bubble {
+    body > .dashboard-senpai.is-expanded .dashboard-senpai-bubble,
+    body > .dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-bubble {
         transform: scale(1);
         opacity: 1;
         pointer-events: auto;
     }
 }
 
-.dashboard-pet-bubble {
+.dashboard-senpai-bubble {
     position: relative;
     min-height: 82px;
     padding: 0.78rem 0.92rem;
@@ -8017,10 +8017,10 @@ body > .dashboard-pet {
     backface-visibility: hidden;
     will-change: transform;
     cursor: pointer;
-    animation: petBubbleFloat 5.6s ease-in-out infinite;
+    animation: senpaiBubbleFloat 5.6s ease-in-out infinite;
 }
 
-.dashboard-pet-bubble::before {
+.dashboard-senpai-bubble::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -8031,11 +8031,11 @@ body > .dashboard-pet {
     will-change: opacity, transform;
 }
 
-.dashboard-pet-bubble.is-talking::before {
-    animation: petBubbleSheen 0.76s var(--ease) both;
+.dashboard-senpai-bubble.is-talking::before {
+    animation: senpaiBubbleSheen 0.76s var(--ease) both;
 }
 
-.dashboard-pet-bubble::after {
+.dashboard-senpai-bubble::after {
     content: "";
     position: absolute;
     right: -7px;
@@ -8048,7 +8048,7 @@ body > .dashboard-pet {
     transform: rotate(-45deg);
 }
 
-.dashboard-pet-kicker {
+.dashboard-senpai-kicker {
     display: block;
     margin-bottom: 0.32rem;
     color: var(--brand-cyan);
@@ -8059,7 +8059,7 @@ body > .dashboard-pet {
     text-transform: uppercase;
 }
 
-.pet-mode-toggle {
+.senpai-mode-toggle {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -8078,39 +8078,39 @@ body > .dashboard-pet {
     white-space: nowrap;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.18s var(--spring);
 }
-.pet-mode-toggle i {
+.senpai-mode-toggle i {
     font-size: 0.72rem;
     line-height: 1;
 }
 
-.pet-mode-toggle:hover {
+.senpai-mode-toggle:hover {
     background: rgba(111, 214, 240, 0.14);
     border-color: rgba(111, 214, 240, 0.45);
 }
 
-.pet-mode-label-local { display: none; }
-.pet-mode-label-claude { display: inline-flex; align-items: center; gap: 0.28rem; }
+.senpai-mode-label-local { display: none; }
+.senpai-mode-label-claude { display: inline-flex; align-items: center; gap: 0.28rem; }
 
-.pet-mode-toggle[aria-pressed="true"] {
+.senpai-mode-toggle[aria-pressed="true"] {
     background: var(--surface);
     color: var(--text-tertiary);
     border-color: var(--hairline);
 }
 
-.pet-mode-toggle[aria-pressed="true"]:hover {
+.senpai-mode-toggle[aria-pressed="true"]:hover {
     background: var(--surface-strong);
     color: var(--text-secondary);
     border-color: var(--hairline-hover);
 }
 
-.pet-mode-toggle[aria-pressed="true"] .pet-mode-label-claude { display: none; }
-.pet-mode-toggle[aria-pressed="true"] .pet-mode-label-local {
+.senpai-mode-toggle[aria-pressed="true"] .senpai-mode-label-claude { display: none; }
+.senpai-mode-toggle[aria-pressed="true"] .senpai-mode-label-local {
     display: inline-flex;
     align-items: center;
     gap: 0.28rem;
 }
 
-.pet-mode-toggle.claude-offline {
+.senpai-mode-toggle.claude-offline {
     opacity: 0.45;
     cursor: not-allowed;
     user-select: none;
@@ -8120,14 +8120,14 @@ body > .dashboard-pet {
     pointer-events: auto;
 }
 
-.pet-mode-toggle.claude-offline:hover {
+.senpai-mode-toggle.claude-offline:hover {
     opacity: 0.6;
     background: var(--surface);
     color: var(--text-tertiary);
     border-color: var(--hairline);
 }
 
-.dashboard-pet-quote {
+.dashboard-senpai-quote {
     display: block;
     color: var(--text-primary);
     font-size: 0.78rem;
@@ -8135,7 +8135,7 @@ body > .dashboard-pet {
     line-height: 1.35;
 }
 
-.dashboard-pet-orb {
+.dashboard-senpai-orb {
     border: 1px solid var(--hairline);
     color: var(--text-primary);
     background: var(--popover-surface);
@@ -8143,7 +8143,7 @@ body > .dashboard-pet {
     -webkit-tap-highlight-color: transparent;
 }
 
-.dashboard-pet-orb {
+.dashboard-senpai-orb {
     position: relative;
     width: 58px;
     height: 58px;
@@ -8162,7 +8162,7 @@ body > .dashboard-pet {
         border-color 0.2s var(--ease);
 }
 
-.dashboard-pet-orb::before {
+.dashboard-senpai-orb::before {
     content: "";
     position: absolute;
     inset: -9px;
@@ -8175,10 +8175,10 @@ body > .dashboard-pet {
     transform: scale(0.88);
     pointer-events: none;
     will-change: opacity, transform;
-    animation: petOrbGlow 3.8s ease-in-out infinite;
+    animation: senpaiOrbGlow 3.8s ease-in-out infinite;
 }
 
-.dashboard-pet-texting {
+.dashboard-senpai-texting {
     position: absolute;
     right: -3px;
     top: -74px;
@@ -8195,13 +8195,13 @@ body > .dashboard-pet {
     will-change: opacity, transform;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-texting {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-texting {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1) rotate(-2deg);
     animation: aiTextingLift 3.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-.dashboard-pet-phone {
+.dashboard-senpai-phone {
     position: absolute;
     inset: 0;
     display: block;
@@ -8218,7 +8218,7 @@ body > .dashboard-pet {
     overflow: hidden;
 }
 
-.dashboard-pet-phone-notch {
+.dashboard-senpai-phone-notch {
     position: absolute;
     left: 50%;
     top: 5px;
@@ -8229,14 +8229,14 @@ body > .dashboard-pet {
     transform: translateX(-50%);
 }
 
-.dashboard-pet-message,
-.dashboard-pet-typing {
+.dashboard-senpai-message,
+.dashboard-senpai-typing {
     position: absolute;
     display: block;
     border-radius: 999px;
 }
 
-.dashboard-pet-message-out {
+.dashboard-senpai-message-out {
     right: 8px;
     top: 17px;
     width: 33px;
@@ -8246,7 +8246,7 @@ body > .dashboard-pet {
     will-change: opacity, transform;
 }
 
-.dashboard-pet-message-in {
+.dashboard-senpai-message-in {
     left: 8px;
     top: 33px;
     width: 27px;
@@ -8256,7 +8256,7 @@ body > .dashboard-pet {
     will-change: opacity, transform;
 }
 
-.dashboard-pet-typing {
+.dashboard-senpai-typing {
     left: 8px;
     bottom: 8px;
     width: 31px;
@@ -8270,33 +8270,33 @@ body > .dashboard-pet {
     will-change: opacity, transform;
 }
 
-.dashboard-pet-typing span {
+.dashboard-senpai-typing span {
     width: 3.5px;
     height: 3.5px;
     border-radius: 50%;
     background: rgba(235, 235, 245, 0.72);
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-message-out {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-message-out {
     animation: aiTextMessageOut 3.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-message-in {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-message-in {
     animation: aiTextMessageIn 3.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-typing {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-typing {
     animation: aiTextTypingBubble 3.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-typing span {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-typing span {
     animation: aiTextTypingDot 1.05s ease-in-out infinite;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-typing span:nth-child(2) { animation-delay: 0.12s; }
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-typing span:nth-child(3) { animation-delay: 0.24s; }
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-typing span:nth-child(2) { animation-delay: 0.12s; }
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-typing span:nth-child(3) { animation-delay: 0.24s; }
 
-.dashboard-pet-send-ping {
+.dashboard-senpai-send-ping {
     position: absolute;
     left: -4px;
     top: 35px;
@@ -8309,15 +8309,15 @@ body > .dashboard-pet {
     will-change: opacity, transform;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-send-ping {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-send-ping {
     animation: aiTextSendPing 3.4s ease-out infinite;
 }
 
-.dashboard-pet.is-texting:not(.is-hidden) .dashboard-pet-send-ping-two {
+.dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-send-ping-two {
     animation-delay: 0.22s;
 }
 
-[data-bs-theme="light"] .dashboard-pet-phone {
+[data-bs-theme="light"] .dashboard-senpai-phone {
     border-color: rgba(0, 0, 0, 0.09);
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.72)),
@@ -8327,42 +8327,42 @@ body > .dashboard-pet {
         inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
-[data-bs-theme="light"] .dashboard-pet-phone-notch {
+[data-bs-theme="light"] .dashboard-senpai-phone-notch {
     background: rgba(60, 60, 67, 0.18);
 }
 
-[data-bs-theme="light"] .dashboard-pet-message-in,
-[data-bs-theme="light"] .dashboard-pet-typing {
+[data-bs-theme="light"] .dashboard-senpai-message-in,
+[data-bs-theme="light"] .dashboard-senpai-typing {
     background: rgba(60, 60, 67, 0.12);
 }
 
-[data-bs-theme="light"] .dashboard-pet-typing span {
+[data-bs-theme="light"] .dashboard-senpai-typing span {
     background: rgba(60, 60, 67, 0.58);
 }
 
-.dashboard-pet-orb:hover,
-.dashboard-pet-orb:focus-visible {
+.dashboard-senpai-orb:hover,
+.dashboard-senpai-orb:focus-visible {
     border-color: var(--hairline-hover);
     box-shadow:
         0 20px 38px -18px rgba(111, 214, 240, 0.72),
         inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
-.dashboard-pet-orb:hover,
-.dashboard-pet-orb:focus-visible {
+.dashboard-senpai-orb:hover,
+.dashboard-senpai-orb:focus-visible {
     transform: translateY(-3px) scale(1.03);
 }
 
-.dashboard-pet-orb:active {
+.dashboard-senpai-orb:active {
     transform: translateY(0) scale(0.95);
 }
 
-.dashboard-pet-orb:focus-visible {
+.dashboard-senpai-orb:focus-visible {
     outline: 2px solid var(--accent-blue);
     outline-offset: 3px;
 }
 
-.dashboard-pet-icon-shell {
+.dashboard-senpai-icon-shell {
     position: relative;
     z-index: 1;
     width: 42px;
@@ -8375,19 +8375,19 @@ body > .dashboard-pet {
     transform: translate3d(0, 0, 0);
 }
 
-.dashboard-pet-icon-shell.is-reacting {
+.dashboard-senpai-icon-shell.is-reacting {
     will-change: transform;
-    animation: petIconReact 0.58s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    animation: senpaiIconReact 0.58s cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
 
-.dashboard-pet-icon-shell img {
+.dashboard-senpai-icon-shell img {
     width: 31px;
     height: 31px;
     display: block;
-    animation: petIconNod 4.6s ease-in-out infinite;
+    animation: senpaiIconNod 4.6s ease-in-out infinite;
 }
 
-.dashboard-pet-status {
+.dashboard-senpai-status {
     position: absolute;
     z-index: 2;
     right: 7px;
@@ -8397,106 +8397,106 @@ body > .dashboard-pet {
     border-radius: 999px;
     background: var(--accent-green);
     box-shadow: 0 0 0 4px rgba(48, 209, 88, 0.13);
-    animation: petStatusPulse 2.2s ease-in-out infinite;
+    animation: senpaiStatusPulse 2.2s ease-in-out infinite;
 }
 
-.dashboard-pet.claude-offline .dashboard-pet-orb {
+.dashboard-senpai.claude-offline .dashboard-senpai-orb {
     border-color: rgba(224, 82, 82, 0.36);
     box-shadow:
         0 20px 34px -22px rgba(224, 82, 82, 0.66),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.dashboard-pet.claude-offline .dashboard-pet-orb::before {
+.dashboard-senpai.claude-offline .dashboard-senpai-orb::before {
     background:
         radial-gradient(circle, rgba(224, 82, 82, 0.30), transparent 66%),
         radial-gradient(circle at 70% 30%, rgba(255, 159, 10, 0.16), transparent 58%);
 }
 
-.dashboard-pet.claude-offline .dashboard-pet-status {
+.dashboard-senpai.claude-offline .dashboard-senpai-status {
     background: #e05252;
     box-shadow: 0 0 0 4px rgba(224, 82, 82, 0.15), 0 0 13px rgba(224, 82, 82, 0.72);
 }
 
-.dashboard-pet.claude-offline .dashboard-pet-kicker {
+.dashboard-senpai.claude-offline .dashboard-senpai-kicker {
     color: #ff7777;
 }
 
-.dashboard-pet.claude-offline .dashboard-pet-bubble {
+.dashboard-senpai.claude-offline .dashboard-senpai-bubble {
     border-color: rgba(224, 82, 82, 0.20);
 }
 
-[data-bs-theme="light"] .dashboard-pet-bubble,
-[data-bs-theme="light"] .dashboard-pet-bubble::after,
-[data-bs-theme="light"] .dashboard-pet-orb {
+[data-bs-theme="light"] .dashboard-senpai-bubble,
+[data-bs-theme="light"] .dashboard-senpai-bubble::after,
+[data-bs-theme="light"] .dashboard-senpai-orb {
     background: rgba(255, 255, 255, 0.96);
 }
 
-@keyframes petBubbleFloat {
+@keyframes senpaiBubbleFloat {
     0%, 100% { transform: translateY(0); }
     50%      { transform: translateY(-4px); }
 }
 
-@keyframes petBubbleSheen {
+@keyframes senpaiBubbleSheen {
     0% { opacity: 0; transform: translateX(-80%); }
     38% { opacity: 1; }
     100% { opacity: 0; transform: translateX(80%); }
 }
 
-@keyframes petOrbGlow {
+@keyframes senpaiOrbGlow {
     0%, 100% { opacity: 0.48; transform: scale(0.88); }
     50%      { opacity: 0.78; transform: scale(1); }
 }
 
-@keyframes petIconNod {
+@keyframes senpaiIconNod {
     0%, 100% { transform: rotate(0deg) translateY(0); }
     35%      { transform: rotate(-4deg) translateY(-1px); }
     48%      { transform: rotate(4deg) translateY(0); }
     62%      { transform: rotate(0deg) translateY(-1px); }
 }
 
-@keyframes petIconReact {
+@keyframes senpaiIconReact {
     0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
     28%  { transform: translate3d(0, -4px, 0) rotate(-7deg) scale(1.06); }
     56%  { transform: translate3d(2px, 1px, 0) rotate(5deg) scale(0.99); }
     100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
 }
 
-@keyframes petStatusPulse {
+@keyframes senpaiStatusPulse {
     0%, 100% { opacity: 0.75; transform: scale(0.86); }
     50%      { opacity: 1; transform: scale(1.08); }
 }
 
 @media (max-width: 575.98px) {
-    body > .dashboard-pet {
+    body > .dashboard-senpai {
         right: 12px;
         bottom: 12px;
         grid-template-columns: minmax(0, calc(100vw - 96px)) 52px;
         gap: 8px;
     }
 
-    .dashboard-pet-bubble {
+    .dashboard-senpai-bubble {
         min-height: 72px;
         padding: 0.66rem 0.76rem;
         border-radius: 14px 14px 5px 14px;
     }
 
-    .dashboard-pet-quote {
+    .dashboard-senpai-quote {
         font-size: 0.72rem;
         line-height: 1.32;
     }
 
-    .dashboard-pet-orb {
+    .dashboard-senpai-orb {
         width: 52px;
         height: 52px;
     }
 
-    .dashboard-pet-icon-shell {
+    .dashboard-senpai-icon-shell {
         width: 38px;
         height: 38px;
     }
 
-    .dashboard-pet-icon-shell img {
+    .dashboard-senpai-icon-shell img {
         width: 28px;
         height: 28px;
     }
@@ -11641,13 +11641,13 @@ body > .dashboard-pet {
     .brand-lockup.is-intro-playing .brand-character::after,
     .brand-lockup.is-intro-playing .brand-icon,
     .brand-intro-callout,
-    .dashboard-pet-bubble,
-    .dashboard-pet-bubble.is-talking::before,
-    .dashboard-pet-orb,
-    .dashboard-pet-icon-shell,
-    .dashboard-pet-icon-shell.is-reacting,
-    .dashboard-pet-icon-shell img,
-    .dashboard-pet-status,
+    .dashboard-senpai-bubble,
+    .dashboard-senpai-bubble.is-talking::before,
+    .dashboard-senpai-orb,
+    .dashboard-senpai-icon-shell,
+    .dashboard-senpai-icon-shell.is-reacting,
+    .dashboard-senpai-icon-shell img,
+    .dashboard-senpai-status,
     .ai-agent-status.is-ready,
     .ai-agent-status.is-ready::before,
     .ai-agent-status.is-ready::after,
@@ -11722,7 +11722,7 @@ body > .dashboard-pet {
     .alloc-popover,
     .brand-lockup,
     .brand-intro-callout,
-    .dashboard-pet,
+    .dashboard-senpai,
     #allocation-chart,
     .btn-holding-intel,
     .btn-refresh-data {

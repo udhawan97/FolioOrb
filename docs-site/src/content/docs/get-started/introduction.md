@@ -21,6 +21,6 @@ not for pulling the trigger on anything.
 
 ## Where to go next
 
-- [Installation](/get-started/installation/) to get the dashboard running locally
-- [Overview & Holdings](/dashboard/overview-holdings/) for a tour of the core workflow
-- [Meet Senpai](/meet-senpai/) to find out who's been watching your portfolio this whole time
+- [Installation](../installation/) to get the dashboard running locally
+- [Overview & Holdings](../../dashboard/overview-holdings/) for a tour of the core workflow
+- [Meet Senpai](../../meet-senpai/) to find out who's been watching your portfolio this whole time

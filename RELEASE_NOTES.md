@@ -1,3 +1,98 @@
+# FolioSenseAI v4.2 Release Notes
+
+**Release date:** July 7, 2026
+
+---
+
+## ✦ Meet Senpai, and Never Get Lost on Day One
+
+> *v4.2 is the release where the orb finally got a name it can keep. Say hello to Senpai — and to the welcome guide that explains what everything means before you have to ask.*
+
+The dashboard's resident orb has a name now, everywhere it lives. What used to be "dashboard pet" / "Portfolio Butler" scattered across the codebase — IDs, CSS classes, JS variables, the `localStorage` key, the visible label — is now **Senpai**, top to bottom. Same orb, same corner of the screen, same personality. Just one name instead of three.
+
+Senpai also got something to actually say. Alongside its usual Claude-flirting commentary, it now rotates in genuine tips and tricks — what Research mode does, what each hold-type icon means, the `M` and `?` shortcuts — surfacing roughly one time in four so they read as a helpful aside, not a lecture.
+
+Brand-new installs get a proper welcome now instead of an empty dashboard. On first launch with zero holdings, a one-time guide walks through adding a holding, what Research mode means, and what each of the four hold-type icons — Auto, Trade, Core, Anchor — actually does, sourced straight from the same tooltips the rest of the app already uses. Dismiss it once and it's gone for good.
+
+The documentation site also got fixed. Five internal links were quietly 404ing on GitHub Pages because they didn't account for the site's base path — worth fixing since v4.2 also adds a **Documentation** link directly in the app's menu, so it needs to actually work.
+
+v4.2 is a naming exercise and a first-impression fix, wrapped around one bug nobody had reported yet but everybody would have hit eventually.
+
+---
+
+## What's New
+
+### Senpai (formerly "dashboard pet")
+
+- Full rename across `templates/index.html`, `static/js/dashboard.js`, and `static/css/style.css` — every id, class, JS variable/function, CSS keyframe, and the `localStorage` key (now `foliosense-dashboard-senpai-visible`) says `senpai`, not `pet`.
+- The one visible label, "Portfolio Butler," is now "Senpai."
+- Pure naming pass — no behavior changed; `_HOLD_MODE_META` and every other tooltip are untouched.
+
+### Tips & Tricks Quotes
+
+- New `DASHBOARD_SENPAI_TIP_QUOTES` array — genuinely useful one-liners covering Research mode, the four hold-type modes, and the `M`/`?` shortcuts.
+- Woven into the existing quote rotation in `showQuote()` at roughly a 1-in-4 chance per cycle (`SENPAI_TIP_QUOTE_CHANCE = 0.25`) without disturbing the underlying rotation index, so the regular commentary still cycles in order.
+
+### First-Run Welcome Guide
+
+- New modal (`#senpai-welcome-guide`), shown once when a fresh install has zero holdings, covering: adding a holding, what Research mode does, and the four hold-type icons — the hold-type list renders directly from `_HOLD_MODE_META` so it can never drift from the tooltips shown elsewhere in the app.
+- Dismissal (close button or backdrop click) persists via `foliosense-senpai-welcome-seen` in `localStorage`; "Add your first holding" closes the guide and opens the portfolio manager directly.
+
+### Documentation
+
+- Fixed 5 internal docs-site links (`troubleshooting.md`, `get-started/introduction.md`, `get-started/claude-setup.md`) that rendered without the GitHub Pages base path and 404'd — converted to relative links, which resolve correctly regardless of base path.
+- Added a **Documentation** entry to the nav overflow menu, linking to the hosted docs site in a new tab.
+
+---
+
+## Developer Notes
+
+- FastAPI metadata version bumped to **`4.2.0`** (previous releases kept it pinned at `4.0.0`).
+- Static cache keys: `style.css?v=101`, `dashboard.js?v=94`, `analytics-charts.js?v=14`.
+- **366 tests passing** (up from 361 in v4.1) — 2 existing tests in `test_intelligence_engine_ui.py` were updated to assert on the new `senpai-*` identifiers instead of the old `pet-*` ones.
+- No database schema changes — no migration required.
+- No `.env` changes required.
+
+---
+
+## Install & Upgrade
+
+**Prerequisite:** Python 3.11+ from [python.org](https://www.python.org/downloads/). Windows: check "Add Python to PATH" during install.
+
+### Mac — one command
+
+Open Terminal (⌘ Space → "Terminal"), paste, and press Enter:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioSenseAI/release-v4.2/scripts/install-mac.sh | bash
+```
+
+Downloads, installs, and places a **FolioSenseAI** shortcut on your Desktop. Browser opens automatically. Next time: double-click the Desktop shortcut.
+
+### Windows — one command
+
+Open PowerShell (Win+R → "powershell"), paste, and press Enter:
+
+```powershell
+irm https://raw.githubusercontent.com/udhawan97/FolioSenseAI/release-v4.2/scripts/install-win.ps1 | iex
+```
+
+Downloads, installs, and places a **FolioSenseAI** shortcut on your Desktop. Browser opens automatically. Next time: double-click the Desktop shortcut.
+
+### Upgrading from v4.1
+
+Run the same install command above — it detects your existing `database/` and `.env`, preserves them, and starts the updated app. No manual backup or file copying required.
+
+No schema migration or `.env` change required. If you had toggled Senpai's visibility off before this update, it resets to visible once (the `localStorage` key changed names) — toggle it back off from menu → Dashboard → Senpai if you'd rather it stay hidden.
+
+---
+
+## Final Word
+
+v4.2 is still not financial advice. It's just the release where the orb got a name, first launches got a map, and the docs stopped sending people into the void.
+
+---
+
 # FolioSenseAI v4.1 Release Notes
 
 **Release date:** June 28, 2026

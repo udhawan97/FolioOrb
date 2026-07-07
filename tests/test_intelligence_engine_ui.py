@@ -81,8 +81,8 @@ def test_analytics_signals_respect_engine_mode():
 def test_enable_claude_ai_button_persists_mode():
     """Regression: enabling Claude AI via the banner button must survive a page reload.
 
-    enableClaudeAiAndReload() saves PET_MODE_KEY="0" to localStorage before
-    reloading.  initDashboardPet() must read that value back — not hardcode
+    enableClaudeAiAndReload() saves SENPAI_MODE_KEY="0" to localStorage before
+    reloading.  initDashboardSenpai() must read that value back — not hardcode
     _forcedLocalMode = true — otherwise the mode resets on every load.
     """
     dash_js = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
@@ -93,51 +93,51 @@ def test_enable_claude_ai_button_persists_mode():
         "so enableClaudeAiAndReload() has no effect after reload"
     )
 
-    # localStorage key must be read inside initDashboardPet() to restore the saved preference.
+    # localStorage key must be read inside initDashboardSenpai() to restore the saved preference.
     # The function contains nested function declarations so we can't simply split on "function ";
     # instead grab everything from the function start up to the closing of the outer function.
-    init_start = dash_js.index("function initDashboardPet()")
+    init_start = dash_js.index("function initDashboardSenpai()")
     init_block = dash_js[init_start:init_start + 12_000]
-    assert "localStorage.getItem(PET_MODE_KEY)" in init_block, (
-        "initDashboardPet() must read PET_MODE_KEY from localStorage "
+    assert "localStorage.getItem(SENPAI_MODE_KEY)" in init_block, (
+        "initDashboardSenpai() must read SENPAI_MODE_KEY from localStorage "
         "to restore the mode after reload"
     )
 
     # The restored value must gate _forcedLocalMode (not "0" means claude mode)
     assert '!== "0"' in init_block, (
-        "initDashboardPet() must set _forcedLocalMode = false "
-        "when PET_MODE_KEY is '0'"
+        "initDashboardSenpai() must set _forcedLocalMode = false "
+        "when SENPAI_MODE_KEY is '0'"
     )
 
     # enableClaudeAiAndReload() must still write "0" to persist the claude preference
     enable_fn = dash_js.split("function enableClaudeAiAndReload()")[1].split("function ")[0]
-    assert 'localStorage.setItem(PET_MODE_KEY, "0")' in enable_fn, (
-        "enableClaudeAiAndReload() must persist PET_MODE_KEY='0' "
+    assert 'localStorage.setItem(SENPAI_MODE_KEY, "0")' in enable_fn, (
+        "enableClaudeAiAndReload() must persist SENPAI_MODE_KEY='0' "
         "so the next load starts in Claude mode"
     )
 
     # applyForcedLocalMode must still write back when the user switches modes
     apply_fn = dash_js.split("function applyForcedLocalMode(")[1].split("function ")[0]
-    assert "localStorage.setItem(PET_MODE_KEY" in apply_fn, (
+    assert "localStorage.setItem(SENPAI_MODE_KEY" in apply_fn, (
         "applyForcedLocalMode() must persist the new mode so it survives reload"
     )
 
 
 def test_mode_toggle_button_structure():
-    """The pet-mode-toggle button and the local-intel-guide Enable button must both exist."""
+    """The senpai-mode-toggle button and the local-intel-guide Enable button must both exist."""
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     dash_js = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
 
     # Nav toggle button — aria-pressed lives on the same element as the id
-    assert 'id="pet-mode-toggle"' in html
+    assert 'id="senpai-mode-toggle"' in html
     # aria-pressed may appear before or after the id attribute within the same tag
-    tag_end = html.index(">", html.index('id="pet-mode-toggle"'))
-    toggle_full = html[html.rindex("<button", 0, html.index('id="pet-mode-toggle"')):tag_end]
+    tag_end = html.index(">", html.index('id="senpai-mode-toggle"'))
+    toggle_full = html[html.rindex("<button", 0, html.index('id="senpai-mode-toggle"')):tag_end]
     assert 'aria-pressed=' in toggle_full
 
     # Banner enable button
     assert 'id="local-intel-guide-enable"' in html
 
     # Both wired up in JS
-    assert 'getElementById("pet-mode-toggle")' in dash_js or '"pet-mode-toggle"' in dash_js
+    assert 'getElementById("senpai-mode-toggle")' in dash_js or '"senpai-mode-toggle"' in dash_js
     assert 'getElementById("local-intel-guide-enable")' in dash_js
