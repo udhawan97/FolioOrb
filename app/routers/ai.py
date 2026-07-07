@@ -540,15 +540,27 @@ async def get_all_summaries(db: Session = Depends(get_db)):
     active_tickers = _active_portfolio_tickers(db)
     quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
 
+    # Fetch every stock summary for the active tickers in one query, then keep the
+    # latest per ticker (rows arrive newest-first, so the first seen wins). This
+    # replaces a per-ticker query in the loop — a real cost when the portfolio is
+    # fully cached and no generation happens.
+    latest_summary: dict[str, AISummary] = {}
+    if active_tickers:
+        for row in (
+            db.query(AISummary)
+            .filter(
+                AISummary.ticker.in_(active_tickers),
+                AISummary.summary_type == "stock",
+            )
+            .order_by(AISummary.generated_at.desc())
+            .all()
+        ):
+            latest_summary.setdefault(row.ticker, row)
+
     for ticker in active_tickers:
         current_price = quotes.get(ticker, {}).get("current_price")
 
-        cached = (
-            db.query(AISummary)
-            .filter(AISummary.ticker == ticker, AISummary.summary_type == "stock")
-            .order_by(AISummary.generated_at.desc())
-            .first()
-        )
+        cached = latest_summary.get(ticker)
 
         if cached and _cache_is_fresh(cached, current_price=current_price):
             results[ticker] = {"summary": cached.summary_text, "from_cache": True}

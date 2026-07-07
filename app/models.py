@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import (
+    Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Index,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -32,6 +34,10 @@ class Holding(Base):
     Tracks how many shares were bought and at what average price.
     """
     __tablename__ = "holdings"
+    # Every dashboard read filters on (portfolio_id, is_active).
+    __table_args__ = (
+        Index("ix_holdings_portfolio_active", "portfolio_id", "is_active"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
@@ -93,6 +99,10 @@ class RealizedTrade(Base):
     Summing realized_gain across all rows gives cumulative realized P&L.
     """
     __tablename__ = "realized_trades"
+    # Realized stats are read per portfolio and grouped by ticker.
+    __table_args__ = (
+        Index("ix_realized_trades_pid_ticker", "portfolio_id", "ticker"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
@@ -128,10 +138,19 @@ class PortfolioSnapshot(Base):
     updates on the same day refresh that day's figures rather than duplicating.
     """
     __tablename__ = "portfolio_snapshots"
+    # One snapshot row per portfolio per calendar day (upserted on refresh).
+    __table_args__ = (
+        Index(
+            "ux_portfolio_snapshots_pid_date",
+            "portfolio_id",
+            "snapshot_date",
+            unique=True,
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
-    snapshot_date = Column(String(10), nullable=False, index=True)  # "YYYY-MM-DD"
+    snapshot_date = Column(String(10), nullable=False)  # "YYYY-MM-DD"
     total_value = Column(Float, nullable=False)
     total_cost_basis = Column(Float, nullable=False)
     unrealized_gain = Column(Float, nullable=False)

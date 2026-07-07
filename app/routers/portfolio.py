@@ -1,6 +1,7 @@
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Portfolio, Holding, RealizedTrade, PortfolioSnapshot
@@ -251,24 +252,42 @@ def _upsert_daily_snapshot(portfolio_id, totals, db):
     total_return = round(unrealized + realized, 2)
 
     today = date.today().isoformat()
-    snap = (
-        db.query(PortfolioSnapshot)
-        .filter(
-            PortfolioSnapshot.portfolio_id == portfolio_id,
-            PortfolioSnapshot.snapshot_date == today,
+
+    def _today_snapshot():
+        return (
+            db.query(PortfolioSnapshot)
+            .filter(
+                PortfolioSnapshot.portfolio_id == portfolio_id,
+                PortfolioSnapshot.snapshot_date == today,
+            )
+            .first()
         )
-        .first()
-    )
+
+    def _apply(target):
+        target.total_value = round(total_value, 2)
+        target.total_cost_basis = round(total_cost_basis, 2)
+        target.unrealized_gain = unrealized
+        target.realized_gain = realized
+        target.total_return = total_return
+
+    snap = _today_snapshot()
     if snap is None:
         snap = PortfolioSnapshot(portfolio_id=portfolio_id, snapshot_date=today)
         db.add(snap)
+    _apply(snap)
 
-    snap.total_value = round(total_value, 2)
-    snap.total_cost_basis = round(total_cost_basis, 2)
-    snap.unrealized_gain = unrealized
-    snap.realized_gain = realized
-    snap.total_return = total_return
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent refresh inserted today's row between our SELECT and INSERT.
+        # The unique (portfolio_id, snapshot_date) index rejects the duplicate — roll
+        # back, re-read the row that won, and refresh it instead of duplicating.
+        db.rollback()
+        snap = _today_snapshot()
+        if snap is not None:
+            _apply(snap)
+            db.commit()
+
     return unrealized, realized, total_return
 
 
