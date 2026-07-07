@@ -1,0 +1,42 @@
+---
+title: FolioSenseAI
+description: Docs for FolioSenseAI, a local-first portfolio intelligence dashboard.
+template: splash
+hero:
+  tagline: Your folio, finally making sense.
+  image:
+    file: ../../assets/folio-orbit-icon.svg
+  actions:
+    - text: Get Started
+      link: /get-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/udhawan97/FolioSenseAI
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+FolioSenseAI turns holdings, live market data, risk signals, and news into plain-English
+portfolio context — running entirely on your machine, with Claude as an optional layer
+on top, never a requirement.
+
+<CardGrid stagger>
+	<Card title="Local-first" icon="approve-check">
+		Your portfolio database and config stay on your machine. Nothing ships anywhere without
+		your Anthropic key.
+	</Card>
+	<Card title="Claude optional" icon="rocket">
+		Local Intelligence runs the dashboard by default. Claude adds narration, action plans,
+		and news themes on top — it never gates the core experience.
+	</Card>
+	<Card title="Meet Senpai" icon="puzzle">
+		The dashboard's resident orb watches your portfolio and reacts to what mode it's running
+		in. <a href="/meet-senpai/">Say hello</a>.
+	</Card>
+	<Card title="Built to be read" icon="open-book">
+		FastAPI, SQLite, a vanilla-JS dashboard, 361 tests, and a service layer designed to be
+		picked apart one piece at a time.
+	</Card>
+</CardGrid>

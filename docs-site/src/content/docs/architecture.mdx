@@ -1,0 +1,60 @@
+---
+title: Architecture
+description: How the browser, FastAPI server, and external services fit together.
+---
+
+import { Image } from 'astro:assets';
+import architecture from '../../assets/architecture.svg';
+
+<Image src={architecture} alt="FolioSenseAI architecture diagram" />
+
+## Layers
+
+| Layer | Stack |
+| --- | --- |
+| Backend | Python 3.11+, FastAPI 0.136.3, Uvicorn 0.48.0 |
+| Data | SQLite, SQLAlchemy 2.0.50, Pydantic 2.13.4 |
+| Market data | `yfinance` 1.4.1 and Yahoo Finance |
+| AI | Anthropic SDK 0.105.2, optional Claude calls, local deterministic fallback |
+| Frontend | Single HTML shell, Bootstrap 5.3.2, Bootstrap Icons, Chart.js 4.4.0, vanilla JavaScript |
+| Quality | pytest, Pylint, `compileall`, pip-audit, Dependency Review, CodeQL |
+
+## Request flow
+
+The browser dashboard talks to the FastAPI app over HTTP/JSON. The app routes requests
+into a service layer split by domain — market data, portfolio analytics, AI, and news —
+each with its own caching behavior. Services read/write SQLite for persistence, call
+Yahoo Finance for market data, and optionally call Anthropic Claude when narration is
+requested and a key is configured.
+
+## Intelligence Engine
+
+The service layer's core is a modular Intelligence Engine split into two halves:
+
+- **Local Intelligence** — always on, fully offline. Covers `investment_signal`,
+  `market_regime`, `portfolio_exposure`, and `event_calendar`, producing verdicts,
+  scenarios, regime classification, exposure breakdowns, peer comparisons, and
+  calibration data.
+- **Claude AI** — optional. Lives in `ai_service.py`, exposing `action_plan()` and
+  `generate_news_themes()`, backed by a 24-hour SQLite cache and live token cost tracking.
+
+## Repository layout
+
+```text
+app/
+├── main.py                 FastAPI app, middleware, static assets, startup warmup
+├── config.py               Environment-backed settings
+├── database.py             SQLite engine/session and startup migrations
+├── models.py                SQLAlchemy ORM models
+├── schemas.py                Pydantic request/response contracts
+├── routers/                  API route groups: stocks, portfolio, ai, news
+└── services/                 Market data, analytics, signals, AI, news, exposure, regimes
+
+templates/
+└── index.html                Dashboard shell
+
+static/
+├── css/style.css             Dashboard design system
+├── js/dashboard.js           Main dashboard behavior
+└── js/analytics-charts.js    Chart.js analytics widgets
+```

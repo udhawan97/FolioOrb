@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#28324a"></stop>
+      <stop offset="0.58" stop-color="#0d1220"></stop>
+      <stop offset="1" stop-color="#070a11"></stop>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6fd6f0" stop-opacity="0.34"></stop>
+      <stop offset="0.7" stop-color="#6fd6f0" stop-opacity="0"></stop>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"></stop>
+      <stop offset="0.42" stop-color="#ffffff" stop-opacity="0"></stop>
+    </linearGradient>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3"></feGaussianBlur>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="235" fill="url(#bg)"></rect>
+  <rect x="0" y="0" width="1024" height="1024" rx="235" fill="url(#sheen)"></rect>
+  <rect x="1" y="1" width="1022" height="1022" rx="234" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="2"></rect>
+  <circle cx="512" cy="512" r="300" fill="url(#glow)"></circle>
+  <g transform="translate(512,512) scale(8.6) translate(-50,-50)">
+    <ellipse cx="50" cy="50" rx="32" ry="16" transform="rotate(-22 50 50)" fill="none" stroke="#97acec" stroke-opacity="0.26" stroke-width="1.5"></ellipse>
+    <circle cx="50" cy="50" r="28" fill="none" stroke="#97acec" stroke-opacity="0.55" stroke-width="2"></circle>
+    <circle cx="50" cy="22" r="6" fill="#6fd6f0" opacity="0.5" filter="url(#soft)"></circle>
+    <circle cx="50" cy="50" r="9" fill="#6fd6f0" opacity="0.55" filter="url(#soft)"></circle>
+    <circle cx="50" cy="22" r="4" fill="#6fd6f0"></circle>
+    <circle cx="50" cy="50" r="6" fill="#6fd6f0"></circle>
+  </g>
+</svg>

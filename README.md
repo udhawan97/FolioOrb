@@ -11,7 +11,11 @@
 <p align="center"><em>Your folio, finally making sense.</em></p>
 
 <p align="center">
-  <strong>A local-first portfolio intelligence dashboard that turns holdings, market data, risk signals, news, and optional Claude narration into plain-English portfolio context.</strong>
+  📦 Runs entirely on your machine &nbsp;·&nbsp; 🔒 Your database never leaves it &nbsp;·&nbsp; 🤖 Claude is a bonus, not a requirement
+</p>
+
+<p align="center">
+  <strong>A local-first portfolio intelligence dashboard that turns holdings, market data, risk signals, and news into plain-English answers to "wait, why did that happen?"</strong>
 </p>
 
 <p align="center">
@@ -31,11 +35,12 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Setup</a> ·
-  <a href="#what-it-does">Features</a> ·
-  <a href="#architecture-and-technical-layout">Architecture</a> ·
-  <a href="#quality-checks">Quality</a> ·
-  <a href="#troubleshooting">Help</a>
+  📖 <a href="https://udhawan97.github.io/FolioSenseAI/">Full Docs</a> ·
+  🚀 <a href="#quick-start">Setup</a> ·
+  🧠 <a href="#what-it-does">Features</a> ·
+  🐣 <a href="#meet-senpai">Meet Senpai</a> ·
+  🏗️ <a href="#architecture-and-technical-layout">Architecture</a> ·
+  🩹 <a href="#troubleshooting">Help</a>
 </p>
 
 ---
@@ -45,6 +50,26 @@
   <br>
   <sub><em>Local dashboard, live market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
 </p>
+
+## The Problem With "The Line Went Up"
+
+Most portfolio trackers stop at the number. Green means good, red means bad, and if you want to know *why*, that's a separate tab, a separate app, or a group chat with someone who read the news this morning and you didn't.
+
+FolioSenseAI exists because "your portfolio is up 2.3%" is not an answer, it's a teaser. Somewhere behind that number is a sector rotation, an earnings beat, a rate decision, or a headline that decided your semiconductor position needed a personality today. This dashboard's whole job is closing that gap: holdings, live prices, risk math, market regime, news, and — if you want it — Claude-written narration, all sitting in one place that runs on your laptop and reports to nobody.
+
+It does not connect to a brokerage. It does not place trades. It will, however, tell you with a straight face whether your "diversified" portfolio is actually just four tech stocks in a trench coat.
+
+## Meet Senpai
+
+<p align="center">
+  <img src="static/img/brand/folio-orbit-icon.svg" alt="Senpai, the FolioSenseAI dashboard orb" width="72">
+</p>
+
+Every dashboard needs one thing staring back at you while your net worth does whatever it's doing today. That's **Senpai** — the small orbiting mark that lives in the corner of the dashboard, watching your portfolio so you don't have to stare at it alone.
+
+Senpai isn't decoration. It reads the room: sharp and a little smug when Claude is connected and narrating your portfolio, dry and matter-of-fact when running on Local Intelligence alone, and quietly sympathetic on the rare occasion Claude is offline and the dashboard has to cope without the fancy words. Tap it and it'll cycle to a new line. It does this on its own too, every so often, whether you asked it to or not.
+
+Senpai doesn't manage your portfolio. Senpai has *opinions* about your portfolio. There's a difference, and Senpai will absolutely make sure you know it.
 
 ## Quick Start
 
@@ -86,11 +111,7 @@ For day-to-day use after setup:
 
 Keep the terminal window open while using FolioSenseAI. Closing it stops the local server.
 
-## The Short Version
-
-FolioSenseAI helps you understand what your portfolio is doing and why it might be doing it. Add holdings, open the dashboard, and it combines live prices, portfolio math, market regime context, risk analytics, headlines, and a modular signal engine into a more useful view than "line went up" or "line went down, emotionally."
-
-The app works without an AI key. Local Intelligence handles the core verdicts, scenarios, exposure, analytics, and fallback summaries. If you bring a Claude key, FolioSenseAI can add richer action plans, portfolio briefings, news themes, and insight copy. Your portfolio database and `.env` stay local.
+> **Tip:** No Anthropic key, no problem. Local Intelligence handles verdicts, scenarios, exposure, and fallback summaries on its own — Claude just adds narration on top.
 
 ## At A Glance
 
@@ -103,27 +124,27 @@ The app works without an AI key. Local Intelligence handles the core verdicts, s
 | Setup | Python 3.11+, `pip install -r requirements.txt`, then `python run.py` or the included setup/start scripts |
 | Engineering depth | FastAPI API, SQLAlchemy models, Pydantic schemas, modular services, caching, startup warmup, Chart.js dashboard, pytest coverage, CI, Pylint, CodeQL, dependency audit |
 
-## Who This Is For
-
-| Audience | Why it helps |
-| --- | --- |
-| Casual users | See portfolio value, P&L, movement explanations, market context, news, and plain-English verdicts without needing a spreadsheet ritual |
-| Recruiters / hiring teams | Review a complete product-minded full-stack project: API design, data modeling, frontend UX, local-first privacy choices, caching, AI integration, tests, and release discipline |
-| Developers | Run a compact FastAPI + SQLite + vanilla JS app locally, inspect the service boundaries, and extend one piece at a time |
+**Who it's for:** casual holders who want plain-English verdicts without a spreadsheet ritual, recruiters sizing up a full-stack product build, and developers who want a compact FastAPI + SQLite + vanilla JS app to run locally and pull apart one service at a time.
 
 ## What It Does
 
-| Area | Capability |
+| Do this | Get this |
 | --- | --- |
-| Portfolio dashboard | 📊 Tracks holdings, watchlist positions, value, cost basis, daily change, unrealized gain, realized reductions, and allocation |
-| Verdict engine | 🧭 Produces Hold / Add / Trim / Exit-style signals with confidence, time horizon, scenario context, and local fallback behavior |
-| Action plan | ✅ Builds bucketed portfolio action plans with thesis text, priority moves, and regime context; Claude-enhanced when available |
-| Holding intelligence | 🔎 Expands tickers into deeper equity or ETF context, market pulse details, peer-relative positioning, event flags, and contribution breakdowns |
-| Analytics | 📈 Covers performance, risk, exposure, signals, market context, benchmark comparison, drawdown, beta, volatility, sector tilt, conviction gaps, and confidence spectrum |
-| News | 🗞️ Fetches grouped news for active holdings and watchlist tickers; Claude mode can add portfolio-level news themes |
-| Market context | 🌎 Pulls live quotes, historical prices, US market status, and major world market indices |
-| Local configuration | 🔐 Lets users save a Claude API key from the dashboard, validates the key shape, writes `.env`, and reconnects without a restart |
-| Cost visibility | 💸 Tracks live Claude token usage for the running process and exposes cache/cost stats through the AI API |
+| 📊 Add holdings and watchlist tickers | Live value, cost basis, daily change, unrealized gain, and allocation, tracked automatically |
+| 🧭 Open a ticker | A Hold / Add / Trim / Exit verdict with confidence, time horizon, and scenario context — local by default, Claude-narrated if connected |
+| ✅ Check the action plan | Bucketed portfolio moves with thesis text, priorities, and regime context |
+| 🔎 Expand a holding | Peer-relative positioning, event flags, contribution breakdowns, and deeper equity/ETF context |
+| 📈 Open Analytics | Performance, risk, exposure, signals, benchmark comparison, drawdown, beta, volatility, sector tilt, and confidence spectrum |
+| 🗞️ Open News | Grouped headlines for everything you hold or watch, plus optional Claude-written portfolio themes |
+| 🌎 Glance at market context | Live quotes, historical prices, US market status, and major world indices |
+| 🔐 Paste a Claude key | The dashboard validates it, writes `.env`, and reconnects — no restart, no editor |
+| 💸 Check the cost HUD | Live Claude token usage and cache/cost stats for the running session |
+
+**Three things worth knowing before you dive in:**
+
+1. Local Intelligence is not a downgraded mode — it's the deterministic engine that runs the dashboard by default. Claude adds narration on top of it, not instead of it.
+2. The holdings table auto-refreshes and expands on the first click. If you're waiting for a second click out of habit, you can stop.
+3. Everything Claude-generated gets cached in SQLite, so refreshing the page doesn't necessarily mean paying for another model call.
 
 ## Product Flow
 
@@ -147,7 +168,7 @@ flowchart LR
     news --> action
 ```
 
-The dashboard keeps the flow intentionally direct: enter holdings, understand the current state, inspect the drivers, then decide what deserves attention. It does not connect to a brokerage or place trades.
+The dashboard keeps the flow intentionally direct: enter holdings, understand the current state, inspect the drivers, then decide what deserves attention.
 
 ## Architecture And Technical Layout
 
@@ -185,31 +206,52 @@ app/
 ├── main.py                 FastAPI app, middleware, static assets, startup warmup
 ├── config.py               Environment-backed settings
 ├── database.py             SQLite engine/session and startup migrations
-├── models.py               SQLAlchemy ORM models
-├── schemas.py              Pydantic request/response contracts
-├── routers/                API route groups: stocks, portfolio, ai, news
-└── services/               Market data, analytics, signals, AI, news, exposure, regimes
+├── models.py                SQLAlchemy ORM models
+├── schemas.py                Pydantic request/response contracts
+├── routers/                  API route groups: stocks, portfolio, ai, news
+└── services/                 Market data, analytics, signals, AI, news, exposure, regimes
 
 templates/
-└── index.html              Dashboard shell
+└── index.html                Dashboard shell
 
 static/
-├── css/style.css           Dashboard design system
-├── js/dashboard.js         Main dashboard behavior
-└── js/analytics-charts.js  Chart.js analytics widgets
+├── css/style.css             Dashboard design system
+├── js/dashboard.js           Main dashboard behavior
+└── js/analytics-charts.js    Chart.js analytics widgets
 
-scripts/                    Setup and start scripts for Mac/Linux/Windows
-tests/                      Offline-focused pytest suite with mocked external services
-docs/                       Dashboard screenshot and architecture diagram
+scripts/                      Setup and start scripts for Mac/Linux/Windows
+tests/                        Offline-focused pytest suite with mocked external services
+docs/                         Dashboard screenshot and architecture diagram
+docs-site/                    Astro + Starlight documentation site
 ```
 
 ## Why It Matters
 
 Most portfolio tools show the number. FolioSenseAI works on the next question: what is behind the number?
 
-That means turning raw holdings into a product workflow: live quote state, exposure context, portfolio-level risk, ticker-level explanations, market regime, news, and action buckets. The interesting engineering problem is not "call an AI model." It is deciding when deterministic local logic is enough, when narration adds value, how to cache expensive or slow work, and how to keep the dashboard useful even when an external service is unavailable.
+That means turning raw holdings into a product workflow: live quote state, exposure context, portfolio-level risk, ticker-level explanations, market regime, news, and action buckets. The interesting engineering problem here was never "call an AI model." It was deciding when deterministic local logic is enough, when narration actually adds value, how to cache expensive or slow work, and how to keep the dashboard useful even when an external service is having a bad day.
 
 For reviewers, the project is meant to show both implementation and product taste: a working local app, clear boundaries between routers and services, practical privacy defaults, a frontend without a build step, and enough tests to make changes without holding your breath.
+
+## Privacy And Data Handling
+
+FolioSenseAI is local-first, not cloud-hosted.
+
+| Data | Handling |
+| --- | --- |
+| Holdings and portfolio snapshots | Stored in local SQLite under `database/` |
+| Config and API keys | Stored in local `.env`; `.env` is excluded from git |
+| Browser cache | Uses `localStorage` for faster dashboard paint |
+| Market data | Requested from Yahoo Finance through `yfinance` |
+| Claude prompts | Sent to Anthropic only when Claude features are enabled and requested |
+| Generated AI summaries | Cached locally in SQLite for reuse and cost control |
+
+Security-oriented defaults in the repo:
+
+- `.env` and `database/` are intended to stay untracked
+- CORS defaults to local origins
+- API key input is format-validated client-side and server-side before being saved
+- Claude is optional; the local engine remains available without an AI provider
 
 ## Release And Project Status
 
@@ -234,7 +276,7 @@ Known limits and roadmap:
 - CSV import/export and transaction history views are planned
 - Verdict calibration data is being logged; reporting is a future improvement once enough history exists
 
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version-by-version changes.
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version-by-version changes, or the [full documentation site](https://udhawan97.github.io/FolioSenseAI/) for guided walkthroughs.
 
 ## Setup, Updating, And Requirements
 
@@ -291,26 +333,6 @@ python run.py
 
 If you used the release installer commands, run the installer again. The install scripts are designed to preserve existing `.env` and `database/` files.
 
-## Privacy And Data Handling
-
-FolioSenseAI is local-first, not cloud-hosted.
-
-| Data | Handling |
-| --- | --- |
-| Holdings and portfolio snapshots | Stored in local SQLite under `database/` |
-| Config and API keys | Stored in local `.env`; `.env` is excluded from git |
-| Browser cache | Uses `localStorage` for faster dashboard paint |
-| Market data | Requested from Yahoo Finance through `yfinance` |
-| Claude prompts | Sent to Anthropic only when Claude features are enabled and requested |
-| Generated AI summaries | Cached locally in SQLite for reuse and cost control |
-
-Security-oriented defaults in the repo:
-
-- `.env` and `database/` are intended to stay untracked
-- CORS defaults to local origins
-- API key input is format-validated client-side and server-side before being saved
-- Claude is optional; the local engine remains available without an AI provider
-
 ## Quality Checks
 
 Run these from an activated virtual environment:
@@ -343,6 +365,13 @@ The GitHub workflow runs tests on Python 3.11 and 3.12, imports the FastAPI app,
 | AI shows Local mode | Add a valid Anthropic key through the dashboard key panel or `.env` |
 | Claude request fails | Confirm the key starts with `sk-ant-`, has account credit/access, and restart if you edited `.env` manually |
 | Pylint command fails on Windows | Use Git Bash, WSL, or run `pylint app tests run.py` |
+| Senpai stopped talking | It's probably hidden — check the overflow menu's Intelligence section and toggle it back on |
+
+More detail on all of the above (plus guided walkthroughs) lives on the [documentation site](https://udhawan97.github.io/FolioSenseAI/).
+
+## Contributing
+
+Issues and pull requests are welcome. If you're proposing a feature, a short issue describing the use case before the PR saves everyone a round trip. Keep changes scoped, run the quality checks above before opening a PR, and don't be surprised if Senpai has opinions about your diff.
 
 ## License
 
@@ -351,5 +380,6 @@ FolioSenseAI is released under the [MIT License](LICENSE).
 This project is for education, analysis, and portfolio exploration. It is **not financial advice**, does not place trades, and should not be treated as a substitute for professional judgment.
 
 <p align="center">
-  Built to make portfolio context easier to read, easier to question, and slightly less spreadsheet-haunted.
+  Built to make portfolio context easier to read, easier to question, and slightly less spreadsheet-haunted.<br>
+  <sub>If FolioSenseAI talked you out of panic-selling on a red Tuesday, a star costs nothing and Senpai will absolutely take credit for it.</sub>
 </p>
