@@ -29,6 +29,57 @@ def _iter_broken_symlinks(root: Path):
             yield path
 
 
+def _find_onedir_internal(dist_dir: Path) -> Path | None:
+    """Locate the onedir COLLECT output's _internal/ dir alongside the .app.
+
+    Same PyInstaller run, always has the real file for anything the BUNDLE
+    step may have left as a dangling symlink.
+    """
+    for candidate in dist_dir.iterdir():
+        internal = candidate / "_internal"
+        if internal.is_dir():
+            return internal
+    return None
+
+
+def _resolve_repair(link: Path, *, frameworks: Path, resources: Path,
+                     onedir_internal: Path) -> tuple[Path, Path] | None:
+    """Return (source, target) to heal one broken symlink, or None if unresolvable."""
+    if "Frameworks" in link.parts:
+        # Frameworks/<rel> -> ../Resources/<rel>, but Resources/<rel> was never
+        # materialized. The onedir output always has the real file at this path.
+        rel = link.relative_to(frameworks)
+        source = onedir_internal / rel
+        target = resources / rel
+    else:
+        # A top-level convenience symlink elsewhere in the bundle (observed for
+        # pyarrow's libarrow*.dylib under Resources/) whose relative target was
+        # never materialized, but the real file exists elsewhere in the bundle
+        # (e.g. under Frameworks, where binaries are correctly placed for
+        # code-signing). Resolve by basename search rather than a fixed direction.
+        candidates = [p for p in frameworks.rglob(link.name) if not p.is_symlink()]
+        if not candidates:
+            candidates = [p for p in onedir_internal.rglob(link.name) if not p.is_symlink()]
+        if not candidates:
+            return None
+        source, target = candidates[0], link  # replace the symlink itself in place
+
+    if not source.exists():
+        return None
+    return source, target
+
+
+def _apply_repair(source: Path, target: Path, link: Path) -> None:
+    if target != link:
+        target.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        link.unlink()
+    if source.is_dir():
+        shutil.copytree(source, target, dirs_exist_ok=True)
+    else:
+        shutil.copy2(source, target)
+
+
 def main() -> int:
     dist_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("dist")
     app_bundles = list(dist_dir.glob("*.app"))
@@ -37,59 +88,24 @@ def main() -> int:
         return 1
     app = app_bundles[0]
     resources = app / "Contents" / "Resources"
+    frameworks = app / "Contents" / "Frameworks"
 
-    # The onedir build (same PyInstaller run) is the known-good source: its
-    # _internal/ directory holds every collected data file as a real file.
-    onedir_internal = None
-    for candidate in dist_dir.iterdir():
-        internal = candidate / "_internal"
-        if internal.is_dir():
-            onedir_internal = internal
-            break
+    onedir_internal = _find_onedir_internal(dist_dir)
     if onedir_internal is None:
         print("No onedir _internal/ output found alongside the .app bundle; "
               "cannot repair broken symlinks.", file=sys.stderr)
         return 1
 
-    frameworks = app / "Contents" / "Frameworks"
     healed = []
-    still_broken = []
     for link in _iter_broken_symlinks(app):
-        # Case 1: Frameworks/<rel> -> ../Resources/<rel>, but Resources/<rel> was
-        # never materialized. The onedir COLLECT output (same PyInstaller run)
-        # always has the real file at _internal/<rel>.
-        if "Frameworks" in link.parts:
-            rel = link.relative_to(frameworks)
-            source = onedir_internal / rel
-            target = resources / rel
-        else:
-            # Case 2: a top-level convenience symlink elsewhere in the bundle
-            # (observed for pyarrow's libarrow*.dylib under Resources/) whose
-            # relative target was never materialized where it points, but the
-            # real file exists elsewhere in the bundle (e.g. under Frameworks,
-            # where binaries are correctly placed for code-signing). Resolve by
-            # basename search rather than assuming a fixed direction.
-            basename = link.name
-            candidates = [p for p in frameworks.rglob(basename) if not p.is_symlink()]
-            if not candidates:
-                candidates = [p for p in onedir_internal.rglob(basename) if not p.is_symlink()]
-            if not candidates:
-                still_broken.append(link)
-                continue
-            source = candidates[0]
-            target = link  # replace the symlink itself with a real copy in place
-
-        if not source.exists():
-            still_broken.append(link)
+        resolved = _resolve_repair(
+            link, frameworks=frameworks, resources=resources,
+            onedir_internal=onedir_internal,
+        )
+        if resolved is None:
             continue
-        if target != link:
-            target.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            link.unlink()
-        if source.is_dir():
-            shutil.copytree(source, target, dirs_exist_ok=True)
-        else:
-            shutil.copy2(source, target)
+        source, target = resolved
+        _apply_repair(source, target, link)
         healed.append(target.relative_to(app))
 
     for rel in healed:
