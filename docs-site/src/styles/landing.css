@@ -140,6 +140,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 .window-bar span:nth-child(2) { background: #febc2e; }
 .window-bar span:nth-child(3) { background: #28c840; }
 .window-chrome img, .window-chrome video { display: block; width: 100%; height: auto; }
+.hero-shot { position: relative; }
 
 .pulse-line { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; opacity: 0.5; }
 .pulse-line::before { content: ''; position: absolute; top: 0; left: -40%; width: 40%; height: 100%;
@@ -253,7 +254,6 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 .wf-step p { margin: 0 0 1rem; color: var(--muted); max-width: 38ch; }
 .wf-note { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.88rem; color: var(--muted); font-style: italic; max-width: 40ch; margin-top: 0.4rem; }
 .wf-note-orb { flex: none; width: 18px; height: 18px; margin-top: 0.15rem; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--act-accent), transparent 70%), var(--bg-soft); border: 1px solid color-mix(in srgb, var(--act-accent) 40%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--act-accent) 40%, transparent); }
-.wf-scene-mini { display: none; }
 
 /* ── FEATURES (Act 4) ─────────────────────────────────────────── */
 .moment { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 3rem; align-items: center; margin-bottom: 6rem; }
@@ -449,7 +449,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 	.demo-side { border-left: none; border-top: 1px solid var(--panel-border); padding-left: 0; padding-top: 1.2rem; }
 	.dl-grid { grid-template-columns: 1fr; }
 	.rail { display: none !important; }
-	/* Workflow → stacked; each step shows its own inline mini-scene, no sticky. */
+	/* Workflow → stacked steps, no sticky visual stage. */
 	.wf-grid { grid-template-columns: 1fr; gap: 1.5rem; }
 	.wf-stage-wrap { display: none; }
 	.wf-step { min-height: auto; opacity: 1; margin-bottom: 2.2rem; }
