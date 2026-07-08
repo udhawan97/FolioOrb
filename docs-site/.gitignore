@@ -17,3 +17,7 @@ npm-debug.log*
 
 # macOS-specific files
 .DS_Store
+
+# demo/screenshot capture scratch
+_demos/
+_shots/

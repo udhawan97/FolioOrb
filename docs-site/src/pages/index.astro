@@ -19,12 +19,15 @@ const RELEASES_LATEST = `${RELEASES}/latest`;
 
 const asset = (p) => `${base}/assets/${p}`;
 const shot = (p) => `${base}/assets/shots/${p}`;
+const demo = (p) => `${base}/assets/demos/${p}`;
 const doc = (slug) => `${base}/${slug}/`;
 
 const macCommands = `curl -fsSL ${'https://raw.githubusercontent.com'}/${REPO}/main/scripts/install-mac.sh | bash`;
 const winCommands = `irm ${'https://raw.githubusercontent.com'}/${REPO}/main/scripts/install-win.ps1 | iex`;
 
-// Feature spotlights that pair a real screenshot crop with one clear sentence.
+// Feature spotlights. `verdicts` and `news` are real recorded product loops
+// (video + poster, lazy, pause off-screen); `risk` stays a still — it's the
+// dense "read me" panel where motion would fight comprehension.
 const spotlights = [
   {
     key: 'risk',
@@ -33,25 +36,22 @@ const spotlights = [
     body: 'Risk-vs-return scatter, correlation matrix, concentration, beta, and drawdown — every number explained in a plain-English line beneath it.',
     img: 'risk-analytics-demo.webp',
     alt: 'FolioSenseAI risk analytics: risk-return scatter, correlation matrix, concentration dial, and beta.',
-    focus: 'top',
   },
   {
     key: 'verdicts',
     kicker: 'Hold / Add / Trim / Exit',
     title: 'A verdict for every position',
-    body: 'Each holding gets a rating, trend read, and ETF-quality or analyst context — so the table tells you what to do, not just what it is worth.',
-    img: 'verdicts-demo.webp',
-    alt: 'FolioSenseAI holdings table with per-ticker verdicts, trend sense, ratings, and 7-day sparklines.',
-    focus: 'top',
+    body: 'Open a holding and its intelligence panel unfolds — rating, trend read, ETF-quality or analyst context, and what moved it today. The table tells you what to do, not just what it is worth.',
+    video: 'verdicts',
+    alt: 'FolioSenseAI holdings table expanding a position into its full intelligence panel with rating, drivers, and sparklines.',
   },
   {
     key: 'news',
     kicker: 'News themes',
     title: 'The headlines that actually touch your book',
-    body: 'Grouped, deduplicated news for everything you hold or watch — with optional Claude-written portfolio themes when a key is connected.',
-    img: 'news-themes-demo.webp',
-    alt: 'FolioSenseAI news feed grouped by holding, with headlines relevant to the demo portfolio.',
-    focus: 'top',
+    body: 'Grouped, deduplicated news for everything you hold or watch, populated per position — with optional Claude-written portfolio themes when a key is connected.',
+    video: 'news',
+    alt: 'FolioSenseAI news feed populating grouped, relevant headlines under each holding in the demo portfolio.',
   },
 ];
 
@@ -74,7 +74,8 @@ const icons = {
 		<meta property="og:title" content="FolioSenseAI" />
 		<meta property="og:description" content="Your portfolio, finally speaking plain English. A local-first portfolio intelligence dashboard for macOS and Windows." />
 		<meta property="og:type" content="website" />
-		<meta property="og:image" content={shot('hero-dashboard-demo.webp')} />
+		<meta property="og:image" content={asset('og-hero.jpg')} />
+			<meta name="twitter:image" content={asset('og-hero.jpg')} />
 		<meta name="twitter:card" content="summary_large_image" />
 	</head>
 	<body>
@@ -145,38 +146,40 @@ const icons = {
 					</div>
 				</div>
 
-				<!-- Product preview: real screenshot + floating insight chips + moving highlight -->
+				<!-- Product preview: real screenshot + floating insight chips + a
+				     region-fitting highlight that tours one feature at a time. -->
 				<div class="hero-stage reveal" id="hero-stage">
 					<div class="window-chrome" id="hero-window">
 						<div class="window-bar"><span></span><span></span><span></span></div>
-						<img src={shot('hero-dashboard-demo.webp')} width="2400" height="1508"
+						<img src={shot('hero-dashboard-demo.webp')} width="2400" height="1508" fetchpriority="high"
 							alt="The FolioSenseAI dashboard showing a demo portfolio: total value, today's P&L, sector map, and today's impact." />
-						<!-- Cursor-style moving highlight (JS-driven, reduced-motion safe) -->
-						<div class="spotlight" id="spotlight" aria-hidden="true">
-							<span class="spotlight-ring"></span>
-							<span class="spotlight-tip" id="spotlight-tip"></span>
+						<!-- Cursor-style guided highlight: a rounded rect that morphs
+						     between hotspots (JS-driven, reduced-motion safe). -->
+						<div class="spot-region" id="spot-region" aria-hidden="true">
+							<span class="spot-region-tip" id="spot-region-tip"></span>
 						</div>
 					</div>
 
-					<div class="chip-float chip-float--tl" data-depth="18" aria-hidden="true">
+					<div class="chip-float chip-float--tl" data-depth="10" aria-hidden="true">
 						<span class="dot dot-amber"></span> Risk · Moderate
 					</div>
-					<div class="chip-float chip-float--tr" data-depth="-22" aria-hidden="true">
+					<div class="chip-float chip-float--tr" data-depth="-12" aria-hidden="true">
 						<span class="dot dot-green"></span> MSFT · Buy
 					</div>
-					<div class="chip-float chip-float--bl" data-depth="26" aria-hidden="true">
+					<div class="chip-float chip-float--bl" data-depth="12" aria-hidden="true">
 						Beta · 0.85×
 					</div>
-					<div class="chip-float chip-float--br" data-depth="-16" aria-hidden="true">
+					<div class="chip-float chip-float--br" data-depth="-10" aria-hidden="true">
 						<span class="dot dot-cyan"></span> Theme · dividend income
 					</div>
+					<span class="sr-only" id="tour-live" aria-live="polite"></span>
 				</div>
 			</section>
 
 			<!-- ── Product story ────────────────────────────────────────────── -->
 			<section class="story">
 				<h2 class="section-title reveal">Know what you hold. Understand what changed. Decide what to do next.</h2>
-				<div class="story-grid">
+				<div class="story-grid reveal-group">
 					<article class="story-step reveal">
 						<span class="step-num">1</span>
 						<h3>Add your holdings</h3>
@@ -195,7 +198,7 @@ const icons = {
 				</div>
 			</section>
 
-			<!-- ── Feature spotlights (real screenshot crops) ───────────────── -->
+			<!-- ── Feature spotlights (product loops + one still) ───────────── -->
 			<section class="spotlights">
 				{spotlights.map((f, i) => (
 					<article class={`spot ${i % 2 ? 'spot--rev' : ''} reveal`}>
@@ -203,18 +206,27 @@ const icons = {
 							<span class="kicker">{f.kicker}</span>
 							<h3>{f.title}</h3>
 							<p>{f.body}</p>
+							{f.video && <span class="demo-tag">Demo data · looping</span>}
 						</div>
-						<figure class={`spot-shot focus-${f.focus}`}>
+						<figure class={`spot-shot ${f.video ? 'spot-shot--video' : 'spot-shot--still'}`}>
 							<div class="window-chrome window-chrome--sm">
 								<div class="window-bar"><span></span><span></span><span></span></div>
-								<img src={shot(f.img)} alt={f.alt} loading="lazy" />
+								{f.video ? (
+									<video class="demo-loop" muted loop playsinline preload="none"
+										width="1600" height="1000" poster={demo(`${f.video}-poster.webp`)}
+										aria-label={f.alt}>
+										<source src={demo(`${f.video}.mp4`)} type="video/mp4" />
+									</video>
+								) : (
+									<img src={shot(f.img)} alt={f.alt} loading="lazy" />
+								)}
 							</div>
 						</figure>
 					</article>
 				))}
 
 				<!-- Supporting capabilities as crisp icon cards (no screenshot needed) -->
-				<div class="mini-grid">
+				<div class="mini-grid reveal-group">
 					<div class="mini reveal">
 						<svg class="mini-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" set:html={icons.lock} />
 						<h4>Local-first by default</h4>
@@ -239,7 +251,7 @@ const icons = {
 					<h2 class="section-title">A worked example</h2>
 					<span class="demo-badge">Demo data only · no real portfolio required</span>
 				</div>
-				<div class="demo-card reveal">
+				<div class="demo-card reveal" id="demo-card">
 					<div class="demo-table" role="table" aria-label="Demo portfolio holdings">
 						<div class="demo-row demo-row--head" role="row">
 							<span role="columnheader">Holding</span>
@@ -285,8 +297,16 @@ const icons = {
 			<!-- ── Senpai ───────────────────────────────────────────────────── -->
 			<section class="senpai">
 				<figure class="senpai-shot reveal">
-					<img src={shot('senpai-insight-demo.webp')} width="676" height="290"
-						alt="Senpai, the dashboard orb, delivering a one-line portfolio insight." loading="lazy" />
+					<!-- Live assistant card: breathing orb + a quip that types on reveal. -->
+					<div class="senpai-card" id="senpai-card">
+						<div class="senpai-card-head">
+							<span class="senpai-orb" aria-hidden="true"><img src={asset('folio-orbit-icon.svg')} alt="" width="34" height="34" /></span>
+							<span class="senpai-name">Senpai</span>
+							<span class="senpai-mode">Local Intelligence</span>
+						</div>
+						<p class="senpai-line" id="senpai-line">Your “diversified” portfolio is four tech stocks in a trench coat.</p>
+						<span class="senpai-hint">Tap for another read →</span>
+					</div>
 				</figure>
 				<div class="senpai-copy reveal">
 					<span class="kicker">Meet Senpai</span>
@@ -332,7 +352,7 @@ const icons = {
 			<!-- ── Trust / security ─────────────────────────────────────────── -->
 			<section class="trust">
 				<h2 class="section-title reveal">Open source. Traceable builds. Your data stays on your machine.</h2>
-				<div class="trust-grid">
+				<div class="trust-grid reveal-group">
 					<div class="trust-item reveal">
 						<h3>Every build is traceable</h3>
 						<p>Each download links back to its GitHub Release, the commit it was built from, and the Actions run that produced it.</p>
@@ -524,7 +544,7 @@ const icons = {
 				document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
 			}
 
-			// ── Hero: floating-chip parallax (very subtle, pointer only) ─────
+			// ── Hero: floating-chip parallax (subtle, pointer-fine only) ─────
 			const stage = document.getElementById('hero-stage');
 			if (stage && !reduce && window.matchMedia('(pointer:fine)').matches) {
 				const chips = stage.querySelectorAll('.chip-float');
@@ -537,32 +557,94 @@ const icons = {
 						c.style.transform = `translate(${dx * d}px, ${dy * d}px)`;
 					});
 				});
-				stage.addEventListener('pointerleave', () => {
-					chips.forEach((c) => { c.style.transform = ''; });
-				});
+				stage.addEventListener('pointerleave', () => { chips.forEach((c) => { c.style.transform = ''; }); });
 			}
 
-			// ── Hero: cursor-style moving highlight ──────────────────────────
-			const spot = document.getElementById('spotlight');
-			const tip = document.getElementById('spotlight-tip');
-			if (spot && tip) {
+			// ── Hero: region-fitting guided tour (morphs between hotspots) ───
+			const region = document.getElementById('spot-region');
+			const regionTip = document.getElementById('spot-region-tip');
+			const tourLive = document.getElementById('tour-live');
+			const heroWindow = document.getElementById('hero-window');
+			if (region && regionTip && heroWindow) {
+				// x/y/w/h as % of the screenshot; tuned to the demo dashboard regions.
 				const hotspots = [
-					{ x: 14, y: 24, label: 'Live value & daily P&L' },
-					{ x: 24, y: 50, label: 'Look-through sector exposure' },
-					{ x: 66, y: 46, label: "What moved today, in plain English" },
-					{ x: 82, y: 80, label: 'Senpai reads the room' },
+					{ x: 2.5, y: 39, w: 24, h: 20, label: 'Live value & today’s P&L' },
+					{ x: 50, y: 39, w: 22, h: 16, label: 'What moved, in dollars' },
+					{ x: 2, y: 61, w: 40, h: 34, label: 'Look-through sector exposure' },
+					{ x: 43, y: 61, w: 55, h: 34, label: 'Today’s impact, in plain English' },
+					{ x: 74, y: 80, w: 22, h: 16, label: 'Senpai reads the room' },
 				];
-				let hi = 0;
+				let hi = 0, timer = null, paused = false;
 				const place = (h) => {
-					spot.style.left = h.x + '%';
-					spot.style.top = h.y + '%';
-					tip.textContent = h.label;
+					region.style.left = h.x + '%'; region.style.top = h.y + '%';
+					region.style.width = h.w + '%'; region.style.height = h.h + '%';
+					regionTip.textContent = h.label;
+					if (tourLive) tourLive.textContent = h.label;
 				};
 				place(hotspots[0]);
 				if (!reduce) {
-					spot.classList.add('is-live');
-					setInterval(() => { hi = (hi + 1) % hotspots.length; place(hotspots[hi]); }, 2600);
+					region.classList.add('is-live');
+					const step = () => { if (!paused) { hi = (hi + 1) % hotspots.length; place(hotspots[hi]); } };
+					const start = () => { if (!timer) timer = setInterval(step, 3200); };
+					const stop = () => { clearInterval(timer); timer = null; };
+					heroWindow.addEventListener('pointerenter', () => { paused = true; });
+					heroWindow.addEventListener('pointerleave', () => { paused = false; });
+					if ('IntersectionObserver' in window) {
+						new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? start() : stop())), { threshold: 0.2 }).observe(heroWindow);
+					} else { start(); }
 				}
+			}
+
+			// ── Demo loops + panel choreography: run only while on-screen ────
+			if ('IntersectionObserver' in window) {
+				const activeIO = new IntersectionObserver((entries) => {
+					entries.forEach((e) => {
+						const el = e.target;
+						if (el.tagName === 'VIDEO') {
+							if (reduce) return;               // posters only under reduced motion
+							if (e.isIntersecting) el.play().catch(() => {}); else el.pause();
+						} else if (e.isIntersecting) {
+							el.classList.add('play');         // demo panel: play once, keep final state
+						}
+					});
+				}, { threshold: 0.35 });
+				document.querySelectorAll('.demo-loop, #demo-card').forEach((el) => activeIO.observe(el));
+			}
+			// JS-armed animation: without JS the panel/bars render in their final state.
+			const demoCard = document.getElementById('demo-card');
+			if (demoCard && !reduce) demoCard.classList.add('js-anim');
+			if (reduce) document.querySelectorAll('.demo-loop').forEach((v) => v.setAttribute('controls', ''));
+
+			// ── Senpai: breathing card that types its read on reveal ────────
+			const senpaiCard = document.getElementById('senpai-card');
+			const senpaiLine = document.getElementById('senpai-line');
+			if (senpaiCard && senpaiLine) {
+				const lines = [
+					senpaiLine.textContent.trim(),
+					'VOO did the heavy lifting again. SCHD quietly paid you to wait.',
+					'Beta 0.85 — you’ll lag the rip and dodge the worst of the dip.',
+					'MSFT leads the book. Concentration’s fine — just know it’s there.',
+					'Technology is 17% of your look-through exposure. Eyes open.',
+				];
+				let idx = 0, typing = null;
+				const type = (text) => {
+					clearTimeout(typing);
+					if (reduce) { senpaiLine.textContent = text; return; }
+					senpaiLine.classList.add('is-typing');
+					let i = 0;
+					const tick = () => {
+						senpaiLine.textContent = text.slice(0, i++);
+						if (i <= text.length) typing = setTimeout(tick, 22);
+						else senpaiLine.classList.remove('is-typing');
+					};
+					tick();
+				};
+				let armed = false;
+				const fire = () => { if (!armed) { armed = true; type(lines[0]); } };
+				if ('IntersectionObserver' in window && !reduce) {
+					new IntersectionObserver((es, ob) => es.forEach((e) => { if (e.isIntersecting) { fire(); ob.disconnect(); } }), { threshold: 0.5 }).observe(senpaiCard);
+				} else { fire(); }
+				senpaiCard.addEventListener('click', () => { idx = (idx + 1) % lines.length; type(lines[idx]); });
 			}
 
 			// ── Senpai footer easter egg ─────────────────────────────────────
@@ -592,6 +674,10 @@ const icons = {
 				--muted: #9a9aa6;
 				--radius: 16px;
 				--maxw: 1140px;
+				--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+				--ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+				--ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+				--stagger: 80ms;
 			}
 			* { box-sizing: border-box; }
 			html { scroll-behavior: smooth; }
@@ -724,42 +810,22 @@ const icons = {
 			.dot-cyan { background: var(--cyan); box-shadow: 0 0 8px rgba(111,214,240,0.6); }
 			@keyframes chip-in { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
 
-			.spotlight { position: absolute; z-index: 2; transform: translate(-50%, -50%); transition: left 0.7s cubic-bezier(0.4,0,0.2,1), top 0.7s cubic-bezier(0.4,0,0.2,1); pointer-events: none; }
-			.spotlight-ring {
-				display: block; width: 46px; height: 46px; border-radius: 50%;
-				border: 2px solid var(--cyan); box-shadow: 0 0 0 6px rgba(111,214,240,0.12), 0 0 24px rgba(111,214,240,0.5);
-			}
-			.spotlight.is-live .spotlight-ring { animation: ring-pulse 2.6s ease-in-out infinite; }
-			@keyframes ring-pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 1; } }
-			.spotlight-tip {
-				position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%);
+			/* Hero guided tour: a rounded rect that morphs between feature regions */
+			.spot-region { position: absolute; z-index: 2; border-radius: 10px; pointer-events: none;
+				left: 3%; top: 39%; width: 24%; height: 20%; border: 2px solid var(--cyan);
+				box-shadow: inset 0 0 0 1px rgba(111,214,240,0.25), 0 0 26px rgba(111,214,240,0.45);
+				transition: left 0.7s var(--ease-std), top 0.7s var(--ease-std), width 0.7s var(--ease-std), height 0.7s var(--ease-std); }
+			.spot-region.is-live { animation: region-glow 3.2s ease-in-out infinite; }
+			@keyframes region-glow { 0%,100% { box-shadow: inset 0 0 0 1px rgba(111,214,240,0.22), 0 0 18px rgba(111,214,240,0.32); } 50% { box-shadow: inset 0 0 0 1px rgba(111,214,240,0.45), 0 0 32px rgba(111,214,240,0.6); } }
+			.spot-region-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
 				white-space: nowrap; font-size: 0.72rem; color: var(--text);
-				background: rgba(14,16,24,0.9); border: 1px solid var(--panel-border); border-radius: 7px;
-				padding: 0.25rem 0.55rem; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-			}
-
-			/* ── Product story ── */
-			.story-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
-			.story-step { position: relative; background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 1.6rem; }
-			.step-num {
-				display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
-				border-radius: 10px; font-weight: 700; color: #04121a; margin-bottom: 0.8rem;
-				background: linear-gradient(135deg, var(--cyan), var(--peri));
-			}
-			.story-step h3 { margin: 0 0 0.4rem; font-size: 1.1rem; }
-			.story-step p { margin: 0; color: var(--muted); font-size: 0.94rem; }
-
-			/* ── Feature spotlights ── */
-			.spot { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 2.5rem; align-items: center; margin-bottom: 3rem; }
-			.spot--rev .spot-copy { order: 2; }
-			.spot--rev .spot-shot { order: 1; }
-			.kicker { font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--cyan); font-weight: 600; }
-			.spot-copy h3 { font-size: clamp(1.3rem, 2.6vw, 1.8rem); margin: 0.5rem 0 0.7rem; letter-spacing: -0.02em; }
-			.spot-copy p { margin: 0; color: var(--muted); font-size: 1rem; max-width: 42ch; }
-			.window-chrome--sm { box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 40px rgba(111, 214, 240, 0.05); }
+				background: rgba(14,16,24,0.92); border: 1px solid var(--panel-border); border-radius: 7px;
+				padding: 0.25rem 0.55rem; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
 			.spot-shot { margin: 0; }
-			.spot-shot.focus-top .window-chrome--sm { max-height: 420px; }
-			.spot-shot.focus-top img { object-fit: cover; object-position: top; max-height: 380px; }
+			.spot-shot--still img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; }
+			.demo-loop { display: block; width: 100%; height: auto; background: var(--bg-soft); }
+			.demo-tag { display: inline-block; margin-top: 0.9rem; font-size: 0.72rem; color: var(--cyan);
+				background: rgba(111,214,240,0.08); border: 1px solid rgba(111,214,240,0.22); padding: 0.2rem 0.6rem; border-radius: 999px; }
 
 			.mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1rem; }
 			.mini { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 1.4rem; }
@@ -796,7 +862,21 @@ const icons = {
 			/* ── Senpai ── */
 			.senpai { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 2.5rem; align-items: center; }
 			.senpai-shot { margin: 0; }
-			.senpai-shot img { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--panel-border); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+			.senpai-card { background: linear-gradient(160deg, rgba(151,172,236,0.09), var(--panel)); border: 1px solid var(--panel-border);
+				border-radius: 16px; padding: 1.4rem 1.5rem; box-shadow: 0 20px 50px rgba(0,0,0,0.45); cursor: pointer;
+				transition: transform 0.2s var(--ease-out), border-color 0.2s ease; }
+			.senpai-card:hover { transform: translateY(-2px); border-color: rgba(111,214,240,0.35); }
+			.senpai-card-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.85rem; }
+			.senpai-orb { display: inline-flex; }
+			.senpai-orb img { width: 34px; height: 34px; animation: senpai-breathe 4s ease-in-out infinite; }
+			@keyframes senpai-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+			.senpai-name { font-weight: 680; }
+			.senpai-mode { margin-left: auto; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cyan);
+				background: rgba(111,214,240,0.08); border: 1px solid rgba(111,214,240,0.25); padding: 0.2rem 0.55rem; border-radius: 999px; }
+			.senpai-line { margin: 0 0 0.9rem; font-size: 1.05rem; line-height: 1.5; min-height: 3.15em; color: var(--text); }
+			.senpai-line.is-typing::after { content: '▍'; color: var(--cyan); animation: caret 1s step-end infinite; }
+			@keyframes caret { 50% { opacity: 0; } }
+			.senpai-hint { font-size: 0.8rem; color: var(--muted); }
 			.senpai-copy h3 { font-size: clamp(1.3rem, 2.6vw, 1.8rem); margin: 0.5rem 0 0.7rem; letter-spacing: -0.02em; }
 			.senpai-copy p { margin: 0 0 1rem; color: var(--muted); }
 			.text-link { font-weight: 600; }
@@ -866,6 +946,23 @@ const icons = {
 			.footer-links a:hover { color: var(--text); text-decoration: none; }
 
 			/* ── Reveal ── */
+			/* Stagger groups */
+			.reveal-group > *:nth-child(2) { transition-delay: var(--stagger); }
+			.reveal-group > *:nth-child(3) { transition-delay: calc(var(--stagger) * 2); }
+			.reveal-group > *:nth-child(4) { transition-delay: calc(var(--stagger) * 3); }
+			.reveal-group > *:nth-child(5) { transition-delay: calc(var(--stagger) * 4); }
+			.reveal-group > *:nth-child(6) { transition-delay: calc(var(--stagger) * 5); }
+			/* Demo panel choreography (default = final; JS arms then plays) */
+			.demo-card .bar { transform-origin: left; }
+			.demo-card.js-anim .demo-row { opacity: 0; transform: translateY(10px); }
+			.demo-card.js-anim .bar { transform: scaleX(0); }
+			.demo-card.js-anim.play .demo-row { opacity: 1; transform: none; transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
+			.demo-card.js-anim.play .demo-row:nth-child(2) { transition-delay: 0.06s; }
+			.demo-card.js-anim.play .demo-row:nth-child(3) { transition-delay: 0.14s; }
+			.demo-card.js-anim.play .demo-row:nth-child(4) { transition-delay: 0.22s; }
+			.demo-card.js-anim.play .demo-row:nth-child(5) { transition-delay: 0.30s; }
+			.demo-card.js-anim.play .bar { transform: scaleX(1); transition: transform 0.7s var(--ease-out) 0.32s; }
+			.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 			.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
 			.reveal.shown { opacity: 1; transform: none; }
 
@@ -892,7 +989,9 @@ const icons = {
 				.reveal { transition: none; }
 				.btn:hover, .card:hover { transform: none; }
 				.chip-float { animation: none; }
-				.spotlight { transition: none; }
+				.spot-region { transition: none; animation: none; }
+				.senpai-orb img { animation: none; }
+				.reveal-group > * { transition-delay: 0ms; }
 			}
 		</style>
 	</body>
