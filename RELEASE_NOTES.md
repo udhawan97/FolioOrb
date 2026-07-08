@@ -1,3 +1,27 @@
+# FolioSenseAI v4.3.4 Release Notes
+
+**Release date:** July 8, 2026
+
+---
+
+## ✦ Quieter Hot Paths
+
+> *v4.3.4 is a performance and hygiene release. No feature changes, no data migration — a handful of targeted fixes to the code that runs most often, so the dashboard stays smooth as portfolios and interactions scale up.*
+
+The v4.3.1–v4.3.3 releases went after scrolling and range-switching. This one tightens the small, high-frequency paths that add up: number formatting that runs on every rendered value, and the correlation heatmap's hover behavior.
+
+**Currency formatting no longer allocates per value.** Every dollar figure on the dashboard — holdings rows, tables, tiles, movers — was built with a freshly constructed `Intl.NumberFormat` on each call. Constructing that object is far more expensive than the formatting itself. The currency formatter (and the two world-market price formatters) are now built once and reused, so rendering a portfolio with many positions does proportionally less work. Output is byte-for-byte identical.
+
+**The correlation heatmap stops rebuilding its canvas on hover.** Moving the mouse across the heatmap re-ran the full draw routine, which reassigned the canvas's pixel dimensions every time — and setting a canvas's width or height reallocates and clears its entire backing store, even when the size hasn't changed. The redraw now only touches the bitmap dimensions when they actually change; the per-frame clear is unchanged, so the picture is identical.
+
+**Hover and resize work is coalesced to one pass per frame.** The heatmap's `mousemove` handler ran a layout read plus a possible redraw on every raw event; it's now throttled to `requestAnimationFrame`, doing at most one pass per frame with the freshest pointer position. The two dashboard-zone indicator handlers, which read and then write layout on every resize event, are throttled the same way.
+
+**Verification:** the full 381-test suite passes, `pylint` holds at 10.00/10, the app boots and renders cleanly, and the currency/market formatters were confirmed to produce identical output after the change. The theme, spacing, typography, and animations are untouched — these changes are internal to how existing work is scheduled, not what is drawn.
+
+No holdings, settings, or `.env` changes are required — installing v4.3.4 over v4.3.3 or earlier keeps everything as-is.
+
+---
+
 # FolioSenseAI v4.3.3 Release Notes
 
 **Release date:** July 8, 2026

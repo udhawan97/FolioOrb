@@ -7,6 +7,26 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v4.3.4 — Quieter Hot Paths
+
+- **Performance release — no feature changes.** Targeted fixes to the code that runs most
+  often, so the dashboard stays smooth as portfolios and interactions scale up. Installing
+  over v4.3.3 or earlier keeps all holdings, settings, and `.env`.
+- **Currency formatting no longer allocates per value** — every dollar figure was built with
+  a freshly constructed `Intl.NumberFormat`, which is far more expensive than the formatting
+  itself. The currency and world-market formatters are now built once and reused. Output is
+  byte-for-byte identical.
+- **The correlation heatmap stops rebuilding its canvas on hover** — the hover redraw was
+  reassigning the canvas's pixel dimensions every time, which reallocates and clears the whole
+  backing store even when the size is unchanged. It now only resizes the bitmap when the
+  dimensions actually change.
+- **Hover and resize work is coalesced to one pass per frame** — the heatmap's `mousemove`
+  handler and the two dashboard-zone indicator resize handlers are throttled to
+  `requestAnimationFrame`, so at most one layout read/redraw runs per frame.
+- **Verified:** the full 381-test suite passes, `pylint` holds at 10.00/10, and the theme,
+  spacing, typography, and animations are untouched — these changes affect only how existing
+  work is scheduled, not what is drawn.
+
 ## v4.3.3 — One Range, Every Section
 
 - **Feature release.** The Overview time-range switcher (Today / 1M / 3M / 6M / 1Y) gains a

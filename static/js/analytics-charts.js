@@ -886,8 +886,25 @@ const AnalyticsCharts = (() => {
         if (tip && tip.parentElement !== document.body) {
             document.body.appendChild(tip);
         }
-        canvas.addEventListener("mousemove", onCorrelationHover);
-        canvas.addEventListener("mouseleave", onCorrelationLeave);
+        // Coalesce mousemove work into one frame: raw mousemove can fire many
+        // times per frame, and each hover pass does a getBoundingClientRect plus
+        // a potential heatmap redraw. rAF-throttling keeps at most one pass per
+        // frame while still using the freshest pointer position.
+        let _hoverRaf = 0;
+        let _lastHoverEvent = null;
+        canvas.addEventListener("mousemove", (event) => {
+            _lastHoverEvent = event;
+            if (_hoverRaf) return;
+            _hoverRaf = requestAnimationFrame(() => {
+                _hoverRaf = 0;
+                if (_lastHoverEvent) onCorrelationHover(_lastHoverEvent);
+            });
+        });
+        canvas.addEventListener("mouseleave", () => {
+            if (_hoverRaf) { cancelAnimationFrame(_hoverRaf); _hoverRaf = 0; }
+            _lastHoverEvent = null;
+            onCorrelationLeave();
+        });
         bindCorrelationScroll();
     }
 
@@ -1019,8 +1036,15 @@ const AnalyticsCharts = (() => {
         plot.style.width = `${gridWidth}px`;
         plot.style.height = `${gridWidth}px`;
 
-        canvas.width = Math.round(gridWidth * dpr);
-        canvas.height = Math.round(gridWidth * dpr);
+        // This function is also the hover-redraw path, where gridWidth is
+        // unchanged. Assigning canvas.width/height reallocates and clears the
+        // whole backing store even when the value is identical, so only touch
+        // the bitmap dimensions when they actually change — the clearRect below
+        // handles the per-frame clear either way.
+        const pxWidth = Math.round(gridWidth * dpr);
+        const pxHeight = Math.round(gridWidth * dpr);
+        if (canvas.width !== pxWidth) canvas.width = pxWidth;
+        if (canvas.height !== pxHeight) canvas.height = pxHeight;
         canvas.style.width = `${gridWidth}px`;
         canvas.style.height = `${gridWidth}px`;
 
