@@ -7,6 +7,27 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v4.3 — FolioSenseAI Goes Desktop
+
+- **One-click desktop installers** — no Python, no terminal. Download a native app for
+  [macOS (Apple Silicon)](https://github.com/udhawan97/FolioSenseAI/releases/latest) or
+  [Windows (x64)](https://github.com/udhawan97/FolioSenseAI/releases/latest) and launch it
+  like any other app. The FastAPI server runs in-process behind a native window
+- **Automated release pipeline** — every tagged release builds, smoke-tests, and publishes
+  the `.dmg` and `.exe` to [GitHub Releases](https://github.com/udhawan97/FolioSenseAI/releases)
+  with a `SHA256SUMS.txt`, so a broken build can never replace a good download
+- **Rolling `latest-main` builds** — every merge to `main` refreshes a prerelease with the
+  newest installers, available under "Development builds" on the site for early testers
+- **Download-first website** — the [landing page](https://udhawan97.github.io/FolioSenseAI/)
+  detects your OS, links straight to the current installer, and shows live release
+  version, date, and checksums
+- **Honest trust story** — early builds aren't code-signed yet, so the
+  [install guides](https://udhawan97.github.io/FolioSenseAI/download/) walk through the
+  expected macOS Gatekeeper / Windows SmartScreen warnings and how to verify your download
+- **Local data stays put** — the installed app keeps your database and `.env` in the
+  per-user data directory (`~/Library/Application Support/FolioSenseAI` on macOS,
+  `%APPDATA%\FolioSenseAI` on Windows), never inside the app bundle
+
 ## v4.2 — Meet Senpai, and Never Get Lost on Day One
 
 - **Senpai** — the dashboard orb formerly known as "dashboard pet" / "Portfolio Butler"
