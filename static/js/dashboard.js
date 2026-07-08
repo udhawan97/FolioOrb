@@ -8397,7 +8397,13 @@ function initDashboardSenpai() {
     modeToggle?.addEventListener("click", (e) => {
         e.stopPropagation();
         if (modeToggle.classList.contains("claude-offline")) {
-            document.getElementById("brand-intro-trigger")?.click();
+            // Route straight to the interactive key-entry panel (paste a key,
+            // "Save & Connect", no restart) instead of the intro callout, which
+            // only points at hand-editing .env and restarting the server.
+            // Close the overflow menu first — it sits above the key panel and
+            // would otherwise cover the input/save button.
+            window.closeNavOverflowMenu?.();
+            document.getElementById("api-key-trigger")?.click();
             return;
         }
         applyForcedLocalMode(!_forcedLocalMode, true);
