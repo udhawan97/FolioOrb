@@ -68,9 +68,9 @@ FolioSenseAI closes that gap: holdings, live prices, risk math, market regime, n
 > **Local Intelligence is not a downgraded mode.** It's the deterministic engine that runs the dashboard by default. Claude adds narration *on top* — it never gates the core experience, and everything it generates is cached in SQLite so refreshing doesn't mean paying again.
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="FolioSenseAI dashboard" width="820">
+  <img src="docs/dashboard.webp" alt="The FolioSenseAI dashboard showing a demo portfolio: total value, today's P&amp;L, sector map, and today's impact" width="820">
   <br>
-  <sub><em>Local dashboard, live market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
+  <sub><em>The real dashboard, running a demo portfolio. Local market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
 </p>
 
 ## Meet Senpai
