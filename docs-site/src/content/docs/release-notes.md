@@ -7,6 +7,25 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v4.3.3 — One Range, Every Section
+
+- **Feature release.** The Overview time-range switcher (Today / 1M / 3M / 6M / 1Y) gains a
+  **1W** option and now drives the sector/movers panel, the portfolio briefing, and the
+  allocation focus read — not just the P&L card. Installing over v4.3.2 or earlier keeps all
+  holdings, settings, and `.env`.
+- **One shared range.** All four sections read from a single selected time range instead of
+  managing their own state, so switching to 3M means Insights, Briefing, Allocation, and
+  P&L all narrate the same three months.
+- **Fixed a real inconsistency** caught during testing: the hero P&L card needed weeks of the
+  app's own usage history to compute longer ranges, so a newer portfolio could show
+  "1M P&L: --" directly above a movers panel already showing a real number for that month
+  from actual market price history. The hero card now falls back to the same price-history
+  calculation so both agree.
+- **Performance:** all five non-day ranges come from one new endpoint in a single request,
+  cached per holdings set so revisiting a range is instant with no network call. Rapid
+  switching never flashes stale data, each section fails independently with its own
+  inline retry, and manual refresh now refreshes range data too.
+
 ## v4.3.2 — Scrolling, Finished
 
 - **Performance release — no feature changes.** Second half of the v4.3.1 scroll fix,

@@ -102,7 +102,7 @@ const SENPAI_MODE_KEY = "foliosense-force-local-mode";
 const LOCAL_INTEL_GUIDE_DISMISS_KEY = "foliosense-local-guide-dismissed";
 const LOCAL_INTEL_GUIDE_TOAST_KEY = "foliosense-local-guide-toast";
 const PERFORMANCE_RANGE_KEY = "foliosense-performance-range";
-const HERO_PNL_RANGE_KEY = "foliosense-hero-pnl-range";
+const DASHBOARD_TIME_RANGE_KEY = "foliosense-hero-pnl-range";
 
 const PERFORMANCE_RANGES = {
     week:       { label: "1W",  days: 7,    marketPeriod: "5d" },
@@ -112,12 +112,44 @@ const PERFORMANCE_RANGES = {
     max:        { label: "Max", days: null, marketPeriod: "max" },
 };
 
-const HERO_PNL_RANGES = {
-    day:        { label: "Today", periodLabel: "Today's P&L", days: null },
-    month:      { label: "1M",    periodLabel: "1M P&L",       days: 30 },
-    threeMonth: { label: "3M",    periodLabel: "3M P&L",       days: 90 },
-    sixMonth:   { label: "6M",    periodLabel: "6M P&L",       days: 180 },
-    year:       { label: "1Y",    periodLabel: "1Y P&L",       days: 365 },
+// Canonical names for the shared dashboard time range (requirement-style enum).
+// Values are the wire/config keys used by DASHBOARD_TIME_RANGES and the API.
+const TIME_RANGE = {
+    TODAY: "day",
+    ONE_WEEK: "week",
+    ONE_MONTH: "month",
+    THREE_MONTHS: "threeMonth",
+    SIX_MONTHS: "sixMonth",
+    ONE_YEAR: "year",
+};
+
+// One shared selected range drives the hero P&L, the snapshot (insights),
+// the allocation focus read, and the portfolio briefing.
+const DASHBOARD_TIME_RANGES = {
+    day: {
+        label: "Today", periodLabel: "Today's P&L", days: null,
+        phrase: "today", impactTitle: "Today’s impact", pnlLabel: "P&L Today",
+    },
+    week: {
+        label: "1W", periodLabel: "1W P&L", days: 7,
+        phrase: "over the past week", impactTitle: "Past week impact", pnlLabel: "P&L · 1W",
+    },
+    month: {
+        label: "1M", periodLabel: "1M P&L", days: 30,
+        phrase: "over the past month", impactTitle: "Past month impact", pnlLabel: "P&L · 1M",
+    },
+    threeMonth: {
+        label: "3M", periodLabel: "3M P&L", days: 90,
+        phrase: "over the past 3 months", impactTitle: "3-month impact", pnlLabel: "P&L · 3M",
+    },
+    sixMonth: {
+        label: "6M", periodLabel: "6M P&L", days: 180,
+        phrase: "over the past 6 months", impactTitle: "6-month impact", pnlLabel: "P&L · 6M",
+    },
+    year: {
+        label: "1Y", periodLabel: "1Y P&L", days: 365,
+        phrase: "over the past year", impactTitle: "Past year impact", pnlLabel: "P&L · 1Y",
+    },
 };
 
 const currentTheme = () =>
@@ -336,74 +368,93 @@ function setPerformanceRange(range) {
     renderCurrentPerformanceChart();
 }
 
-function normalizeHeroPnlRange(range) {
-    return HERO_PNL_RANGES[range] ? range : "day";
+function normalizeTimeRange(range) {
+    return DASHBOARD_TIME_RANGES[range] ? range : TIME_RANGE.TODAY;
 }
 
-function initialHeroPnlRange() {
+function timeRangeConfig(rangeKey = dashboardTimeRange) {
+    return DASHBOARD_TIME_RANGES[normalizeTimeRange(rangeKey)];
+}
+
+function initialTimeRange() {
     try {
-        return normalizeHeroPnlRange(localStorage.getItem(HERO_PNL_RANGE_KEY));
+        return normalizeTimeRange(localStorage.getItem(DASHBOARD_TIME_RANGE_KEY));
     } catch (_) {
-        return "day";
+        return TIME_RANGE.TODAY;
     }
 }
 
 function initHeroPnlRangeControls() {
     const group = document.getElementById("hero-pnl-range-tabs");
     if (!group) return;
-    heroPnlRange = initialHeroPnlRange();
+    dashboardTimeRange = initialTimeRange();
     updateHeroPnlRangeControls();
     group.querySelectorAll("[data-range]").forEach(button => {
-        button.addEventListener("click", () => setHeroPnlRange(button.dataset.range));
+        button.addEventListener("click", () => setDashboardTimeRange(button.dataset.range));
     });
 }
 
 function updateHeroPnlRangeControls() {
     const group = document.getElementById("hero-pnl-range-tabs");
     if (!group) return;
-    group.dataset.activeRange = heroPnlRange;
+    group.dataset.activeRange = dashboardTimeRange;
     group.querySelectorAll("[data-range]").forEach(button => {
-        const isActive = button.dataset.range === heroPnlRange;
+        const isActive = button.dataset.range === dashboardTimeRange;
         button.classList.toggle("is-active", isActive);
         button.setAttribute("aria-pressed", String(isActive));
     });
 }
 
-function setHeroPnlRange(range) {
-    const next = normalizeHeroPnlRange(range);
-    if (next === heroPnlRange) return;
-    heroPnlRange = next;
-    try { localStorage.setItem(HERO_PNL_RANGE_KEY, next); } catch (_) {}
+// Single entry point for range switches: chip state and hero P&L update
+// synchronously; the range-scoped sections refresh from cache or fetch in the
+// background so the switch never blocks the UI.
+function setDashboardTimeRange(range) {
+    const next = normalizeTimeRange(range);
+    if (next === dashboardTimeRange) return;
+    dashboardTimeRange = next;
+    try { localStorage.setItem(DASHBOARD_TIME_RANGE_KEY, next); } catch (_) {}
     updateHeroPnlRangeControls();
     renderHeroPnl();
+    renderSnapshotMovePanel();
+    scheduleAllocationFocusPanelRefresh();
+    loadPortfolioBriefing();
 }
 
-function computeHeroPeriodPnl(history, currentValue, rangeKey = heroPnlRange) {
-    const config = HERO_PNL_RANGES[normalizeHeroPnlRange(rangeKey)];
+// Primary source is the app's own daily snapshot history (true portfolio
+// value change, correct even across share-count changes). A fresh portfolio
+// won't have a week/month of snapshots yet, so this falls back to the same
+// price-return range data the insights panel uses — otherwise the hero card
+// would show "--" right above a panel already showing real numbers for the
+// identical range.
+function computeHeroPeriodPnl(history, currentValue, rangeKey = dashboardTimeRange) {
+    const config = timeRangeConfig(rangeKey);
     if (!config?.days) return null;
 
     const rows = (history || []).filter(row => row?.date && row.total_value != null);
-    if (!rows.length || !isFiniteNumber(currentValue)) return null;
+    if (rows.length && isFiniteNumber(currentValue)) {
+        const endValue = Number(currentValue);
+        const lastDate = new Date(`${rows[rows.length - 1].date}T12:00:00`);
+        const cutoff = new Date(lastDate);
+        cutoff.setDate(cutoff.getDate() - config.days);
+        const startRow = rows.find(row => new Date(`${row.date}T12:00:00`) >= cutoff) || rows[0];
+        const startValue = Number(startRow.total_value);
+        if (startValue > 0) {
+            const change = endValue - startValue;
+            return { change, pct: (change / startValue) * 100 };
+        }
+    }
 
-    const endValue = Number(currentValue);
-    const lastDate = new Date(`${rows[rows.length - 1].date}T12:00:00`);
-    const cutoff = new Date(lastDate);
-    cutoff.setDate(cutoff.getDate() - config.days);
-    const startRow = rows.find(row => new Date(`${row.date}T12:00:00`) >= cutoff) || rows[0];
-    const startValue = Number(startRow.total_value);
-    if (startValue <= 0) return null;
-
-    const change = endValue - startValue;
-    return {
-        change,
-        pct: (change / startValue) * 100,
-    };
+    const group = rangePerfGroup(rangeKey);
+    if (group && isFiniteNumber(group.net_change) && isFiniteNumber(group.net_change_pct)) {
+        return { change: group.net_change, pct: group.net_change_pct };
+    }
+    return null;
 }
 
 function renderHeroPnlLabel() {
     const labelEl = document.getElementById("hero-pnl-label");
     if (!labelEl) return;
-    const config = HERO_PNL_RANGES[normalizeHeroPnlRange(heroPnlRange)];
+    const config = timeRangeConfig();
     const tipBtn = labelEl.querySelector(".tip-trigger");
     labelEl.childNodes.forEach(node => {
         if (node.nodeType === Node.TEXT_NODE) node.remove();
@@ -425,11 +476,11 @@ function renderHeroPnl(data = latestPortfolioValueData) {
     let change = null;
     let pct = null;
 
-    if (heroPnlRange === "day") {
+    if (dashboardTimeRange === TIME_RANGE.TODAY) {
         change = isFiniteNumber(data.total_daily_change) ? Number(data.total_daily_change) : null;
         pct = isFiniteNumber(data.total_daily_change_pct) ? Number(data.total_daily_change_pct) : null;
     } else {
-        const period = computeHeroPeriodPnl(latestPnlHistory, data.total_value, heroPnlRange);
+        const period = computeHeroPeriodPnl(latestPnlHistory, data.total_value, dashboardTimeRange);
         if (period) {
             change = period.change;
             pct = period.pct;
@@ -583,8 +634,16 @@ let holdingsViewFilter = "all"; // "all" | "portfolio" | "research"
 let allocationTotal = 0;     // Portfolio total, drawn in the doughnut's center
 let latestPortfolioDailyChange = null; // Backend total, used to validate allocation impact math
 let latestPortfolioValueData = null;
-let heroPnlRange = "day";
+// Shared selected range for hero P&L, snapshot, allocation read, briefing.
+// Initialized from localStorage up front so the cache-hydration paint (which
+// runs before control wiring) already renders the persisted range.
+let dashboardTimeRange = initialTimeRange();
 let _hasLoadedOnce = false;  // True after first successful data load
+
+// Per-holding change across all non-day ranges, from /api/portfolio/range-performance.
+// One response covers every range, so rapid range switching re-renders from
+// this cache without refetching. Invalidated when the holdings set changes.
+const _rangePerf = { data: null, promise: null, signature: null, error: false };
 
 // Doughnut center hover / selection state
 let hoveredCenterLabel = null;
@@ -1360,6 +1419,94 @@ function allocationImpactForHolding(holding) {
         : 0;
 }
 
+// ── Shared range-performance data (per-holding change for 1W…1Y) ─────────────
+
+function holdingsRangeSignature() {
+    return latestHoldings
+        .filter(h => !h.is_watchlist)
+        .map(h => `${h.ticker}:${h.shares}`)
+        .sort()
+        .join("|");
+}
+
+// Cached rows for one range, or null when not loaded / holdings changed.
+function rangePerfGroup(rangeKey = dashboardTimeRange) {
+    if (rangeKey === TIME_RANGE.TODAY) return null;
+    if (!_rangePerf.data || _rangePerf.signature !== holdingsRangeSignature()) return null;
+    return _rangePerf.data.ranges?.[rangeKey] || null;
+}
+
+// Fetch range performance for all non-day ranges at once. Deduped while in
+// flight; a signature mismatch (holdings edited mid-flight) drops the result.
+function ensureRangePerformance() {
+    const signature = holdingsRangeSignature();
+    if (_rangePerf.data && _rangePerf.signature === signature) {
+        return Promise.resolve(_rangePerf.data);
+    }
+    if (_rangePerf.promise && _rangePerf.signature === signature) {
+        return _rangePerf.promise;
+    }
+    _rangePerf.signature = signature;
+    _rangePerf.data = null;
+    _rangePerf.error = false;
+    _rangePerf.promise = fetch("/api/portfolio/range-performance")
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            if (_rangePerf.signature === signature) {
+                _rangePerf.data = data;
+                _rangePerf.promise = null;
+            }
+            return data;
+        })
+        .catch(err => {
+            if (_rangePerf.signature === signature) {
+                _rangePerf.promise = null;
+                _rangePerf.error = true;
+            }
+            throw err;
+        });
+    return _rangePerf.promise;
+}
+
+// Manual "Refresh" should actually refresh range data too, not just quotes —
+// invalidate the client cache (a plain signature match would otherwise skip
+// refetching indefinitely) and re-render the range-scoped sections once the
+// new data lands.
+function refreshRangePerformanceIfActive() {
+    if (dashboardTimeRange === TIME_RANGE.TODAY) return Promise.resolve();
+    _rangePerf.signature = null;
+    const requestedRange = dashboardTimeRange;
+    return ensureRangePerformance()
+        .then(() => {
+            if (dashboardTimeRange !== requestedRange) return;
+            renderHeroPnl();
+            renderSnapshotMovePanel();
+            scheduleAllocationFocusPanelRefresh();
+        })
+        .catch(() => {
+            if (dashboardTimeRange === requestedRange) renderSnapshotMovesPending(true);
+        });
+}
+
+// {pct, value} change for one holding over the selected range.
+// Day reads the live quote fields; other ranges read the cached range data.
+function holdingRangeChange(holding, rangeKey = dashboardTimeRange) {
+    if (normalizeTimeRange(rangeKey) === TIME_RANGE.TODAY) {
+        return {
+            pct: isFiniteNumber(holding?.day_change_pct) ? Number(holding.day_change_pct) : null,
+            value: allocationImpactForHolding(holding),
+        };
+    }
+    const row = rangePerfGroup(rangeKey)?.holdings?.[holding?.ticker];
+    return {
+        pct: isFiniteNumber(row?.change_pct) ? Number(row.change_pct) : null,
+        value: isFiniteNumber(row?.value_change) ? Number(row.value_change) : null,
+    };
+}
+
 function validateAllocationHoldingMath(holding, impactToday) {
     const warnings = [];
     const hasSharesMove = isFiniteNumber(holding?.shares) && isFiniteNumber(holding?.day_change);
@@ -1402,19 +1549,30 @@ function allocationTooltipMetrics(ticker, value) {
         .findIndex(h => h.ticker === ticker) + 1;
     const equalWeightValue = allocationTotal / holdingsCount;
     const equalWeightDrift = toNumber(value) - equalWeightValue;
-    const impactToday = allocationImpactForHolding(holding);
+    // Day keeps the exact live-quote math (and its validation); longer ranges
+    // read the shared range data, where a holding without history counts as 0.
+    const isDayRange = dashboardTimeRange === TIME_RANGE.TODAY;
+    const impactOf = isDayRange
+        ? allocationImpactForHolding
+        : (h) => {
+            const rangeValue = holdingRangeChange(h).value;
+            return Number.isFinite(rangeValue) ? rangeValue : 0;
+        };
+    const impactToday = impactOf(holding);
     const portfolioImpactToday = portfolioHoldings.reduce(
-        (sum, h) => sum + allocationImpactForHolding(h),
+        (sum, h) => sum + impactOf(h),
         0
     );
     const grossPortfolioMove = portfolioHoldings.reduce(
-        (sum, h) => sum + Math.abs(allocationImpactForHolding(h)),
+        (sum, h) => sum + Math.abs(impactOf(h)),
         0
     );
-    const mathWarnings = [
-        ...validateAllocationHoldingMath(holding, impactToday),
-        ...validateAllocationPortfolioMath(portfolioImpactToday, grossPortfolioMove, holdingsCount),
-    ];
+    const mathWarnings = isDayRange
+        ? [
+            ...validateAllocationHoldingMath(holding, impactToday),
+            ...validateAllocationPortfolioMath(portfolioImpactToday, grossPortfolioMove, holdingsCount),
+        ]
+        : [];
     if (mathWarnings.length) {
         console.warn("Allocation tooltip math validation failed", {
             ticker,
@@ -1501,9 +1659,15 @@ function allocationExternalTooltip({ chart, tooltip }) {
     const concentrationNote = metrics.equalWeightDrift >= 0
         ? `${formatCurrency(Math.abs(metrics.equalWeightDrift))} more than an even split`
         : `${formatCurrency(Math.abs(metrics.equalWeightDrift))} less than an even split`;
+    const isDayRange = dashboardTimeRange === TIME_RANGE.TODAY;
+    const rangePhrase = timeRangeConfig().phrase;
     const todayNote = metrics.shareOfMove !== null
-        ? `${metrics.shareOfMove.toFixed(0)}% of today's absolute move`
-        : "Its dollar effect on today's portfolio move";
+        ? (isDayRange
+            ? `${metrics.shareOfMove.toFixed(0)}% of today's absolute move`
+            : `${metrics.shareOfMove.toFixed(0)}% of the absolute move ${rangePhrase}`)
+        : (isDayRange
+            ? "Its dollar effect on today's portfolio move"
+            : `Its dollar effect on the portfolio ${rangePhrase}`);
 
     popover.innerHTML = `
         <div class="alloc-popover-hero">
@@ -1517,7 +1681,7 @@ function allocationExternalTooltip({ chart, tooltip }) {
         </div>
         <div class="alloc-popover-rows">
             ${allocationInsightRow("How much rides on this?", `${metrics.weightPct.toFixed(1)}% · #${metrics.rank}`, concentrationNote, concentrationTone)}
-            ${allocationInsightRow("Did it drive today?", formatSignedCurrency(metrics.impactToday), todayNote, impactTone)}
+            ${allocationInsightRow(isDayRange ? "Did it drive today?" : `Did it drive the ${timeRangeConfig().label} move?`, formatSignedCurrency(metrics.impactToday), todayNote, impactTone)}
             ${allocationInsightRow("What if it drops 10%?", formatSignedCurrency(metrics.stressValue), `${Math.abs(metrics.stressPct).toFixed(1)}% hit to the whole portfolio`, "is-negative")}
         </div>
     `;
@@ -1588,6 +1752,21 @@ function allocationFocusWhatItIs(holding, intel) {
 }
 
 function allocationFocusMoveCopy(holding, metrics, explanation) {
+    // Move explainers are day-scoped; longer ranges get a deterministic
+    // period read from the shared range data instead.
+    if (dashboardTimeRange !== TIME_RANGE.TODAY) {
+        const config = timeRangeConfig();
+        const rangeChange = holdingRangeChange(holding);
+        if (!isFiniteNumber(rangeChange.pct)) {
+            return `Not enough price history to read this holding ${config.phrase} yet.`;
+        }
+        const direction = rangeChange.pct >= 0 ? "up" : "down";
+        const impact = isFiniteNumber(rangeChange.value)
+            ? `, ${formatSignedCurrency(rangeChange.value)} for your position`
+            : "";
+        return `${holding.ticker} is ${direction} ${Math.abs(rangeChange.pct).toFixed(2)}% ${config.phrase}${impact}.`;
+    }
+
     if (explanation?.explanation_text) {
         return allocationFocusShortText(explanation.explanation_text, 158);
     }
@@ -1730,11 +1909,12 @@ function renderAllocationFocusPanel(ticker = null, sorted = null, options = {}) 
     const safeVerdict = verdict ? (_sanitizeVerdict(verdict) || verdict) : null;
     const verdictHtml = allocationFocusVerdictCopy(safeVerdict, activeTicker).html;
     const trend = allocationFocusTrendMeta(activeTicker, holding, safeVerdict);
-    const dayTone = isFiniteNumber(holding.day_change_pct)
-        ? colorClass(Number(holding.day_change_pct))
+    const rangeChange = holdingRangeChange(holding);
+    const dayTone = isFiniteNumber(rangeChange.pct)
+        ? colorClass(Number(rangeChange.pct))
         : "text-secondary";
-    const dayText = isFiniteNumber(holding.day_change_pct)
-        ? formatPct(holding.day_change_pct)
+    const dayText = isFiniteNumber(rangeChange.pct)
+        ? formatPct(rangeChange.pct)
         : "—";
     const returnPct = isFiniteNumber(holding.unrealized_gain_pct)
         ? Number(holding.unrealized_gain_pct)
@@ -1761,7 +1941,7 @@ function renderAllocationFocusPanel(ticker = null, sorted = null, options = {}) 
                 <p class="alloc-focus-sub">${escapeHtml(formatCurrency(holding.current_value))} · ${escapeHtml(formatAllocationPct(holding.allocation_pct))} of portfolio · ${escapeHtml(concentrationNote)}</p>
             </div>
             <div class="alloc-focus-day">
-                <span>Today</span>
+                <span>${escapeHtml(timeRangeConfig().label)}</span>
                 <strong class="${dayTone}">${escapeHtml(dayText)}</strong>
             </div>
         </div>
@@ -1976,13 +2156,16 @@ function snapshotActiveHoldings() {
 
 function snapshotMoveRows(active) {
     return active
-        .map(h => ({
-            ticker: h.ticker,
-            name: h.name || h.ticker,
-            allocation_pct: toNumber(h.allocation_pct),
-            day_change_pct: isFiniteNumber(h.day_change_pct) ? Number(h.day_change_pct) : null,
-            impact: allocationImpactForHolding(h),
-        }))
+        .map(h => {
+            const change = holdingRangeChange(h);
+            return {
+                ticker: h.ticker,
+                name: h.name || h.ticker,
+                allocation_pct: toNumber(h.allocation_pct),
+                change_pct: change.pct,
+                impact: change.value,
+            };
+        })
         .filter(r => Number.isFinite(r.impact))
         .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact));
 }
@@ -2113,7 +2296,8 @@ function snapshotAiRead(rows, net, pct) {
         ? `${top.ticker} is the largest ${top.impact >= 0 ? "push" : "drag"}`
         : "moves are muted";
     const pctCopy = Number.isFinite(pct) ? ` (${formatPct(pct)})` : "";
-    return `Likely to go ${direction} near-term: net today is ${formatSignedCurrency(net)}${pctCopy}, ${breadth}, and ${mover}.`;
+    const phrase = timeRangeConfig().phrase;
+    return `Likely to go ${direction} near-term: net ${phrase} is ${formatSignedCurrency(net)}${pctCopy}, ${breadth}, and ${mover}.`;
 }
 
 function snapshotLocalCatalysts(rows, sectors) {
@@ -2122,19 +2306,20 @@ function snapshotLocalCatalysts(rows, sectors) {
     const loss = rows.find(r => r.impact < 0);
     const topSector = sectors?.[0];
     const net = rows.reduce((sum, r) => sum + r.impact, 0);
+    const phrase = timeRangeConfig().phrase;
 
     if (gain) {
         catalysts.push({
             icon: "bi-arrow-up-right",
             tone: "positive",
-            text: `${gain.ticker} led gains at ${formatOptionalPct(gain.day_change_pct)} (${formatSignedCurrency(gain.impact)})`,
+            text: `${gain.ticker} led gains ${phrase} at ${formatOptionalPct(gain.change_pct)} (${formatSignedCurrency(gain.impact)})`,
         });
     }
     if (loss) {
         catalysts.push({
             icon: "bi-arrow-down-right",
             tone: "negative",
-            text: `${loss.ticker} was the main drag at ${formatOptionalPct(loss.day_change_pct)} (${formatSignedCurrency(loss.impact)})`,
+            text: `${loss.ticker} was the main drag at ${formatOptionalPct(loss.change_pct)} (${formatSignedCurrency(loss.impact)})`,
         });
     }
     if (topSector) {
@@ -2193,11 +2378,59 @@ function renderSnapshotIntel(rows, net, pct) {
         </div>`).join("");
 }
 
+// Loading / error pill scoped to the move panel only — sector map, briefing,
+// and the rest of the dashboard stay untouched while range data streams in.
+function renderSnapshotMovesPending(failed = false) {
+    const summary = document.getElementById("snapshot-move-summary");
+    const stack = document.getElementById("snapshot-move-stack");
+    const list = document.getElementById("snapshot-mover-list");
+    const intel = document.getElementById("snapshot-intel-lines");
+    if (!summary) return;
+    summary.innerHTML = `<span class="snapshot-loading-pill">
+        <i class="bi ${failed ? "bi-exclamation-circle" : "bi-hourglass-split"}" aria-hidden="true"></i>
+        ${failed ? "Range data unavailable — refresh to retry" : `Loading ${escapeHtml(timeRangeConfig().label)} moves`}
+    </span>`;
+    if (stack) stack.innerHTML = "";
+    if (list) list.innerHTML = "";
+    if (intel) intel.innerHTML = "";
+}
+
+function renderSnapshotMoveTitle() {
+    const title = document.getElementById("snapshot-move-title");
+    if (title) title.textContent = timeRangeConfig().impactTitle;
+}
+
 function renderSnapshotMoves(active) {
     const summary = document.getElementById("snapshot-move-summary");
     const stack = document.getElementById("snapshot-move-stack");
     const list = document.getElementById("snapshot-mover-list");
     if (!summary || !stack || !list) return;
+
+    const config = timeRangeConfig();
+    renderSnapshotMoveTitle();
+
+    const isDay = dashboardTimeRange === TIME_RANGE.TODAY;
+    const group = isDay ? null : rangePerfGroup();
+    if (!isDay && !group && active.length) {
+        // Range data not cached yet — show a panel-scoped pill and re-render
+        // when the (single, all-ranges) fetch lands, unless the user has
+        // already switched again. Always attempts the fetch (even after a
+        // prior failure) so switching ranges again after an outage acts as
+        // an implicit retry instead of leaving the pill stuck forever.
+        const requestedRange = dashboardTimeRange;
+        renderSnapshotMovesPending(_rangePerf.error);
+        ensureRangePerformance()
+            .then(() => {
+                if (dashboardTimeRange !== requestedRange) return;
+                renderHeroPnl();
+                renderSnapshotMovePanel();
+                scheduleAllocationFocusPanelRefresh();
+            })
+            .catch(() => {
+                if (dashboardTimeRange === requestedRange) renderSnapshotMovesPending(true);
+            });
+        return;
+    }
 
     const rows = snapshotMoveRows(active);
     const gains = rows.filter(r => r.impact > 0);
@@ -2205,9 +2438,12 @@ function renderSnapshotMoves(active) {
     const grossGain = gains.reduce((sum, r) => sum + r.impact, 0);
     const grossLoss = losses.reduce((sum, r) => sum + Math.abs(r.impact), 0);
     const net = rows.reduce((sum, r) => sum + r.impact, 0);
-    const pct = latestPortfolioValueData && isFiniteNumber(latestPortfolioValueData.total_daily_change_pct)
+    const dayPct = latestPortfolioValueData && isFiniteNumber(latestPortfolioValueData.total_daily_change_pct)
         ? Number(latestPortfolioValueData.total_daily_change_pct)
         : null;
+    const pct = isDay
+        ? dayPct
+        : (isFiniteNumber(group?.net_change_pct) ? Number(group.net_change_pct) : null);
     const totalAbs = grossGain + grossLoss;
     const gainShare = totalAbs > 0 ? (grossGain / totalAbs) * 100 : 50;
     const lossShare = totalAbs > 0 ? (grossLoss / totalAbs) * 100 : 50;
@@ -2221,8 +2457,14 @@ function renderSnapshotMoves(active) {
         return;
     }
 
+    if (!rows.length && !isDay) {
+        // Range data arrived but had no usable history (e.g. brand-new tickers)
+        renderSnapshotMovesPending(true);
+        return;
+    }
+
     summary.innerHTML = `<div class="snapshot-net is-${tone}">
-        <span class="snapshot-net-label">P&amp;L Today</span>
+        <span class="snapshot-net-label">${escapeHtml(config.pnlLabel)}</span>
         <strong>${formatSignedCurrency(net)}</strong>
         ${pct !== null ? `<span class="snapshot-net-pct">${formatPct(pct)}</span>` : ""}
     </div>
@@ -2261,7 +2503,7 @@ function renderSnapshotMoves(active) {
         const rightFill = isPos ? `<span class="snapshot-mover-fill" style="width:${fillW}%"></span>` : "";
         return `<div class="snapshot-mover-row is-${rowTone}" style="--snapshot-delay:${index * 35}ms">
             <span class="snapshot-mover-ticker">${escapeHtml(r.ticker)}</span>
-            <span class="snapshot-mover-pct">${formatOptionalPct(r.day_change_pct)}</span>
+            <span class="snapshot-mover-pct">${formatOptionalPct(r.change_pct)}</span>
             <span class="snapshot-mover-track" aria-hidden="true">
                 <span class="snapshot-mover-left">${leftFill}</span>
                 <span class="snapshot-mover-axis"></span>
@@ -2272,6 +2514,13 @@ function renderSnapshotMoves(active) {
     }).join("");
 
     renderSnapshotIntel(rows, net, pct);
+}
+
+// Move panel only — used on range switches so the sector map (which is
+// range-independent) doesn't re-render and replay its entry animations.
+function renderSnapshotMovePanel() {
+    if (!document.getElementById("portfolio-snapshot-card")) return;
+    renderSnapshotMoves(snapshotActiveHoldings());
 }
 
 function renderPortfolioSnapshot() {
@@ -2724,8 +2973,9 @@ function setDashboardZone(zone, opts = {}) {
         requestAnimationFrame(() => {
             if (allocationChart) { allocationChart.resize(); allocationChart.update("none"); }
         });
-        // Load briefing on first Overview visit if not already done
-        if (!_cachedBriefing.ai && !_cachedBriefing.local && !_briefingLoading) {
+        // Load briefing on first Overview visit if not already done for the
+        // current time range (loadPortfolioBriefing dedupes in-flight fetches)
+        if (!_cachedBriefing[_briefingCacheKey("ai")] && !_cachedBriefing[_briefingCacheKey("local")]) {
             loadPortfolioBriefing();
         }
     } else {
@@ -8395,6 +8645,7 @@ function refreshDashboardData({
     const jobs = [
         loadPortfolioValue(),
         loadPnl(),
+        refreshRangePerformanceIfActive(),
     ];
     if (includeManageHoldings && isPortfolioManagerOpen()) {
         jobs.push(loadManageHoldings({ preserveExisting: true }));
@@ -8796,12 +9047,25 @@ document.addEventListener("keydown", (e) => {
 
 // ── Portfolio Briefing ────────────────────────────────────────────────────────
 
-const _cachedBriefing = { ai: null, local: null };
+// Briefings cached per mode AND time range ("local:day", "ai:week", …) so a
+// range the user already visited re-renders instantly with the right content.
+const _cachedBriefing = {};
+const _briefingPending = new Set();  // keys with a fetch in flight (dedupe)
 let _briefingActiveMode = null;  // current mode shown in card
-let _briefingLoading = false;
+
+function _briefingCacheKey(mode, rangeKey = dashboardTimeRange) {
+    return `${mode}:${normalizeTimeRange(rangeKey)}`;
+}
 
 function _briefingDefaultMode() {
     return isLocalIntelligenceMode() ? "local" : "ai";
+}
+
+// Range-aware movers divider label ("Today's Movers", "Movers · 1W", …).
+function _briefingMoversLabel() {
+    return dashboardTimeRange === TIME_RANGE.TODAY
+        ? "Today's Movers"
+        : `Movers · ${timeRangeConfig().label}`;
 }
 
 function _briefingSyncSegControl(mode, claudeOffline) {
@@ -8900,7 +9164,11 @@ function _briefingRenderLeadBlock(text, mode) {
     const sentiment = _briefingLeadSentiment(text);
     const isAi = mode === "ai";
     const eyebrowIcon = isAi ? "bi-stars" : "bi-cpu-fill";
-    const eyebrowLabel = isAi ? "Portfolio health" : "Today's read";
+    const eyebrowLabel = isAi
+        ? "Portfolio health"
+        : (dashboardTimeRange === TIME_RANGE.TODAY
+            ? "Today's read"
+            : `${timeRangeConfig().label} read`);
     const modeClass = isAi ? "is-ai" : "is-local";
 
     return `<div class="briefing-lead-block ${modeClass} is-sentiment-${sentiment}">
@@ -8972,7 +9240,7 @@ function _briefingRenderAi(data) {
         <div class="briefing-divider briefing-divider--movers">
             <span class="briefing-divider-label">
                 <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
-                Today's Movers
+                ${escapeHtml(_briefingMoversLabel())}
             </span>
         </div>
         <div class="briefing-driver-list">${driverItems}</div>` : "";
@@ -9032,7 +9300,7 @@ function _briefingRenderLocal(data) {
         <div class="briefing-divider briefing-divider--movers">
             <span class="briefing-divider-label">
                 <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
-                Today's Movers
+                ${escapeHtml(_briefingMoversLabel())}
             </span>
         </div>
         <div class="briefing-mover-grid">${moverRows}</div>` : "";
@@ -9046,8 +9314,6 @@ function _briefingRenderLocal(data) {
 }
 
 async function loadPortfolioBriefing(mode, forceRefresh = false) {
-    if (_briefingLoading && !forceRefresh) return;
-
     const claudeOffline = _isClaudeApiLive === false;
     if (mode === null || mode === undefined) {
         mode = _briefingDefaultMode();
@@ -9057,37 +9323,51 @@ async function loadPortfolioBriefing(mode, forceRefresh = false) {
     _briefingActiveMode = mode;
     _briefingSyncSegControl(mode, claudeOffline);
 
+    const rangeKey = normalizeTimeRange(dashboardTimeRange);
+    const cacheKey = _briefingCacheKey(mode, rangeKey);
+
     // Instant render from cache if available and not forced
-    if (_cachedBriefing[mode] && !forceRefresh) {
+    if (_cachedBriefing[cacheKey] && !forceRefresh) {
         _briefingShowSkeleton(false);
-        mode === "ai" ? _briefingRenderAi(_cachedBriefing[mode])
-                      : _briefingRenderLocal(_cachedBriefing[mode]);
+        mode === "ai" ? _briefingRenderAi(_cachedBriefing[cacheKey])
+                      : _briefingRenderLocal(_cachedBriefing[cacheKey]);
         return;
     }
 
-    _briefingLoading = true;
+    // Dedupe identical requests; different mode/range requests may overlap
+    // (rapid range switching) — only the one matching the current selection
+    // renders when it lands.
+    if (_briefingPending.has(cacheKey) && !forceRefresh) return;
+    _briefingPending.add(cacheKey);
     _briefingShowSkeleton(true);
 
     const refreshBtn = document.getElementById("briefing-refresh-btn");
     refreshBtn?.classList.add("is-spinning");
 
+    const isCurrent = () =>
+        _briefingActiveMode === mode && normalizeTimeRange(dashboardTimeRange) === rangeKey;
+
     try {
-        const params = new URLSearchParams({ mode });
+        const params = new URLSearchParams({ mode, range: rangeKey });
         if (forceRefresh) params.set("force_refresh", "true");
         const res = await fetch(`/api/ai/portfolio-summary?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        _cachedBriefing[mode] = data;
-        _briefingShowSkeleton(false);
-        mode === "ai" ? _briefingRenderAi(data) : _briefingRenderLocal(data);
+        _cachedBriefing[cacheKey] = data;
+        if (isCurrent()) {
+            _briefingShowSkeleton(false);
+            mode === "ai" ? _briefingRenderAi(data) : _briefingRenderLocal(data);
+        }
     } catch (err) {
         console.warn("Portfolio briefing fetch failed:", err);
-        _briefingShowSkeleton(false);
-        const ct = document.getElementById("briefing-content");
-        if (ct) ct.innerHTML = `<span class="briefing-error">Briefing unavailable — refresh to retry.</span>`;
+        if (isCurrent()) {
+            _briefingShowSkeleton(false);
+            const ct = document.getElementById("briefing-content");
+            if (ct) ct.innerHTML = `<span class="briefing-error">Briefing unavailable — refresh to retry.</span>`;
+        }
     } finally {
-        _briefingLoading = false;
+        _briefingPending.delete(cacheKey);
         refreshBtn?.classList.remove("is-spinning");
     }
 }

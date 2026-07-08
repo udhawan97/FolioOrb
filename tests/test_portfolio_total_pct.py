@@ -342,3 +342,41 @@ def test_delete_realized_trade_adjusts_realized_total_and_today_snapshot(monkeyp
     assert after["realized_gain"] == 0.0
     assert after["trades"] == []
     assert snap.realized_gain == 0.0
+
+
+def test_range_performance_excludes_watchlist_and_inactive(monkeypatch):
+    db = make_db()
+    add_holding(db, "AAPL", shares=10, avg_cost=100)
+    add_holding(db, "OLD", shares=5, avg_cost=50, is_active=False)
+    db.add(Holding(
+        portfolio_id=1, ticker="WATCH", shares=0, avg_cost=0,
+        is_active=True, is_watchlist=True,
+    ))
+    db.commit()
+
+    seen_tickers = []
+
+    def fake_history(tickers, **_kwargs):
+        seen_tickers.extend(tickers)
+        closes = [100.0 + i for i in range(30)]
+        return {t: closes for t in tickers}
+
+    monkeypatch.setattr(
+        "app.services.portfolio_analytics.get_batched_history_closes",
+        fake_history,
+    )
+
+    result = asyncio.run(portfolio_router.get_portfolio_range_performance(db=db))
+
+    assert seen_tickers == ["AAPL"], "inactive and watchlist holdings must not be fetched"
+    assert "AAPL" in result["ranges"]["week"]["holdings"]
+    assert set(result["ranges"].keys()) == {"week", "month", "threeMonth", "sixMonth", "year"}
+
+
+def test_range_performance_404_for_unknown_portfolio():
+    db = make_empty_db()
+    try:
+        asyncio.run(portfolio_router.get_portfolio_range_performance(portfolio_id=999, db=db))
+        assert False, "expected HTTPException for unknown portfolio"
+    except HTTPException as exc:
+        assert exc.status_code == 404

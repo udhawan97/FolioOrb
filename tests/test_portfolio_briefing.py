@@ -314,6 +314,116 @@ def test_unknown_mode_defaults_to_ai(monkeypatch):
     assert result["mode"] == "ai"
 
 
+# ── Tests — range-aware briefing (1W … 1Y) ─────────────────────────────────────
+
+def _patch_range_history(monkeypatch):
+    """300 trading days of $1/day linear growth for every requested ticker."""
+    closes = [100.0 + i for i in range(300)]
+    monkeypatch.setattr(
+        "app.services.portfolio_analytics.get_batched_history_closes",
+        lambda tickers, period="1y": {t: list(closes) for t in tickers},
+    )
+
+
+class TestRangeBriefing:
+    def test_local_week_uses_period_movers(self, monkeypatch):
+        db = _make_db()
+        _patch_portfolio_compute(monkeypatch)
+        _patch_market_regime(monkeypatch)
+        _patch_quotes(monkeypatch)
+        _patch_explain_move(monkeypatch)
+        _patch_range_history(monkeypatch)
+
+        result = asyncio.run(
+            ai_router.get_portfolio_summary(mode="local", time_range="week", db=db)
+        )
+        assert result["mode"] == "local"
+        assert result["period_label"] == "over the past week"
+        assert "past week" in result["lead"]
+        aapl = next(m for m in result["movers"] if m["ticker"] == "AAPL")
+        # 10 shares × 5 trading days × $1/day — period change, not day change
+        assert aapl["day_change_dollar"] == 50.0
+        assert aapl["explanation"] == ""
+
+    def test_ai_week_caches_separately_from_day(self, monkeypatch):
+        db = _make_db()
+        _patch_portfolio_compute(monkeypatch)
+        _patch_market_regime(monkeypatch)
+        _patch_range_history(monkeypatch)
+
+        call_count = []
+
+        def fake_generate(_snapshot):
+            call_count.append(1)
+            return _BRIEFING_AI_RESPONSE.copy()
+
+        monkeypatch.setattr(ai_router, "generate_portfolio_briefing", fake_generate)
+
+        asyncio.run(ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db))
+        asyncio.run(ai_router.get_portfolio_summary(mode="ai", time_range="day", db=db))
+        assert len(call_count) == 2, "day and week must not share a cache entry"
+
+        result = asyncio.run(
+            ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db)
+        )
+        assert len(call_count) == 2, "second week call should hit the week cache"
+        assert result.get("from_cache") is True
+
+        from app.models import AISummary
+        types = {row.summary_type for row in db.query(AISummary).all()}
+        assert {"briefing", "briefing_week"} <= types
+
+    def test_ai_week_snapshot_is_period_scoped(self, monkeypatch):
+        db = _make_db()
+        _patch_portfolio_compute(monkeypatch)
+        _patch_market_regime(monkeypatch)
+        _patch_range_history(monkeypatch)
+
+        seen = {}
+
+        def fake_generate(snapshot):
+            seen.update(snapshot)
+            return _BRIEFING_AI_RESPONSE.copy()
+
+        monkeypatch.setattr(ai_router, "generate_portfolio_briefing", fake_generate)
+
+        asyncio.run(ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db))
+        assert seen["period_label"] == "over the past week"
+        assert "period_pl" in seen
+        assert "best_period" in seen
+        assert "today_pl" not in seen
+        assert "best_today" not in seen
+
+    def test_unknown_range_defaults_to_day(self, monkeypatch):
+        db = _make_db()
+        _patch_portfolio_compute(monkeypatch)
+        _patch_market_regime(monkeypatch)
+        _patch_quotes(monkeypatch)
+        _patch_explain_move(monkeypatch)
+
+        result = asyncio.run(
+            ai_router.get_portfolio_summary(mode="local", time_range="bogus", db=db)
+        )
+        assert "period_label" not in result, "unknown range must use the day payload"
+
+    def test_fallback_uses_period_phrase(self, monkeypatch):
+        db = _make_db()
+        _patch_portfolio_compute(monkeypatch)
+        _patch_market_regime(monkeypatch)
+        _patch_range_history(monkeypatch)
+        monkeypatch.setattr(
+            ai_router,
+            "generate_portfolio_briefing",
+            lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
+        )
+
+        result = asyncio.run(
+            ai_router.get_portfolio_summary(mode="ai", time_range="month", db=db)
+        )
+        assert result["source"] == "local-fallback"
+        assert "over the past month" in result["health"]
+
+
 # ── Tests — generate_portfolio_briefing unit ──────────────────────────────────
 
 class TestGeneratePortfolioBriefing:

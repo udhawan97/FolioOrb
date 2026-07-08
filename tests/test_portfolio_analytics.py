@@ -99,6 +99,73 @@ def test_compute_contribution_aggregates_others():
     assert result["others"]["contribution"] != 0
 
 
+def _range_perf_holdings():
+    return [
+        {"ticker": "AAPL", "shares": 10, "is_watchlist": False},
+        {"ticker": "MSFT", "shares": 5, "is_watchlist": False},
+        {"ticker": "WATCH", "shares": 1, "is_watchlist": True},
+    ]
+
+
+@patch.object(pa, "get_batched_history_closes")
+def test_compute_range_performance_all_ranges(mock_history):
+    # 300 trading days of linear growth: 100, 100.5, 101, …
+    closes = [100.0 + i * 0.5 for i in range(300)]
+    mock_history.return_value = {"AAPL": closes, "MSFT": closes}
+
+    result = pa.compute_range_performance(_range_perf_holdings())
+
+    assert set(result["ranges"].keys()) == set(pa.RANGE_TRADING_DAYS.keys())
+    # Watchlist ticker excluded; one history fetch for the active tickers only
+    mock_history.assert_called_once()
+    assert sorted(mock_history.call_args[0][0]) == ["AAPL", "MSFT"]
+
+    week = result["ranges"]["week"]
+    # 5 trading days back: last=249.5, first=247.0 → +2.5/share
+    assert week["holdings"]["AAPL"]["value_change"] == 25.0
+    assert week["holdings"]["MSFT"]["value_change"] == 12.5
+    assert week["net_change"] == 37.5
+    assert week["net_change_pct"] is not None and week["net_change_pct"] > 0
+
+    year = result["ranges"]["year"]
+    # 252 trading days back from index 299 → first index 47
+    expected = (closes[-1] - closes[47]) * 10
+    assert abs(year["holdings"]["AAPL"]["value_change"] - expected) < 0.01
+
+
+@patch.object(pa, "get_batched_history_closes")
+def test_compute_range_performance_partial_history(mock_history):
+    mock_history.return_value = {"AAPL": [100.0, 110.0], "MSFT": []}
+    result = pa.compute_range_performance(_range_perf_holdings())
+    month = result["ranges"]["month"]
+    # Short history clamps to the available window; empty history is skipped
+    assert month["holdings"]["AAPL"]["change_pct"] == 10.0
+    assert "MSFT" not in month["holdings"]
+    assert month["net_change"] == 100.0
+
+
+@patch.object(pa, "get_batched_history_closes")
+def test_compute_range_performance_empty(mock_history):
+    result = pa.compute_range_performance([])
+    mock_history.assert_not_called()
+    assert not result["ranges"]["week"]["holdings"]
+    assert result["ranges"]["week"]["net_change_pct"] is None
+
+
+@patch.object(pa, "get_batched_history_closes")
+def test_compute_range_rows_single_range(mock_history):
+    closes = [100.0 + i for i in range(30)]
+    mock_history.return_value = {"AAPL": closes}
+    rows = pa.compute_range_rows(
+        [{"ticker": "AAPL", "shares": 2, "is_watchlist": False}], "week"
+    )
+    assert rows["holdings"]["AAPL"]["value_change"] == 10.0  # 2 shares × 5 days × $1
+    unknown = pa.compute_range_rows(
+        [{"ticker": "AAPL", "shares": 2, "is_watchlist": False}], "nope"
+    )
+    assert not unknown["holdings"]
+
+
 def test_correlation_label():
     from app.services.portfolio_analytics import _correlation_label, _market_insight
     assert _correlation_label(0.8) == "High"

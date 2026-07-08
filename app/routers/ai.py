@@ -10,7 +10,7 @@ import re
 import stat
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -1529,6 +1529,56 @@ async def get_all_analyst_recommendations(db: Session = Depends(get_db)):
 
 _BRIEFING_CACHE_TYPE = "briefing"
 
+# Dashboard time ranges the briefing can narrate. "day" keeps the legacy
+# live-quote path and the legacy "briefing" cache type; longer ranges compute
+# from daily closes and cache under "briefing_<range>" so each range gets its
+# own 24 h entry.
+_BRIEFING_RANGES: dict[str, dict] = {
+    "day":        {"phrase": "today",                  "calendar_days": None},
+    "week":       {"phrase": "over the past week",     "calendar_days": 7},
+    "month":      {"phrase": "over the past month",    "calendar_days": 30},
+    "threeMonth": {"phrase": "over the past 3 months", "calendar_days": 90},
+    "sixMonth":   {"phrase": "over the past 6 months", "calendar_days": 180},
+    "year":       {"phrase": "over the past year",     "calendar_days": 365},
+}
+
+
+def _normalize_briefing_range(range_key: str | None) -> str:
+    return range_key if range_key in _BRIEFING_RANGES else "day"
+
+
+def _briefing_cache_type(range_key: str) -> str:
+    if range_key == "day":
+        return _BRIEFING_CACHE_TYPE
+    return f"{_BRIEFING_CACHE_TYPE}_{range_key}"
+
+
+def _period_portfolio_pl(db: Session, total_value: float, calendar_days: int) -> dict | None:
+    """
+    Portfolio P&L over the range, from daily snapshot history — the same
+    semantics the hero P&L card uses (closest snapshot at/after the cutoff,
+    else the earliest available).
+    """
+    from app.routers.portfolio import _portfolio_snapshots  # lazy — no circular dep
+
+    rows = [
+        r for r in _portfolio_snapshots(1, db)
+        if r.get("date") and r.get("total_value") is not None
+    ]
+    if not rows:
+        return None
+    last = datetime.strptime(rows[-1]["date"], "%Y-%m-%d")
+    cutoff = last - timedelta(days=calendar_days)
+    start_row = next(
+        (r for r in rows if datetime.strptime(r["date"], "%Y-%m-%d") >= cutoff),
+        rows[0],
+    )
+    start_value = float(start_row["total_value"] or 0)
+    if start_value <= 0:
+        return None
+    change = total_value - start_value
+    return {"dollar": round(change, 2), "pct": round(change / start_value * 100, 2)}
+
 
 def _briefing_snapshot(db: Session) -> tuple[dict, list[dict]]:
     """
@@ -1619,6 +1669,110 @@ def _briefing_snapshot(db: Session) -> tuple[dict, list[dict]]:
     return snapshot, non_watchlist
 
 
+def _briefing_period_snapshot(db: Session, range_key: str) -> tuple[dict, list[dict]]:
+    """
+    Range-aware snapshot variant: swaps the day-scoped fields for period ones
+    (daily-close lookbacks for movers, snapshot history for portfolio P&L) so
+    Haiku narrates the selected window instead of today's tape.
+    """
+    from app.services.portfolio_analytics import compute_range_rows
+
+    snapshot, non_watchlist = _briefing_snapshot(db)
+    cfg = _BRIEFING_RANGES[range_key]
+    period = compute_range_rows(non_watchlist, range_key)
+    rows = period.get("holdings") or {}
+
+    ranked = sorted(rows.items(), key=lambda kv: kv[1]["change_pct"])
+    best = ranked[-1] if ranked else None
+    worst = ranked[0] if ranked else None
+    contributors = sorted(
+        rows.items(), key=lambda kv: abs(kv[1]["value_change"]), reverse=True
+    )[:4]
+
+    snapshot["period_label"] = cfg["phrase"]
+    snapshot["period_pl"] = (
+        _period_portfolio_pl(db, snapshot["total_value"], cfg["calendar_days"])
+        or {"dollar": period.get("net_change"), "pct": period.get("net_change_pct")}
+    )
+    snapshot["best_period"] = (
+        {"ticker": best[0], "change_pct": best[1]["change_pct"]} if best else {}
+    )
+    snapshot["worst_period"] = (
+        {"ticker": worst[0], "change_pct": worst[1]["change_pct"]} if worst else {}
+    )
+    snapshot["period_contributors"] = [
+        {"ticker": ticker, "contribution_dollar": vals["value_change"]}
+        for ticker, vals in contributors
+    ]
+    for h in snapshot["top_holdings"]:
+        row = rows.get(h["ticker"])
+        h["period_change_pct"] = row["change_pct"] if row else None
+        h.pop("day_change_pct", None)
+    for key in ("today_pl", "best_today", "worst_today", "today_contributors"):
+        snapshot.pop(key, None)
+    return snapshot, non_watchlist
+
+
+def _briefing_local_period(db: Session, range_key: str) -> dict:
+    """
+    Local briefing over a non-day range: deterministic period digest from daily
+    closes. Move explainers are day-scoped, so period movers carry no
+    explanation text.
+    """
+    from app.services.portfolio_analytics import compute_range_rows
+
+    cfg = _BRIEFING_RANGES[range_key]
+    phrase = cfg["phrase"]
+    _snapshot, non_watchlist = _briefing_snapshot(db)
+    period = compute_range_rows(non_watchlist, range_key)
+    rows = period.get("holdings") or {}
+
+    movers: list[dict] = []
+    for h in non_watchlist:
+        row = rows.get(h["ticker"])
+        if not row:
+            continue
+        movers.append({
+            "ticker": h["ticker"],
+            # Field names match the day payload so the card renderer is shared.
+            "day_change_pct": row["change_pct"],
+            "day_change_dollar": row["value_change"],
+            "icon": "bi-graph-up-arrow" if row["change_pct"] >= 0 else "bi-graph-down-arrow",
+            "explanation": "",
+        })
+    movers.sort(key=lambda m: abs(m["day_change_dollar"]), reverse=True)
+    movers = movers[:6]
+
+    rose = sum(1 for r in rows.values() if r["change_pct"] > 0)
+    fell = sum(1 for r in rows.values() if r["change_pct"] < 0)
+    total = len(rows)
+
+    if not total:
+        lead = f"Not enough price history yet to read your portfolio {phrase}."
+    elif rose > 0:
+        best_ticker, best_vals = max(rows.items(), key=lambda kv: kv[1]["change_pct"])
+        lead = (
+            f"{rose} of {total} holdings rose {phrase}, "
+            f"led by {best_ticker} ({best_vals['change_pct']:+.1f}%)."
+        )
+    elif fell == total:
+        worst_ticker, worst_vals = min(rows.items(), key=lambda kv: kv[1]["change_pct"])
+        lead = (
+            f"All {total} holdings fell {phrase}; "
+            f"{worst_ticker} pulled back the most ({worst_vals['change_pct']:+.1f}%)."
+        )
+    else:
+        lead = f"Holdings were flat {phrase} — no clear directional trend."
+
+    return {
+        "mode": "local",
+        "lead": lead,
+        "movers": movers,
+        "period_label": phrase,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _briefing_local(db: Session) -> dict:
     """Compute local briefing using move_explainer. Never calls Claude."""
     snapshot, non_watchlist = _briefing_snapshot(db)
@@ -1699,31 +1853,38 @@ def _briefing_local(db: Session) -> dict:
 
 def _briefing_fallback(snapshot: dict) -> dict:
     """Deterministic AI-mode response when Claude is unavailable."""
-    pl = snapshot.get("today_pl") or {}
+    phrase = snapshot.get("period_label") or "today"
+    pl = snapshot.get("today_pl") or snapshot.get("period_pl") or {}
     tr = snapshot.get("total_return") or {}
-    best = snapshot.get("best_today") or {}
-    worst = snapshot.get("worst_today") or {}
+    best = snapshot.get("best_today") or snapshot.get("best_period") or {}
+    worst = snapshot.get("worst_today") or snapshot.get("worst_period") or {}
+
+    def _mover_pct(entry: dict) -> float:
+        value = entry.get("day_change_pct")
+        if value is None:
+            value = entry.get("change_pct")
+        return float(value or 0)
 
     direction = "up" if float(pl.get("dollar") or 0) >= 0 else "down"
     pct = abs(float(pl.get("pct") or 0))
     ret_pct = float(tr.get("pct") or 0)
     health = (
-        f"Your portfolio is {direction} {pct:.2f}% today. "
+        f"Your portfolio is {direction} {pct:.2f}% {phrase}. "
         f"Total return stands at {ret_pct:+.2f}% overall."
     )
     drivers: list[str] = []
     if best.get("ticker"):
         drivers.append(
-            f"{best['ticker']} was your best mover today "
-            f"({float(best.get('day_change_pct') or 0):+.1f}%)."
+            f"{best['ticker']} was your best mover {phrase} "
+            f"({_mover_pct(best):+.1f}%)."
         )
     if worst.get("ticker") and worst.get("ticker") != best.get("ticker"):
         drivers.append(
             f"{worst['ticker']} pulled back "
-            f"({float(worst.get('day_change_pct') or 0):+.1f}%)."
+            f"({_mover_pct(worst):+.1f}%)."
         )
     if not drivers:
-        drivers = ["No standout movers today."]
+        drivers = [f"No standout movers {phrase}."]
 
     return {
         "mode": "ai",
@@ -1739,6 +1900,7 @@ def _briefing_fallback(snapshot: dict) -> dict:
 @router.get("/portfolio-summary")
 async def get_portfolio_summary(
     mode: str = "ai",
+    time_range: str = Query("day", alias="range"),
     force_refresh: bool = False,
     db: Session = Depends(get_db),
 ):
@@ -1746,27 +1908,34 @@ async def get_portfolio_summary(
     Portfolio briefing card.
     mode=local — deterministic move digest, no Claude, always free.
     mode=ai    — Haiku narrative, cached 24 h in AISummary (ticker=BOOK,
-                 summary_type='briefing'); falls back deterministically.
+                 summary_type='briefing' / 'briefing_<range>');
+                 falls back deterministically.
+    range      — dashboard time range (day|week|month|threeMonth|sixMonth|year);
+                 unknown values fall back to day.
     """
     if mode not in ("ai", "local"):
         mode = "ai"
+    range_key = _normalize_briefing_range(time_range)
 
     if mode == "local":
         try:
-            return _briefing_local(db)
+            if range_key == "day":
+                return _briefing_local(db)
+            return _briefing_local_period(db, range_key)
         except Exception as exc:
             logger.error("Local briefing failed; exception_type=%s", type(exc).__name__)
             raise HTTPException(
                 status_code=500, detail="Briefing temporarily unavailable."
             ) from exc
 
-    # AI mode — check 24 h cache first
+    # AI mode — check 24 h cache first (one entry per range)
+    cache_type = _briefing_cache_type(range_key)
     if not force_refresh:
         cached = (
             db.query(AISummary)
             .filter(
                 AISummary.ticker == _PORTFOLIO_CACHE_TICKER,
-                AISummary.summary_type == _BRIEFING_CACHE_TYPE,
+                AISummary.summary_type == cache_type,
             )
             .order_by(AISummary.generated_at.desc())
             .first()
@@ -1781,7 +1950,10 @@ async def get_portfolio_summary(
 
     # Build snapshot; surface 500 so the card can show a clear error
     try:
-        snapshot, _ = _briefing_snapshot(db)
+        if range_key == "day":
+            snapshot, _ = _briefing_snapshot(db)
+        else:
+            snapshot, _ = _briefing_period_snapshot(db, range_key)
     except Exception as exc:
         logger.error("Briefing snapshot failed; exception_type=%s", type(exc).__name__)
         raise HTTPException(
@@ -1800,7 +1972,7 @@ async def get_portfolio_summary(
         try:
             db.add(AISummary(
                 ticker=_PORTFOLIO_CACHE_TICKER,
-                summary_type=_BRIEFING_CACHE_TYPE,
+                summary_type=cache_type,
                 summary_text=json.dumps(payload),
                 price_when_generated=None,
                 model_used=MODEL,

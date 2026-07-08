@@ -18,6 +18,7 @@ from app.services.portfolio_analytics import (
     compute_correlation_matrix,
     compute_drawdown,
     compute_contribution,
+    compute_range_performance,
     compute_market_context,
     compute_benchmark_comparison,
     compute_return_calendar,
@@ -654,6 +655,33 @@ async def get_portfolio_contribution(
     _get_portfolio_or_404(portfolio_id, db)
     result, _total, _daily, _cost = _compute_portfolio(portfolio_id, db)
     return compute_contribution(result, period=period)
+
+
+@router.get("/range-performance")
+async def get_portfolio_range_performance(
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
+    """
+    Per-holding change for every dashboard time range (1W … 1Y) in one payload.
+    Computed from daily closes only — no live quotes — so switching ranges on
+    the dashboard costs a single request that covers all ranges.
+    """
+    _get_portfolio_or_404(portfolio_id, db)
+    holdings = (
+        db.query(Holding)
+        .filter(Holding.portfolio_id == portfolio_id, Holding.is_active.is_(True))
+        .all()
+    )
+    rows = [
+        {
+            "ticker": h.ticker,
+            "shares": h.shares,
+            "is_watchlist": bool(h.is_watchlist),
+        }
+        for h in holdings
+    ]
+    return compute_range_performance(rows)
 
 
 @router.get("/market-context")

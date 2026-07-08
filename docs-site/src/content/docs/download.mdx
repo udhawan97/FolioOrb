@@ -20,7 +20,7 @@ The buttons above always resolve to the newest **stable** release. You can also 
 
 | Channel | Where it comes from | Who it's for |
 | --- | --- | --- |
-| **Stable** | A version tag (`v4.3.2`), cut manually | Everyone. This is the default download. |
+| **Stable** | A version tag (`v4.3.3`), cut manually | Everyone. This is the default download. |
 | **latest-main** | Refreshed automatically on every merge to `main` | Testing the newest changes; may be unstable. |
 
 The `latest-main` prerelease is offered under **Development builds** on the website and in
@@ -47,7 +47,7 @@ shasum -a 256 -c SHA256SUMS.txt
 
 ```powershell
 # Windows PowerShell — compare against the line in SHA256SUMS.txt
-Get-FileHash .\FolioSenseAI-Windows-x64-v4.3.2-Setup.exe -Algorithm SHA256
+Get-FileHash .\FolioSenseAI-Windows-x64-v4.3.3-Setup.exe -Algorithm SHA256
 ```
 
 A match confirms the file is byte-for-byte what CI published to GitHub Releases.

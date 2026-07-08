@@ -376,6 +376,85 @@ def compute_contribution(
     )
 
 
+# Dashboard time ranges → trading-day lookbacks into daily closes.
+# Keys match the frontend's shared selectedTimeRange values ("day" is computed
+# from live quotes client-side and never hits this table).
+RANGE_TRADING_DAYS: dict[str, int] = {
+    "week": 5,
+    "month": 21,
+    "threeMonth": 63,
+    "sixMonth": 126,
+    "year": 252,
+}
+
+
+def _range_holding_rows(
+    active: list[dict],
+    history: dict[str, list[float]],
+    lookback: int,
+) -> dict[str, Any]:
+    """Per-holding change over `lookback` trading days from batched closes."""
+    rows: dict[str, dict[str, float]] = {}
+    net = 0.0
+    base = 0.0
+    for h in active:
+        ticker = h["ticker"]
+        shares = float(h.get("shares") or 0)
+        closes = history.get(ticker, [])
+        if len(closes) < 2:
+            continue
+        tail = closes[-min(lookback + 1, len(closes)):]
+        if len(tail) < 2 or tail[0] <= 0:
+            continue
+        value_change = shares * (tail[-1] - tail[0])
+        rows[ticker] = {
+            "change_pct": round((tail[-1] - tail[0]) / tail[0] * 100.0, 2),
+            "value_change": round(value_change, 2),
+        }
+        net += value_change
+        base += shares * tail[0]
+    return {
+        "holdings": rows,
+        "net_change": round(net, 2),
+        "net_change_pct": round(net / base * 100.0, 2) if base > 0 else None,
+    }
+
+
+def compute_range_rows(holdings: list[dict], range_key: str) -> dict[str, Any]:
+    """Per-holding change for a single dashboard range (week … year)."""
+    lookback = RANGE_TRADING_DAYS.get(range_key)
+    if lookback is None:
+        return {"holdings": {}, "net_change": 0.0, "net_change_pct": None}
+    active = [
+        h for h in holdings
+        if not h.get("is_watchlist") and float(h.get("shares") or 0) > 0
+    ]
+    history = get_batched_history_closes([h["ticker"] for h in active], period="1y")
+    return _range_holding_rows(active, history, lookback)
+
+
+def compute_range_performance(holdings: list[dict]) -> dict[str, Any]:
+    """
+    Per-holding price change for every dashboard time range in one payload,
+    from a single batched 1y history fetch (same-day cached server-side).
+    """
+    active = [
+        h for h in holdings
+        if not h.get("is_watchlist") and float(h.get("shares") or 0) > 0
+    ]
+    history = (
+        get_batched_history_closes([h["ticker"] for h in active], period="1y")
+        if active else {}
+    )
+    return {
+        "as_of": date.today().isoformat(),
+        "ranges": {
+            key: _range_holding_rows(active, history, lookback)
+            for key, lookback in RANGE_TRADING_DAYS.items()
+        },
+    }
+
+
 _INDEX_GEO_KEYS: dict[str, list[str]] = {
     "^GSPC": ["united states"],
     "^IXIC": ["united states"],

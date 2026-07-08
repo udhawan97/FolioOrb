@@ -1,3 +1,27 @@
+# FolioSenseAI v4.3.3 Release Notes
+
+**Release date:** July 8, 2026
+
+---
+
+## ✦ One Range, Every Section
+
+> *v4.3.3 adds a 1W time range and makes range switching mean something everywhere on the dashboard — not just the P&L card.*
+
+Until now, the Today / 1M / 3M / 6M / 1Y switcher on the Overview tab only drove the hero P&L number. Everything below it — the sector/movers panel, the portfolio briefing, the allocation focus read — stayed locked to "today," even after you'd switched to a longer view. v4.3.3 makes the whole dashboard follow your selection.
+
+**Added a 1W option.** The switcher is now Today, 1W, 1M, 3M, 6M, 1Y, same chip style, same keyboard/hover/focus behavior.
+
+**The range now drives four sections, not one.** Switch to 1M and "Today's impact" becomes "Past month impact" with real per-holding movers for that window, the portfolio briefing narrates the month instead of the day, and the allocation focus panel's "why it moved" read updates to match. All four read from one shared selected range instead of managing it independently.
+
+**Fixed a real inconsistency this surfaced during testing.** The hero P&L card computed longer ranges from the app's own daily snapshot history, which needs weeks of actual usage to build up — so a newer portfolio would show "1M P&L: --" directly above a movers panel already showing a real number for that same month, pulled from actual market price history instead. The hero card now falls back to the same price-history calculation when snapshot history is too short, so the two numbers agree instead of one going blank.
+
+**Performance:** all five non-day ranges are served by a single new endpoint in one request (not five), cached client-side per holdings set so re-selecting a previously-viewed range is instant with zero network calls. Rapid range switching cancels stale renders instead of flashing old data, each section fails independently with its own inline error/retry instead of taking down the dashboard, and the manual refresh button now refreshes range data too instead of only quotes.
+
+No holdings, settings, or `.env` changes are required — installing v4.3.3 over v4.3.2 or earlier keeps everything as-is.
+
+---
+
 # FolioSenseAI v4.3.2 Release Notes
 
 **Release date:** July 8, 2026
