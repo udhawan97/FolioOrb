@@ -1,66 +1,78 @@
 ---
 /**
- * FolioSenseAI landing / download page.
+ * FolioSenseAI landing page — v3 "private cockpit".
  *
- * Standalone Astro page (not the Starlight docs layout) that takes over the
- * site root. Built as a "product demo disguised as a landing page": real,
- * retina app screenshots (captured via docs-site/scripts/capture.sh) anchor
- * every section, with CSS-only motion and a tiny bit of vanilla JS.
+ * A single cinematic story told in acts (hero → workflow → features → demo →
+ * trust → download → developer), narrated by a Senpai scroll companion. Real
+ * retina app screenshots and recorded product loops anchor every claim.
  *
+ * Architecture stays deliberately dependency-free: CSS/SVG motion + a small
+ * amount of vanilla JS behind one IntersectionObserver-driven controller.
  * Release metadata is fetched client-side from the GitHub API with static
- * fallbacks, so the download buttons always work even with JS disabled or the
- * API unreachable. No runtime dependencies; keep it fast on GitHub Pages.
+ * fallbacks, so downloads work with JS disabled or the API unreachable.
  */
+import '../styles/landing.css';
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const REPO = 'udhawan97/FolioSenseAI';
 const GITHUB = `https://github.com/${REPO}`;
 const RELEASES = `${GITHUB}/releases`;
 const RELEASES_LATEST = `${RELEASES}/latest`;
+const RAW = 'https://raw.githubusercontent.com';
 
 const asset = (p) => `${base}/assets/${p}`;
 const shot = (p) => `${base}/assets/shots/${p}`;
 const demo = (p) => `${base}/assets/demos/${p}`;
 const doc = (slug) => `${base}/${slug}/`;
 
-const macCommands = `curl -fsSL ${'https://raw.githubusercontent.com'}/${REPO}/main/scripts/install-mac.sh | bash`;
-const winCommands = `irm ${'https://raw.githubusercontent.com'}/${REPO}/main/scripts/install-win.ps1 | iex`;
+const macCmd = `curl -fsSL ${RAW}/${REPO}/main/scripts/install-mac.sh | bash`;
+const winCmd = `irm ${RAW}/${REPO}/main/scripts/install-win.ps1 | iex`;
 
-// Feature spotlights. `verdicts` and `news` are real recorded product loops
-// (video + poster, lazy, pause off-screen); `risk` stays a still — it's the
-// dense "read me" panel where motion would fight comprehension.
-const spotlights = [
+// Act 3 — the three-step workflow.
+const steps = [
   {
-    key: 'risk',
-    kicker: 'Risk analytics',
-    title: 'See the risk behind the return',
-    body: 'Risk-vs-return scatter, correlation matrix, concentration, beta, and drawdown — every number explained in a plain-English line beneath it.',
-    img: 'risk-analytics-demo.webp',
-    alt: 'FolioSenseAI risk analytics: risk-return scatter, correlation matrix, concentration dial, and beta.',
+    n: 1, title: 'Add your holdings',
+    body: 'Tickers, shares, cost basis — or a watchlist. No brokerage link, no sign-up.',
+    senpai: 'Drop in VOO and AAPL. No brokerage link, no awkward data-hostage situation.',
   },
   {
-    key: 'verdicts',
-    kicker: 'Hold / Add / Trim / Exit',
-    title: 'A verdict for every position',
-    body: 'Open a holding and its intelligence panel unfolds — rating, trend read, ETF-quality or analyst context, and what moved it today. The table tells you what to do, not just what it is worth.',
-    video: 'verdicts',
-    alt: 'FolioSenseAI holdings table expanding a position into its full intelligence panel with rating, drivers, and sparklines.',
+    n: 2, title: 'It reads the whole picture',
+    body: 'Exposure, risk, concentration, news, and market regime — computed on-device.',
+    senpai: 'I checked risk, concentration, headlines, and whether your “diversification” is just tech in a trench coat.',
   },
   {
-    key: 'news',
-    kicker: 'News themes',
-    title: 'The headlines that actually touch your book',
-    body: 'Grouped, deduplicated news for everything you hold or watch, populated per position — with optional Claude-written portfolio themes when a key is connected.',
-    video: 'news',
-    alt: 'FolioSenseAI news feed populating grouped, relevant headlines under each holding in the demo portfolio.',
+    n: 3, title: 'You get plain-English answers',
+    body: 'Verdicts, drivers, and themes in language you can act on. Turn on Claude for narrated briefings.',
+    senpai: 'Here’s the read: what changed, why it matters, and what to consider next.',
   },
 ];
 
-// Small, crisp vector icons (no emoji, no raster) for the icon cards.
-const icons = {
-  lock: '<path d="M6 10V7a6 6 0 0 1 12 0v3" /><rect x="4" y="10" width="16" height="10" rx="2" /><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/>',
-  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
-  pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
-};
+// Act 4 — feature moments. Some carry a screenshot/video, some a pure artifact.
+const features = [
+  {
+    key: 'risk', accent: 'teal', kicker: 'Risk analytics',
+    title: 'See the risk behind the return',
+    body: 'Scatter, correlation, concentration, and drawdown — every number explained in a plain-English line beneath it.',
+    img: 'risk-analytics-demo.webp',
+    alt: 'FolioSenseAI risk analytics: risk-return scatter, correlation matrix, and concentration dial.',
+    senpai: 'Concentration check: five sectors, one ego.',
+  },
+  {
+    key: 'verdicts', accent: 'amber', kicker: 'Hold / Add / Trim / Exit',
+    title: 'A verdict for every position',
+    body: 'Open a holding and its intelligence panel unfolds — rating, drivers, and what moved it today.',
+    video: 'verdicts',
+    alt: 'FolioSenseAI holdings table expanding a position into its full intelligence panel.',
+  },
+  {
+    key: 'news', accent: 'cyan', kicker: 'News themes',
+    title: 'Headlines, mapped to your holdings',
+    body: 'Grouped, deduplicated, and themed — only the news that touches what you own or watch.',
+    video: 'news-v2',
+    alt: 'FolioSenseAI news feed with grouped, relevant headlines under each holding.',
+    senpai: 'I read the news so it doesn’t read you.',
+  },
+];
 ---
 
 <!doctype html>
@@ -68,18 +80,23 @@ const icons = {
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>FolioSenseAI — Your portfolio, finally speaking plain English.</title>
-		<meta name="description" content="A local-first portfolio intelligence dashboard for macOS and Windows. Turns holdings, risk, market context, and news into plain-English answers — running entirely on your machine, with Claude as an optional layer." />
+		<title>FolioSenseAI — Your portfolio, finally speaks back.</title>
+		<meta name="description" content="Local-first portfolio intelligence for macOS and Windows. FolioSenseAI turns holdings, risk, news, and market context into plain-English portfolio reads — on your machine, Claude-optional, built for trust." />
 		<link rel="icon" type="image/svg+xml" href={asset('folio-orbit-icon.svg')} />
-		<meta property="og:title" content="FolioSenseAI" />
-		<meta property="og:description" content="Your portfolio, finally speaking plain English. A local-first portfolio intelligence dashboard for macOS and Windows." />
+		<meta property="og:title" content="FolioSenseAI — Your portfolio, finally speaks back." />
+		<meta property="og:description" content="Local-first portfolio intelligence for macOS and Windows. Plain-English reads on holdings, risk, news, and market context." />
 		<meta property="og:type" content="website" />
 		<meta property="og:image" content={asset('og-hero.jpg')} />
-			<meta name="twitter:image" content={asset('og-hero.jpg')} />
 		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:image" content={asset('og-hero.jpg')} />
 	</head>
 	<body>
-		<div class="backdrop" aria-hidden="true"></div>
+		<!-- Ambient canvas: financial grid + aurora, tinted per act. -->
+		<div class="canvas" aria-hidden="true">
+			<div class="canvas-grid"></div>
+			<div class="canvas-aurora aurora-a"></div>
+			<div class="canvas-aurora aurora-b"></div>
+		</div>
 
 		<header class="topbar">
 			<a class="brand" href={base + '/'}>
@@ -93,15 +110,26 @@ const icons = {
 			</nav>
 		</header>
 
+		<!-- Senpai scroll companion (desktop rail; inline cards on mobile). -->
+		<aside class="rail" id="rail" aria-label="Senpai guide">
+			<button class="rail-dismiss" id="rail-dismiss" type="button" aria-label="Hide guide">×</button>
+			<div class="rail-track"></div>
+			<div class="rail-orb" id="rail-orb">
+				<img src={asset('folio-orbit-icon.svg')} alt="" width="30" height="30" />
+			</div>
+			<div class="rail-bubble" id="rail-bubble" hidden></div>
+			<span class="sr-only" id="rail-live" aria-live="polite"></span>
+		</aside>
+
 		<main>
-			<!-- ── Hero ─────────────────────────────────────────────────────── -->
-			<section class="hero">
+			<!-- ═══ ACT 1+2 · HERO ═══════════════════════════════════════════ -->
+			<section class="hero act" id="act-hero" data-hue="cyan">
 				<div class="hero-copy">
 					<span class="eyebrow reveal">Local-first portfolio intelligence</span>
-					<h1 class="reveal">Your portfolio, finally speaking plain&nbsp;English.</h1>
+					<h1 class="display reveal">Your portfolio, finally speaks&nbsp;back.</h1>
 					<p class="lede reveal">
-						Holdings, risk, market context, and news — translated into plain-English answers,
-						running entirely on your machine. Claude adds narration when you want it, never as a requirement.
+						FolioSenseAI turns holdings, risk, news, and market context into plain-English
+						portfolio reads — running on your machine, Claude-optional, built for trust.
 					</p>
 
 					<div class="cta-row reveal">
@@ -116,10 +144,8 @@ const icons = {
 					</div>
 
 					<div class="cta-secondary reveal">
-						<a href={doc('get-started/introduction')}>View Docs</a>
-						<span>·</span>
-						<a href={GITHUB}>View GitHub</a>
-						<span>·</span>
+						<a href={doc('get-started/introduction')}>View Docs</a><span>·</span>
+						<a href={GITHUB}>View GitHub</a><span>·</span>
 						<a href={RELEASES}>Release Notes</a>
 						<details class="dev-builds">
 							<summary>Development builds</summary>
@@ -131,11 +157,7 @@ const icons = {
 					</div>
 
 					<ul class="trust-strip reveal" aria-label="At a glance">
-						<li>Local-first</li>
-						<li>Claude optional</li>
-						<li>Open source</li>
-						<li>SHA256 verifiable</li>
-						<li>macOS + Windows</li>
+						<li>Local-first</li><li>Claude optional</li><li>Open source</li><li>SHA256 verifiable</li>
 					</ul>
 
 					<div id="release-strip" class="release-strip reveal" hidden>
@@ -146,142 +168,192 @@ const icons = {
 					</div>
 				</div>
 
-				<!-- Product preview: real screenshot + floating insight chips + a
-				     region-fitting highlight that tours one feature at a time. -->
 				<div class="hero-stage reveal" id="hero-stage">
-					<div class="window-chrome" id="hero-window">
+					<div class="window-chrome grad-border" id="hero-window">
 						<div class="window-bar"><span></span><span></span><span></span></div>
-						<img src={shot('hero-dashboard-demo.webp')} width="2400" height="1508" fetchpriority="high"
-							alt="The FolioSenseAI dashboard showing a demo portfolio: total value, today's P&L, sector map, and today's impact." />
-						<!-- Cursor-style guided highlight: a rounded rect that morphs
-						     between hotspots (JS-driven, reduced-motion safe). -->
+						<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
+							alt="The FolioSenseAI dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
+						<div class="pulse-line" aria-hidden="true"></div>
 						<div class="spot-region" id="spot-region" aria-hidden="true">
 							<span class="spot-region-tip" id="spot-region-tip"></span>
 						</div>
 					</div>
 
-					<div class="chip-float chip-float--tl" data-depth="10" aria-hidden="true">
-						<span class="dot dot-amber"></span> Risk · Moderate
+					<div class="chip-float chip-float--tl" data-depth="9" aria-hidden="true"><span class="dot dot-amber"></span> Risk · Moderate</div>
+					<div class="chip-float chip-float--tr" data-depth="-10" aria-hidden="true"><span class="dot dot-green"></span> MSFT · Buy</div>
+					<div class="chip-float chip-float--bl" data-depth="10" aria-hidden="true">β · 0.85×</div>
+					<div class="chip-float chip-float--br" data-depth="-8" aria-hidden="true"><span class="dot dot-cyan"></span> Theme · dividend income</div>
+
+					<!-- Transient "signal" chips that converge + dissolve on load. -->
+					<div class="signals" aria-hidden="true">
+						<span class="sig sig-1">AAPL +0.7%</span>
+						<span class="sig sig-2">Fed holds</span>
+						<span class="sig sig-3">semis ↑</span>
+						<span class="sig sig-4">VOO</span>
+						<span class="sig sig-5">β 0.85</span>
 					</div>
-					<div class="chip-float chip-float--tr" data-depth="-12" aria-hidden="true">
-						<span class="dot dot-green"></span> MSFT · Buy
-					</div>
-					<div class="chip-float chip-float--bl" data-depth="12" aria-hidden="true">
-						Beta · 0.85×
-					</div>
-					<div class="chip-float chip-float--br" data-depth="-10" aria-hidden="true">
-						<span class="dot dot-cyan"></span> Theme · dividend income
-					</div>
-					<span class="sr-only" id="tour-live" aria-live="polite"></span>
 				</div>
 			</section>
 
-			<!-- ── Product story ────────────────────────────────────────────── -->
-			<section class="story">
-				<h2 class="section-title reveal">Know what you hold. Understand what changed. Decide what to do next.</h2>
-				<div class="story-grid reveal-group">
-					<article class="story-step reveal">
-						<span class="step-num">1</span>
-						<h3>Add your holdings</h3>
-						<p>Enter tickers, shares, and cost basis — or add a watchlist. No account, no brokerage link, no sign-up.</p>
-					</article>
-					<article class="story-step reveal">
-						<span class="step-num">2</span>
-						<h3>It reads the whole picture</h3>
-						<p>Exposure, risk, market regime, and news are computed on-device — instantly, with no API key required.</p>
-					</article>
-					<article class="story-step reveal">
-						<span class="step-num">3</span>
-						<h3>You get plain-English answers</h3>
-						<p>Verdicts, drivers, and themes in language you can act on. Turn on Claude for narrated briefings and action plans.</p>
-					</article>
+			<!-- ═══ ACT 3 · WORKFLOW ═════════════════════════════════════════ -->
+			<section class="act workflow" id="act-workflow" data-hue="teal">
+				<div class="act-head reveal">
+					<span class="kicker">The workflow</span>
+					<h2 class="section-title">Know what changed. Understand why. Decide what to do next.</h2>
+				</div>
+
+				<div class="wf-grid">
+					<!-- Sticky stage (desktop): one scene plays per active step. -->
+					<div class="wf-stage-wrap">
+						<div class="wf-stage grad-border" id="wf-stage" data-step="1">
+							<!-- Scene 1: ticker chips snap into a table -->
+							<div class="wf-scene wf-scene-1">
+								<div class="wf-chips">
+									<span class="tk">VOO</span><span class="tk">MSFT</span><span class="tk">SCHD</span><span class="tk tk-watch">NVDA</span>
+								</div>
+								<div class="wf-table">
+									<div class="wf-row"><b>VOO</b><span>Core ETF</span><i>18 sh</i></div>
+									<div class="wf-row"><b>MSFT</b><span>Stock</span><i>22 sh</i></div>
+									<div class="wf-row"><b>SCHD</b><span>Dividend ETF</span><i>60 sh</i></div>
+									<div class="wf-row wf-row--watch"><b>NVDA</b><span>Watchlist</span><i>watch</i></div>
+								</div>
+							</div>
+							<!-- Scene 2: radar sweep pings analysis chips -->
+							<div class="wf-scene wf-scene-2">
+								<div class="wf-radar"><span class="wf-beam"></span><span class="wf-core"></span></div>
+								<div class="wf-orbits">
+									<span class="an an-1">β 0.85</span><span class="an an-2">HHI 21</span>
+									<span class="an an-3">Tech 17%</span><span class="an an-4">3 headlines</span>
+									<span class="an an-5">risk-on</span>
+								</div>
+							</div>
+							<!-- Scene 3: verdict card resolves -->
+							<div class="wf-scene wf-scene-3">
+								<div class="wf-verdict">
+									<div class="wf-verdict-head"><b>VOO</b><span class="v-tag">HOLD</span></div>
+									<div class="wf-conf"><span class="wf-conf-fill"></span></div>
+									<p class="wf-verdict-line">Tracking its index closely — nothing here needs action today.</p>
+									<div class="wf-drivers"><span>S&amp;P 500 −0.48%</span><span>Vol 0.6× avg</span></div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Step blocks drive the stage as they scroll through. -->
+					<ol class="wf-steps">
+						{steps.map((s) => (
+							<li class="wf-step" data-step={s.n}>
+								<span class="wf-num">{s.n}</span>
+								<h3>{s.title}</h3>
+								<p>{s.body}</p>
+								<div class="wf-note"><span class="wf-note-orb"></span><span>{s.senpai}</span></div>
+								<div class="wf-scene-mini" data-mini={s.n} aria-hidden="true"></div>
+							</li>
+						))}
+					</ol>
 				</div>
 			</section>
 
-			<!-- ── Feature spotlights (product loops + one still) ───────────── -->
-			<section class="spotlights">
-				{spotlights.map((f, i) => (
-					<article class={`spot ${i % 2 ? 'spot--rev' : ''} reveal`}>
-						<div class="spot-copy">
+			<!-- ═══ ACT 4 · FEATURES ═════════════════════════════════════════ -->
+			<section class="act features" id="act-features" data-hue="cyan">
+				<div class="act-head reveal">
+					<span class="kicker">Feature intelligence</span>
+					<h2 class="section-title">Every claim, with the product behind it.</h2>
+				</div>
+
+				{features.map((f, i) => (
+					<article class={`moment reveal accent-${f.accent} ${i % 2 ? 'moment--rev' : ''}`}>
+						<div class="moment-copy">
 							<span class="kicker">{f.kicker}</span>
 							<h3>{f.title}</h3>
 							<p>{f.body}</p>
 							{f.video && <span class="demo-tag">Demo data · looping</span>}
+							{f.senpai && <div class="wf-note"><span class="wf-note-orb"></span><span>{f.senpai}</span></div>}
 						</div>
-						<figure class={`spot-shot ${f.video ? 'spot-shot--video' : 'spot-shot--still'}`}>
+						<figure class="moment-visual">
 							<div class="window-chrome window-chrome--sm">
 								<div class="window-bar"><span></span><span></span><span></span></div>
 								{f.video ? (
 									<video class="demo-loop" muted loop playsinline preload="none"
-										width="1600" height="1000" poster={demo(`${f.video}-poster.webp`)}
-										aria-label={f.alt}>
+										width="1600" height="1000" poster={demo(`${f.video}-poster.webp`)} aria-label={f.alt}>
 										<source src={demo(`${f.video}.mp4`)} type="video/mp4" />
 									</video>
 								) : (
-									<img src={shot(f.img)} alt={f.alt} loading="lazy" />
+									<img class="moment-img" src={shot(f.img)} alt={f.alt} loading="lazy" decoding="async" />
 								)}
 							</div>
 						</figure>
 					</article>
 				))}
 
-				<!-- Supporting capabilities as crisp icon cards (no screenshot needed) -->
-				<div class="mini-grid reveal-group">
-					<div class="mini reveal">
-						<svg class="mini-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" set:html={icons.lock} />
-						<h4>Local-first by default</h4>
-						<p>Your database and config never leave your machine. Nothing ships anywhere without your key.</p>
+				<!-- Moment D — Local-first + live market context (artifact) -->
+				<article class="moment reveal accent-green moment--rev moment--artifact">
+					<div class="moment-copy">
+						<span class="kicker">Local-first · live context</span>
+						<h3>Runs on your machine. Watches the whole market.</h3>
+						<p>Quotes, history, market regime, and world indices — computed and cached locally. Your database never leaves your laptop.</p>
+						<div class="wf-note"><span class="wf-note-orb"></span><span>Your data stays home. The market comes to you.</span></div>
 					</div>
-					<div class="mini reveal">
-						<svg class="mini-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" set:html={icons.pulse} />
-						<h4>Live market context</h4>
-						<p>Quotes, history, market regime, and world indices — cached for a fast first paint.</p>
+					<figure class="moment-visual">
+						<div class="artifact artifact-market grad-border">
+							<div class="am-head"><span class="am-lock" aria-hidden="true"></span><b>Your machine</b><span class="am-badge">local · encrypted at rest</span></div>
+							<div class="am-tape" aria-hidden="true">
+								<span class="am-tick up">S&amp;P +0.3%</span><span class="am-tick up">NASDAQ +0.5%</span>
+								<span class="am-tick down">FTSE −0.2%</span><span class="am-tick up">Nikkei +0.8%</span>
+								<span class="am-tick up">DAX +0.1%</span><span class="am-tick down">HSI −0.4%</span>
+								<span class="am-tick up">S&amp;P +0.3%</span><span class="am-tick up">NASDAQ +0.5%</span>
+							</div>
+							<div class="am-regime"><span class="am-dot"></span> Market regime · <b>Risk-on</b></div>
+						</div>
+					</figure>
+				</article>
+
+				<!-- Moment E — Claude optional (toggle artifact) -->
+				<article class="moment reveal accent-peri moment--artifact">
+					<div class="moment-copy">
+						<span class="kicker">Claude, optional</span>
+						<h3>Local by default. Narrated when you want.</h3>
+						<p>Add an Anthropic key for briefings, action plans, and news themes. Everything else never needed it.</p>
+						<div class="wf-note"><span class="wf-note-orb"></span><span>I’m eloquent either way. Claude just adds adjectives.</span></div>
 					</div>
-					<div class="mini reveal">
-						<svg class="mini-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" set:html={icons.spark} />
-						<h4>Claude, when you choose</h4>
-						<p>Add an Anthropic key for narrated briefings, action plans, and news themes. Everything else runs without it.</p>
-					</div>
-				</div>
+					<figure class="moment-visual">
+						<div class="artifact artifact-claude grad-border" id="claude-artifact">
+							<div class="ac-toggle"><span class="ac-knob"></span><span class="ac-label ac-label-local">Local</span><span class="ac-label ac-label-claude">Claude</span></div>
+							<p class="ac-line ac-line-local">VOO — Hold. Tracking its index; nothing needs action.</p>
+							<p class="ac-line ac-line-claude">VOO held its ground as the index drifted — a calm anchor on a choppy Tuesday. Nothing here demands a move; your core is doing exactly its job.</p>
+						</div>
+					</figure>
+				</article>
 			</section>
 
-			<!-- ── Demo portfolio panel ─────────────────────────────────────── -->
-			<section class="demo">
-				<div class="demo-head reveal">
-					<h2 class="section-title">A worked example</h2>
-					<span class="demo-badge">Demo data only · no real portfolio required</span>
+			<!-- ═══ ACT 5 · DEMO PORTFOLIO ═══════════════════════════════════ -->
+			<section class="act demo" id="act-demo" data-hue="amber">
+				<div class="act-head reveal">
+					<span class="kicker">A worked example</span>
+					<h2 class="section-title">Demo data. Real workflow.</h2>
+					<span class="demo-badge">Demo holdings only · no real portfolio required</span>
 				</div>
-				<div class="demo-card reveal" id="demo-card">
+				<div class="demo-card grad-border reveal" id="demo-card">
 					<div class="demo-table" role="table" aria-label="Demo portfolio holdings">
 						<div class="demo-row demo-row--head" role="row">
-							<span role="columnheader">Holding</span>
-							<span role="columnheader">Type</span>
-							<span role="columnheader">Allocation</span>
-							<span role="columnheader">Verdict</span>
+							<span role="columnheader">Holding</span><span role="columnheader">Type</span>
+							<span role="columnheader">Allocation</span><span role="columnheader">Verdict</span>
 						</div>
 						<div class="demo-row" role="row">
-							<span role="cell"><strong>VOO</strong> Vanguard S&amp;P 500</span>
-							<span role="cell">Core ETF</span>
-							<span role="cell"><span class="bar" style="--w:54%"></span>54.1%</span>
-							<span role="cell"><em class="v-hold">Hold</em></span>
+							<span role="cell"><strong>VOO</strong> Vanguard S&amp;P 500</span><span role="cell">Core ETF</span>
+							<span role="cell"><span class="bar" style="--w:54%"></span>54.1%</span><span role="cell"><em class="v-hold">Hold</em></span>
 						</div>
 						<div class="demo-row" role="row">
-							<span role="cell"><strong>MSFT</strong> Microsoft</span>
-							<span role="cell">Stock</span>
-							<span role="cell"><span class="bar" style="--w:37%"></span>37.4%</span>
-							<span role="cell"><em class="v-buy">Buy</em></span>
+							<span role="cell"><strong>MSFT</strong> Microsoft</span><span role="cell">Stock</span>
+							<span role="cell"><span class="bar" style="--w:37%"></span>37.4%</span><span role="cell"><em class="v-buy">Buy</em></span>
 						</div>
 						<div class="demo-row" role="row">
-							<span role="cell"><strong>SCHD</strong> Schwab US Dividend</span>
-							<span role="cell">Dividend ETF</span>
-							<span role="cell"><span class="bar" style="--w:9%"></span>8.5%</span>
-							<span role="cell"><em class="v-hold">Hold</em></span>
+							<span role="cell"><strong>SCHD</strong> Schwab US Dividend</span><span role="cell">Dividend ETF</span>
+							<span role="cell"><span class="bar" style="--w:9%"></span>8.5%</span><span role="cell"><em class="v-hold">Hold</em></span>
 						</div>
 						<div class="demo-row demo-row--watch" role="row">
-							<span role="cell"><strong>NVDA</strong> NVIDIA</span>
-							<span role="cell">Watchlist</span>
-							<span role="cell">—</span>
-							<span role="cell"><em class="v-watch">Research</em></span>
+							<span role="cell"><strong>NVDA</strong> NVIDIA</span><span role="cell">Watchlist</span>
+							<span role="cell">—</span><span role="cell"><em class="v-watch">Research</em></span>
 						</div>
 					</div>
 					<div class="demo-side">
@@ -294,115 +366,95 @@ const icons = {
 				</div>
 			</section>
 
-			<!-- ── Senpai ───────────────────────────────────────────────────── -->
-			<section class="senpai">
-				<figure class="senpai-shot reveal">
-					<!-- Live assistant card: breathing orb + a quip that types on reveal. -->
-					<div class="senpai-card" id="senpai-card">
-						<div class="senpai-card-head">
-							<span class="senpai-orb" aria-hidden="true"><img src={asset('folio-orbit-icon.svg')} alt="" width="34" height="34" /></span>
-							<span class="senpai-name">Senpai</span>
-							<span class="senpai-mode">Local Intelligence</span>
-						</div>
-						<p class="senpai-line" id="senpai-line">Your “diversified” portfolio is four tech stocks in a trench coat.</p>
-						<span class="senpai-hint">Tap for another read →</span>
-					</div>
-				</figure>
-				<div class="senpai-copy reveal">
-					<span class="kicker">Meet Senpai</span>
-					<h3>An orb in the corner, with opinions</h3>
-					<p>
-						Senpai watches your portfolio and drops the occasional read — sharp when Claude is narrating,
-						dry on Local Intelligence, quietly sympathetic when Claude is offline. It doesn't manage your
-						money. It just makes sure you're not staring at a red Tuesday alone.
-					</p>
-					<a class="text-link" href={doc('meet-senpai')}>Say hello to Senpai →</a>
+			<!-- ═══ ACT 7 · TRUST ════════════════════════════════════════════ -->
+			<section class="act trust" id="act-trust" data-hue="teal">
+				<div class="act-head reveal">
+					<span class="kicker">Trust &amp; local-first</span>
+					<h2 class="section-title">Open source. Traceable builds. Your data stays on your machine.</h2>
 				</div>
-			</section>
-
-			<!-- ── Download ─────────────────────────────────────────────────── -->
-			<section class="cards" id="download">
-				<h2 class="section-title reveal">Download</h2>
-				<div class="cards-grid">
-					<article class="card reveal">
-						<div class="card-head">
-							<h3>macOS</h3>
-							<span class="arch">arm64 · Apple Silicon</span>
+				<div class="trust-console grad-border reveal">
+					<div class="tc-col">
+						<div class="tc-item"><span class="tc-ic tc-ic-trace" aria-hidden="true"></span>
+							<div><b>Every build is traceable</b><p>Each download links back to its Release, the commit it was built from, and the Actions run that produced it.</p></div>
 						</div>
-						<p>A native app window — no Python, no terminal. Runs on macOS 11 Big Sur and newer.</p>
-						<a class="card-btn" href={RELEASES_LATEST} data-os="mac" data-role="card-dl">Download .dmg</a>
-						<a class="card-more" href={doc('install-macos')}>Install guide →</a>
-					</article>
-					<article class="card reveal">
-						<div class="card-head">
-							<h3>Windows</h3>
-							<span class="arch">x64 · Windows 10/11</span>
+						<div class="tc-item"><span class="tc-ic tc-ic-lock" aria-hidden="true"></span>
+							<div><b>Your data stays local</b><p>Holdings and config live in SQLite and a local <code>.env</code>. Market data comes from Yahoo Finance; Claude is called only when you enable it.</p></div>
 						</div>
-						<p>A clean per-user installer — no admin rights required. Uninstalls cleanly from Apps &amp; Features.</p>
-						<a class="card-btn" href={RELEASES_LATEST} data-os="win" data-role="card-dl">Download .exe</a>
-						<a class="card-more" href={doc('install-windows')}>Install guide →</a>
-					</article>
-				</div>
-				<p class="cards-note reveal">
-					Early builds aren't code-signed yet, so macOS and Windows show a first-launch warning. That's expected for
-					an open-source app — the <a href={doc('download')}>install guides</a> show exactly what you'll see.
-				</p>
-			</section>
-
-			<!-- ── Trust / security ─────────────────────────────────────────── -->
-			<section class="trust">
-				<h2 class="section-title reveal">Open source. Traceable builds. Your data stays on your machine.</h2>
-				<div class="trust-grid reveal-group">
-					<div class="trust-item reveal">
-						<h3>Every build is traceable</h3>
-						<p>Each download links back to its GitHub Release, the commit it was built from, and the Actions run that produced it.</p>
 					</div>
-					<div class="trust-item reveal">
-						<h3>Verify your download</h3>
-						<p>Each release ships a <code>SHA256SUMS.txt</code>. Check your file matches before opening it:</p>
+					<div class="tc-verify">
+						<div class="tc-verify-head"><span class="tc-hash" id="tc-hash" aria-hidden="true"></span> Verify your download</div>
+						<p>Each release ships a <code>SHA256SUMS.txt</code>. Check your file before opening it:</p>
 						<div class="code" data-copy={'shasum -a 256 -c SHA256SUMS.txt'}>
 							<code>shasum -a 256 -c SHA256SUMS.txt</code>
 							<button class="copy" type="button" aria-label="Copy command">Copy</button>
 						</div>
 					</div>
-					<div class="trust-item reveal">
-						<h3>Your data stays local</h3>
-						<p>Holdings and config live in SQLite and a local <code>.env</code> on your machine. Market data comes from Yahoo Finance; Claude is called only when you enable it.</p>
-					</div>
 				</div>
 			</section>
 
-			<!-- ── For developers ───────────────────────────────────────────── -->
-			<section class="dev">
-				<h2 class="section-title reveal">For developers</h2>
-				<div class="dev-grid reveal">
-					<div class="code" data-copy={`git clone ${GITHUB}.git\ncd FolioSenseAI\n./scripts/setup.sh`}>
-						<code>git clone {GITHUB}.git<br/>cd FolioSenseAI<br/>./scripts/setup.sh</code>
-						<button class="copy" type="button" aria-label="Copy command">Copy</button>
+			<!-- ═══ ACT 8a · DOWNLOAD ════════════════════════════════════════ -->
+			<section class="act download" id="act-download" data-hue="cyan">
+				<div class="act-head reveal">
+					<span class="kicker">Download</span>
+					<h2 class="section-title">Runs on your machine. No Python, no account.</h2>
+				</div>
+				<div class="dl-grid">
+					<article class="dl-card grad-border reveal" data-plat="mac">
+						<span class="dl-glyph dl-glyph-mac" aria-hidden="true"></span>
+						<div class="dl-head"><h3>macOS</h3><span class="arch">arm64 · Apple Silicon</span></div>
+						<p>A native app window — no terminal. macOS 11 Big Sur and newer.</p>
+						<a class="dl-btn" href={RELEASES_LATEST} data-os="mac" data-role="card-dl">Download .dmg</a>
+						<a class="dl-more" href={doc('install-macos')}>Install guide →</a>
+					</article>
+					<article class="dl-card grad-border reveal" data-plat="win">
+						<span class="dl-glyph dl-glyph-win" aria-hidden="true"></span>
+						<div class="dl-head"><h3>Windows</h3><span class="arch">x64 · Windows 10/11</span></div>
+						<p>A clean per-user installer — no admin rights. Uninstalls cleanly.</p>
+						<a class="dl-btn" href={RELEASES_LATEST} data-os="win" data-role="card-dl">Download .exe</a>
+						<a class="dl-more" href={doc('install-windows')}>Install guide →</a>
+					</article>
+				</div>
+				<p class="dl-note reveal">Early builds aren’t code-signed yet, so macOS and Windows show a first-launch warning — expected for an open-source app. The <a href={doc('download')}>install guides</a> show exactly what you’ll see.</p>
+			</section>
+
+			<!-- ═══ ACT 8b · DEVELOPER CONSOLE ═══════════════════════════════ -->
+			<section class="act dev" id="act-dev" data-hue="peri">
+				<div class="dev-console grad-border reveal">
+					<div class="dev-pitch">
+						<span class="kicker">Open source</span>
+						<h2>Build it yourself.</h2>
+						<p>A compact FastAPI + SQLite app with no frontend build step. Clone it, run it, pull it apart one service at a time.</p>
+						<div class="dev-pills">
+							<a class="pill" href={doc('build-from-source')}>Build from source →</a>
+							<a class="pill" href={doc('releases-and-versioning')}>Release &amp; versioning →</a>
+							<a class="pill" href={`${RELEASES}/tag/latest-main`}>Latest-main build →</a>
+							<a class="pill" href={GITHUB}>GitHub repository →</a>
+						</div>
+						<div class="dev-verify">
+							<span class="tc-hash" aria-hidden="true"></span>
+							<div><b>Every release ships checksums.</b>
+								<div class="code code--inline" data-copy={'shasum -a 256 -c SHA256SUMS.txt'}>
+									<code>shasum -a 256 -c SHA256SUMS.txt</code>
+									<button class="copy" type="button" aria-label="Copy command">Copy</button>
+								</div>
+							</div>
+						</div>
 					</div>
-					<div class="dev-links">
-						<a href={doc('build-from-source')}>Build from source →</a>
-						<a href={doc('releases-and-versioning')}>Release &amp; versioning →</a>
-						<a href={`${RELEASES}/tag/latest-main`}>Latest-main build →</a>
-						<a href={GITHUB}>GitHub repository →</a>
+
+					<div class="terminal" id="terminal">
+						<div class="term-bar"><span></span><span></span><span></span><span class="term-title">foliosenseai — zsh</span></div>
+						<div class="term-tabs" role="tablist">
+							<button class="term-tab is-active" data-tab="clone" role="tab" type="button">Clone</button>
+							<button class="term-tab" data-tab="mac" role="tab" type="button">macOS · Linux</button>
+							<button class="term-tab" data-tab="win" role="tab" type="button">Windows</button>
+						</div>
+						<div class="term-body">
+							<pre class="term-pane is-active" data-tab="clone" data-copy={`git clone ${GITHUB}.git\ncd FolioSenseAI\n./scripts/setup.sh`}><span class="tl"><i>❯</i> git clone {GITHUB}.git</span><span class="tl"><i>❯</i> cd FolioSenseAI</span><span class="tl"><i>❯</i> ./scripts/setup.sh</span><span class="tl to"># venv + deps + first run → localhost:8000</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+							<pre class="term-pane" data-tab="mac" data-copy={macCmd}><span class="tl to"># one-line install (reads the latest release)</span><span class="tl"><i>❯</i> {macCmd}</span><span class="tl to"># FOLIO_REF=latest-main … for the dev channel</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+							<pre class="term-pane" data-tab="win" data-copy={winCmd}><span class="tl to"># PowerShell — one-line install</span><span class="tl"><i>❯</i> {winCmd}</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+						</div>
 					</div>
 				</div>
-				<details class="acc reveal">
-					<summary>One-line install (advanced)</summary>
-					<div class="acc-body">
-						<p>Prefer a script? These download the source and set up a local Python environment. Read them first — they're short and open-source: <a href={`${GITHUB}/blob/main/scripts/install-mac.sh`}>mac</a> · <a href={`${GITHUB}/blob/main/scripts/install-win.ps1`}>win</a>.</p>
-						<p class="mini">macOS / Linux</p>
-						<div class="code" data-copy={macCommands}>
-							<code>{macCommands}</code>
-							<button class="copy" type="button" aria-label="Copy command">Copy</button>
-						</div>
-						<p class="mini">Windows PowerShell</p>
-						<div class="code" data-copy={winCommands}>
-							<code>{winCommands}</code>
-							<button class="copy" type="button" aria-label="Copy command">Copy</button>
-						</div>
-					</div>
-				</details>
 			</section>
 		</main>
 
@@ -410,589 +462,237 @@ const icons = {
 			<div class="footer-inner">
 				<div class="footer-brand">
 					<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" id="senpai-egg" />
-					<div>
-						<strong>FolioSenseAI</strong>
-						<p id="senpai-quip">Not financial advice. Very much a dashboard.</p>
-					</div>
+					<div><strong>FolioSenseAI</strong><p id="senpai-quip">Not financial advice. Very much a dashboard.</p></div>
 				</div>
 				<nav class="footer-links">
-					<a href={GITHUB}>GitHub</a>
-					<a href={doc('get-started/introduction')}>Docs</a>
-					<a href={RELEASES}>Releases</a>
-					<a href={`${GITHUB}/blob/main/LICENSE`}>MIT License</a>
+					<a href={GITHUB}>GitHub</a><a href={doc('get-started/introduction')}>Docs</a>
+					<a href={RELEASES}>Releases</a><a href={`${GITHUB}/blob/main/LICENSE`}>MIT License</a>
 				</nav>
 			</div>
 		</footer>
 
 		<script define:vars={{ API: `https://api.github.com/repos/${REPO}/releases/latest`, TAGS_API: `https://api.github.com/repos/${REPO}/git/refs/tags` }}>
-			// ── OS-aware CTA ──────────────────────────────────────────────────
-			function detectOS() {
+			const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+			// ── OS-aware CTA ──────────────────────────────────────────────
+			const os = (() => {
 				const p = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '').toLowerCase();
-				if (p.includes('mac')) return 'mac';
-				if (p.includes('win')) return 'win';
-				return 'other';
-			}
-			const os = detectOS();
+				return p.includes('mac') ? 'mac' : p.includes('win') ? 'win' : 'other';
+			})();
 			if (os !== 'other') {
 				document.querySelectorAll('.btn[data-os]').forEach((b) => {
-					if (b.getAttribute('data-os') === os) b.classList.add('is-preferred');
-					else b.classList.add('is-secondary');
+					b.classList.add(b.getAttribute('data-os') === os ? 'is-preferred' : 'is-secondary');
 				});
 			}
 
-			// ── Live release metadata (with graceful fallback) ───────────────
-			function fmtBytes(n) {
-				if (!n) return '';
-				const mb = n / (1024 * 1024);
-				return mb >= 1 ? `${mb.toFixed(0)} MB` : `${(n / 1024).toFixed(0)} KB`;
-			}
-			function fmtDate(iso) {
-				try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
-				catch { return ''; }
-			}
-			function pickAsset(assets, ext) {
-				return assets.find((a) => a.name.toLowerCase().endsWith(ext));
-			}
+			// ── Live release metadata (graceful fallback to static links) ──
+			const fmtBytes = (n) => n ? (n >= 1048576 ? `${(n / 1048576).toFixed(0)} MB` : `${(n / 1024).toFixed(0)} KB`) : '';
+			const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return ''; } };
+			const pick = (assets, ext) => assets.find((a) => a.name.toLowerCase().endsWith(ext));
 			function applyRelease(data) {
 				if (!data || !data.assets) return;
-				const dmg = pickAsset(data.assets, '.dmg');
-				const exe = pickAsset(data.assets, '.exe');
-				const setBtn = (id, assetObj) => {
-					const btn = document.getElementById(id);
-					if (!btn || !assetObj) return;
-					btn.href = assetObj.browser_download_url;
-					const meta = btn.querySelector('[data-role="meta"]');
-					if (meta) meta.textContent = `${data.tag_name} · ${fmtBytes(assetObj.size)}`;
-				};
-				setBtn('dl-mac', dmg);
-				setBtn('dl-win', exe);
-				document.querySelectorAll('[data-role="card-dl"]').forEach((el) => {
-					const a = el.getAttribute('data-os') === 'mac' ? dmg : exe;
-					if (a) el.href = a.browser_download_url;
-				});
-
+				const dmg = pick(data.assets, '.dmg'), exe = pick(data.assets, '.exe');
+				const setBtn = (id, a) => { const b = document.getElementById(id); if (!b || !a) return; b.href = a.browser_download_url; const m = b.querySelector('[data-role="meta"]'); if (m) m.textContent = `${data.tag_name} · ${fmtBytes(a.size)}`; };
+				setBtn('dl-mac', dmg); setBtn('dl-win', exe);
+				document.querySelectorAll('[data-role="card-dl"]').forEach((el) => { const a = el.getAttribute('data-os') === 'mac' ? dmg : exe; if (a) el.href = a.browser_download_url; });
 				const strip = document.getElementById('release-strip');
 				if (strip) {
-					const set = (role, text) => { const el = strip.querySelector(`[data-role="${role}"]`); if (el) el.textContent = text; };
-					set('version', data.tag_name || '—');
-					set('date', fmtDate(data.published_at));
-					const link = strip.querySelector('[data-role="release-link"]');
-					if (link && data.html_url) link.href = data.html_url;
+					const set = (r, t) => { const el = strip.querySelector(`[data-role="${r}"]`); if (el) el.textContent = t; };
+					set('version', data.tag_name || '—'); set('date', fmtDate(data.published_at));
+					const link = strip.querySelector('[data-role="release-link"]'); if (link && data.html_url) link.href = data.html_url;
 					strip.hidden = false;
-					// Best-effort commit SHA from the tag ref (non-blocking).
-					// Lightweight tags point straight at a commit (object.type === "commit").
-					// Annotated tags point at a tag object whose own .sha is NOT a commit — it
-					// has to be dereferenced one level via object.url to reach the commit.
 					if (data.tag_name) {
 						fetch(`${TAGS_API}/${data.tag_name}`, { headers: { Accept: 'application/vnd.github+json' } })
 							.then((r) => (r.ok ? r.json() : null))
-							.then((ref) => {
-								if (!ref?.object) return null;
-								if (ref.object.type === 'commit') return ref.object.sha;
-								return fetch(ref.object.url, { headers: { Accept: 'application/vnd.github+json' } })
-									.then((r) => (r.ok ? r.json() : null))
-									.then((tagObj) => tagObj?.object?.sha || null);
-							})
-							.then((sha) => {
-								if (sha) {
-									const el = strip.querySelector('[data-role="sha"]');
-									if (el) { el.textContent = sha.slice(0, 7); el.hidden = false; }
-								}
-							})
+							.then((ref) => { if (!ref?.object) return null; if (ref.object.type === 'commit') return ref.object.sha; return fetch(ref.object.url).then((r) => (r.ok ? r.json() : null)).then((t) => t?.object?.sha || null); })
+							.then((sha) => { if (sha) { const el = strip.querySelector('[data-role="sha"]'); if (el) { el.textContent = sha.slice(0, 7); el.hidden = false; } } })
 							.catch(() => {});
 					}
 				}
 			}
-			async function loadRelease() {
+			(async () => {
 				const key = 'fs-release-latest';
 				try {
-					const cached = sessionStorage.getItem(key);
-					if (cached) { applyRelease(JSON.parse(cached)); return; }
+					const c = sessionStorage.getItem(key);
+					if (c) { applyRelease(JSON.parse(c)); return; }
 					const r = await fetch(API, { headers: { Accept: 'application/vnd.github+json' } });
-					if (!r.ok) return; // keep static fallback links
+					if (!r.ok) return;
 					const data = await r.json();
 					sessionStorage.setItem(key, JSON.stringify(data));
 					applyRelease(data);
-				} catch { /* offline / rate-limited → static fallbacks remain */ }
-			}
-			loadRelease();
+				} catch { /* offline → static fallbacks stay */ }
+			})();
 
-			// ── Copy buttons ─────────────────────────────────────────────────
-			document.querySelectorAll('.code .copy').forEach((btn) => {
+			// ── Copy buttons ──────────────────────────────────────────────
+			document.querySelectorAll('.copy').forEach((btn) => {
 				btn.addEventListener('click', async () => {
-					const text = btn.closest('.code')?.getAttribute('data-copy') || '';
+					const text = btn.closest('[data-copy]')?.getAttribute('data-copy') || '';
 					try {
 						await navigator.clipboard.writeText(text);
-						const prev = btn.textContent;
-						btn.textContent = '✓ Copied';
-						btn.classList.add('copied');
+						const prev = btn.textContent; btn.textContent = '✓ Copied'; btn.classList.add('copied');
 						setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1400);
-					} catch { /* clipboard blocked — no-op */ }
+					} catch { /* clipboard blocked */ }
 				});
 			});
 
-			// ── Reduced-motion gate ──────────────────────────────────────────
-			const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-			// ── Scroll reveal ────────────────────────────────────────────────
+			// ── Reveals (with blur-resolve) ───────────────────────────────
 			if (reduce || !('IntersectionObserver' in window)) {
 				document.querySelectorAll('.reveal').forEach((el) => el.classList.add('shown'));
 			} else {
-				const io = new IntersectionObserver((entries) => {
-					entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('shown'); io.unobserve(e.target); } });
-				}, { threshold: 0.12 });
+				const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('shown'); io.unobserve(e.target); } }), { threshold: 0.14 });
 				document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
 			}
 
-			// ── Hero: floating-chip parallax (subtle, pointer-fine only) ─────
+			// ── Per-act chapter tint ──────────────────────────────────────
+			if ('IntersectionObserver' in window) {
+				const tintIO = new IntersectionObserver((es) => {
+					es.forEach((e) => { if (e.isIntersecting) document.body.setAttribute('data-hue', e.target.getAttribute('data-hue') || 'cyan'); });
+				}, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+				document.querySelectorAll('.act[data-hue]').forEach((el) => tintIO.observe(el));
+			}
+
+			// ── Shared active-visibility controller: videos + loop pausing ─
+			if ('IntersectionObserver' in window) {
+				const activeIO = new IntersectionObserver((es) => {
+					es.forEach((e) => {
+						const el = e.target;
+						if (el.tagName === 'VIDEO') { if (reduce) return; e.isIntersecting ? el.play().catch(() => {}) : el.pause(); }
+						else el.classList.toggle('in-view', e.isIntersecting);
+					});
+				}, { threshold: 0.35 });
+				document.querySelectorAll('.demo-loop, .wf-stage, .artifact, #demo-card, .term-body').forEach((el) => activeIO.observe(el));
+			}
+			const demoCard = document.getElementById('demo-card');
+			if (demoCard && !reduce) demoCard.classList.add('js-anim');
+			if (reduce) document.querySelectorAll('.demo-loop').forEach((v) => v.setAttribute('controls', ''));
+
+			// ── Hero: chip parallax + signal convergence + region tour ────
 			const stage = document.getElementById('hero-stage');
 			if (stage && !reduce && window.matchMedia('(pointer:fine)').matches) {
 				const chips = stage.querySelectorAll('.chip-float');
 				stage.addEventListener('pointermove', (e) => {
 					const r = stage.getBoundingClientRect();
-					const dx = (e.clientX - r.left) / r.width - 0.5;
-					const dy = (e.clientY - r.top) / r.height - 0.5;
-					chips.forEach((c) => {
-						const d = parseFloat(c.getAttribute('data-depth') || '0');
-						c.style.transform = `translate(${dx * d}px, ${dy * d}px)`;
-					});
+					const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
+					chips.forEach((c) => { const d = parseFloat(c.getAttribute('data-depth') || '0'); c.style.transform = `translate(${dx * d}px, ${dy * d}px)`; });
 				});
-				stage.addEventListener('pointerleave', () => { chips.forEach((c) => { c.style.transform = ''; }); });
+				stage.addEventListener('pointerleave', () => chips.forEach((c) => { c.style.transform = ''; }));
 			}
-
-			// ── Hero: region-fitting guided tour (morphs between hotspots) ───
-			const region = document.getElementById('spot-region');
-			const regionTip = document.getElementById('spot-region-tip');
-			const tourLive = document.getElementById('tour-live');
-			const heroWindow = document.getElementById('hero-window');
+			const region = document.getElementById('spot-region'), regionTip = document.getElementById('spot-region-tip'), heroWindow = document.getElementById('hero-window');
 			if (region && regionTip && heroWindow) {
-				// x/y/w/h as % of the screenshot; tuned to the demo dashboard regions.
 				const hotspots = [
-					{ x: 2.5, y: 39, w: 24, h: 20, label: 'Live value & today’s P&L' },
-					{ x: 50, y: 39, w: 22, h: 16, label: 'What moved, in dollars' },
-					{ x: 2, y: 61, w: 40, h: 34, label: 'Look-through sector exposure' },
-					{ x: 43, y: 61, w: 55, h: 34, label: 'Today’s impact, in plain English' },
-					{ x: 74, y: 80, w: 22, h: 16, label: 'Senpai reads the room' },
+					{ x: 2, y: 12, w: 26, h: 22, label: 'Live value & today’s P&L' },
+					{ x: 51, y: 12, w: 24, h: 20, label: 'What moved, in dollars' },
+					{ x: 2, y: 40, w: 40, h: 42, label: 'Look-through sector exposure' },
+					{ x: 43, y: 40, w: 55, h: 42, label: 'Today’s impact, in plain English' },
 				];
 				let hi = 0, timer = null, paused = false;
-				const place = (h) => {
-					region.style.left = h.x + '%'; region.style.top = h.y + '%';
-					region.style.width = h.w + '%'; region.style.height = h.h + '%';
-					regionTip.textContent = h.label;
-					if (tourLive) tourLive.textContent = h.label;
-				};
+				const place = (h) => { region.style.left = h.x + '%'; region.style.top = h.y + '%'; region.style.width = h.w + '%'; region.style.height = h.h + '%'; regionTip.textContent = h.label; };
 				place(hotspots[0]);
 				if (!reduce) {
 					region.classList.add('is-live');
 					const step = () => { if (!paused) { hi = (hi + 1) % hotspots.length; place(hotspots[hi]); } };
-					const start = () => { if (!timer) timer = setInterval(step, 3200); };
-					const stop = () => { clearInterval(timer); timer = null; };
+					let started = false;
 					heroWindow.addEventListener('pointerenter', () => { paused = true; });
 					heroWindow.addEventListener('pointerleave', () => { paused = false; });
 					if ('IntersectionObserver' in window) {
-						new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? start() : stop())), { threshold: 0.2 }).observe(heroWindow);
-					} else { start(); }
-				}
+						new IntersectionObserver((es) => es.forEach((e) => {
+							if (e.isIntersecting) { if (!timer) timer = setInterval(step, 3200); if (!started) { started = true; region.classList.add('show'); } }
+							else { clearInterval(timer); timer = null; }
+						}), { threshold: 0.25 }).observe(heroWindow);
+					} else { region.classList.add('show'); timer = setInterval(step, 3200); }
+				} else { region.classList.add('show'); }
 			}
 
-			// ── Demo loops + panel choreography: run only while on-screen ────
-			if ('IntersectionObserver' in window) {
-				const activeIO = new IntersectionObserver((entries) => {
-					entries.forEach((e) => {
-						const el = e.target;
-						if (el.tagName === 'VIDEO') {
-							if (reduce) return;               // posters only under reduced motion
-							if (e.isIntersecting) el.play().catch(() => {}); else el.pause();
-						} else if (e.isIntersecting) {
-							el.classList.add('play');         // demo panel: play once, keep final state
+			// ── Workflow: active step drives the sticky stage ─────────────
+			const wfStage = document.getElementById('wf-stage');
+			if (wfStage && 'IntersectionObserver' in window) {
+				const stepEls = [...document.querySelectorAll('.wf-step')];
+				const wfIO = new IntersectionObserver((es) => {
+					es.forEach((e) => {
+						if (e.isIntersecting) {
+							const n = e.target.getAttribute('data-step');
+							wfStage.setAttribute('data-step', n);
+							stepEls.forEach((s) => s.classList.toggle('is-active', s === e.target));
 						}
 					});
-				}, { threshold: 0.35 });
-				document.querySelectorAll('.demo-loop, #demo-card').forEach((el) => activeIO.observe(el));
+				}, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+				stepEls.forEach((s) => wfIO.observe(s));
 			}
-			// JS-armed animation: without JS the panel/bars render in their final state.
-			const demoCard = document.getElementById('demo-card');
-			if (demoCard && !reduce) demoCard.classList.add('js-anim');
-			if (reduce) document.querySelectorAll('.demo-loop').forEach((v) => v.setAttribute('controls', ''));
 
-			// ── Senpai: breathing card that types its read on reveal ────────
-			const senpaiCard = document.getElementById('senpai-card');
-			const senpaiLine = document.getElementById('senpai-line');
-			if (senpaiCard && senpaiLine) {
-				const lines = [
-					senpaiLine.textContent.trim(),
-					'VOO did the heavy lifting again. SCHD quietly paid you to wait.',
-					'Beta 0.85 — you’ll lag the rip and dodge the worst of the dip.',
-					'MSFT leads the book. Concentration’s fine — just know it’s there.',
-					'Technology is 17% of your look-through exposure. Eyes open.',
-				];
-				let idx = 0, typing = null;
-				const type = (text) => {
-					clearTimeout(typing);
-					if (reduce) { senpaiLine.textContent = text; return; }
-					senpaiLine.classList.add('is-typing');
-					let i = 0;
-					const tick = () => {
-						senpaiLine.textContent = text.slice(0, i++);
-						if (i <= text.length) typing = setTimeout(tick, 22);
-						else senpaiLine.classList.remove('is-typing');
-					};
-					tick();
+			// ── Terminal: tabs + type-in on first reveal ──────────────────
+			const term = document.getElementById('terminal');
+			if (term) {
+				const tabs = term.querySelectorAll('.term-tab'), panes = term.querySelectorAll('.term-pane');
+				const activate = (name) => {
+					tabs.forEach((t) => t.classList.toggle('is-active', t.getAttribute('data-tab') === name));
+					panes.forEach((p) => p.classList.toggle('is-active', p.getAttribute('data-tab') === name));
 				};
-				let armed = false;
-				const fire = () => { if (!armed) { armed = true; type(lines[0]); } };
-				if ('IntersectionObserver' in window && !reduce) {
-					new IntersectionObserver((es, ob) => es.forEach((e) => { if (e.isIntersecting) { fire(); ob.disconnect(); } }), { threshold: 0.5 }).observe(senpaiCard);
-				} else { fire(); }
-				senpaiCard.addEventListener('click', () => { idx = (idx + 1) % lines.length; type(lines[idx]); });
+				tabs.forEach((t) => t.addEventListener('click', () => activate(t.getAttribute('data-tab'))));
+				if (!reduce && 'IntersectionObserver' in window) {
+					const typeIO = new IntersectionObserver((es, ob) => es.forEach((e) => {
+						if (e.isIntersecting) { term.classList.add('typed'); ob.disconnect(); }
+					}), { threshold: 0.4 });
+					typeIO.observe(term);
+				} else { term.classList.add('typed'); }
 			}
 
-			// ── Senpai footer easter egg ─────────────────────────────────────
+			// ── Senpai rail: scroll progress + section-aware bubbles ──────
+			const rail = document.getElementById('rail'), orb = document.getElementById('rail-orb'),
+				bubble = document.getElementById('rail-bubble'), railLive = document.getElementById('rail-live'),
+				railDismiss = document.getElementById('rail-dismiss');
+			const LINES = {
+				'act-hero': 'I read the portfolio so you don’t stare at a red Tuesday alone.',
+				'act-workflow': 'Three steps. I do the middle one.',
+				'act-features': 'Beta 0.85 — you’ll lag the rip, dodge the worst of the dip.',
+				'act-demo': 'Fake holdings. Real workflow. Commentary: complimentary.',
+				'act-trust': 'Local-first. Your database never texts anyone.',
+				'act-download': 'Pick your platform. I’ll behave. Mostly.',
+				'act-dev': 'Or build me yourself. I’m flattered either way.',
+			};
+			if (rail && orb && bubble && localStorage.getItem('fs-rail') !== 'off') {
+				rail.classList.add('on');
+				let bubbleTimer = null, curAct = '';
+				const showBubble = (text) => {
+					bubble.textContent = text; bubble.hidden = false;
+					requestAnimationFrame(() => bubble.classList.add('show'));
+					if (railLive) railLive.textContent = text;
+					clearTimeout(bubbleTimer);
+					bubbleTimer = setTimeout(() => bubble.classList.remove('show'), 6000);
+				};
+				// progress: orb travels the rail with scroll
+				let ticking = false;
+				const onScroll = () => {
+					if (ticking) return; ticking = true;
+					requestAnimationFrame(() => {
+						const p = Math.min(1, Math.max(0, window.scrollY / (document.body.scrollHeight - window.innerHeight)));
+						orb.style.setProperty('--p', p);
+						ticking = false;
+					});
+				};
+				window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+				if ('IntersectionObserver' in window) {
+					const actIO = new IntersectionObserver((es) => es.forEach((e) => {
+						if (e.isIntersecting && e.target.id !== curAct) {
+							curAct = e.target.id;
+							const line = LINES[curAct];
+							if (line && !reduce) { orb.classList.remove('pulse'); void orb.offsetWidth; orb.classList.add('pulse'); showBubble(line); }
+						}
+					}), { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+					document.querySelectorAll('.act[id]').forEach((el) => actIO.observe(el));
+				}
+				orb.addEventListener('click', () => { if (LINES[curAct]) showBubble(LINES[curAct]); });
+				railDismiss?.addEventListener('click', () => { rail.classList.remove('on'); rail.classList.add('off'); localStorage.setItem('fs-rail', 'off'); });
+			}
+
+			// ── Footer Senpai easter egg ──────────────────────────────────
 			const quips = [
 				'Not financial advice. Very much a dashboard.',
-				'Your "diversified" portfolio is four tech stocks in a trench coat.',
+				'Your “diversified” portfolio is four tech stocks in a trench coat.',
 				'The line went up. I have theories about why.',
-				'I watch your portfolio so you don’t have to stare at it alone.',
 				'Green Tuesday? I’ll take partial credit.',
 			];
-			let qi = 0;
-			const egg = document.getElementById('senpai-egg');
-			const quip = document.getElementById('senpai-quip');
+			let qi = 0; const egg = document.getElementById('senpai-egg'), quip = document.getElementById('senpai-quip');
 			egg?.addEventListener('click', () => { qi = (qi + 1) % quips.length; if (quip) quip.textContent = quips[qi]; });
 		</script>
-
-		<style>
-			:root {
-				--cyan: #6fd6f0;
-				--peri: #97acec;
-				--bg: #050508;
-				--bg-soft: #0c0c12;
-				--panel: rgba(255, 255, 255, 0.04);
-				--panel-2: rgba(255, 255, 255, 0.06);
-				--panel-border: rgba(255, 255, 255, 0.09);
-				--text: #f5f5f7;
-				--muted: #9a9aa6;
-				--radius: 16px;
-				--maxw: 1140px;
-				--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-				--ease-std: cubic-bezier(0.4, 0, 0.2, 1);
-				--ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
-				--stagger: 80ms;
-			}
-			* { box-sizing: border-box; }
-			html { scroll-behavior: smooth; }
-			body {
-				margin: 0;
-				background: var(--bg);
-				color: var(--text);
-				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-				line-height: 1.6;
-				-webkit-font-smoothing: antialiased;
-				overflow-x: hidden;
-			}
-			a { color: var(--cyan); text-decoration: none; }
-			a:hover { text-decoration: underline; }
-			code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-			:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
-
-			.backdrop {
-				position: fixed; inset: 0; z-index: -1;
-				background:
-					radial-gradient(60% 50% at 50% -10%, rgba(111, 214, 240, 0.16), transparent 70%),
-					radial-gradient(50% 40% at 88% 8%, rgba(151, 172, 236, 0.13), transparent 70%),
-					radial-gradient(45% 45% at 8% 24%, rgba(111, 214, 240, 0.08), transparent 70%),
-					var(--bg);
-			}
-
-			.topbar {
-				display: flex; align-items: center; justify-content: space-between;
-				max-width: var(--maxw); margin: 0 auto; padding: 1.1rem 1.5rem;
-			}
-			.brand { display: flex; align-items: center; gap: 0.55rem; color: var(--text); font-weight: 650; }
-			.brand:hover { text-decoration: none; }
-			.topnav { display: flex; align-items: center; gap: 1.3rem; font-size: 0.94rem; }
-			.topnav a { color: var(--muted); }
-			.topnav a:hover { color: var(--text); text-decoration: none; }
-			.topnav .ghost { color: var(--text); }
-
-			main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
-			section { padding: 4rem 0; }
-			.section-title { font-size: clamp(1.5rem, 3.2vw, 2rem); text-align: center; margin: 0 auto 2.2rem; letter-spacing: -0.02em; max-width: 22ch; line-height: 1.2; }
-
-			/* ── Hero ── */
-			.hero {
-				display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
-				padding-top: 2.5rem; padding-bottom: 3rem;
-			}
-			.eyebrow {
-				display: inline-block; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase;
-				color: var(--cyan); background: rgba(111,214,240,0.08); border: 1px solid rgba(111,214,240,0.25);
-				padding: 0.3rem 0.8rem; border-radius: 999px; margin-bottom: 1.1rem;
-			}
-			.hero h1 {
-				font-size: clamp(2.1rem, 4.4vw, 3.3rem); line-height: 1.06; margin: 0 0 1.1rem;
-				letter-spacing: -0.03em; font-weight: 700;
-				background: linear-gradient(120deg, #fff 30%, var(--cyan) 75%, var(--peri));
-				-webkit-background-clip: text; background-clip: text; color: transparent;
-			}
-			.lede { max-width: 52ch; margin: 0 0 1.8rem; color: var(--muted); font-size: 1.08rem; }
-
-			.cta-row { display: flex; gap: 0.9rem; flex-wrap: wrap; }
-			.btn {
-				display: inline-flex; flex-direction: column; align-items: flex-start;
-				padding: 0.7rem 1.4rem; border-radius: 12px; min-width: 210px;
-				border: 1px solid var(--panel-border); transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-			}
-			.btn:hover { text-decoration: none; transform: translateY(-2px); }
-			.btn-primary { background: linear-gradient(135deg, rgba(111,214,240,0.16), rgba(151,172,236,0.16)); color: var(--text); }
-			.btn-primary:hover { border-color: var(--cyan); box-shadow: 0 8px 30px rgba(111, 214, 240, 0.18); }
-			.btn-title { font-weight: 640; font-size: 1rem; }
-			.btn-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
-			.btn.is-preferred { background: linear-gradient(135deg, var(--cyan), var(--peri)); color: #04121a; border-color: transparent; }
-			.btn.is-preferred .btn-sub { color: rgba(4, 18, 26, 0.7); }
-			.btn.is-secondary { opacity: 0.82; }
-
-			.cta-secondary { margin-top: 1.2rem; color: var(--muted); font-size: 0.94rem; display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
-			.dev-builds { position: relative; }
-			.dev-builds summary { cursor: pointer; color: var(--muted); list-style: none; }
-			.dev-builds summary::-webkit-details-marker { display: none; }
-			.dev-builds summary:hover { color: var(--text); }
-			.dev-panel {
-				position: absolute; top: 1.8rem; left: 0; width: 260px; padding: 0.9rem 1rem; z-index: 5;
-				background: var(--bg-soft); border: 1px solid var(--panel-border); border-radius: 12px;
-				font-size: 0.85rem; text-align: left; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-			}
-			.dev-panel p { margin: 0 0 0.5rem; color: var(--muted); }
-
-			.trust-strip {
-				list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; padding: 0; margin: 1.6rem 0 0;
-				font-size: 0.85rem; color: var(--muted);
-			}
-			.trust-strip li { display: flex; align-items: center; gap: 0.4rem; }
-			.trust-strip li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px rgba(111,214,240,0.6); }
-
-			.release-strip { margin-top: 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
-			.chip {
-				font-size: 0.8rem; color: var(--muted); background: var(--panel);
-				border: 1px solid var(--panel-border); border-radius: 999px; padding: 0.28rem 0.75rem;
-			}
-			.chip-link { color: var(--cyan); }
-			.chip-link:hover { text-decoration: none; border-color: var(--cyan); }
-
-			/* ── Hero stage: screenshot + chips + highlight ── */
-			.hero-stage { position: relative; }
-			.window-chrome {
-				position: relative; width: 100%; border-radius: var(--radius); overflow: hidden;
-				border: 1px solid var(--panel-border); background: var(--bg-soft);
-				box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 60px rgba(111, 214, 240, 0.07);
-			}
-			.window-bar { display: flex; gap: 0.5rem; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--panel-border); background: rgba(0,0,0,0.2); }
-			.window-bar span { width: 11px; height: 11px; border-radius: 50%; background: #3a3a42; }
-			.window-bar span:first-child { background: #ff5f57; }
-			.window-bar span:nth-child(2) { background: #febc2e; }
-			.window-bar span:nth-child(3) { background: #28c840; }
-			.window-chrome img { display: block; width: 100%; height: auto; }
-
-			.chip-float {
-				position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 0.45rem;
-				padding: 0.4rem 0.75rem; font-size: 0.82rem; font-weight: 560; color: var(--text);
-				background: rgba(14, 16, 24, 0.72); border: 1px solid var(--panel-border); border-radius: 10px;
-				backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-				transition: transform 0.25s ease; animation: chip-in 0.7s ease both;
-			}
-			.chip-float--tl { top: 8%; left: -6%; animation-delay: 0.2s; }
-			.chip-float--tr { top: 18%; right: -7%; animation-delay: 0.35s; }
-			.chip-float--bl { bottom: 16%; left: -5%; animation-delay: 0.5s; }
-			.chip-float--br { bottom: 6%; right: -6%; animation-delay: 0.65s; }
-			.dot { width: 7px; height: 7px; border-radius: 50%; }
-			.dot-amber { background: #febc2e; box-shadow: 0 0 8px #febc2e88; }
-			.dot-green { background: #28c840; box-shadow: 0 0 8px #28c84088; }
-			.dot-cyan { background: var(--cyan); box-shadow: 0 0 8px rgba(111,214,240,0.6); }
-			@keyframes chip-in { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
-
-			/* Hero guided tour: a rounded rect that morphs between feature regions */
-			.spot-region { position: absolute; z-index: 2; border-radius: 10px; pointer-events: none;
-				left: 3%; top: 39%; width: 24%; height: 20%; border: 2px solid var(--cyan);
-				box-shadow: inset 0 0 0 1px rgba(111,214,240,0.25), 0 0 26px rgba(111,214,240,0.45);
-				transition: left 0.7s var(--ease-std), top 0.7s var(--ease-std), width 0.7s var(--ease-std), height 0.7s var(--ease-std); }
-			.spot-region.is-live { animation: region-glow 3.2s ease-in-out infinite; }
-			@keyframes region-glow { 0%,100% { box-shadow: inset 0 0 0 1px rgba(111,214,240,0.22), 0 0 18px rgba(111,214,240,0.32); } 50% { box-shadow: inset 0 0 0 1px rgba(111,214,240,0.45), 0 0 32px rgba(111,214,240,0.6); } }
-			.spot-region-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
-				white-space: nowrap; font-size: 0.72rem; color: var(--text);
-				background: rgba(14,16,24,0.92); border: 1px solid var(--panel-border); border-radius: 7px;
-				padding: 0.25rem 0.55rem; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-			.spot-shot { margin: 0; }
-			.spot-shot--still img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; }
-			.demo-loop { display: block; width: 100%; height: auto; background: var(--bg-soft); }
-			.demo-tag { display: inline-block; margin-top: 0.9rem; font-size: 0.72rem; color: var(--cyan);
-				background: rgba(111,214,240,0.08); border: 1px solid rgba(111,214,240,0.22); padding: 0.2rem 0.6rem; border-radius: 999px; }
-
-			.mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1rem; }
-			.mini { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 1.4rem; }
-			.mini-ic { width: 26px; height: 26px; color: var(--cyan); }
-			.mini h4 { margin: 0.7rem 0 0.35rem; font-size: 1.02rem; }
-			.mini p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-
-			/* ── Demo panel ── */
-			.demo-head { text-align: center; }
-			.demo-head .section-title { margin-bottom: 0.7rem; }
-			.demo-badge {
-				display: inline-block; font-size: 0.78rem; color: var(--cyan);
-				background: rgba(111,214,240,0.08); border: 1px solid rgba(111,214,240,0.25);
-				padding: 0.3rem 0.8rem; border-radius: 999px; margin-bottom: 2rem;
-			}
-			.demo-card { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 1.6rem; backdrop-filter: blur(8px); }
-			.demo-table { display: flex; flex-direction: column; }
-			.demo-row { display: grid; grid-template-columns: 2fr 1fr 1.4fr 0.9fr; gap: 0.8rem; align-items: center; padding: 0.7rem 0; border-bottom: 1px solid var(--panel-border); font-size: 0.92rem; }
-			.demo-row:last-child { border-bottom: none; }
-			.demo-row--head { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-			.demo-row strong { color: var(--text); font-weight: 660; margin-right: 0.35rem; }
-			.demo-row span[role="cell"] { color: var(--muted); }
-			.demo-row--watch { opacity: 0.78; }
-			.bar { display: inline-block; width: var(--w); max-width: 78px; height: 6px; border-radius: 3px; margin-right: 0.5rem; vertical-align: middle; background: linear-gradient(90deg, var(--cyan), var(--peri)); }
-			.v-buy { color: #28c840; font-style: normal; font-weight: 600; }
-			.v-hold { color: var(--cyan); font-style: normal; font-weight: 600; }
-			.v-watch { color: #febc2e; font-style: normal; font-weight: 600; }
-			.demo-side { display: flex; flex-direction: column; gap: 0.6rem; border-left: 1px solid var(--panel-border); padding-left: 1.5rem; }
-			.demo-stat { display: flex; flex-direction: column; }
-			.demo-stat span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-			.demo-stat strong { font-size: 0.98rem; font-weight: 600; }
-			.demo-note { margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--muted); font-style: italic; }
-
-			/* ── Senpai ── */
-			.senpai { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 2.5rem; align-items: center; }
-			.senpai-shot { margin: 0; }
-			.senpai-card { background: linear-gradient(160deg, rgba(151,172,236,0.09), var(--panel)); border: 1px solid var(--panel-border);
-				border-radius: 16px; padding: 1.4rem 1.5rem; box-shadow: 0 20px 50px rgba(0,0,0,0.45); cursor: pointer;
-				transition: transform 0.2s var(--ease-out), border-color 0.2s ease; }
-			.senpai-card:hover { transform: translateY(-2px); border-color: rgba(111,214,240,0.35); }
-			.senpai-card-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.85rem; }
-			.senpai-orb { display: inline-flex; }
-			.senpai-orb img { width: 34px; height: 34px; animation: senpai-breathe 4s ease-in-out infinite; }
-			@keyframes senpai-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-			.senpai-name { font-weight: 680; }
-			.senpai-mode { margin-left: auto; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cyan);
-				background: rgba(111,214,240,0.08); border: 1px solid rgba(111,214,240,0.25); padding: 0.2rem 0.55rem; border-radius: 999px; }
-			.senpai-line { margin: 0 0 0.9rem; font-size: 1.05rem; line-height: 1.5; min-height: 3.15em; color: var(--text); }
-			.senpai-line.is-typing::after { content: '▍'; color: var(--cyan); animation: caret 1s step-end infinite; }
-			@keyframes caret { 50% { opacity: 0; } }
-			.senpai-hint { font-size: 0.8rem; color: var(--muted); }
-			.senpai-copy h3 { font-size: clamp(1.3rem, 2.6vw, 1.8rem); margin: 0.5rem 0 0.7rem; letter-spacing: -0.02em; }
-			.senpai-copy p { margin: 0 0 1rem; color: var(--muted); }
-			.text-link { font-weight: 600; }
-
-			/* ── Download cards ── */
-			.cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
-			.card {
-				background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
-				padding: 1.6rem; backdrop-filter: blur(8px); transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-			}
-			.card:hover { transform: translateY(-3px); border-color: rgba(111, 214, 240, 0.4); box-shadow: 0 12px 40px rgba(111, 214, 240, 0.1); }
-			.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-			.card-head h3 { margin: 0; font-size: 1.4rem; }
-			.arch { font-size: 0.8rem; color: var(--muted); }
-			.card p { color: var(--muted); font-size: 0.95rem; }
-			.card-btn {
-				display: inline-block; margin-top: 0.4rem; padding: 0.5rem 1.1rem; border-radius: 10px;
-				background: linear-gradient(135deg, var(--cyan), var(--peri)); color: #04121a; font-weight: 620;
-			}
-			.card-btn:hover { text-decoration: none; opacity: 0.92; }
-			.card-more { display: inline-block; margin-top: 0.9rem; margin-left: 0.9rem; font-size: 0.9rem; }
-			.cards-note { text-align: center; color: var(--muted); font-size: 0.9rem; max-width: 60ch; margin: 1.5rem auto 0; }
-
-			/* ── Trust ── */
-			.trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
-			.trust-item { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 1.4rem; }
-			.trust-item h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
-			.trust-item p { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
-
-			/* ── Dev ── */
-			.dev-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.5rem; align-items: center; margin-bottom: 1.2rem; }
-			.dev-links { display: grid; gap: 0.6rem; }
-			.dev-links a { font-size: 0.95rem; }
-			.acc { max-width: 760px; margin: 0 auto; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; overflow: hidden; }
-			.acc summary { cursor: pointer; padding: 0.9rem 1.2rem; font-weight: 600; list-style: none; display: flex; align-items: center; justify-content: space-between; }
-			.acc summary::-webkit-details-marker { display: none; }
-			.acc summary::after { content: '+'; color: var(--muted); font-size: 1.2rem; }
-			.acc[open] summary::after { content: '−'; }
-			.acc-body { padding: 0 1.2rem 1.1rem; color: var(--muted); font-size: 0.94rem; }
-			.acc-body .mini { background: none; border: none; padding: 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0.9rem 0 0.3rem; }
-
-			.code {
-				position: relative; background: #0a0a0f; border: 1px solid var(--panel-border);
-				border-radius: 10px; padding: 0.8rem 3.5rem 0.8rem 0.9rem; margin: 0.4rem 0; overflow-x: auto;
-			}
-			.code code { color: #d8e8ff; white-space: pre-wrap; word-break: break-all; }
-			.copy {
-				position: absolute; top: 0.55rem; right: 0.55rem; padding: 0.25rem 0.6rem;
-				font-size: 0.75rem; border-radius: 7px; cursor: pointer;
-				background: var(--panel); border: 1px solid var(--panel-border); color: var(--muted);
-			}
-			.copy:hover { color: var(--text); border-color: var(--cyan); }
-			.copy.copied { color: var(--cyan); border-color: var(--cyan); }
-
-			/* ── Footer ── */
-			.footer { border-top: 1px solid var(--panel-border); margin-top: 2rem; }
-			.footer-inner {
-				max-width: var(--maxw); margin: 0 auto; padding: 2rem 1.5rem;
-				display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
-			}
-			.footer-brand { display: flex; align-items: center; gap: 0.8rem; }
-			.footer-brand img { cursor: pointer; }
-			.footer-brand strong { font-size: 0.98rem; }
-			.footer-brand p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.85rem; max-width: 42ch; }
-			.footer-links { display: flex; gap: 1.3rem; font-size: 0.9rem; }
-			.footer-links a { color: var(--muted); }
-			.footer-links a:hover { color: var(--text); text-decoration: none; }
-
-			/* ── Reveal ── */
-			/* Stagger groups */
-			.reveal-group > *:nth-child(2) { transition-delay: var(--stagger); }
-			.reveal-group > *:nth-child(3) { transition-delay: calc(var(--stagger) * 2); }
-			.reveal-group > *:nth-child(4) { transition-delay: calc(var(--stagger) * 3); }
-			.reveal-group > *:nth-child(5) { transition-delay: calc(var(--stagger) * 4); }
-			.reveal-group > *:nth-child(6) { transition-delay: calc(var(--stagger) * 5); }
-			/* Demo panel choreography (default = final; JS arms then plays) */
-			.demo-card .bar { transform-origin: left; }
-			.demo-card.js-anim .demo-row { opacity: 0; transform: translateY(10px); }
-			.demo-card.js-anim .bar { transform: scaleX(0); }
-			.demo-card.js-anim.play .demo-row { opacity: 1; transform: none; transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
-			.demo-card.js-anim.play .demo-row:nth-child(2) { transition-delay: 0.06s; }
-			.demo-card.js-anim.play .demo-row:nth-child(3) { transition-delay: 0.14s; }
-			.demo-card.js-anim.play .demo-row:nth-child(4) { transition-delay: 0.22s; }
-			.demo-card.js-anim.play .demo-row:nth-child(5) { transition-delay: 0.30s; }
-			.demo-card.js-anim.play .bar { transform: scaleX(1); transition: transform 0.7s var(--ease-out) 0.32s; }
-			.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-			.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
-			.reveal.shown { opacity: 1; transform: none; }
-
-			/* ── Responsive ── */
-			@media (max-width: 940px) {
-				.hero { grid-template-columns: 1fr; gap: 2.5rem; }
-				.hero-stage { margin-top: 0.5rem; }
-				.chip-float--tl, .chip-float--bl { left: 2%; }
-				.chip-float--tr, .chip-float--br { right: 2%; }
-				.spot, .senpai, .demo-card, .dev-grid { grid-template-columns: 1fr; gap: 1.5rem; }
-				.spot--rev .spot-copy, .spot--rev .spot-shot { order: 0; }
-				.demo-side { border-left: none; border-top: 1px solid var(--panel-border); padding-left: 0; padding-top: 1.2rem; }
-			}
-			@media (max-width: 720px) {
-				.story-grid, .mini-grid, .trust-grid, .cards-grid { grid-template-columns: 1fr; }
-				.btn { min-width: 0; flex: 1 1 100%; }
-				.demo-row { grid-template-columns: 1.6fr 1.2fr; row-gap: 0.3rem; }
-				.demo-row span[role="columnheader"]:nth-child(3), .demo-row span[role="columnheader"]:nth-child(4),
-				.demo-row span[role="cell"]:nth-child(3), .demo-row span[role="cell"]:nth-child(4) { display: none; }
-				.chip-float { display: none; }
-			}
-			@media (prefers-reduced-motion: reduce) {
-				html { scroll-behavior: auto; }
-				.reveal { transition: none; }
-				.btn:hover, .card:hover { transform: none; }
-				.chip-float { animation: none; }
-				.spot-region { transition: none; animation: none; }
-				.senpai-orb img { animation: none; }
-				.reveal-group > * { transition-delay: 0ms; }
-			}
-		</style>
 	</body>
 </html>

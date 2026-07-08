@@ -31,16 +31,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SCENES = [
   {
     name: 'news',
-    async run(page) {
+    // Preroll runs BEFORE the recorder marks the trim window, so the loop never
+    // opens on the loading skeleton — it starts on already-populated headlines.
+    async preroll(page) {
       await page.click('[data-zone="news"]').catch(() => {});
       await page.waitForSelector('[data-zone-pane="news"]', { state: 'visible', timeout: 15000 }).catch(() => {});
-      await sleep(3200); // headlines populate
-      // Gentle scroll through the grouped news, then settle back.
-      await page.mouse.wheel(0, 320);
-      await sleep(1800);
-      await page.mouse.wheel(0, 320);
-      await sleep(1800);
-      await page.mouse.wheel(0, -640);
+      await sleep(4200); // fully populate grouped headlines
+    },
+    async run(page) {
+      // Gentle scroll through the (already loaded) grouped news, then settle.
+      await page.mouse.wheel(0, 300);
+      await sleep(1900);
+      await page.mouse.wheel(0, 300);
+      await sleep(1900);
+      await page.mouse.wheel(0, -600);
       await sleep(2200); // hold calm final state
     },
   },
@@ -85,7 +89,16 @@ async function main() {
         return el && /\d/.test(el.textContent || '');
       }, { timeout: 30000 })
       .catch(() => console.log(`  (total-value wait timed out; recording anyway)`));
+    // Hide the in-app onboarding banner so footage reads as a pure cockpit.
+    await page.evaluate(() => {
+      document.getElementById('local-intel-guide')?.setAttribute('hidden', '');
+      document.querySelector('.local-intel-guide')?.style.setProperty('display', 'none');
+    }).catch(() => {});
     await sleep(1200);
+
+    // Optional preroll (navigation + data load) happens outside the trim window
+    // so the loop never opens on a loading/skeleton state.
+    if (scene.preroll) await scene.preroll(page);
 
     // Measure where the meaningful action starts/ends within the recording so
     // the encoder can trim off the page-load lead-in deterministically. Video
