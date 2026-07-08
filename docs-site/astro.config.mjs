@@ -18,6 +18,9 @@ export default defineConfig({
         { icon: 'github', label: 'GitHub', href: 'https://github.com/udhawan97/FolioSenseAI' },
       ],
       customCss: ['./src/styles/custom.css'],
+      components: {
+        TableOfContents: './src/components/TableOfContents.astro',
+      },
       editLink: {
         baseUrl: 'https://github.com/udhawan97/FolioSenseAI/edit/main/docs-site/',
       },

@@ -1,0 +1,102 @@
+---
+/**
+ * Override of Starlight's `TableOfContents` that renders the default component
+ * and layers on a bottom-of-page fix for the "On this page" scrollspy.
+ *
+ * Starlight only marks a heading active when it crosses a thin band just below
+ * the nav bar (see `starlight-toc.ts`). The final heading on a page sits near
+ * the bottom and can't be scrolled up into that band, so scrolling to the
+ * bottom leaves the highlight stuck on the previous section. This script forces
+ * the correct heading active once the page is scrolled to the very bottom.
+ */
+import Default from '@astrojs/starlight/components/TableOfContents.astro';
+---
+
+<Default />
+
+<script>
+	(function () {
+		// How close to the absolute bottom counts as "at the bottom" (sub-pixel slack).
+		const BOTTOM_GAP = 4;
+		// Guards against reacting to our own aria-current changes (avoids a loop).
+		let selfMutating = false;
+
+		/** The link that should be active at the page bottom, or null if we're not there. */
+		function bottomLink(toc: Element): HTMLAnchorElement | null {
+			const doc = document.documentElement;
+			const distanceToBottom = doc.scrollHeight - (window.innerHeight + window.scrollY);
+			// Only intervene at the very bottom of the page — the one spot where
+			// Starlight's observer can't scroll a short final section's heading into
+			// its detection band, so it stays stuck on the section above. Everywhere
+			// else we return null and leave Starlight's scrollspy untouched.
+			if (distanceToBottom > BOTTOM_GAP) return null;
+
+			const links = Array.from(toc.querySelectorAll('a'));
+			if (links.length < 2) return null;
+
+			// At the page bottom the reader has reached the end, so the active section
+			// is the last heading that has entered the viewport — the final section on
+			// screen. (A short trailing section's heading never reaches the top band,
+			// which is exactly the case Starlight misses.)
+			let active: HTMLAnchorElement | null = null;
+			for (const link of links) {
+				const heading = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+				if (heading && heading.getBoundingClientRect().top <= window.innerHeight) {
+					active = link;
+				}
+			}
+			return active;
+		}
+
+		function fixBottom() {
+			document.querySelectorAll('starlight-toc').forEach((toc) => {
+				const active = bottomLink(toc);
+				if (!active || active.getAttribute('aria-current') === 'true') return;
+
+				selfMutating = true;
+				// Prefer Starlight's own `current` setter so its internal state stays
+				// in sync and normal scrolling keeps working once we leave the bottom.
+				const setter = Object.getOwnPropertyDescriptor(
+					Object.getPrototypeOf(toc),
+					'current'
+				)?.set;
+				if (setter) {
+					(toc as any).current = active;
+				} else {
+					Array.from(toc.querySelectorAll('a')).forEach((l) =>
+						l.removeAttribute('aria-current')
+					);
+					active.setAttribute('aria-current', 'true');
+				}
+				selfMutating = false;
+			});
+		}
+
+		let scheduled = false;
+		function schedule() {
+			if (scheduled) return;
+			scheduled = true;
+			requestAnimationFrame(() => {
+				scheduled = false;
+				fixBottom();
+			});
+		}
+
+		if (!(window as any).__slTocBottomFix) {
+			(window as any).__slTocBottomFix = true;
+			window.addEventListener('scroll', schedule, { passive: true });
+			window.addEventListener('resize', schedule, { passive: true });
+
+			// Starlight's IntersectionObserver can fire *after* our scroll handler and
+			// overwrite the fix. Watch aria-current and immediately re-assert whenever
+			// it changes to the wrong link while we're sitting at the page bottom.
+			const mo = new MutationObserver(() => {
+				if (!selfMutating) fixBottom();
+			});
+			document.querySelectorAll('starlight-toc').forEach((toc) =>
+				mo.observe(toc, { subtree: true, attributes: true, attributeFilter: ['aria-current'] })
+			);
+		}
+		fixBottom();
+	})();
+</script>

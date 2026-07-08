@@ -12,9 +12,9 @@ import architecture from '../../assets/architecture.svg';
 
 | Layer | Stack |
 | --- | --- |
-| Backend | Python 3.11+, FastAPI 0.136.3, Uvicorn 0.48.0 |
-| Data | SQLite, SQLAlchemy 2.0.50, Pydantic 2.13.4 |
-| Market data | `yfinance` 1.4.1 and Yahoo Finance |
+| Backend | Python 3.11+, FastAPI 0.138.2, Uvicorn 0.48.0 |
+| Data | SQLite, SQLAlchemy 2.0.51, Pydantic 2.13.4 |
+| Market data | `yfinance` 1.5.1 and Yahoo Finance |
 | AI | Anthropic SDK 0.105.2, optional Claude calls, local deterministic fallback |
 | Frontend | Single HTML shell, Bootstrap 5.3.2, Bootstrap Icons, Chart.js 4.4.0, vanilla JavaScript |
 | Quality | pytest, Pylint, `compileall`, pip-audit, Dependency Review, CodeQL |
@@ -35,7 +35,7 @@ The service layer's core is a modular Intelligence Engine split into two halves:
   `market_regime`, `portfolio_exposure`, and `event_calendar`, producing verdicts,
   scenarios, regime classification, exposure breakdowns, peer comparisons, and
   calibration data.
-- **Claude AI** — optional. Lives in `ai_service.py`, exposing `action_plan()` and
+- **Claude AI** — optional. Lives in `ai_service.py`, exposing `generate_action_plan()` and
   `generate_news_themes()`, backed by a 24-hour SQLite cache and live token cost tracking.
 
 ## Repository layout
@@ -45,16 +45,16 @@ app/
 ├── main.py                 FastAPI app, middleware, static assets, startup warmup
 ├── config.py               Environment-backed settings
 ├── database.py             SQLite engine/session and startup migrations
-├── models.py                SQLAlchemy ORM models
-├── schemas.py                Pydantic request/response contracts
-├── routers/                  API route groups: stocks, portfolio, ai, news
-└── services/                 Market data, analytics, signals, AI, news, exposure, regimes
+├── models.py               SQLAlchemy ORM models
+├── schemas.py              Pydantic request/response contracts
+├── routers/                API route groups: stocks, portfolio, ai, news
+└── services/               Market data, analytics, signals, AI, news, exposure, regimes
 
 templates/
-└── index.html                Dashboard shell
+└── index.html              Dashboard shell
 
 static/
-├── css/style.css             Dashboard design system
-├── js/dashboard.js           Main dashboard behavior
-└── js/analytics-charts.js    Chart.js analytics widgets
+├── css/style.css           Dashboard design system
+├── js/dashboard.js         Main dashboard behavior
+└── js/analytics-charts.js  Chart.js analytics widgets
 ```
