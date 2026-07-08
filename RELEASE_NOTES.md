@@ -1,3 +1,27 @@
+# FolioSenseAI v4.3 Release Notes
+
+**Release date:** July 7, 2026
+
+---
+
+## ✦ FolioSenseAI Goes Desktop
+
+> *v4.3 is the release where FolioSenseAI stops being a thing you set up and starts being a thing you download. No Python, no terminal, no `pip install` — just a native app.*
+
+Until now, running FolioSenseAI meant having Python on your machine and a comfortable relationship with a terminal. v4.3 removes that entirely. There are now real installers — a **`.dmg`** for macOS (Apple Silicon) and a clean per-user **`.exe`** for Windows — that drop a native app on your machine and open the dashboard in its own window. The FastAPI server still runs locally; it just runs *inside* the app now instead of a terminal tab you have to keep alive.
+
+**One-click installers.** Download the [macOS DMG](https://github.com/udhawan97/FolioSenseAI/releases/latest) or [Windows installer](https://github.com/udhawan97/FolioSenseAI/releases/latest), launch it, and you're in. Your database and `.env` live in the per-user data directory (`~/Library/Application Support/FolioSenseAI` on macOS, `%APPDATA%\FolioSenseAI` on Windows) — never inside the app bundle — so updates and uninstalls leave your portfolio untouched.
+
+**An automated, honest release pipeline.** Every version tag builds both platforms in GitHub Actions, smoke-tests that the frozen app actually boots, and only *then* publishes the installers plus a `SHA256SUMS.txt` to GitHub Releases. A broken build can never replace a good download. Every merge to `main` also refreshes a rolling `latest-main` prerelease for early testers, kept clearly separate from stable.
+
+**A download-first website.** The [landing page](https://udhawan97.github.io/FolioSenseAI/) was rebuilt around real, retina screenshots of the actual dashboard — it detects your OS, links straight to the current installer, and shows the live release version, date, and commit. The docs gained a full Download & Install section with macOS Gatekeeper and Windows SmartScreen walkthroughs.
+
+**Signing, honestly.** These early builds are not yet code-signed, so macOS and Windows will show a first-launch warning. That's expected for an open-source app without a paid certificate, and the install guides show exactly what you'll see and how to verify your download against the published checksums. Code signing and notarization are the planned next step.
+
+v4.3 is the release that turns a project you clone into a product you install.
+
+---
+
 # FolioSenseAI v4.2 Release Notes
 
 **Release date:** July 7, 2026
