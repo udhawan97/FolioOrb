@@ -171,11 +171,13 @@ const features = [
 				<div class="hero-stage reveal" id="hero-stage">
 					<div class="window-chrome grad-border" id="hero-window">
 						<div class="window-bar"><span></span><span></span><span></span></div>
-						<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
-							alt="The FolioSenseAI dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
-						<div class="pulse-line" aria-hidden="true"></div>
-						<div class="spot-region" id="spot-region" aria-hidden="true">
-							<span class="spot-region-tip" id="spot-region-tip"></span>
+						<div class="hero-shot">
+							<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
+								alt="The FolioSenseAI dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
+							<div class="pulse-line" aria-hidden="true"></div>
+							<div class="spot-region" id="spot-region" aria-hidden="true">
+								<span class="spot-region-tip" id="spot-region-tip"></span>
+							</div>
 						</div>
 					</div>
 
@@ -247,7 +249,6 @@ const features = [
 								<h3>{s.title}</h3>
 								<p>{s.body}</p>
 								<div class="wf-note"><span class="wf-note-orb"></span><span>{s.senpai}</span></div>
-								<div class="wf-scene-mini" data-mini={s.n} aria-hidden="true"></div>
 							</li>
 						))}
 					</ol>
