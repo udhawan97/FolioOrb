@@ -7,6 +7,22 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v4.3.2 — Scrolling, Finished
+
+- **Performance release — no feature changes.** Second half of the v4.3.1 scroll fix,
+  this time aimed at portfolios with a real number of holdings in them. Installing over
+  v4.3.1 or earlier keeps all holdings, settings, and `.env`.
+- **Fixed a sparkline redraw bug** — each holding's 7-day trend canvas was repainting
+  every time it scrolled into view, even when its price history hadn't changed. It now
+  only redraws when the data actually changes, verified pixel-for-pixel.
+- **Fixed the real cost** — switching away from the Holdings tab hid it with
+  `visibility: hidden`, which keeps a hidden element fully "in play" for layout. With
+  enough holdings, that table's column-width math is expensive, and it was being
+  recomputed on every scroll frame on *every* tab — not just Holdings. It's now skipped
+  entirely while off-screen (`content-visibility: hidden`) and restored instantly on switch.
+- **Result:** roughly 4× faster scrolling on Overview and Holdings with a 30-holding
+  portfolio, with Analytics and News both meaningfully smoother too.
+
 ## v4.3.1 — Smooth Scrolling in the Desktop App
 
 - **Performance release — no feature changes.** The native app scrolled sluggishly on

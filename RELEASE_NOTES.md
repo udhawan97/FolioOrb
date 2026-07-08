@@ -1,3 +1,25 @@
+# FolioSenseAI v4.3.2 Release Notes
+
+**Release date:** July 8, 2026
+
+---
+
+## ✦ Scrolling, Finished
+
+> *v4.3.2 is the second half of the v4.3.1 scroll-performance fix. Same goal — no feature changes, no data migration — this time aimed at portfolios with a real number of holdings in them.*
+
+v4.3.1 fixed the background and blur effects that made every scroll frame expensive everywhere in the app. That was a real win, but it left the biggest cost in place for anyone with more than a handful of positions: the Holdings table itself, and a quieter bug in how its sparklines redraw.
+
+**Fixed the sparkline redraw.** Each row's 7-day trend chart lives in a canvas that redraws whenever it scrolls into view. The check for "did this row's data actually change" was being skipped, so every row repainted on every pass through the viewport — even rows that hadn't moved. A holding's canvas now only repaints when its underlying price history actually changes, verified pixel-for-pixel: unchanged data draws nothing, changed data draws correctly.
+
+**Fixed the real cost: tables you can't see still cost you.** Switching away from the Holdings tab hid it with `visibility: hidden`, which keeps a hidden element fully "in play" for the browser's layout engine. With enough holdings, the Holdings table's column-width math is expensive — and it was being recomputed on every scroll frame on *every* tab, Overview and News included, because the hidden Holdings table was still there to think about. It's now skipped entirely while off-screen and restored instantly when you switch back, so the other tabs stop paying rent for a table they're not showing.
+
+**Measured result (30-holding portfolio, the case that showed it worst):** Overview scrolling roughly **4× faster**, Analytics and News both meaningfully smoother, Holdings itself close to **4× faster**. Two CSS approaches that looked promising on paper — a stricter table layout mode, and a narrower containment hint — were tested, measured, and dropped: one visibly shifted column widths on smaller windows, the other simply didn't help. Neither shipped.
+
+No holdings, settings, or `.env` changes are required — installing v4.3.2 over v4.3.1 or earlier keeps everything as-is.
+
+---
+
 # FolioSenseAI v4.3.1 Release Notes
 
 **Release date:** July 8, 2026
