@@ -4,7 +4,7 @@
 #
 # By default this installs the latest stable release. Override the ref to pin a
 # tag or track the dev channel:
-#   FOLIO_REF=v4.3.0      curl ... | bash     # a specific release
+#   FOLIO_REF=v4.3.1      curl ... | bash     # a specific release
 #   FOLIO_REF=latest-main curl ... | bash     # newest main build
 #   FOLIO_REF=main        curl ... | bash     # current main branch
 #

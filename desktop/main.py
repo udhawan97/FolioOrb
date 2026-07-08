@@ -113,9 +113,13 @@ def main() -> int:
 
     import webview
 
+    # `?app=1` tells the dashboard it's running inside the native WebView so it
+    # can switch to a lighter rendering profile (no backdrop-filter, fewer
+    # ambient animations) for smooth scrolling. The in-browser experience is
+    # unaffected. Tab switching is client-side, so this query persists.
     webview.create_window(
         "FolioSenseAI",
-        base_url,
+        f"{base_url}/?app=1",
         width=1440,
         height=920,
         min_size=(1024, 720),

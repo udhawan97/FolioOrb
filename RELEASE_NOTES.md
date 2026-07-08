@@ -1,3 +1,23 @@
+# FolioSenseAI v4.3.1 Release Notes
+
+**Release date:** July 8, 2026
+
+---
+
+## ✦ Smooth Scrolling in the Desktop App
+
+> *v4.3.1 is a performance release. The desktop app scrolled sluggishly on macOS; this fixes it — no feature changes, no data migration, just a much smoother dashboard.*
+
+The native app (macOS DMG / Windows EXE) renders inside a system WebView — WKWebView on macOS, WebView2 on Windows — which pays a much steeper per-frame cost for certain effects than a desktop browser does. On slower machines that showed up as laggy, sluggish scrolling. v4.3.1 removes those hot spots:
+
+**Fixed the two universal scroll killers.** The ambient page background used `background-attachment: fixed`, which forces the browser to repaint the entire glow gradient on *every* scroll frame; it now lives on a fixed, compositor-cached layer that's painted once. The drifting background "orbs" carried a heavy `blur(40px)` filter that had to be re-rasterized each frame while they animated; the blur is gone (the glows were already soft radial gradients) and the drift is now a cheap, GPU-composited transform. Both changes benefit the browser and from-source runs too.
+
+**Added a desktop-app rendering profile.** Inside the native WebView, the app now switches to a lighter profile that drops `backdrop-filter` (frosted surfaces fall back to near-opaque fills, so the look holds up) and freezes a few always-on ambient animations. The in-browser and run-from-source experience is deliberately left at full fidelity — nothing was removed from the design.
+
+**Measured result:** roughly a **3× improvement** in scroll frame rate on the overview and analytics views under CPU-throttled testing, with janky frames cut by about two-thirds. No holdings, settings, or `.env` changes are required — installing v4.3.1 over v4.3.0 keeps everything as-is.
+
+---
+
 # FolioSenseAI v4.3 Release Notes
 
 **Release date:** July 7, 2026

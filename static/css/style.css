@@ -195,7 +195,11 @@ html[data-text-size="comfortable"] {
     pointer-events: none;
     z-index: 0;
     border-radius: 50%;
-    filter: blur(40px);
+    /* No blur() filter: the radial-gradient fills already fade to transparent,
+       so they read as soft glows on their own. A blur filter on a fixed,
+       transform-animated element forces the GPU to re-rasterize the whole orb
+       every frame — a major scroll-jank source in WKWebView. Dropping it keeps
+       the look and makes the drift a cheap, composited transform. */
     will-change: transform;
 }
 
@@ -309,14 +313,28 @@ body > *:not(.bg-orb) {
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
-body {
-    min-height: 100vh;
-    /* Layered ambient depth — soft blue + green glows over a near-black base. */
+/* Ambient depth lives on a fixed, compositor-cached layer instead of on the
+   scrolling <body>. `background-attachment: fixed` forces a full-viewport
+   background repaint on every scroll frame — brutal in WKWebView / the desktop
+   app. A fixed pseudo-element is painted once and simply composited, so
+   scrolling stays smooth with the identical look. */
+html {
+    background: var(--bg-base);
+}
+html::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background:
         var(--bg-ambient-1),
-        var(--bg-ambient-2),
-        var(--bg-base);
-    background-attachment: fixed;
+        var(--bg-ambient-2);
+}
+
+body {
+    min-height: 100vh;
+    background: transparent;
     color: var(--text-primary);
     font-family: var(--font-text);
     letter-spacing: 0;
@@ -20239,4 +20257,30 @@ body > .correlation-cell-tip {
         align-items: flex-start;
         gap: 0.55rem;
     }
+}
+
+/* ── Desktop-app performance profile ──────────────────────────────────────────
+   Applied only inside the native WebView (pywebview → WKWebView on macOS,
+   WebView2 on Windows), detected via `?app=1` in templates/index.html. These
+   engines pay a heavy per-frame cost for backdrop-filter and full-viewport
+   ambient animations while scrolling, which makes the dashboard feel sluggish.
+   Dropping them here restores smooth scrolling; the in-browser / from-source
+   experience is deliberately left untouched. Nothing is removed structurally —
+   surfaces fall back to near-opaque fills so the look holds up. */
+html.desktop-app *,
+html.desktop-app *::before,
+html.desktop-app *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+/* Frosted surfaces that sit over scrolling content get a near-opaque fill so
+   nothing bleeds through once the blur is gone. */
+html.desktop-app            { --nav-surface: rgba(8, 8, 12, 0.97); }
+html.desktop-app[data-bs-theme="light"] { --nav-surface: rgba(248, 248, 248, 0.97); }
+/* Ambient background animations repaint the whole viewport every frame; freeze
+   them to a static state in the app (they keep animating in the browser). */
+html.desktop-app .bg-orb,
+html.desktop-app .bg-grid,
+html.desktop-app body::before {
+    animation: none !important;
 }

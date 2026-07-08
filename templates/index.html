@@ -12,8 +12,19 @@
                 document.documentElement.dataset.bsTheme = "dark";
                 const textSizes = ["compact", "standard", "comfortable"];
                 document.documentElement.dataset.textSize = textSizes.includes(savedTextSize) ? savedTextSize : "standard";
+                // Desktop app (pywebview / WKWebView / WebView2) runs a lighter
+                // rendering profile: expensive backdrop-filters and a few ambient
+                // animations are dropped for smooth scrolling. The browser/source
+                // experience is untouched. Signalled by ?app=1 from desktop/main.py,
+                // with window.pywebview as a fallback once it initialises.
+                const isDesktop = /[?&]app=1\b/.test(location.search) || typeof window.pywebview !== "undefined";
+                if (isDesktop) document.documentElement.classList.add("desktop-app");
             } catch (_) {}
         })();
+        // pywebview injects its bridge slightly after this runs; catch that case too.
+        window.addEventListener("pywebviewready", () => {
+            document.documentElement.classList.add("desktop-app");
+        });
     </script>
     <link rel="icon" type="image/svg+xml" href="/static/img/brand/folio-orbit-icon.svg">
     <link rel="apple-touch-icon" href="/static/img/brand/folio-orbit-icon-1024.png">
