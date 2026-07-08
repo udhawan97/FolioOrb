@@ -15,6 +15,7 @@ __pycache__/
 *$py.class
 *.pyc
 .pytest_cache/
+.pylint_cache/
 htmlcov/
 .coverage
  
