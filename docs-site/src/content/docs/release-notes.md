@@ -23,9 +23,17 @@ in the repository. Highlights of the current release below.
 - **Hover and resize work is coalesced to one pass per frame** — the heatmap's `mousemove`
   handler and the two dashboard-zone indicator resize handlers are throttled to
   `requestAnimationFrame`, so at most one layout read/redraw runs per frame.
+- **Fixed misleading "AI failed" warnings when no Claude API key is configured** — running
+  key-free (the default Local Intelligence mode) logged every briefing/insights/action-plan
+  request as a warning-level failure, even though it's the expected, harmless case. These now
+  log at debug with an accurate message; a genuine failure with a key present still warns.
+- **Fixed the greyed-out Engine toggle opening the wrong panel** — tapping the disabled
+  "Local Intel" control (no API key set) opened the passive intro card instead of the
+  interactive **Connect Claude AI** panel. It now opens that panel directly — paste a key,
+  hit Save & Connect, no restart — and closes the menu first so it isn't covered.
 - **Verified:** the full 381-test suite passes, `pylint` holds at 10.00/10, and the theme,
   spacing, typography, and animations are untouched — these changes affect only how existing
-  work is scheduled, not what is drawn.
+  work is scheduled and routed, not what is drawn.
 
 ## v4.3.3 — One Range, Every Section
 

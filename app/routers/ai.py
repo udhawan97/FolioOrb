@@ -88,6 +88,19 @@ from app.services.verdict_calibration import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
+
+def _log_claude_call_result(label: str, exc: Exception) -> None:
+    """Warn on a genuine Claude-call failure; debug-log the common no-key case.
+
+    An unconfigured API key surfaces as a client-side TypeError from the
+    Anthropic SDK before any request is made — the default, key-optional
+    state, not a failure. Warning about it on every load would cry wolf.
+    """
+    if settings.ANTHROPIC_API_KEY.strip():
+        logger.warning("%s failed; exception_type=%s", label, type(exc).__name__)
+    else:
+        logger.debug("%s skipped; no Claude API key configured", label)
+
 # Only accept the canonical Anthropic key format: sk-ant-<variant>-<chars>
 # This guards against prompt injection via the key field and nonsense values.
 _API_KEY_RE = re.compile(r"^sk-ant-[A-Za-z0-9_\-]{20,300}$")
@@ -1983,7 +1996,7 @@ async def get_portfolio_summary(
         return payload
 
     except Exception as exc:
-        logger.warning("AI briefing failed; exception_type=%s", type(exc).__name__)
+        _log_claude_call_result("AI briefing", exc)
         return _briefing_fallback(snapshot)
 
 
@@ -2126,7 +2139,7 @@ async def get_analytics_insights(
         return payload
 
     except Exception as exc:
-        logger.warning("AI analytics insights failed; exception_type=%s", type(exc).__name__)
+        _log_claude_call_result("AI analytics insights", exc)
         return build_analytics_fallback(snapshot)
 
 
@@ -2464,8 +2477,5 @@ async def get_action_plan(
         return payload
 
     except Exception as exc:
-        logger.warning(
-            "Action plan Claude call failed; exception_type=%s",
-            type(exc).__name__,
-        )
+        _log_claude_call_result("Action plan Claude call", exc)
         return _action_plan_fallback(core)
