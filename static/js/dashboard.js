@@ -8,8 +8,25 @@ const toNumber = (n, fallback = 0) => {
     const value = Number(n);
     return Number.isFinite(value) ? value : fallback;
 };
-const formatCurrency = (n) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(toNumber(n));
+// Coalesce bursty events (resize, etc.) to at most one call per frame. The
+// wrapped fn runs inside rAF, so read-then-write layout work batches cleanly
+// instead of thrashing on every raw event.
+const rafThrottle = (fn) => {
+    let scheduled = false;
+    return (...args) => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => {
+            scheduled = false;
+            fn(...args);
+        });
+    };
+};
+// Intl.NumberFormat construction is expensive relative to .format(); build the
+// currency formatter once and reuse it. formatCurrency runs in tight loops
+// (holdings rows, tables, tiles) so caching avoids per-value allocation.
+const _USD_FMT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const formatCurrency = (n) => _USD_FMT.format(toNumber(n));
 const formatUsdTiny = (n) => {
     const value = toNumber(n);
     if (value > 0 && value < 0.01) return `$${value.toFixed(4)}`;
@@ -3002,7 +3019,7 @@ function initDashboardZones() {
     let initial = "overview";
     setDashboardZone(initial, { persist: false });
     requestAnimationFrame(syncDztIndicator);
-    window.addEventListener("resize", syncDztIndicator, { passive: true });
+    window.addEventListener("resize", rafThrottle(syncDztIndicator), { passive: true });
 }
 
 function popHvtCount(el, value) {
@@ -9812,7 +9829,7 @@ async function initDashboard() {
     initPortfolioManager();
     initPortfolioBriefing();
     requestAnimationFrame(syncHvtIndicator);
-    window.addEventListener("resize", syncHvtIndicator, { passive: true });
+    window.addEventListener("resize", rafThrottle(syncHvtIndicator), { passive: true });
 
     await criticalData;
 
@@ -9837,13 +9854,14 @@ async function initDashboard() {
 
 // ── World Markets ─────────────────────────────────────────────────────────────
 
+// Two reusable formatters instead of one built per row: whole-number for large
+// indices (Nikkei, Hang Seng, …) and two-decimal for everything else.
+const _MARKET_FMT_WHOLE = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const _MARKET_FMT_DECIMAL = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function _marketPrice(price) {
     if (!price || price === 0) return "—";
     // Omit decimals for large indices (Nikkei, Hang Seng, etc.)
-    const opts = price > 999
-        ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
-        : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-    return new Intl.NumberFormat("en-US", opts).format(price);
+    return (price > 999 ? _MARKET_FMT_WHOLE : _MARKET_FMT_DECIMAL).format(price);
 }
 
 const _REGION_ORDER = ["US", "Europe", "Asia", "Pacific"];
