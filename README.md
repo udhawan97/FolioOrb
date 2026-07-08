@@ -16,7 +16,13 @@
 </p>
 
 <p align="center">
-  <a href="https://udhawan97.github.io/FolioSenseAI/"><img src="https://img.shields.io/badge/🌐_Visit_the_website-udhawan97.github.io%2FFolioSenseAI-6fd6f0?style=for-the-badge&labelColor=0c0c12" alt="Visit the FolioSenseAI website"></a>
+  <a href="https://udhawan97.github.io/FolioSenseAI/">
+    <img src="static/img/brand/visit-website.svg" alt="Explore the live website — real product demos, downloads, and docs" width="440">
+  </a>
+</p>
+
+<p align="center">
+  <sub><a href="https://udhawan97.github.io/FolioSenseAI/"><strong>udhawan97.github.io/FolioSenseAI</strong></a> — watch the dashboard work, then download it.</sub>
 </p>
 
 <p align="center">
