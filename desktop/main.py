@@ -125,6 +125,65 @@ def main() -> int:
     return _launch_window(base_url)
 
 
+def _safe_download_name(name: str) -> str:
+    """Reduce a page-suggested download name to a bare, safe basename.
+
+    The name comes from the web layer, so strip any directory components (an
+    accidental or malicious ``../``) and fall back to a sensible default.
+    """
+    base = os.path.basename(str(name or "").strip())
+    return base or "export.csv"
+
+
+def _write_text_file(path: str, content: str) -> str:
+    """Write ``content`` to ``path`` as UTF-8 with exactly one leading BOM.
+
+    Exported CSVs open cleanly in Excel only with a BOM. ``fetch().text()`` in
+    the page strips the server's BOM, so content arriving here usually has none —
+    write it as ``utf-8-sig`` to add one. Content that already carries a BOM is
+    written as-is so it never doubles.
+    """
+    encoding = "utf-8" if content.startswith("﻿") else "utf-8-sig"
+    with open(path, "w", encoding=encoding, newline="") as handle:
+        handle.write(content)
+    return path
+
+
+class _NativeBridge:  # pylint: disable=too-few-public-methods
+    """JS ↔ native bridge exposed to the page as ``window.pywebview.api``.
+
+    The WebView has no download chrome: an ``<a download>`` or a blob-URL click
+    just navigates and renders the file inline, stranding the user on a text page
+    with no back button. ``save_file`` gives the page a real "Save As…" dialog so
+    CSV export and template download write an actual file. Real browsers never
+    see this bridge and keep their own download path.
+    """
+
+    def save_file(self, filename: str, content: str) -> dict:
+        """Prompt for a location and write ``content`` there.
+
+        Returns ``{"saved": bool, "path": str|None}``; a cancelled dialog is a
+        clean ``saved=False`` (not an error).
+        """
+        try:
+            import webview
+
+            window = webview.active_window()
+            if window is None:
+                return {"saved": False, "path": None}
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG, save_filename=_safe_download_name(filename)
+            )
+            # SAVE_DIALOG yields a path string (some builds: a 1-tuple) or None.
+            path = result[0] if isinstance(result, (list, tuple)) else result
+            if not path:
+                return {"saved": False, "path": None}
+            _write_text_file(path, content or "")
+            return {"saved": True, "path": path}
+        except Exception as exc:  # pylint: disable=broad-except
+            return {"saved": False, "path": None, "error": type(exc).__name__}
+
+
 def _launch_window(base_url: str) -> int:
     """Create the native window (with menu + exit hook) and run the UI loop."""
     import webbrowser
@@ -152,6 +211,7 @@ def _launch_window(base_url: str) -> int:
         width=1440,
         height=920,
         min_size=(1024, 720),
+        js_api=_NativeBridge(),
     )
 
     # The server is up and the window is created: this launch is healthy, so

@@ -11036,19 +11036,80 @@ function toggleCsvImportPanel() {
     if (open) updateImportPanelMode();
 }
 
-function downloadHoldingsTemplate() {
-    const csv = "﻿ticker,shares,avg_cost,is_watchlist,hold_class,notes\n"
-        + "VOO,10,412.5,false,auto,\n"
-        + "NVDA,0,,true,auto,Watching for a pullback\n";
+// The desktop WebView has no download chrome: an <a download> or a blob-URL
+// click just navigates and renders the file inline, with no back button. When
+// the native bridge is present, route CSV saves through a real "Save As…"
+// dialog. In a real browser the bridge is absent and we do a normal download.
+function desktopSaveBridge() {
+    const api = window.pywebview && window.pywebview.api;
+    return api && typeof api.save_file === "function" ? api : null;
+}
+
+function browserDownloadCsv(filename, csv) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "foliosense-holdings-template.csv";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+}
+
+async function saveCsv(filename, csv) {
+    const bridge = desktopSaveBridge();
+    if (bridge) {
+        try {
+            const res = await bridge.save_file(filename, csv);
+            if (res && res.saved) {
+                const shown = res.path ? res.path.split(/[\\/]/).pop() : filename;
+                showToast(`Saved ${shown}`, "success");
+            }
+            return; // handled natively — a user cancel still counts as handled
+        } catch (err) {
+            console.warn("Native save failed, falling back to download:", err);
+        }
+    }
+    browserDownloadCsv(filename, csv);
+}
+
+function downloadHoldingsTemplate() {
+    const csv = "﻿ticker,shares,avg_cost,is_watchlist,hold_class,notes\n"
+        + "VOO,10,412.5,false,auto,\n"
+        + "NVDA,0,,true,auto,Watching for a pullback\n";
+    saveCsv("foliosense-holdings-template.csv", csv);
+}
+
+// Export lives on an <a href download> so a real browser just downloads it.
+// Inside the desktop WebView that navigation would render the CSV inline, so
+// intercept there, fetch the CSV, and hand it to the native Save dialog.
+function handleExportClick(event) {
+    if (!desktopSaveBridge()) return true; // browser: let the anchor download
+    event.preventDefault();
+    const href = event.currentTarget.getAttribute("href");
+    exportHoldingsCsv(href);
+    return false;
+}
+
+function _filenameFromDisposition(res) {
+    const cd = res.headers.get("Content-Disposition") || "";
+    const match = /filename="?([^"]+)"?/.exec(cd);
+    return match ? match[1] : null;
+}
+
+async function exportHoldingsCsv(href) {
+    try {
+        const res = await fetch(href);
+        if (!res.ok) throw new Error(`export ${res.status}`);
+        const csv = await res.text();
+        const filename = _filenameFromDisposition(res)
+            || `foliosense-holdings-${new Date().toISOString().slice(0, 10)}.csv`;
+        await saveCsv(filename, csv);
+    } catch (err) {
+        console.warn("CSV export failed:", err);
+        showToast("Export failed — please try again.", "error");
+    }
 }
 
 async function handleImportFile(file) {
