@@ -203,6 +203,23 @@ jobs:
           cd release
           shasum -a 256 * > SHA256SUMS.txt
           echo "Assets:"; ls -la
+
+      - name: Sign checksums (minisign)
+        # Authenticity signature for SHA256SUMS.txt. Runs only once the signing
+        # key secret is configured; until then releases ship SHA-256 checksums
+        # only and the app verifies integrity without authenticity. The app
+        # embeds the matching public key (app/services/signature_service.py).
+        if: ${{ secrets.MINISIGN_SECRET_KEY != '' }}
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y minisign
+          printf '%s\n' "$MINISIGN_SECRET_KEY" > minisign.key
+          # Key is created passwordless (minisign -G -W) so CI can sign headless.
+          minisign -S -s minisign.key -m release/SHA256SUMS.txt
+          rm -f minisign.key
+          echo "Signed: $(ls release/SHA256SUMS.txt.minisig)"
       - name: Publish stable release
         if: needs.prepare.outputs.channel == 'stable'
         env:

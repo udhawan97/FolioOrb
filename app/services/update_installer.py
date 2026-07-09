@@ -87,6 +87,19 @@ def _run(info: dict) -> None:
 
         update_service.mark(UpdateStatus.VERIFYING)
         sums = update_downloader.fetch_text(info["sha256_url"]) if info.get("sha256_url") else ""
+
+        # Authenticity: if a signing key is embedded and the release ships a
+        # signature, the checksum manifest must be validly signed by us before
+        # it is trusted. When signing isn't configured yet, this returns None
+        # and SHA-256 integrity alone is used (today's behavior).
+        if not _signature_ok(sums, info):
+            _safe_unlink(dest)
+            update_service.mark(
+                UpdateStatus.ERROR,
+                error="The update's signature couldn't be verified and was discarded.",
+            )
+            return
+
         if not update_downloader.verify_download(dest, sums, info["asset_name"]):
             _safe_unlink(dest)
             update_service.mark(
@@ -213,6 +226,31 @@ def _launch_installer(path) -> None:
         subprocess.Popen(["open", str(path)])  # noqa: S603,S607  pylint: disable=consider-using-with
     else:
         raise RuntimeError("In-app install is not supported on this platform")
+
+
+def _signature_ok(sums: str, info: dict) -> bool:
+    """True if the checksum manifest's signature is valid — or not yet required.
+
+    Returns True when signing isn't configured (verify_manifest -> None) so the
+    flow falls back to SHA-256 integrity. Returns False only when a signature is
+    expected but is missing or invalid.
+    """
+    from app.services import signature_service
+
+    if not signature_service.is_configured():
+        return True
+    sig_url = info.get("sha256_sig_url")
+    if not sig_url:
+        update_log.event("signature missing while signing is enabled")
+        return False
+    try:
+        minisig = update_downloader.fetch_text(sig_url)
+    except update_downloader.DownloadError:
+        return False
+    result = signature_service.verify_manifest(sums.encode("utf-8"), minisig)
+    if result is False:
+        update_log.event("signature verification FAILED")
+    return result is not False
 
 
 def _safe_unlink(path) -> None:

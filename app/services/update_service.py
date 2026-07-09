@@ -81,6 +81,7 @@ class UpdateInfo:  # pylint: disable=too-many-instance-attributes
     asset_name: str | None
     size_bytes: int | None
     sha256_url: str | None
+    sha256_sig_url: str | None
     restart_required: bool = True
 
     def to_dict(self) -> dict[str, Any]:
@@ -300,6 +301,7 @@ def _release_to_info(payload: dict[str, Any]) -> UpdateInfo:
         asset_name=(asset or {}).get("name"),
         size_bytes=(asset or {}).get("size"),
         sha256_url=_find_asset_url(assets, _SHASUMS_ASSET),
+        sha256_sig_url=_find_asset_url(assets, f"{_SHASUMS_ASSET}.minisig"),
     )
 
 

@@ -68,6 +68,25 @@ def test_run_verify_failure_discards_and_errors(monkeypatch):
     assert not (update_downloader.pending_dir() / _info()["asset_name"]).exists()
 
 
+def test_run_rejects_bad_signature(monkeypatch):
+    from app.services import signature_service
+
+    info = _info()
+    info["sha256_sig_url"] = "https://github.com/x/releases/download/v4.4.0/SHA256SUMS.txt.minisig"
+    _stub_download(monkeypatch)
+    monkeypatch.setattr(signature_service, "is_configured", lambda: True)
+    monkeypatch.setattr(signature_service, "verify_manifest", lambda content, sig, **k: False)
+
+    update_installer._run(info)
+
+    st = update_service.get_state()
+    assert st["status"] == "error"
+    assert "signature" in st["error"].lower()
+    assert update_installer._rt["path"] is None
+    # The file is discarded when its signature can't be trusted.
+    assert not (update_downloader.pending_dir() / info["asset_name"]).exists()
+
+
 def test_run_cancel_returns_to_available(monkeypatch):
     def cancel_dl(url, dest, on_progress=None, should_cancel=None):
         raise update_downloader.DownloadCancelled()
