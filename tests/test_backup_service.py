@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Backup, verification, and restore of the SQLite portfolio database.
 
 These tests use real on-disk SQLite files in a temp directory to exercise the
@@ -121,7 +122,8 @@ def test_env_snapshot_and_restore(tmp_path, monkeypatch):
     env.write_text("ANTHROPIC_API_KEY=sk-original\n", encoding="utf-8")
 
     snap = backup_service.snapshot_env(tmp_path / "backup.env")
-    assert snap is not None and snap.read_text(encoding="utf-8").startswith("ANTHROPIC_API_KEY=sk-original")
+    assert snap is not None
+    assert snap.read_text(encoding="utf-8").startswith("ANTHROPIC_API_KEY=sk-original")
 
     # Current .env drifts, then is restored from the snapshot.
     env.write_text("ANTHROPIC_API_KEY=sk-changed\n", encoding="utf-8")

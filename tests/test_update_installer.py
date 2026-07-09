@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Download → verify → ready orchestration and the OS install handoff.
 
 The downloader functions are stubbed so the state-machine flow is exercised
@@ -138,7 +139,7 @@ def test_install_refuses_when_not_frozen(monkeypatch):
 
     assert st["status"] == "error"
     assert "packaged app" in st["error"].lower()
-    assert launched == []
+    assert not launched
 
 
 def _setup_file_db(tmp_path, monkeypatch):
@@ -220,7 +221,7 @@ def test_install_rejects_backup_that_silently_lost_holdings(tmp_path, monkeypatc
     st = update_installer.install()
 
     assert st["status"] == "error"
-    assert launched == []
+    assert not launched
 
 
 def test_install_aborts_when_backup_fails(tmp_path, monkeypatch):
@@ -240,7 +241,7 @@ def test_install_aborts_when_backup_fails(tmp_path, monkeypatch):
     st = update_installer.install()
 
     assert st["status"] == "error"
-    assert launched == []  # never hand off without a verified backup
+    assert not launched  # never hand off without a verified backup
 
 
 def test_install_launches_and_schedules_exit(monkeypatch):
@@ -250,7 +251,9 @@ def test_install_launches_and_schedules_exit(monkeypatch):
     monkeypatch.setattr(update_installer, "_create_rollback_point", lambda: {"version": "4.3.4"})
 
     launched = {}
-    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.setdefault("p", p))
+    monkeypatch.setattr(
+        update_installer, "_launch_installer", lambda p: launched.setdefault("p", p)
+    )
 
     fired = {}
 

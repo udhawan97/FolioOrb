@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """minisign parsing + verification of the checksum manifest.
 
 Constructs real minisign public keys and .minisig files (both legacy 'Ed' and
@@ -60,7 +61,8 @@ def test_key_id_mismatch_fails():
 
 def test_malformed_signature_fails():
     _, _, pub = _keypair()
-    assert signature_service.verify_manifest(b"x", "not a real minisig", public_key_b64=pub) is False
+    result = signature_service.verify_manifest(b"x", "not a real minisig", public_key_b64=pub)
+    assert result is False
 
 
 def test_is_configured_reflects_key():

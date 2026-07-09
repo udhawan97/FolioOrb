@@ -160,7 +160,7 @@ def apply_migrations_safely(engine: Engine) -> MigrationResult:
 
     try:
         models.Base.metadata.create_all(bind=engine)
-        ensure_startup_migrations()
+        ensure_startup_migrations(engine)
     except Exception:
         if backup_path and backed_up:
             from app.services import backup_service

@@ -73,11 +73,20 @@ def get_db():
         db.close()
 
 
-def ensure_startup_migrations():
-    """Apply tiny idempotent SQLite migrations that create_all cannot cover."""
-    if not settings.DATABASE_URL.startswith("sqlite"):
+def ensure_startup_migrations(target_engine=None):
+    """Apply tiny idempotent SQLite migrations that create_all cannot cover.
+
+    ``target_engine`` defaults to the module-level engine (production). It is
+    passed explicitly by ``apply_migrations_safely`` so the migrations run
+    against the SAME engine that ``create_all`` just built — otherwise, when a
+    caller (e.g. a test) supplies an engine that differs from the global one,
+    the migrations would hit an unrelated database that has no ``holdings``
+    table yet and fail on ``CREATE INDEX ... ON holdings``.
+    """
+    active_engine = target_engine if target_engine is not None else engine
+    if not str(active_engine.url).startswith("sqlite"):
         return
-    with engine.begin() as conn:
+    with active_engine.begin() as conn:
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info(holdings)")).fetchall()

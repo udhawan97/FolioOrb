@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """The dedicated, rotating update log writes to the data dir and sanitizes input."""
 import pytest
 

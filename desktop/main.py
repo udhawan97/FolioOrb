@@ -243,5 +243,27 @@ def _hard_exit(code: int) -> None:
     os._exit(code)  # pylint: disable=protected-access
 
 
+def _run() -> int:
+    """Run main(), converting ANY escaping exception into an exit code.
+
+    An exception unwinding out of main() (e.g. webview.start() raising something
+    other than the ImportError/AttributeError/TypeError we fall back on, a socket
+    or thread-start failure, a WebKit init error) must not propagate to normal
+    interpreter shutdown — that runs finalization and hits the same daemon-thread
+    buffer-flush abort. Catching it here guarantees every exit still leaves via
+    _hard_exit.
+    """
+    try:
+        return main()
+    except SystemExit as exc:  # an explicit sys.exit somewhere in startup
+        return exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+    except BaseException as exc:  # pylint: disable=broad-exception-caught
+        try:
+            print(f"FolioSenseAI exited on error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        except Exception:  # pylint: disable=broad-except
+            pass
+        return 1
+
+
 if __name__ == "__main__":
-    _hard_exit(main())
+    _hard_exit(_run())

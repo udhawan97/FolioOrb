@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Presence and wiring of the in-app Software Update UI.
 
 Follows the project convention of asserting on the shipped template/JS/CSS so a

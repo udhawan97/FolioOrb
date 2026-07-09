@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Pure-Python Ed25519 used to verify update signatures.
 
 Roundtrip + negative tests. The algorithm is the RFC 8032 reference, so a valid

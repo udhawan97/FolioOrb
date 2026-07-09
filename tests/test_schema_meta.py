@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Protected migration sequence: version stamping, backup-first, restore-on-fail.
 
 Uses real on-disk SQLite files so the backup/restore paths (which operate on the
@@ -42,11 +43,11 @@ def test_fresh_db_stamps_version_without_backup(file_db):
     assert result.backed_up is False  # nothing to lose on a fresh DB
     assert schema_meta.read_schema_version(engine) == schema_meta.SCHEMA_VERSION
     # No backups created for a first-run empty database.
-    assert list((backup_service.backups_dir()).glob("*.db")) == []
+    assert not list((backup_service.backups_dir()).glob("*.db"))
 
 
 def test_existing_data_is_backed_up_and_preserved(file_db):
-    engine, db_path = file_db
+    engine, _ = file_db
     # Seed a realistic holdings table with data, and force "needs migration".
     from app import models
 
@@ -85,9 +86,8 @@ def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
     fix (computing the real pre-backup count) catches that and skips the
     otherwise-unsafe migration path.
     """
-    engine, db_path = file_db
+    engine, _ = file_db
     from app import models
-    from app.services import backup_service as bs
 
     models.Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
@@ -102,7 +102,7 @@ def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
         schema_meta._write_meta(conn, "schema_version", "0")
 
     def _empty_backup(source_db, label, dest_dir=None, ts=None):
-        dest_dir = dest_dir or bs.backups_dir()
+        dest_dir = dest_dir or backup_service.backups_dir()
         dest_dir.mkdir(parents=True, exist_ok=True)
         empty = dest_dir / f"{label}-corrupt.db"
         conn = sqlite3.connect(str(empty))
@@ -111,7 +111,7 @@ def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
         conn.close()
         return empty
 
-    monkeypatch.setattr(bs, "create_backup", _empty_backup)
+    monkeypatch.setattr(backup_service, "create_backup", _empty_backup)
 
     result = schema_meta.apply_migrations_safely(engine)
 
@@ -157,7 +157,7 @@ def test_failed_migration_restores_backup(file_db, monkeypatch):
         schema_meta._ensure_app_meta(conn)
         schema_meta._write_meta(conn, "schema_version", "0")
 
-    def _boom():
+    def _boom(target_engine=None):  # noqa: ARG001 (matches ensure_startup_migrations signature)
         # Corrupt the live DB, then fail — the restore must undo this.
         conn = sqlite3.connect(str(db_path))
         conn.execute("DELETE FROM holdings")

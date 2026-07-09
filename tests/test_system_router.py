@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """System/update API endpoints.
 
 Mounts only the system router on a bare FastAPI app so the full application
@@ -73,7 +74,7 @@ def test_skip_version_endpoint(client):
 
 
 def test_download_cancel_install_endpoints_return_state(client, monkeypatch):
-    from app.services import update_installer, update_service
+    from app.services import update_installer
 
     monkeypatch.setattr(update_installer, "start_download", lambda: {"status": "downloading"})
     monkeypatch.setattr(update_installer, "cancel_download", lambda: {"status": "available"})
@@ -94,7 +95,9 @@ def test_rollback_endpoints(client, monkeypatch):
     assert status["offer_rollback"] is False
 
     monkeypatch.setattr(
-        rollback_service, "rollback", lambda restore_data=False: {"status": "installing", "restore": restore_data}
+        rollback_service,
+        "rollback",
+        lambda restore_data=False: {"status": "installing", "restore": restore_data},
     )
     body = client.post("/api/system/rollback", json={"restore_data": True}).json()
     assert body["status"] == "installing"

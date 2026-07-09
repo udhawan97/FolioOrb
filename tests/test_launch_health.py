@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Consecutive-failed-launch counter that gates the proactive rollback offer."""
 import pytest
 

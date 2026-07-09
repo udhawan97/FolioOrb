@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Behavior of the JSON-backed application settings store.
 
 Settings live outside the database so they survive DB restores and can never
@@ -89,6 +90,6 @@ def test_concurrent_saves_do_not_lose_updates(temp_data_dir, monkeypatch):
 def test_write_is_atomic_and_leaves_no_temp_files(temp_data_dir):
     app_settings.save_settings({"auto_check_updates": False})
     leftovers = list(temp_data_dir.glob("*.tmp"))
-    assert leftovers == []
+    assert not leftovers
     on_disk = json.loads(app_settings.settings_path().read_text(encoding="utf-8"))
     assert on_disk["auto_check_updates"] is False

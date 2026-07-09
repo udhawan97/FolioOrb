@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Update-check service: semver, asset selection, state machine, ETag caching.
 
 The single HTTP seam (``update_service._http_get``) is monkeypatched in every

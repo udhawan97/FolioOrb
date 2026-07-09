@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Guards for the desktop shell's process-exit path.
 
 The frozen app must terminate via os._exit (bypassing interpreter finalization),
@@ -31,9 +32,21 @@ def test_hard_exit_uses_os_exit():
 def test_entrypoint_exits_hard_not_via_systemexit():
     src = _source()
     # The module entrypoint must funnel through _hard_exit, never raise
-    # SystemExit(main()) (which would run the crashing finalization path).
-    assert "_hard_exit(main())" in src
-    assert "raise SystemExit(main())" not in src
+    # SystemExit (which would run the crashing finalization path).
+    assert "_hard_exit(_run())" in src
+    assert "raise SystemExit" not in src
+
+
+def test_entrypoint_catches_escaping_exceptions():
+    """An exception escaping main() must still leave via _hard_exit, not unwind
+    through interpreter finalization (which re-triggers the crash)."""
+    src = _source()
+    run_fn = src[src.index("def _run("):]
+    run_fn = run_fn[: run_fn.index("\nif __name__")]
+    assert "return main()" in run_fn
+    # Catches BaseException (covers RuntimeError from webview.start(), OSError
+    # from sockets, thread-start failures, etc.) so nothing reaches finalization.
+    assert "except BaseException" in run_fn
 
 
 def test_quit_hook_flushes_before_exit():

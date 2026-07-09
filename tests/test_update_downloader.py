@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Resumable download + SHA-256 verification, with the HTTP seam injected.
 
 No network: update_downloader._open is monkeypatched to serve bytes from memory,
@@ -55,7 +56,8 @@ def test_parse_sha256sums_matches_by_basename():
         "bbb222  FolioSenseAI-Windows-x64-v4.4.0-Setup.exe\n"
     )
     assert dl.parse_sha256sums(text, "FolioSenseAI-macOS-arm64-v4.4.0.dmg") == "aaa111"
-    assert dl.parse_sha256sums(text, "some/path/FolioSenseAI-Windows-x64-v4.4.0-Setup.exe") == "bbb222"
+    win = "some/path/FolioSenseAI-Windows-x64-v4.4.0-Setup.exe"
+    assert dl.parse_sha256sums(text, win) == "bbb222"
     assert dl.parse_sha256sums(text, "missing.dmg") is None
 
 
@@ -76,7 +78,9 @@ def test_download_writes_file_and_reports_progress(tmp_path, monkeypatch):
     seen = []
     dest = dl.pending_dir() / "pkg.dmg"
 
-    result = dl.download_update("https://x/pkg.dmg", dest, on_progress=lambda d, t: seen.append((d, t)))
+    result = dl.download_update(
+        "https://x/pkg.dmg", dest, on_progress=lambda d, t: seen.append((d, t))
+    )
 
     assert result == dest
     assert dest.read_bytes() == data

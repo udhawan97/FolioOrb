@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 """Data-safe rollback: safety backup first, optional snapshot restore, relaunch.
 
 Uses real on-disk SQLite so the backup/restore paths run end to end. The
