@@ -37,6 +37,10 @@ export default defineConfig({
           ],
         },
         {
+          label: "What's Next",
+          items: [{ label: 'Roadmap', slug: 'roadmap' }],
+        },
+        {
           label: 'Get Started',
           items: [
             { label: 'Introduction', slug: 'get-started/introduction' },

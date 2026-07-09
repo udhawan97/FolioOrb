@@ -73,6 +73,53 @@ const features = [
     senpai: 'I read the news so it doesn’t read you.',
   },
 ];
+
+// Act 8½ — the roadmap. Optimistic sneak peek, not a delivery promise.
+// Each icon is a compact stroke SVG (inner markup only) coloured by the act accent.
+const roadmap = [
+  {
+    status: 'Next up in the lab',
+    title: 'Spreadsheet in, spreadsheet out',
+    body: 'Import and export holdings as CSV — because retyping thirty tickers is nobody’s idea of a fun evening.',
+    icon: '<path d="M7 4v12M7 4 4 7M7 4l3 3"/><path d="M17 20V8M17 20l3-3M17 20l-3-3"/>',
+  },
+  {
+    status: 'On the radar',
+    title: 'More than one portfolio',
+    body: 'Give your retirement account and your fun-money account their own separate scoreboards.',
+    icon: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5"/>',
+  },
+  {
+    status: 'Quietly brewing',
+    title: 'Earnings radar',
+    body: 'A gentle heads-up when a holding is about to face the earnings music.',
+    icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/><circle cx="16" cy="15" r="1.3" fill="currentColor" stroke="none"/>',
+  },
+  {
+    status: 'On the radar',
+    title: 'A verdict report card',
+    body: 'The dashboard grading its own past Hold / Add / Trim calls over time — in public, no less.',
+    icon: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8.5 13l2 2 4-4"/>',
+  },
+  {
+    status: 'Next up in the lab',
+    title: 'Year-end realized recap',
+    body: 'A tidy “what did I actually lock in this year?” summary for when tax season comes knocking.',
+    icon: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/>',
+  },
+  {
+    status: 'Being explored',
+    title: 'Income & dividends view',
+    body: 'A clear read on what your portfolio pays you back — the income side, not just the price side.',
+    icon: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.6 9.6c0-1 1-1.6 2.4-1.6s2.4.6 2.4 1.6c0 2.2-4.8 1-4.8 3.2 0 1 1 1.6 2.4 1.6s2.4-.6 2.4-1.6"/>',
+  },
+  {
+    status: 'Being explored',
+    title: 'A what-if simulator',
+    body: 'Preview a buy or a trim before you touch anything real. Regret-free rehearsals.',
+    icon: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+  },
+];
 ---
 
 <!doctype html>
@@ -462,6 +509,31 @@ const features = [
 				<p class="dl-note reveal">Early builds aren’t code-signed yet, so macOS and Windows show a first-launch warning — expected for an open-source app. The <a href={doc('download')}>install guides</a> show exactly what you’ll see.</p>
 			</section>
 
+			<!-- ═══ ACT 8½ · ROADMAP ═════════════════════════════════════════ -->
+			<section class="act roadmap" id="act-roadmap" data-hue="green">
+				<div class="act-head reveal">
+					<span class="kicker">The road ahead</span>
+					<h2 class="section-title">This is just the beginning.</h2>
+					<p class="rm-lede">The app already earns its spot in your dock — but the lab is very much open. Here’s what’s quietly brewing for future releases. A peek through the workshop window, not a signed contract.</p>
+				</div>
+
+				<div class="rm-grid reveal">
+					{roadmap.map((r) => (
+						<article class="rm-card grad-border">
+							<span class="rm-status">{r.status}</span>
+							<svg class="rm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={r.icon} />
+							<h3>{r.title}</h3>
+							<p>{r.body}</p>
+						</article>
+					))}
+				</div>
+
+				<div class="rm-outro reveal">
+					<p class="rm-oath"><strong>The fine print, minus the lawyers:</strong> this roadmap is less of a blood oath and more of a friendly sneak peek. FolioSenseAI is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.</p>
+					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
+				</div>
+			</section>
+
 			<!-- ═══ ACT 8b · DEVELOPER CONSOLE ═══════════════════════════════ -->
 			<section class="act dev" id="act-dev" data-hue="peri">
 				<div class="dev-console grad-border reveal">
@@ -692,6 +764,7 @@ const features = [
 				'act-demo': 'Fake holdings. Real workflow. Commentary: complimentary.',
 				'act-trust': 'Local-first. Your database never texts anyone.',
 				'act-download': 'Pick your platform. I’ll behave. Mostly.',
+				'act-roadmap': 'More features are brewing. No dates — I’m an orb, not an oracle.',
 				'act-dev': 'Or build me yourself. I’m flattered either way.',
 			};
 			if (rail && orb && bubble && localStorage.getItem('fs-rail') !== 'off') {
@@ -735,6 +808,7 @@ const features = [
 				'Your “diversified” portfolio is four tech stocks in a trench coat.',
 				'The line went up. I have theories about why.',
 				'Green Tuesday? I’ll take partial credit.',
+				'More features are brewing. Dates? I plead the fifth.',
 			];
 			let qi = 0; const egg = document.getElementById('senpai-egg'), quip = document.getElementById('senpai-quip');
 			egg?.addEventListener('click', () => { qi = (qi + 1) % quips.length; if (quip) quip.textContent = quips[qi]; });

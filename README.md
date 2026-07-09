@@ -87,6 +87,24 @@ FolioSenseAI closes that gap: holdings, live prices, risk math, market regime, n
 
 <br clear="left">
 
+## 🔭 What's Brewing
+
+The app already earns its spot in your dock — but this is very much the opening chapter, and the lab is open. Here's what's *on the radar* for future releases. Think of it as a sneak peek through the workshop window, not a pinky promise carved in stone.
+
+| | On the radar | The gist | Status |
+| --- | --- | --- | --- |
+| 📥 | **Spreadsheet in, spreadsheet out** | Import and export your holdings as CSV — because retyping thirty tickers is nobody's idea of a fun evening. | Next up in the lab |
+| 🗂️ | **More than one portfolio** | Give your retirement account and your fun-money account their own separate scoreboards. | On the radar |
+| 📅 | **Earnings radar** | A gentle heads-up when a holding is about to face the earnings music. | Quietly brewing |
+| 🧾 | **A verdict report card** | The dashboard grading its own past Hold / Add / Trim calls — in public, no less. | On the radar |
+| 🧮 | **Year-end realized recap** | A tidy "what did I actually lock in this year?" summary for when tax season comes knocking. | Next up in the lab |
+| 💸 | **Income & dividends view** | See what your portfolio pays *you* back for the privilege of holding it. | Being explored |
+| 🔮 | **A what-if simulator** | Preview a buy or a trim *before* you touch anything real. Regret-free rehearsals. | Being explored |
+
+> **The fine print, minus the lawyers:** This roadmap is less of a blood oath and more of a friendly sneak peek. FolioSenseAI is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.
+
+Got a feature you'd fight for? [Open an issue](https://github.com/udhawan97/FolioSenseAI/issues/new) — Senpai reads every one and has opinions about most.
+
 ## Install
 
 The [desktop downloads](#️-download) are the easy path. If you'd rather run from source:
