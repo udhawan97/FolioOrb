@@ -607,3 +607,72 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 	.rail { display: none !important; }
 	.ac-line-local { opacity: 0 !important; } .ac-line-claude { opacity: 1 !important; }
 }
+
+
+/* ── HOW UPDATES WORK (Act 8¼) ────────────────────────────────── */
+.up-lede { max-width: 56ch; margin: 1rem auto 0; color: var(--muted); font-size: 1.05rem; }
+.update-console { display: grid; grid-template-columns: 1fr 1.05fr; gap: 2.4rem; border-radius: var(--radius); padding: 2.2rem; align-items: center; }
+
+/* Mock in-app Software Update panel */
+.up-panel { margin: 0; border-radius: 16px; overflow: hidden; background: #0a0b12; border: 1px solid var(--panel-border);
+	box-shadow: 0 24px 60px rgba(0,0,0,0.5), 0 0 40px color-mix(in srgb, var(--act-accent) 8%, transparent); }
+.up-panel-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 0.9rem; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--panel-border); }
+.up-panel-bar > span { flex: none; width: 11px; height: 11px; border-radius: 50%; background: #3a3a42; }
+.up-panel-bar > span:first-child { background: #ff5f57; }
+.up-panel-bar > span:nth-child(2) { background: #febc2e; }
+.up-panel-bar > span:nth-child(3) { background: #28c840; }
+.up-panel-bar b { margin-left: 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.up-panel-body { padding: 1.3rem 1.4rem 1.4rem; }
+.up-status { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.1rem; }
+.up-avail { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 620; color: var(--text); }
+.up-avail-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--act-accent); box-shadow: 0 0 10px var(--act-accent); animation: up-pulse 2.6s ease-in-out infinite; }
+@keyframes up-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+.up-size { font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.up-versions { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.2rem; }
+.up-ver { display: flex; flex-direction: column; font-weight: 640; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.up-ver small { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin-bottom: 0.15rem; }
+.up-ver--now { color: var(--muted); }
+.up-ver--new { color: var(--text); }
+.up-track { position: relative; flex: 1; height: 2px; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
+.up-track-fill { position: absolute; top: 0; left: 0; bottom: 0; width: 38%; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--act-accent)); animation: up-flow 2.8s ease-in-out infinite; }
+@keyframes up-flow { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+.up-changes { list-style: none; margin: 0 0 1.2rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.up-changes li { position: relative; padding-left: 1.3rem; font-size: 0.9rem; color: var(--muted); }
+.up-changes li::before { content: ''; position: absolute; left: 0; top: 0.55em; width: 6px; height: 6px; border-radius: 50%; background: var(--act-accent); opacity: 0.75; }
+.up-reassure { display: flex; align-items: flex-start; gap: 0.55rem; font-size: 0.82rem; color: var(--muted);
+	background: color-mix(in srgb, var(--act-accent) 7%, transparent); border: 1px solid color-mix(in srgb, var(--act-accent) 20%, transparent); border-radius: 10px; padding: 0.6rem 0.75rem; margin-bottom: 1.2rem; }
+.up-shield { flex: none; width: 16px; height: 16px; margin-top: 0.05rem; border-radius: 4px 4px 6px 6px;
+	background: radial-gradient(circle at 40% 30%, var(--act-accent), transparent 70%), var(--panel-2); border: 1px solid color-mix(in srgb, var(--act-accent) 45%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--act-accent) 35%, transparent); }
+.up-actions { display: flex; gap: 0.7rem; }
+.up-btn { font-size: 0.9rem; font-weight: 640; border-radius: 10px; padding: 0.55rem 1.2rem; }
+.up-btn--primary { background: linear-gradient(135deg, var(--act-accent), var(--act-accent-2)); color: #04121a; }
+.up-btn--ghost { color: var(--muted); border: 1px solid var(--panel-border); }
+
+/* Four calm assurances */
+.up-assure { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.4rem; }
+.up-item { display: flex; gap: 0.9rem; }
+.up-item b { display: block; margin-bottom: 0.25rem; }
+.up-item p { margin: 0; color: var(--muted); font-size: 0.92rem; max-width: 46ch; }
+.up-item em { color: var(--act-accent); font-style: normal; font-weight: 600; }
+.up-ico { flex: none; width: 34px; height: 34px; padding: 7px; border-radius: 9px; color: var(--act-accent);
+	background: var(--panel-2); border: 1px solid color-mix(in srgb, var(--act-accent) 30%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--act-accent) 18%, transparent); }
+.up-note { max-width: 64ch; margin: 1.8rem auto 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
+
+/* Footer Senpai one-liner — interactive shuffle */
+.footer-brand-copy { min-width: 0; }
+.senpai-quip { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.1rem 0 0; padding: 0; max-width: 46ch; text-align: left;
+	background: none; border: none; cursor: pointer; color: var(--muted); font: inherit; font-size: 0.85rem; line-height: 1.4; }
+.senpai-quip .quip-text { border-bottom: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); transition: color var(--dur-micro) ease, border-color var(--dur-micro) ease; }
+.senpai-quip:hover .quip-text, .senpai-quip:focus-visible .quip-text { color: var(--text); border-bottom-color: var(--act-accent); }
+.quip-shuffle { flex: none; width: 13px; height: 13px; background: currentColor; opacity: 0.55; transition: opacity var(--dur-micro) ease, transform 0.4s var(--ease-out);
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat; }
+.senpai-quip:hover .quip-shuffle, .senpai-quip:focus-visible .quip-shuffle { opacity: 1; }
+.senpai-quip.shuffled .quip-shuffle { animation: quip-spin 0.45s var(--ease-out); }
+@keyframes quip-spin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
+.senpai-quip.shuffled .quip-text { animation: quip-fade 0.4s var(--ease-out); }
+@keyframes quip-fade { 0% { opacity: 0.35; transform: translateY(2px); } 100% { opacity: 1; transform: none; } }
+
+@media (max-width: 960px) {
+	.update-console { grid-template-columns: 1fr; gap: 1.6rem; padding: 1.6rem; }
+}

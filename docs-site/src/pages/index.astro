@@ -509,6 +509,65 @@ const roadmap = [
 				<p class="dl-note reveal">Early builds aren’t code-signed yet, so macOS and Windows show a first-launch warning — expected for an open-source app. The <a href={doc('download')}>install guides</a> show exactly what you’ll see.</p>
 			</section>
 
+			<!-- ═══ ACT 8¼ · HOW UPDATES WORK ════════════════════════════════ -->
+			<section class="act updates" id="act-updates" data-hue="teal">
+				<div class="act-head reveal">
+					<span class="kicker">Staying current</span>
+					<h2 class="section-title">Updates that ask first — and never risk your data.</h2>
+					<p class="up-lede">FolioSenseAI keeps itself current the calm way: it tells you when there’s something new, backs up your portfolio before touching anything, and never installs without your go-ahead.</p>
+				</div>
+
+				<div class="update-console grad-border reveal">
+					<!-- A representative Software Update panel, as it appears inside the app. -->
+					<figure class="up-panel" aria-label="The in-app Software Update panel">
+						<div class="up-panel-bar" aria-hidden="true"><span></span><span></span><span></span><b>Software Update</b></div>
+						<div class="up-panel-body">
+							<div class="up-status">
+								<span class="up-avail"><span class="up-avail-dot"></span>Update available</span>
+								<span class="up-size">≈ 38 MB · relaunch</span>
+							</div>
+							<div class="up-versions">
+								<span class="up-ver up-ver--now"><small>Installed</small>v4.4.0</span>
+								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v4.4.1</span>
+							</div>
+							<ul class="up-changes">
+								<li>Safer, backup-integrated updates</li>
+								<li>One-click restore of the previous version</li>
+								<li>Fixes &amp; quiet refinements</li>
+							</ul>
+							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
+							<div class="up-actions">
+								<span class="up-btn up-btn--primary">Update Now</span>
+								<span class="up-btn up-btn--ghost">Later</span>
+							</div>
+						</div>
+					</figure>
+
+					<!-- What that flow guarantees, in four calm promises. -->
+					<ul class="up-assure" aria-label="How updates keep your data safe">
+						<li class="up-item">
+							<svg class="up-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+							<div><b>It notices, quietly</b><p>A gentle check shortly after launch and about once a day. You’ll see a calm <em>Update available</em> — nothing downloads until you choose.</p></div>
+						</li>
+						<li class="up-item">
+							<svg class="up-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.5 7 9.7 4-1.2 7-5.3 7-9.7V6l-7-3Z"/><path d="M9 12l2 2 4-4"/></svg>
+							<div><b>Your data is backed up first</b><p>A verified snapshot of your database and settings is taken before installing. If it can’t be made, the update pauses rather than risk your holdings.</p></div>
+						</li>
+						<li class="up-item">
+							<svg class="up-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"/><path d="M9 11.5l3 3L21.5 5"/></svg>
+							<div><b>Every download is verified</b><p>Each file is checked against the checksums published with its release. A corrupted or interrupted download is rejected or resumed automatically.</p></div>
+						</li>
+						<li class="up-item">
+							<svg class="up-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v6h6"/><path d="M3.5 9a9 9 0 1 1-1.3 6"/></svg>
+							<div><b>Roll back in one click</b><p>Restore the previous version anytime from Settings. If the app ever won’t start after an update, it offers the rollback for you.</p></div>
+						</li>
+					</ul>
+				</div>
+
+				<p class="up-note reveal">No silent installs — every update waits for your explicit go-ahead, and there’s deliberately no “install automatically” to switch on. Prefer to do it by hand? <a href={doc('updating')}>Manual updates</a> carry your holdings, snapshots, and settings over untouched.</p>
+			</section>
+
 			<!-- ═══ ACT 8½ · ROADMAP ═════════════════════════════════════════ -->
 			<section class="act roadmap" id="act-roadmap" data-hue="green">
 				<div class="act-head reveal">
@@ -579,7 +638,13 @@ const roadmap = [
 			<div class="footer-inner">
 				<div class="footer-brand">
 					<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" id="senpai-egg" />
-					<div><strong>FolioSenseAI</strong><p id="senpai-quip">Not financial advice. Very much a dashboard.</p></div>
+					<div class="footer-brand-copy">
+						<strong>FolioSenseAI</strong>
+						<button type="button" class="senpai-quip" id="senpai-quip" aria-label="Shuffle Senpai’s one-liner">
+							<span class="quip-text" id="senpai-quip-text">Not financial advice. Very much a dashboard.</span>
+							<span class="quip-shuffle" aria-hidden="true"></span>
+						</button>
+					</div>
 				</div>
 				<nav class="footer-links">
 					<a href={GITHUB}>GitHub</a><a href={doc('get-started/introduction')}>Docs</a>
@@ -764,6 +829,7 @@ const roadmap = [
 				'act-demo': 'Fake holdings. Real workflow. Commentary: complimentary.',
 				'act-trust': 'Local-first. Your database never texts anyone.',
 				'act-download': 'Pick your platform. I’ll behave. Mostly.',
+				'act-updates': 'Updates knock first, back up your data, and wait for a yes.',
 				'act-roadmap': 'More features are brewing. No dates — I’m an orb, not an oracle.',
 				'act-dev': 'Or build me yourself. I’m flattered either way.',
 			};
@@ -802,16 +868,39 @@ const roadmap = [
 				railDismiss?.addEventListener('click', () => { rail.classList.remove('on'); rail.classList.add('off'); localStorage.setItem('fs-rail', 'off'); });
 			}
 
-			// ── Footer Senpai easter egg ──────────────────────────────────
-			const quips = [
-				'Not financial advice. Very much a dashboard.',
-				'Your “diversified” portfolio is four tech stocks in a trench coat.',
-				'The line went up. I have theories about why.',
-				'Green Tuesday? I’ll take partial credit.',
-				'More features are brewing. Dates? I plead the fifth.',
-			];
-			let qi = 0; const egg = document.getElementById('senpai-egg'), quip = document.getElementById('senpai-quip');
-			egg?.addEventListener('click', () => { qi = (qi + 1) % quips.length; if (quip) quip.textContent = quips[qi]; });
+			// ── Footer Senpai one-liner: random on every load, click/tap to shuffle ──
+				const quips = [
+					'Not financial advice. Very much a dashboard.',
+					'Your “diversified” portfolio is four tech stocks in a trench coat.',
+					'The line went up. I have theories about why.',
+					'Green Tuesday? I’ll take partial credit.',
+					'More features are brewing. Dates? I plead the fifth.',
+					'Updates knock before they enter. Very well-mannered software.',
+					'Your data never left the building. I double-checked.',
+					'I read the 10-K so your group chat doesn’t have to.',
+					'Rebalancing: spring cleaning for people who own ETFs.',
+					'Past performance guarantees nothing. Neither do I — but I’m charming.',
+					'Dollar-cost averaging is just investing with the lights off. Calmly.',
+					'I don’t predict the market. I narrate its mood swings.',
+					'Beta 0.85: you’ll miss the moon, and most of the crater.',
+					'Backed up, checksum-checked, and waiting for your yes. No rush.',
+				];
+				const egg = document.getElementById('senpai-egg');
+				const quipBtn = document.getElementById('senpai-quip');
+				const quipText = document.getElementById('senpai-quip-text');
+				let qi = Math.floor(Math.random() * quips.length);
+				const paintQuip = (animate) => {
+					if (!quipText) return;
+					quipText.textContent = quips[qi];
+					if (animate && !reduce && quipBtn) { quipBtn.classList.remove('shuffled'); void quipBtn.offsetWidth; quipBtn.classList.add('shuffled'); }
+				};
+				const shuffleQuip = () => {
+					if (quips.length > 1) { let n; do { n = Math.floor(Math.random() * quips.length); } while (n === qi); qi = n; }
+					paintQuip(true);
+				};
+				paintQuip(false); // randomised first line on every refresh
+				quipBtn?.addEventListener('click', shuffleQuip);
+				egg?.addEventListener('click', shuffleQuip);
 		</script>
 	</body>
 </html>
