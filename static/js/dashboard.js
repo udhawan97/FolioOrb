@@ -767,6 +767,7 @@ function _defaultScanSubtitle() {
 
 // Rating state: stock analyst ratings or ETF quality labels
 let cachedRecommendations = {};  // ticker → rec object from /api/ai/analyst-recommendations/all
+let cachedEarnings = {};         // ticker → event from /api/portfolio/earnings (earnings radar)
 let cachedVerdicts = {};         // ticker → verdict object from /api/ai/investment-signals/all
 let cachedPortfolioExposure = null;
 let cachedMarketRegime = null;
@@ -2915,6 +2916,74 @@ function renderHoldings() {
     }
 }
 
+// ── Earnings radar ─────────────────────────────────────────────────────────────
+// Upcoming-earnings dates for holdings + watchlist, surfaced two ways: a small
+// badge on each row (<=14 days out) and a compact strip above the table (<=30
+// days). Deterministic on-device data — no Claude tokens. Loads on idle and on
+// portfolio change; never polls (earnings dates move quarterly). Fail-silent:
+// if the fetch dies, badges and strip simply don't appear.
+
+async function loadEarningsRadar() {
+    try {
+        const res = await fetch("/api/portfolio/earnings");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const map = {};
+        (data.events || []).forEach(e => { if (e && e.ticker) map[e.ticker] = e; });
+        cachedEarnings = map;
+    } catch (_) {
+        cachedEarnings = {};  // garnish, not dinner
+    }
+    renderEarningsStrip();
+    renderHoldings();  // refresh row badges against the new cache
+}
+
+// Format an ISO date (YYYY-MM-DD) as "Feb 12" — parsed by hand to avoid the
+// timezone drift a `new Date("2026-02-12")` (UTC midnight) would introduce.
+function formatEarnDate(iso) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    if (!y || !m || !d || m < 1 || m > 12) return String(iso);
+    return `${MONTHS[m - 1]} ${d}`;
+}
+
+// Row badge — only for the near term (<=14d); the strip covers the 15-30d tail.
+function earningsBadgeHtml(h) {
+    const e = cachedEarnings[(h.ticker || "").toUpperCase()];
+    if (!e || !Number.isFinite(e.days_until) || e.days_until < 0 || e.days_until > 14) return "";
+    const text = e.days_until === 0 ? "Today" : e.days_until === 1 ? "1d" : `${e.days_until}d`;
+    const soon = e.days_until <= 3 ? " earnings-badge--soon" : "";
+    const tip = `Earnings ~${formatEarnDate(e.date)} — ${String(e.label || "").toLowerCase()}`;
+    return `<span class="badge earnings-badge${soon} ms-1" title="${escapeHtml(tip)}"><i class="bi bi-calendar-event me-1"></i>${escapeHtml(text)}</span>`;
+}
+
+function renderEarningsStrip() {
+    const strip = document.getElementById("earnings-radar-strip");
+    if (!strip) return;
+    const events = Object.values(cachedEarnings)
+        .filter(e => e && Number.isFinite(e.days_until))
+        .sort((a, b) => a.days_until - b.days_until || String(a.ticker).localeCompare(String(b.ticker)));
+    if (!events.length) {
+        strip.hidden = true;
+        strip.replaceChildren();
+        return;
+    }
+    const MAX = 8;
+    const shown = events.slice(0, MAX);
+    const overflow = events.length - shown.length;
+    const chips = shown.map(e => {
+        const soon = e.days_until <= 3 ? " earnings-chip--soon" : "";
+        const flask = e.is_watchlist ? '<i class="bi bi-flask" aria-hidden="true"></i> ' : "";
+        const when = e.days_until === 0 ? "today" : e.days_until === 1 ? "tomorrow" : `in ${e.days_until}d`;
+        const tip = `${e.ticker} earnings ~${formatEarnDate(e.date)}`;
+        return `<span class="earnings-chip${soon}" title="${escapeHtml(tip)}">${flask}<strong>${escapeHtml(e.ticker)}</strong> · ${escapeHtml(when)}</span>`;
+    }).join("");
+    const more = overflow > 0 ? `<span class="earnings-chip earnings-chip--more">+${overflow} more</span>` : "";
+    strip.innerHTML =
+        `<span class="earnings-radar-label"><i class="bi bi-broadcast" aria-hidden="true"></i> Earnings radar</span>${chips}${more}`;
+    strip.hidden = false;
+}
+
 function toggleHoldingsSort(key) {
     holdingsSort = {
         key,
@@ -3848,7 +3917,7 @@ function updateHoldingRow(row, h, index, trendData = {}) {
     const tickerHtml = `
         <span class="holding-ticker-wrap">
             <span class="ticker-dot" style="background:${chartColor(index)}"></span>
-            <span class="holding-ticker-symbol">${escapeHtml(h.ticker)}</span>${holdingBadgeHtml(h)}
+            <span class="holding-ticker-symbol">${escapeHtml(h.ticker)}</span>${holdingBadgeHtml(h)}${earningsBadgeHtml(h)}
             <i class="bi bi-chevron-right row-chevron"></i>
         </span>
     `;
@@ -8669,6 +8738,7 @@ function refreshDashboardData({
         loadPortfolioValue(),
         loadPnl(),
         refreshRangePerformanceIfActive(),
+        loadEarningsRadar(),
     ];
     if (includeManageHoldings && isPortfolioManagerOpen()) {
         jobs.push(loadManageHoldings({ preserveExisting: true }));
@@ -9849,6 +9919,7 @@ async function initDashboard() {
     scheduleWhenIdle(() => {
         window.AnalyticsCharts?.init?.();
         loadAnalystRecommendations();
+        loadEarningsRadar();
         loadWorldMarkets();
         loadPortfolioBriefing();
         loadActionPlan();

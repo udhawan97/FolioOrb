@@ -12644,6 +12644,86 @@ tr.research-holding-row:hover {
     opacity: .85;
 }
 
+/* ── Earnings radar (strip above the holdings table + row badge) ─────────── */
+.earnings-radar-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(111, 214, 240, 0.045);
+    border-bottom: 1px solid var(--hairline-soft);
+    font-size: .74rem;
+}
+.earnings-radar-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-right: 4px;
+    color: var(--accent-cyan);
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    font-size: .67rem;
+}
+.earnings-radar-label i { font-size: .82rem; }
+.earnings-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--hairline);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.earnings-chip strong { color: var(--text-primary); font-weight: 600; }
+.earnings-chip i { font-size: .72rem; opacity: .8; }
+.earnings-chip--soon {
+    background: rgba(255, 214, 10, 0.10);
+    border-color: rgba(255, 214, 10, 0.28);
+    color: rgba(255, 214, 10, 0.92);
+}
+.earnings-chip--soon strong { color: inherit; }
+.earnings-chip--more {
+    color: var(--text-tertiary);
+    background: transparent;
+    border-style: dashed;
+}
+.earnings-badge {
+    background: rgba(111, 214, 240, 0.14);
+    color: var(--accent-cyan);
+    font-weight: 600;
+    font-size: .66rem;
+    vertical-align: middle;
+    padding: .2em .5em;
+}
+.earnings-badge i { font-size: .72em; }
+.earnings-badge--soon {
+    background: rgba(255, 214, 10, 0.15);
+    color: rgba(255, 214, 10, 0.95);
+}
+[data-bs-theme="light"] .earnings-radar-strip {
+    background: rgba(14, 143, 173, 0.06);
+}
+[data-bs-theme="light"] .earnings-chip {
+    background: rgba(0, 0, 0, 0.04);
+}
+[data-bs-theme="light"] .earnings-chip--soon {
+    background: rgba(180, 130, 0, 0.12);
+    border-color: rgba(180, 130, 0, 0.3);
+    color: #8a5600;
+}
+[data-bs-theme="light"] .earnings-badge {
+    background: rgba(14, 143, 173, 0.12);
+    color: #0e7a94;
+}
+[data-bs-theme="light"] .earnings-badge--soon {
+    background: rgba(180, 130, 0, 0.14);
+    color: #8a5600;
+}
+
 /* Light theme overrides */
 [data-bs-theme="light"] .holdings-view-tabs {
     background: rgba(0, 0, 0, 0.045);

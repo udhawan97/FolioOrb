@@ -1,5 +1,5 @@
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,8 +10,10 @@ from app.config import settings
 from app.services.stock_service import (
     get_portfolio_quotes,
     get_stock_data,
+    normalize_ticker,
     validate_ticker_symbol,
 )
+from app.services.earnings_radar import get_earnings_events
 from app.services.portfolio_projection import get_cached_projection
 from app.services.portfolio_analytics import (
     compute_risk_metrics,
@@ -342,6 +344,38 @@ async def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
             for h in holdings
         ],
         "count": len(holdings),
+    }
+
+
+@router.get("/earnings")
+async def get_earnings_radar(
+    portfolio_id: int = 1,
+    window: int = Query(30, ge=1, le=60),
+    db: Session = Depends(get_db),
+):
+    """Upcoming-earnings events for a portfolio's holdings (stocks only).
+
+    Watchlist tickers are included — a watched name's earnings matter too.
+    Events come soonest-first; the list is empty when nothing reports within
+    `window` days. ETFs, funds, and tickers without a known date are omitted.
+    """
+    _get_portfolio_or_404(portfolio_id, db)
+    holdings = (
+        db.query(Holding)
+        .filter(Holding.portfolio_id == portfolio_id, Holding.is_active.is_(True))
+        .all()
+    )
+    watchlist_by_ticker = {
+        normalize_ticker(h.ticker): bool(h.is_watchlist) for h in holdings
+    }
+    events = get_earnings_events(list(watchlist_by_ticker.keys()), window_days=window)
+    for event in events:
+        event["is_watchlist"] = watchlist_by_ticker.get(event["ticker"], False)
+    return {
+        "portfolio_id": portfolio_id,
+        "window_days": window,
+        "events": events,
+        "count": len(events),
     }
 
 
