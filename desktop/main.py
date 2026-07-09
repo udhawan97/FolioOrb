@@ -170,7 +170,7 @@ def _launch_window(base_url: str) -> int:
         try:
             window.destroy()
         except Exception:  # pylint: disable=broad-except
-            os._exit(0)  # pylint: disable=protected-access
+            _hard_exit(0)
 
     try:
         from app.services import update_installer
@@ -214,8 +214,34 @@ def _launch_window(base_url: str) -> int:
         webview.start(menu=menu_items)
     except (ImportError, AttributeError, TypeError):
         webview.start()
+
+    # webview.start() has returned — the window was closed (by the user, or by
+    # _quit_app for an install/rollback handoff). Return; __main__ terminates
+    # the process via _hard_exit.
     return 0
 
 
+def _hard_exit(code: int) -> None:
+    """Terminate the process immediately, bypassing interpreter finalization.
+
+    Every exit path funnels through here. A normal ``SystemExit``/return would
+    run ``Py_FinalizeEx``, which flushes stdout/stderr while the still-running
+    daemon threads (uvicorn's server thread, the cache-warmup thread, the
+    update-check scheduler) may be mid-write to those same buffered streams. If a
+    daemon holds the buffer lock at that moment, CPython aborts with a fatal
+    ``_enter_buffered_busy`` error — surfacing as a macOS "FolioSenseAI quit
+    unexpectedly" crash dialog on every quit (reproduced deterministically in the
+    frozen build). A desktop app being closed needs no graceful teardown: daemon
+    threads die with the process and the OS reclaims the loopback socket, so we
+    flush what we can and skip finalization entirely.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:  # pylint: disable=broad-except
+            pass
+    os._exit(code)  # pylint: disable=protected-access
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _hard_exit(main())
