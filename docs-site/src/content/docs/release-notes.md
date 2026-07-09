@@ -9,6 +9,15 @@ in the repository. Highlights of the current release below.
 
 ## v4.4.1 — Software Update, done right
 
+- **Fixed: the updater falsely showing "You're offline."** The packaged app's bundled OpenSSL
+  pointed at a build-machine certificate path that doesn't exist on your Mac, so every update
+  check failed TLS verification and was reported as "offline" even when you were connected. Now
+  fixed at the root — the checker verifies against a CA bundle shipped inside the app — and
+  failure states are told apart instead of lumped together ("Couldn't securely check for
+  updates," "GitHub rate limit reached," etc., each with its own diagnostic).
+- **Real in-app updates on macOS**, not just "open the DMG." Update Now downloads, verifies,
+  backs up your data, swaps in the new app, and relaunches automatically. Windows keeps its
+  one-click silent install.
 - **A consent-first in-app update system.** FolioSenseAI checks quietly for new versions, shows
   a calm indicator when one's available, and never downloads or installs without an explicit
   click. Check any time from **Check for Updates…** in the app menu or **Settings → Software
@@ -19,9 +28,11 @@ in the repository. Highlights of the current release below.
   data first so nothing is lost either way.
 - **Trustworthy downloads.** SHA-256 verified against published checksums, with optional minisign
   authenticity signing. Release notes render as text, not raw HTML.
-- Built in eight phases, then hardened through two rounds of adversarial review that caught and
-  fixed nine real issues — including a data-loss gap in backup verification and an XSS path in
-  release-notes rendering — before shipping. 133 dedicated tests, `pylint` 10.00.
+- Built in eight phases, then hardened through repeated rounds of adversarial review — against
+  both source and the actual installed app — that caught and fixed the offline/TLS root cause plus
+  nine other real issues, including a data-loss gap in backup verification, an XSS path in
+  release-notes rendering, and a macOS "quit unexpectedly" crash on every exit. 256 dedicated
+  tests, `pylint` 10.00.
 
 ## v4.3.4 — Quieter Hot Paths
 

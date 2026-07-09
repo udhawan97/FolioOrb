@@ -50,6 +50,7 @@ fail() {
 # Wait for the running app to exit (up to ~30s), then swap.
 for _ in $(seq 1 60); do /bin/kill -0 "$PID" 2>/dev/null || break; sleep 0.5; done
 MNT="$(/usr/bin/mktemp -d /tmp/folio-update.XXXXXX)"
+trap '/bin/rm -rf "$MNT"' EXIT
 /usr/bin/hdiutil attach "$DMG" -nobrowse -noverify -mountpoint "$MNT" -quiet || fail "mount"
 NEWAPP="$MNT/FolioSenseAI.app"
 if [ ! -d "$NEWAPP" ]; then /usr/bin/hdiutil detach "$MNT" -quiet 2>/dev/null; fail "no-app-in-dmg"; fi

@@ -4,6 +4,39 @@
 
 ---
 
+## ✦ Fixed: the updater showing "You're offline" while online
+
+The `v4.4.1` desktop app shipped with a bug in the very feature this release
+introduces: the packaged macOS and Windows apps reported **"You're offline"**
+when checking for updates, even on a fully connected machine. Root cause: the
+frozen app's bundled OpenSSL pointed at a build-machine certificate path that
+doesn't exist on a user's computer, so every HTTPS request to GitHub failed
+certificate verification — and that failure was generically caught as
+"offline" instead of being told apart from a real network outage.
+
+This is fixed in the `v4.4.1` assets as published (the release was re-built and
+re-published with the fix before wide distribution — if you downloaded before
+today, grab it again from the same link, the version number is unchanged):
+
+- **The real fix**: the update checker now verifies HTTPS against certifi's CA
+  bundle, which ships inside the app. This is the actual root cause fix, not a
+  copy change.
+- **Failures are told apart, not lumped together**: "You're offline" is now
+  reserved for a genuine network outage. A certificate problem says *"Couldn't
+  securely check for updates,"* a GitHub rate limit says *"GitHub rate limit
+  reached,"* and a malformed response or server hiccup gets its own message —
+  each is also logged with a sanitized diagnostic reason for support.
+- **A real in-app update on macOS.** Clicking **Update Now** no longer just
+  opens the DMG for you to drag manually — the app downloads it, verifies its
+  checksum (and signature, once minisign is enabled), backs up your data,
+  quits, swaps in the new version, and relaunches itself automatically.
+  Windows keeps its existing one-click silent install. Your portfolio database
+  and `.env` live outside the app bundle entirely, so nothing in this flow can
+  touch them, and a failed swap safely falls back to your current version with
+  a clear "your data is safe" message.
+
+---
+
 ## ✦ Software Update, done right
 
 > *v4.4.1 adds a professional, consent-first update system. FolioSenseAI can now tell you when a new version is out, download and install it with your permission, and — most importantly — protect your holdings across every update, with a real way back if anything goes wrong.*
@@ -16,7 +49,7 @@
 
 **Trustworthy downloads.** Every update package is verified by SHA-256 against the checksums published with the release before it's installed; corrupted or interrupted downloads are rejected or resumed. Optional minisign signing (see `packaging/SIGNING.md`) adds cryptographic authenticity when enabled. Release notes are rendered as text, not raw HTML — a malicious link in a release body can't inject a script into the app.
 
-**Verification:** the update system was built in eight phases and then put through two independent rounds of adversarial review — multi-angle code review plus live browser testing of every state (checking, available, downloading, verifying, backing up, ready, installing, offline, error, rollback) — which caught and fixed nine real issues before release, including a data-loss gap in backup verification, an XSS path in release-notes rendering, and two settings/rollback race conditions. 133 dedicated offline tests cover backup/restore, migration safety, download/verify, rollback, and signature checking; `pylint` holds at 10.00 across every module. In-app install/relaunch was verified against a live server; final confirmation on built DMG/EXE artifacts happens as each platform's asset is published.
+**Verification:** the update system was built in eight phases, then put through two rounds of adversarial review and a dedicated pass on the frozen-app connectivity fix above — multi-angle code review plus live testing of every state (checking, available, downloading, verifying, backing up, ready, installing, offline, error, rollback) against the actual installed `.app`, not just source. Together these caught and fixed the TLS/offline root cause plus nine other real issues before wide distribution, including a data-loss gap in backup verification, an XSS path in release-notes rendering, two settings/rollback race conditions, and a macOS "quit unexpectedly" crash on every app exit. 256 dedicated offline tests cover backup/restore, migration safety, download/verify, rollback, signature checking, TLS/error classification, and the macOS bundle-swap install; `pylint` holds at 10.00 across every module.
 
 No action is required on update: your holdings, settings, and `.env` are preserved.
 
