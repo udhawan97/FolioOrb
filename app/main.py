@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from starlette.middleware.gzip import GZipMiddleware
 from app.routers import stocks, portfolio, ai
 from app.routers import news
+from app.routers import system
 from app.config import settings
 from app.database import engine
 from app.schema_meta import apply_migrations_safely
@@ -70,6 +71,11 @@ async def lifespan(_app: FastAPI):
         )
     # Warm caches off the main thread so startup isn't blocked on Yahoo.
     threading.Thread(target=_run_startup_warmup, daemon=True).start()
+    # Quietly check for updates ~30 s after boot, then daily (respects the
+    # auto-check setting; never installs anything on its own).
+    from app.services.update_service import start_auto_check_scheduler
+
+    start_auto_check_scheduler()
     yield  # The app runs while we're "inside" this yield
 
 # Create the FastAPI application instance
@@ -105,6 +111,7 @@ app.include_router(stocks.router)
 app.include_router(portfolio.router)
 app.include_router(ai.router)
 app.include_router(news.router)
+app.include_router(system.router)
 
 
 @app.get("/")

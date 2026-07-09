@@ -1,0 +1,354 @@
+"""Update checking against the project's GitHub Releases.
+
+No new metadata feed is needed: the GitHub Releases API already carries the
+version (tag), publish date, curated notes (the release body), and the platform
+assets with their sizes and download URLs. This module wraps that API with:
+
+* ETag/If-None-Match caching and a TTL, so repeated checks don't spend the
+  unauthenticated 60/hour rate limit (a 304 costs nothing against it);
+* strict numeric semver comparison against ``app.version.__version__``, so only
+  genuinely newer versions are ever offered (no downgrades);
+* per-platform asset selection (macOS arm64 DMG / Windows x64 installer);
+* a small in-memory state machine that the API and UI poll.
+
+Network egress is pinned to ``api.github.com`` / ``github.com`` for this repo.
+The single HTTP seam (:func:`_http_get`) is injected in tests, so no test ever
+touches the network.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any
+
+from app.services.log_safety import sanitize_for_log
+from app.version import __version__
+
+logger = logging.getLogger(__name__)
+
+REPO = os.getenv("FOLIO_UPDATE_REPO", "udhawan97/FolioSenseAI")
+API_BASE = "https://api.github.com"
+RELEASES_LATEST_URL = f"{API_BASE}/repos/{REPO}/releases/latest"
+CACHE_TTL_SECONDS = 6 * 3600
+_USER_AGENT = f"FolioSenseAI-Updater/{__version__}"
+_SHASUMS_ASSET = "SHA256SUMS.txt"
+
+
+class UpdateStatus(str, Enum):
+    """Lifecycle states. Phase 2 reaches the first six; the rest are for later."""
+
+    IDLE = "idle"
+    CHECKING = "checking"
+    UP_TO_DATE = "up_to_date"
+    AVAILABLE = "available"
+    OFFLINE = "offline"
+    ERROR = "error"
+    DOWNLOADING = "downloading"
+    VERIFYING = "verifying"
+    BACKING_UP = "backing_up"
+    READY = "ready"
+    INSTALLING = "installing"
+
+
+class UpdateOffline(Exception):
+    """Raised when the check cannot reach GitHub (no network / DNS / timeout)."""
+
+
+class UpdateError(Exception):
+    """Raised for any other failure to obtain or parse release metadata."""
+
+
+@dataclass
+class UpdateInfo:  # pylint: disable=too-many-instance-attributes
+    """A single available release, resolved for the current platform."""
+
+    version: str
+    name: str
+    published_at: str | None
+    notes_md: str
+    channel: str  # "stable" or "dev"
+    download_url: str | None
+    asset_name: str | None
+    size_bytes: int | None
+    sha256_url: str | None
+    restart_required: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class _State:
+    status: UpdateStatus = UpdateStatus.IDLE
+    current_version: str = __version__
+    available: UpdateInfo | None = None
+    last_checked_at: str | None = None
+    error: str | None = None
+    downloaded_bytes: int = 0
+    total_bytes: int = 0
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "status": self.status.value,
+            "current_version": self.current_version,
+            "available": self.available.to_dict() if self.available else None,
+            "last_checked_at": self.last_checked_at,
+            "error": self.error,
+            "downloaded_bytes": self.downloaded_bytes,
+            "total_bytes": self.total_bytes,
+        }
+
+
+_state = _State()
+_state_lock = threading.Lock()
+_cache: dict[str, Any] = {"etag": None, "fetched_at": 0.0, "payload": None}
+_cache_lock = threading.Lock()
+
+
+# --------------------------------------------------------------------------- #
+# Version parsing
+# --------------------------------------------------------------------------- #
+def parse_version(value: str) -> tuple[int, int, int] | None:
+    """Parse ``"4.3.4"`` or ``"v4.3.4"`` into ``(4, 3, 4)``; None if not numeric.
+
+    Any pre-release/build suffix after the third component is ignored. A value
+    that isn't a numeric dotted version (e.g. ``"latest-main"``) returns None and
+    is treated as "not an upgrade", which keeps the comparison downgrade-safe.
+    """
+    if not value:
+        return None
+    cleaned = value.strip()
+    if cleaned[:1] in ("v", "V"):
+        cleaned = cleaned[1:]
+    parts = cleaned.split(".")
+    if len(parts) < 3:
+        return None
+    try:
+        return (int(parts[0]), int(parts[1]), int(parts[2].split("-")[0].split("+")[0]))
+    except (ValueError, IndexError):
+        return None
+
+
+def is_newer(candidate: str, current: str) -> bool:
+    """True only when ``candidate`` is a strictly higher numeric semver."""
+    cand = parse_version(candidate)
+    cur = parse_version(current)
+    if cand is None or cur is None:
+        return False
+    return cand > cur
+
+
+# --------------------------------------------------------------------------- #
+# Platform / asset selection
+# --------------------------------------------------------------------------- #
+def current_platform_key() -> str:
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform.startswith("win"):
+        return "windows"
+    return "other"
+
+
+def _select_asset(assets: list[dict[str, Any]], platform_key: str) -> dict[str, Any] | None:
+    """Pick the installer asset for the given platform from a release's assets."""
+    for asset in assets:
+        name = str(asset.get("name", "")).lower()
+        if platform_key == "macos" and name.endswith(".dmg") and "macos" in name:
+            return asset
+        if platform_key == "windows" and name.endswith(".exe") and "windows" in name:
+            return asset
+    return None
+
+
+def _find_asset_url(assets: list[dict[str, Any]], filename: str) -> str | None:
+    for asset in assets:
+        if str(asset.get("name", "")) == filename:
+            return asset.get("browser_download_url")
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# HTTP (single injectable seam)
+# --------------------------------------------------------------------------- #
+def _http_get(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
+    """Perform a GET and return ``(status, response_headers, body_bytes)``.
+
+    Tests monkeypatch this so the network is never touched. A 304 is returned as
+    a normal status (urllib raises for it, so it is caught and re-surfaced).
+    """
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as resp:
+            return resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as exc:
+        # 304 Not Modified is expected with a cached ETag; surface it plainly.
+        return exc.code, dict(exc.headers or {}), b""
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise UpdateOffline(str(exc)) from exc
+
+
+def _fetch_latest_release(force: bool) -> dict[str, Any]:
+    """Return the latest-release JSON, using the ETag/TTL cache when possible."""
+    with _cache_lock:
+        etag = _cache["etag"]
+        fetched_at = _cache["fetched_at"]
+        payload = _cache["payload"]
+
+    fresh = payload is not None and (time.monotonic() - fetched_at) < CACHE_TTL_SECONDS
+    if fresh and not force:
+        return payload
+
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": _USER_AGENT}
+    if etag:
+        headers["If-None-Match"] = etag
+
+    status, resp_headers, body = _http_get(RELEASES_LATEST_URL, headers)
+
+    if status == 304 and payload is not None:
+        with _cache_lock:
+            _cache["fetched_at"] = time.monotonic()
+        return payload
+    if status == 200:
+        try:
+            parsed = json.loads(body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise UpdateError("Malformed release metadata") from exc
+        with _cache_lock:
+            _cache["etag"] = resp_headers.get("ETag")
+            _cache["fetched_at"] = time.monotonic()
+            _cache["payload"] = parsed
+        return parsed
+    if status in (403, 429):
+        raise UpdateError("Rate limited by GitHub; try again later")
+    raise UpdateError(f"Unexpected response status {status}")
+
+
+def _release_to_info(payload: dict[str, Any]) -> UpdateInfo:
+    """Convert a GitHub release payload into an :class:`UpdateInfo`."""
+    tag = str(payload.get("tag_name", ""))
+    version = tag[1:] if tag[:1] in ("v", "V") else tag
+    channel = "stable" if parse_version(tag) is not None else "dev"
+    assets = payload.get("assets") or []
+    asset = _select_asset(assets, current_platform_key())
+    return UpdateInfo(
+        version=version,
+        name=str(payload.get("name") or tag),
+        published_at=payload.get("published_at"),
+        notes_md=str(payload.get("body") or ""),
+        channel=channel,
+        download_url=(asset or {}).get("browser_download_url"),
+        asset_name=(asset or {}).get("name"),
+        size_bytes=(asset or {}).get("size"),
+        sha256_url=_find_asset_url(assets, _SHASUMS_ASSET),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Public API
+# --------------------------------------------------------------------------- #
+def get_state() -> dict[str, Any]:
+    with _state_lock:
+        return _state.snapshot()
+
+
+def _set_state(**changes: Any) -> dict[str, Any]:
+    with _state_lock:
+        for key, value in changes.items():
+            setattr(_state, key, value)
+        return _state.snapshot()
+
+
+def check_for_updates(force: bool = False) -> dict[str, Any]:
+    """Check GitHub for a newer release and update the shared state.
+
+    Returns the resulting state snapshot. Never raises: network problems map to
+    the ``offline`` state and other failures to ``error`` with a sanitized
+    message, so callers (the API and the scheduler) can rely on it.
+    """
+    _set_state(status=UpdateStatus.CHECKING, error=None)
+    try:
+        payload = _fetch_latest_release(force)
+        info = _release_to_info(payload)
+        checked_at = datetime.now(timezone.utc).isoformat()
+        _persist_last_checked(checked_at)
+
+        if is_newer(info.version, __version__):
+            return _set_state(
+                status=UpdateStatus.AVAILABLE,
+                available=info,
+                last_checked_at=checked_at,
+                error=None,
+            )
+        return _set_state(
+            status=UpdateStatus.UP_TO_DATE,
+            available=None,
+            last_checked_at=checked_at,
+            error=None,
+        )
+    except UpdateOffline:
+        logger.debug("Update check offline")
+        return _set_state(status=UpdateStatus.OFFLINE)
+    except UpdateError as exc:
+        logger.warning("Update check failed: %s", sanitize_for_log(exc))
+        return _set_state(status=UpdateStatus.ERROR, error=str(exc))
+
+
+def _persist_last_checked(iso_timestamp: str) -> None:
+    try:
+        from app import app_settings
+
+        app_settings.save_settings({"last_checked_at": iso_timestamp})
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.debug("Could not persist last-checked time: %s", type(exc).__name__)
+
+
+# --------------------------------------------------------------------------- #
+# Background scheduler
+# --------------------------------------------------------------------------- #
+_scheduler = {"started": False}
+_INITIAL_DELAY_SECONDS = 30.0
+_INTERVAL_SECONDS = 24 * 3600
+
+
+def start_auto_check_scheduler() -> None:
+    """Start a daemon thread that checks ~30 s after boot, then every 24 h.
+
+    Respects the ``auto_check_updates`` setting on each tick and never crashes
+    the app on a failed check. Disabled entirely by the
+    ``FOLIO_DISABLE_UPDATE_SCHEDULER`` env var (used by tests/CI).
+    """
+    if _scheduler["started"] or os.getenv("FOLIO_DISABLE_UPDATE_SCHEDULER"):
+        return
+    _scheduler["started"] = True
+
+    def _loop() -> None:
+        time.sleep(_INITIAL_DELAY_SECONDS)
+        while True:
+            try:
+                from app import app_settings
+
+                if app_settings.load_settings().get("auto_check_updates", True):
+                    check_for_updates(force=False)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.debug("Scheduled update check error: %s", type(exc).__name__)
+            time.sleep(_INTERVAL_SECONDS)
+
+    threading.Thread(target=_loop, name="update-scheduler", daemon=True).start()
+
+
+def _reset_for_tests() -> None:
+    """Reset module state so tests start from a clean slate."""
+    with _cache_lock:
+        _cache.update({"etag": None, "fetched_at": 0.0, "payload": None})
+    with _state_lock:
+        globals()["_state"] = _State()
+    _scheduler["started"] = False

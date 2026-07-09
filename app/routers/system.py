@@ -1,0 +1,71 @@
+"""System / update endpoints.
+
+Exposes the current version, the update-check and status of the update state
+machine, and read/write access to the update preferences. Download, install, and
+rollback endpoints are added in later phases; the routes here are the read-mostly
+surface the UI needs to show version info, run a manual check, and toggle the
+Software Updates settings.
+"""
+from __future__ import annotations
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from app import app_settings, paths
+from app.services import update_service
+from app.version import __version__
+
+router = APIRouter(prefix="/api/system", tags=["system"])
+
+
+class UpdateSettingsIn(BaseModel):
+    """Only the user-toggleable update preferences may be written here."""
+
+    auto_check_updates: bool | None = None
+    notify_updates: bool | None = None
+    include_early_builds: bool | None = None
+
+
+class SkipVersionIn(BaseModel):
+    version: str
+
+
+@router.get("/version")
+def get_version() -> dict:
+    """Installed version and whether this is a packaged (frozen) build."""
+    return {
+        "version": __version__,
+        "is_frozen": paths.is_frozen(),
+        "platform": update_service.current_platform_key(),
+    }
+
+
+@router.get("/update/check")
+def check_for_updates(force: bool = False) -> dict:
+    """Run an update check (network) and return the resulting state snapshot."""
+    return update_service.check_for_updates(force=force)
+
+
+@router.get("/update/status")
+def update_status() -> dict:
+    """Return the current update state without triggering a network check."""
+    return update_service.get_state()
+
+
+@router.get("/update/settings")
+def get_update_settings() -> dict:
+    """Return update preferences plus the last-checked timestamp."""
+    return app_settings.load_settings()
+
+
+@router.put("/update/settings")
+def put_update_settings(payload: UpdateSettingsIn) -> dict:
+    """Persist only the provided preference fields and echo the merged settings."""
+    changes = payload.model_dump(exclude_none=True)
+    return app_settings.save_settings(changes)
+
+
+@router.post("/update/skip")
+def skip_version(payload: SkipVersionIn) -> dict:
+    """Record a version the user chose to skip so the pill stays hidden for it."""
+    return app_settings.save_settings({"skipped_version": payload.version})
