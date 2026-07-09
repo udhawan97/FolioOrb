@@ -73,10 +73,10 @@ def test_is_newer_is_downgrade_safe():
 # --------------------------- check_for_updates ----------------------------- #
 def test_available_when_newer(monkeypatch):
     monkeypatch.setattr(update_service, "current_platform_key", lambda: "macos")
-    _patch_response(monkeypatch, _release("v4.4.0", _macos_assets()))
+    _patch_response(monkeypatch, _release("v9.9.9", _macos_assets("9.9.9")))
     state = update_service.check_for_updates()
     assert state["status"] == "available"
-    assert state["available"]["version"] == "4.4.0"
+    assert state["available"]["version"] == "9.9.9"
     assert state["available"]["download_url"].endswith("a.dmg")
     assert state["available"]["sha256_url"].endswith("SHA256SUMS.txt")
     assert state["available"]["size_bytes"] == 100_663_296
@@ -140,7 +140,7 @@ def test_etag_cache_avoids_refetch_and_force_bypasses(monkeypatch):
     def fake_get(url, headers):
         calls["n"] += 1
         if calls["n"] == 1:
-            body = json.dumps(_release("v4.4.0", _macos_assets())).encode("utf-8")
+            body = json.dumps(_release("v9.9.9", _macos_assets("9.9.9"))).encode("utf-8")
             return 200, {"ETag": "e1"}, body
         # A forced refetch must send the stored ETag and may get a 304.
         assert headers.get("If-None-Match") == "e1"
@@ -157,7 +157,7 @@ def test_etag_cache_avoids_refetch_and_force_bypasses(monkeypatch):
     forced = update_service.check_for_updates(force=True)
     assert calls["n"] == 2
     assert forced["status"] == "available"
-    assert forced["available"]["version"] == "4.4.0"
+    assert forced["available"]["version"] == "9.9.9"
 
 
 def test_get_state_returns_snapshot():
