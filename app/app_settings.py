@@ -35,8 +35,10 @@ DEFAULTS: dict[str, Any] = {
     "skipped_version": None,
     # ISO-8601 timestamp of the last successful update check, or None.
     "last_checked_at": None,
-    # Rollback point metadata: {"version", "installer", "backup"} or None.
+    # Rollback point metadata (see update_installer) or None.
     "rollback_point": None,
+    # The version the user last actually ran, used to detect a fresh update.
+    "last_seen_version": None,
 }
 
 

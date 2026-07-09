@@ -103,9 +103,70 @@ def test_install_requires_ready_state():
     assert update_installer.install()["status"] != "installing"
 
 
+def _setup_file_db(tmp_path, monkeypatch):
+    import sqlite3
+
+    from app.config import settings
+
+    db = tmp_path / "portfolio.db"
+    monkeypatch.setattr(settings, "DATABASE_URL", f"sqlite:///{db.as_posix()}")
+    conn = sqlite3.connect(str(db))
+    conn.execute("CREATE TABLE holdings (id INTEGER PRIMARY KEY, ticker TEXT)")
+    conn.execute("INSERT INTO holdings (ticker) VALUES ('VOO')")
+    conn.commit()
+    conn.close()
+    return db
+
+
+def test_install_creates_verified_backup_and_rollback_point(tmp_path, monkeypatch):
+    from app import app_settings
+    from app.services import backup_service
+
+    _setup_file_db(tmp_path, monkeypatch)
+    (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=sk-test\n", encoding="utf-8")
+    installer = tmp_path / "Setup.exe"
+    installer.write_text("x")
+
+    update_service.mark(UpdateStatus.READY)
+    update_installer._rt["path"] = installer
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: None)
+
+    st = update_installer.install()
+
+    assert st["status"] == "installing"
+    rollback = app_settings.load_settings()["rollback_point"]
+    assert rollback is not None
+    assert Path(rollback["db_backup"]).exists()
+    assert backup_service.verify_backup(Path(rollback["db_backup"]), expected_min_holdings=1)
+    assert rollback["env_backup"] and Path(rollback["env_backup"]).exists()
+    assert rollback["version"]
+
+
+def test_install_aborts_when_backup_fails(tmp_path, monkeypatch):
+    from app.services import backup_service
+
+    _setup_file_db(tmp_path, monkeypatch)
+    update_service.mark(UpdateStatus.READY)
+    update_installer._rt["path"] = tmp_path / "Setup.exe"
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(backup_service, "create_backup", boom)
+    launched = []
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
+
+    st = update_installer.install()
+
+    assert st["status"] == "error"
+    assert launched == []  # never hand off without a verified backup
+
+
 def test_install_launches_and_schedules_exit(monkeypatch):
     update_service.mark(UpdateStatus.READY)
     update_installer._rt["path"] = Path("/x/Setup.exe")
+    # Focus on handoff + exit scheduling; backup is covered by its own tests.
+    monkeypatch.setattr(update_installer, "_create_rollback_point", lambda: {"version": "4.3.4"})
 
     launched = {}
     monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.setdefault("p", p))

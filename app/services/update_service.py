@@ -113,6 +113,34 @@ _state = _State()
 _state_lock = threading.Lock()
 _cache: dict[str, Any] = {"etag": None, "fetched_at": 0.0, "payload": None}
 _cache_lock = threading.Lock()
+# Set once per process at startup: whether this launch is the first run on a
+# newly-installed version, and what version preceded it.
+_launch: dict[str, Any] = {"just_updated": False, "previous_version": None}
+
+
+def note_launch() -> dict[str, Any]:
+    """Detect a post-update first run by comparing __version__ to last-seen.
+
+    Records the current version as last-seen so the confirmation shows only once.
+    Called at startup; returns the launch info for convenience.
+    """
+    try:
+        from app import app_settings
+
+        stored = app_settings.load_settings()
+        last = stored.get("last_seen_version")
+        if last and last != __version__:
+            _launch["just_updated"] = True
+            _launch["previous_version"] = last
+        if last != __version__:
+            app_settings.save_settings({"last_seen_version": __version__})
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.debug("note_launch failed: %s", type(exc).__name__)
+    return dict(_launch)
+
+
+def launch_info() -> dict[str, Any]:
+    return dict(_launch)
 
 
 # --------------------------------------------------------------------------- #
@@ -363,3 +391,4 @@ def _reset_for_tests() -> None:
     with _state_lock:
         globals()["_state"] = _State()
     _scheduler["started"] = False
+    _launch.update({"just_updated": False, "previous_version": None})

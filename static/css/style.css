@@ -20657,6 +20657,46 @@ body > .fs-update-sheet {
 }
 .fs-switch.is-on .fs-switch-thumb { transform: translateX(16px); }
 
+/* ── Post-update confirmation toast ───────────────────────────────────────*/
+body > .fs-update-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 2002;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    max-width: 92vw;
+    padding: 0.7rem 1rem 0.7rem 0.8rem;
+    border-radius: 14px;
+    background: var(--toast-surface);
+    border: 1px solid var(--hairline-hover);
+    box-shadow: var(--shadow-float);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    color: var(--text-primary);
+    opacity: 0;
+    transform: translate(-50%, 12px);
+    transition: opacity 0.28s var(--ease), transform 0.34s var(--spring);
+    pointer-events: none;
+}
+body > .fs-update-toast.is-in { opacity: 1; transform: translate(-50%, 0); }
+.fs-update-toast-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.fs-update-toast-title { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+.fs-update-toast-sub { font-size: 0.74rem; color: var(--text-secondary); margin-top: 1px; }
+
 /* ── Reduced motion ───────────────────────────────────────────────────────*/
 @media (prefers-reduced-motion: reduce) {
     .fs-update-pill-dot { animation: none; }
@@ -20665,6 +20705,7 @@ body > .fs-update-sheet {
     .fs-update-panel,
     .fs-update-progress-fill,
     .fs-switch,
-    .fs-switch-thumb { transition: none; }
+    .fs-switch-thumb,
+    body > .fs-update-toast { transition: none; }
     .fs-update-panel { transform: none; }
 }

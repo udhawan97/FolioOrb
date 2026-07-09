@@ -71,11 +71,14 @@ async def lifespan(_app: FastAPI):
         )
     # Warm caches off the main thread so startup isn't blocked on Yahoo.
     threading.Thread(target=_run_startup_warmup, daemon=True).start()
+    # Record whether this is the first run on a freshly installed version, so the
+    # UI can show a one-time "holdings intact" confirmation.
+    from app.services import update_service
+
+    update_service.note_launch()
     # Quietly check for updates ~30 s after boot, then daily (respects the
     # auto-check setting; never installs anything on its own).
-    from app.services.update_service import start_auto_check_scheduler
-
-    start_auto_check_scheduler()
+    update_service.start_auto_check_scheduler()
     yield  # The app runs while we're "inside" this yield
 
 # Create the FastAPI application instance

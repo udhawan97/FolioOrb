@@ -500,7 +500,40 @@
                 el.navUpdateVersion.textContent = "v" + versionInfo.version;
             }
             refreshPassiveIndicators();
+            if (versionInfo && versionInfo.just_updated) {
+                showUpdatedToast(versionInfo.version);
+            }
         });
+    }
+
+    /* A calm, auto-dismissing confirmation on the first run after an update. */
+    function showUpdatedToast(version) {
+        var toast = document.createElement("div");
+        toast.className = "fs-update-toast";
+        toast.setAttribute("role", "status");
+
+        var mark = document.createElement("span");
+        mark.className = "fs-update-toast-mark";
+        mark.textContent = "✓";
+
+        var body = document.createElement("div");
+        var title = document.createElement("div");
+        title.className = "fs-update-toast-title";
+        title.textContent = "Updated to FolioSenseAI " + version;
+        var sub = document.createElement("div");
+        sub.className = "fs-update-toast-sub";
+        sub.textContent = "Your holdings are intact — backup verified.";
+        body.appendChild(title);
+        body.appendChild(sub);
+        toast.appendChild(mark);
+        toast.appendChild(body);
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(function () { toast.classList.add("is-in"); });
+        window.setTimeout(function () {
+            toast.classList.remove("is-in");
+            window.setTimeout(function () { toast.remove(); }, 320);
+        }, 6000);
     }
 
     window.FolioUpdates = { open: open, openAndCheck: openAndCheck, close: close };

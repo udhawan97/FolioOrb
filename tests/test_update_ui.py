@@ -60,6 +60,9 @@ def test_updates_js_exposes_api_and_states():
     # Accessibility: focus trap + Escape handling.
     assert "trapFocus" in js
     assert 'e.key === "Escape"' in js
+    # Post-update confirmation.
+    assert "showUpdatedToast" in js
+    assert "just_updated" in js
 
 
 def test_update_styles_present():
@@ -67,6 +70,6 @@ def test_update_styles_present():
     for selector in (
         ".fs-update-pill", ".fs-update-panel", ".fs-update-notes",
         ".fs-update-trust", ".fs-update-btn--primary", ".fs-switch",
-        "prefers-reduced-motion",
+        ".fs-update-toast", "prefers-reduced-motion",
     ):
         assert selector in css, selector

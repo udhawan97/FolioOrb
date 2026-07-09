@@ -35,6 +35,35 @@ def backups_dir() -> Path:
     return directory
 
 
+def env_path() -> Path:
+    """Path to the per-user ``.env`` (Claude key etc.)."""
+    return paths.data_dir() / ".env"
+
+
+def snapshot_env(dest_path: Path) -> Path | None:
+    """Copy the current ``.env`` to ``dest_path`` if it exists; else return None."""
+    src = env_path()
+    if not src.exists():
+        return None
+    dest_path = Path(dest_path)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dest_path)
+    return dest_path
+
+
+def restore_env(env_backup: Path, ts: str | None = None) -> bool:
+    """Restore a ``.env`` backup, preserving the current one as ``.failed-<ts>``."""
+    env_backup = Path(env_backup)
+    if not env_backup.exists():
+        return False
+    current = env_path()
+    if current.exists():
+        stamp = ts or _timestamp()
+        current.replace(Path(f"{current}.failed-{stamp}"))
+    shutil.copyfile(env_backup, current)
+    return True
+
+
 def live_db_path() -> Path:
     """Filesystem path of the live SQLite database from the configured URL.
 

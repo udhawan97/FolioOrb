@@ -32,11 +32,14 @@ class SkipVersionIn(BaseModel):
 
 @router.get("/version")
 def get_version() -> dict:
-    """Installed version and whether this is a packaged (frozen) build."""
+    """Installed version, packaged flag, and whether this is a post-update run."""
+    launch = update_service.launch_info()
     return {
         "version": __version__,
         "is_frozen": paths.is_frozen(),
         "platform": update_service.current_platform_key(),
+        "just_updated": launch.get("just_updated", False),
+        "previous_version": launch.get("previous_version"),
     }
 
 

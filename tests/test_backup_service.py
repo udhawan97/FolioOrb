@@ -97,6 +97,30 @@ def test_restore_refuses_unverified_backup(tmp_path):
     assert _holdings(live) == ["KEEP"]
 
 
+def test_env_snapshot_and_restore(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    env = tmp_path / ".env"
+    env.write_text("ANTHROPIC_API_KEY=sk-original\n", encoding="utf-8")
+
+    snap = backup_service.snapshot_env(tmp_path / "backup.env")
+    assert snap is not None and snap.read_text(encoding="utf-8").startswith("ANTHROPIC_API_KEY=sk-original")
+
+    # Current .env drifts, then is restored from the snapshot.
+    env.write_text("ANTHROPIC_API_KEY=sk-changed\n", encoding="utf-8")
+    assert backup_service.restore_env(snap, ts="20260101-000000") is True
+    assert "sk-original" in env.read_text(encoding="utf-8")
+    assert (tmp_path / ".env.failed-20260101-000000").exists()
+
+
+def test_snapshot_env_returns_none_when_absent(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    assert backup_service.snapshot_env(tmp_path / "backup.env") is None
+
+
 def test_prune_keeps_newest_n(tmp_path):
     backups = tmp_path / "backups"
     backups.mkdir()

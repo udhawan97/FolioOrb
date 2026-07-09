@@ -164,3 +164,23 @@ def test_get_state_returns_snapshot():
     state = update_service.get_state()
     assert state["status"] == "idle"
     assert state["current_version"] == __version__
+
+
+# ---------------------------- post-update launch --------------------------- #
+def test_note_launch_detects_update():
+    from app import app_settings
+
+    app_settings.save_settings({"last_seen_version": "4.3.0"})
+    info = update_service.note_launch()
+    assert info["just_updated"] is True
+    assert info["previous_version"] == "4.3.0"
+    # last-seen is advanced so the confirmation shows only once.
+    assert app_settings.load_settings()["last_seen_version"] == __version__
+
+
+def test_note_launch_quiet_on_same_version():
+    from app import app_settings
+
+    app_settings.save_settings({"last_seen_version": __version__})
+    info = update_service.note_launch()
+    assert info["just_updated"] is False
