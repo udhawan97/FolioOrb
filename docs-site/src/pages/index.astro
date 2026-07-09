@@ -627,18 +627,43 @@ const roadmap = [
 			</section>
 		</main>
 
+		<!-- ═══ SENPAI SPOTLIGHT · standalone, above the footer ═══════════ -->
+		<section class="senpai-spotlight" id="senpai-spotlight" aria-label="A word from Senpai">
+			<div class="ss-decor" aria-hidden="true">
+				<span class="ss-glow ss-glow-a"></span>
+				<span class="ss-glow ss-glow-b"></span>
+				<span class="ss-streak"></span>
+				<span class="ss-dot ss-dot-1"></span>
+				<span class="ss-dot ss-dot-2"></span>
+				<span class="ss-dot ss-dot-3"></span>
+				<span class="ss-dot ss-dot-4"></span>
+			</div>
+			<div class="ss-wrap">
+				<div class="ss-card grad-border" id="ss-card">
+					<span class="ss-card-aura" aria-hidden="true"></span>
+					<button type="button" class="ss-orb-wrap" id="senpai-egg" aria-label="Shuffle Senpai’s one-liner">
+						<span class="ss-orb-ring ss-orb-ring-a" aria-hidden="true"></span>
+						<span class="ss-orb-ring ss-orb-ring-b" aria-hidden="true"></span>
+						<span class="ss-orb-glow" aria-hidden="true"></span>
+						<img src={asset('folio-orbit-icon.svg')} alt="" width="30" height="30" class="ss-orb-img" />
+					</button>
+					<div class="ss-copy">
+						<span class="ss-eyebrow"><span class="ss-eyebrow-dot" aria-hidden="true"></span>Senpai says</span>
+						<p class="ss-quip" id="senpai-quip-text">Not financial advice. Very much a dashboard.</p>
+					</div>
+					<button type="button" class="ss-shuffle" id="senpai-quip" aria-label="Shuffle Senpai’s one-liner">
+						<i class="ss-shuffle-icon" aria-hidden="true"></i>
+						<span>New line</span>
+					</button>
+				</div>
+			</div>
+		</section>
+
 		<footer class="footer">
 			<div class="footer-inner">
 				<div class="footer-brand">
-					<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" id="senpai-egg" />
-					<div class="footer-brand-copy">
-						<strong class="footer-brand-name">FolioSenseAI</strong>
-						<button type="button" class="senpai-quip" id="senpai-quip" aria-label="Shuffle Senpai’s one-liner">
-							<span class="quip-dot" aria-hidden="true"></span>
-							<span class="quip-text" id="senpai-quip-text">Not financial advice. Very much a dashboard.</span>
-							<span class="quip-shuffle-chip" aria-hidden="true"><i class="quip-shuffle"></i></span>
-						</button>
-					</div>
+					<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" />
+					<strong class="footer-brand-name">FolioSenseAI</strong>
 				</div>
 				<nav class="footer-links">
 					<a href={GITHUB}>GitHub</a><a href={doc('get-started/introduction')}>Docs</a>
@@ -862,7 +887,7 @@ const roadmap = [
 				railDismiss?.addEventListener('click', () => { rail.classList.remove('on'); rail.classList.add('off'); localStorage.setItem('fs-rail', 'off'); });
 			}
 
-			// ── Footer Senpai one-liner: random on every load, click/tap to shuffle ──
+			// ── Senpai spotlight: random on every load, click/tap/auto-cycle to shuffle ──
 				const quips = [
 					'Not financial advice. Very much a dashboard.',
 					'Your “diversified” portfolio is four tech stocks in a trench coat.',
@@ -882,11 +907,12 @@ const roadmap = [
 				const egg = document.getElementById('senpai-egg');
 				const quipBtn = document.getElementById('senpai-quip');
 				const quipText = document.getElementById('senpai-quip-text');
+				const quipCard = document.getElementById('ss-card');
 				let qi = Math.floor(Math.random() * quips.length);
 				const paintQuip = (animate) => {
 					if (!quipText) return;
 					quipText.textContent = quips[qi];
-					if (animate && !reduce && quipBtn) { quipBtn.classList.remove('shuffled'); void quipBtn.offsetWidth; quipBtn.classList.add('shuffled'); }
+					if (animate && !reduce && quipCard) { quipCard.classList.remove('is-shuffled'); void quipCard.offsetWidth; quipCard.classList.add('is-shuffled'); }
 				};
 				const shuffleQuip = () => {
 					if (quips.length > 1) { let n; do { n = Math.floor(Math.random() * quips.length); } while (n === qi); qi = n; }
@@ -895,6 +921,10 @@ const roadmap = [
 				paintQuip(false); // randomised first line on every refresh
 				quipBtn?.addEventListener('click', shuffleQuip);
 				egg?.addEventListener('click', shuffleQuip);
+				// Auto-cycle every 9s while the tab is visible — a spotlight, not a static footer note.
+				if (!reduce && quipCard) {
+					setInterval(() => { if (!document.hidden) shuffleQuip(); }, 9000);
+				}
 		</script>
 	</body>
 </html>

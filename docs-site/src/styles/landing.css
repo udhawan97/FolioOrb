@@ -526,9 +526,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 .footer { border-top: 1px solid var(--panel-border); margin-top: 4rem; }
 .footer-inner { max-width: var(--maxw); margin: 0 auto; padding: 2rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
 .footer-brand { display: flex; align-items: center; gap: 0.8rem; }
-.footer-brand img { cursor: pointer; }
-.footer-brand strong { font-size: 0.98rem; }
-.footer-brand p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.85rem; max-width: 42ch; }
+.footer-brand-name { font-size: 0.98rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
 .footer-links { display: flex; gap: 1.3rem; font-size: 0.9rem; }
 .footer-links a { color: var(--muted); }
 .footer-links a:hover { color: var(--text); text-decoration: none; }
@@ -653,73 +651,112 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 	background: var(--panel-2); border: 1px solid color-mix(in srgb, var(--act-accent) 30%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--act-accent) 18%, transparent); }
 .up-note { max-width: 64ch; margin: 1.8rem auto 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
 
-/* Footer Senpai one-liner — a self-contained, shufflable pill.
-   The brand name sits on its own line; Senpai's quip lives in an accent-tinted
-   pill below it, so the two never bleed into each other. */
-.footer-brand-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 0.55rem; min-width: 0; }
-.footer-brand-name { font-size: 0.98rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); line-height: 1; }
+@media (max-width: 960px) {
+	.update-console { grid-template-columns: 1fr; gap: 1.6rem; padding: 1.6rem; }
+}
 
-.senpai-quip {
-	display: inline-flex; align-items: center; gap: 0.6rem;
-	margin: 0; padding: 0.42rem 0.45rem 0.42rem 0.8rem; max-width: 48ch;
-	font: inherit; font-size: 0.85rem; line-height: 1.35; text-align: left; cursor: pointer;
-	color: var(--muted);
-	border-radius: 999px;
-	border: 1px solid color-mix(in srgb, var(--act-accent) 24%, var(--panel-border));
-	background:
-		linear-gradient(180deg, color-mix(in srgb, var(--act-accent) 9%, transparent), transparent),
-		var(--panel);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+/* ── SENPAI SPOTLIGHT ─────────────────────────────────────────────
+   A standalone, animated banner between the last act and the footer.
+   Senpai gets a proper stage: a rotating aura, a twin-ring orb, sparkle
+   decor, and a materializing quip that auto-cycles as well as shuffles
+   on click. Everything folds under the site's global reduced-motion
+   query (animation-duration forced near-zero), and the auto-cycle timer
+   is skipped outright when the user has asked for less motion. */
+.senpai-spotlight { position: relative; padding: 4.5rem 1.5rem; overflow: hidden; isolation: isolate; }
+.ss-wrap { max-width: var(--maxw); margin: 0 auto; position: relative; }
+
+.ss-decor { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.ss-glow { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.28; }
+.ss-glow-a { width: 30vw; height: 30vw; max-width: 420px; max-height: 420px; left: 8%; top: -30%; background: var(--act-accent); animation: ss-glow-drift 12s ease-in-out infinite; }
+.ss-glow-b { width: 24vw; height: 24vw; max-width: 340px; max-height: 340px; right: 6%; bottom: -40%; background: var(--act-accent-2); animation: ss-glow-drift 12s ease-in-out infinite reverse; animation-delay: -4s; }
+@keyframes ss-glow-drift { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-18px) scale(1.12); } }
+.ss-streak { position: absolute; top: -20%; left: 62%; width: 1px; height: 160%; transform: rotate(14deg); opacity: 0.3; overflow: hidden;
+	background: linear-gradient(var(--act-accent), transparent 75%); }
+.ss-streak::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent, rgba(255,255,255,0.6) 46%, transparent 60%); animation: ss-streak-sweep 8s linear infinite; }
+@keyframes ss-streak-sweep { 0% { transform: translateY(-120%); } 100% { transform: translateY(120%); } }
+.ss-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--act-accent); box-shadow: 0 0 6px var(--act-accent); opacity: 0.4; animation: ss-dot-twinkle 5s ease-in-out infinite; }
+.ss-dot-1 { left: 14%; top: 20%; }
+.ss-dot-2 { left: 26%; top: 74%; animation-delay: -1.3s; }
+.ss-dot-3 { right: 18%; top: 30%; animation-delay: -2.6s; }
+.ss-dot-4 { right: 30%; top: 70%; animation-delay: -3.8s; }
+@keyframes ss-dot-twinkle { 0%,100% { opacity: 0.2; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.8); } }
+
+.ss-card {
+	position: relative; display: flex; align-items: center; gap: 1.6rem;
+	padding: 1.6rem 2rem; border-radius: 24px;
+}
+
+/* A softly rotating conic-gradient aura peeking out from behind the card. */
+.ss-card-aura {
+	position: absolute; inset: -2px; z-index: -1; border-radius: inherit;
+	background: conic-gradient(from 0deg,
+		color-mix(in srgb, var(--act-accent) 55%, transparent),
+		transparent 30%, transparent 55%,
+		color-mix(in srgb, var(--act-accent-2) 55%, transparent),
+		transparent 85%);
+	filter: blur(18px); opacity: 0.55;
+	animation: ss-aura-spin 10s linear infinite;
+}
+@keyframes ss-aura-spin { to { transform: rotate(360deg); } }
+
+.ss-orb-wrap {
+	position: relative; flex: none; width: 68px; height: 68px; display: grid; place-items: center;
+	background: none; border: none; cursor: pointer; padding: 0; border-radius: 50%;
+}
+.ss-orb-ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--act-accent) 45%, transparent); }
+.ss-orb-ring-a { animation: ss-ring-spin 11s linear infinite; border-style: dashed; }
+.ss-orb-ring-b { inset: -9px; border-color: color-mix(in srgb, var(--act-accent-2) 35%, transparent); animation: ss-ring-spin 17s linear infinite reverse; }
+@keyframes ss-ring-spin { to { transform: rotate(360deg); } }
+.ss-orb-glow { position: absolute; inset: 6px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--act-accent) 55%, transparent), transparent 70%);
+	animation: ss-orb-glow-pulse 3s ease-in-out infinite; }
+@keyframes ss-orb-glow-pulse { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.15); } }
+.ss-orb-img { position: relative; width: 30px; height: 30px; animation: ss-orb-bob 4s ease-in-out infinite; }
+@keyframes ss-orb-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.ss-orb-wrap:hover .ss-orb-glow, .ss-orb-wrap:focus-visible .ss-orb-glow { opacity: 1; }
+.ss-orb-wrap:focus-visible { outline: 2px solid var(--act-accent); outline-offset: 4px; }
+
+.ss-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.ss-eyebrow { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: var(--act-accent); }
+.ss-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--act-accent); box-shadow: 0 0 8px color-mix(in srgb, var(--act-accent) 70%, transparent);
+	animation: ss-eyebrow-pulse 2.4s ease-in-out infinite; }
+@keyframes ss-eyebrow-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.ss-quip { margin: 0; font-size: 1.08rem; line-height: 1.5; color: var(--text); max-width: 56ch; }
+
+.ss-shuffle {
+	flex: none; display: inline-flex; align-items: center; gap: 0.5rem;
+	padding: 0.62rem 1.1rem; border-radius: 999px; cursor: pointer;
+	font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--text);
+	border: 1px solid color-mix(in srgb, var(--act-accent) 40%, var(--panel-border));
+	background: color-mix(in srgb, var(--act-accent) 12%, var(--panel));
 	transition: border-color var(--dur-micro) ease, background var(--dur-micro) ease,
 		box-shadow var(--dur-micro) ease, transform var(--dur-micro) ease;
 }
-.senpai-quip:hover, .senpai-quip:focus-visible {
-	outline: none;
-	transform: translateY(-1px);
-	border-color: color-mix(in srgb, var(--act-accent) 55%, transparent);
-	background:
-		linear-gradient(180deg, color-mix(in srgb, var(--act-accent) 15%, transparent), transparent),
-		var(--panel-2);
-	box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--act-accent) 45%, transparent),
-		inset 0 1px 0 rgba(255, 255, 255, 0.06);
+.ss-shuffle:hover, .ss-shuffle:focus-visible {
+	outline: none; transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--act-accent) 65%, transparent);
+	background: color-mix(in srgb, var(--act-accent) 22%, var(--panel-2));
+	box-shadow: 0 10px 26px -12px color-mix(in srgb, var(--act-accent) 55%, transparent);
 }
-
-/* Pulsing "live" dot on the left. */
-.quip-dot {
-	flex: none; width: 6px; height: 6px; border-radius: 50%;
-	background: var(--act-accent);
-	box-shadow: 0 0 8px color-mix(in srgb, var(--act-accent) 70%, transparent);
-	animation: quip-pulse 2.6s var(--ease-out) infinite;
-}
-
-.senpai-quip .quip-text { color: var(--muted); transition: color var(--dur-micro) ease; }
-.senpai-quip:hover .quip-text, .senpai-quip:focus-visible .quip-text { color: var(--text); }
-
-/* Shuffle icon in its own accent chip on the right. */
-.quip-shuffle-chip {
-	flex: none; display: inline-flex; align-items: center; justify-content: center;
-	width: 22px; height: 22px; border-radius: 50%;
-	background: color-mix(in srgb, var(--act-accent) 16%, transparent);
-	transition: background var(--dur-micro) ease, transform 0.45s var(--ease-out);
-}
-.senpai-quip:hover .quip-shuffle-chip, .senpai-quip:focus-visible .quip-shuffle-chip {
-	background: color-mix(in srgb, var(--act-accent) 30%, transparent);
-}
-.quip-shuffle {
-	width: 12px; height: 12px; background: var(--act-accent);
+.ss-shuffle-icon {
+	width: 14px; height: 14px; background: currentColor; flex: none;
 	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat;
 	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 
-.senpai-quip.shuffled .quip-shuffle-chip { animation: quip-spin 0.45s var(--ease-out); }
-.senpai-quip.shuffled .quip-text { animation: quip-fade 0.4s var(--ease-out); }
-@keyframes quip-spin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
-@keyframes quip-fade { 0% { opacity: 0.35; transform: translateY(2px); } 100% { opacity: 1; transform: none; } }
-@keyframes quip-pulse {
-	0%, 100% { opacity: 1; box-shadow: 0 0 8px color-mix(in srgb, var(--act-accent) 70%, transparent); }
-	50% { opacity: 0.5; box-shadow: 0 0 3px color-mix(in srgb, var(--act-accent) 35%, transparent); }
-}
+/* Shuffle burst — the whole card announces a new line. */
+.ss-card.is-shuffled .ss-quip { animation: ss-quip-materialize 0.55s var(--ease-out); }
+.ss-card.is-shuffled .ss-shuffle-icon { animation: ss-shuffle-spin 0.5s var(--ease-out); }
+.ss-card.is-shuffled .ss-orb-glow { animation: ss-orb-glow-pulse 3s ease-in-out infinite, ss-orb-flash 0.5s var(--ease-out); }
+.ss-card.is-shuffled .ss-card-aura { animation: ss-aura-spin 10s linear infinite, ss-aura-flash 0.6s var(--ease-out); }
+@keyframes ss-quip-materialize { 0% { opacity: 0; transform: translateY(6px); filter: blur(6px); } 100% { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes ss-shuffle-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes ss-orb-flash { 0% { opacity: 1; transform: scale(1.5); } 100% { opacity: 0.55; transform: scale(1); } }
+@keyframes ss-aura-flash { 0% { opacity: 1; } 100% { opacity: 0.55; } }
 
-@media (max-width: 960px) {
-	.update-console { grid-template-columns: 1fr; gap: 1.6rem; padding: 1.6rem; }
+@media (max-width: 720px) {
+	.senpai-spotlight { padding: 3.2rem 1.25rem; }
+	.ss-card { flex-direction: column; text-align: center; padding: 2rem 1.5rem; }
+	.ss-copy { align-items: center; }
+	.ss-quip { max-width: 42ch; }
+	.ss-shuffle { width: 100%; justify-content: center; }
 }
