@@ -7,6 +7,22 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v4.4.1 — Software Update, done right
+
+- **A consent-first in-app update system.** FolioSenseAI checks quietly for new versions, shows
+  a calm indicator when one's available, and never downloads or installs without an explicit
+  click. Check any time from **Check for Updates…** in the app menu or **Settings → Software
+  Update**.
+- **Your holdings are protected at every step.** A verified backup is taken before any update or
+  migration; if the backup can't be made or fails verification, the update pauses rather than
+  risking your data. **Restore previous version…** rolls back safely, always snapshotting current
+  data first so nothing is lost either way.
+- **Trustworthy downloads.** SHA-256 verified against published checksums, with optional minisign
+  authenticity signing. Release notes render as text, not raw HTML.
+- Built in eight phases, then hardened through two rounds of adversarial review that caught and
+  fixed nine real issues — including a data-loss gap in backup verification and an XSS path in
+  release-notes rendering — before shipping. 133 dedicated tests, `pylint` 10.00.
+
 ## v4.3.4 — Quieter Hot Paths
 
 - **Performance release — no feature changes.** Targeted fixes to the code that runs most

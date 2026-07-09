@@ -1,22 +1,22 @@
-# FolioSenseAI v4.4.0 Release Notes
+# FolioSenseAI v4.4.1 Release Notes
 
-**Release date:** _unreleased — pending release QA on built artifacts_
+**Release date:** July 9, 2026
 
 ---
 
 ## ✦ Software Update, done right
 
-> *v4.4.0 adds a professional, consent-first update system. FolioSenseAI can now tell you when a new version is out, download and install it with your permission, and — most importantly — protect your holdings across every update, with a real way back if anything goes wrong.*
+> *v4.4.1 adds a professional, consent-first update system. FolioSenseAI can now tell you when a new version is out, download and install it with your permission, and — most importantly — protect your holdings across every update, with a real way back if anything goes wrong.*
 
 **Nothing updates without your say-so.** The app checks quietly for new versions (about 30 seconds after launch, then daily — you can turn this off) and, when one is available, shows a single calm indicator. Opening it reveals a Software Update sheet modelled on the macOS one: what's new, the download size, whether a relaunch is needed, and clear **Update Now / Later** actions. You can also check any time from the **Check for Updates…** menu item or **Settings → Software Update**.
 
-**Your holdings are protected at every step.** Before an update installs, FolioSenseAI takes a verified backup of your portfolio database and your settings — and if that backup can't be made, the update is paused rather than risking your data. Database migrations are wrapped in the same protection: a version bump backs up first and, if a migration ever failed, automatically restores the last good state. After updating, a quiet confirmation notes that your holdings came through intact.
+**Your holdings are protected at every step.** Before an update installs, FolioSenseAI takes a verified backup of your portfolio database and your settings — and if that backup can't be made, the update is paused rather than risking your data. Backup verification checks the database's actual holdings count, not just that a file exists, so a backup that silently lost data is caught before it's ever trusted. Database migrations get the same protection: a version bump backs up first and, if a migration ever failed, automatically restores the last good state. After updating, a quiet confirmation notes that your holdings came through intact.
 
-**A real way back.** If an update misbehaves, **Restore previous version…** (in Settings, and offered automatically after repeated failed launches) rolls back to the prior version. It always snapshots your current data first, so nothing is lost either way; you choose whether to also restore the pre-update data. 
+**A real way back.** If an update misbehaves, **Restore previous version…** (in Settings, and offered automatically after repeated failed launches) rolls back to the prior version. It always snapshots your current data first, so nothing is lost either way; you choose whether to also restore the pre-update data. Rolling back refuses to run while another update is already in progress, so the two can't collide.
 
-**Trustworthy downloads.** Every update package is verified by SHA-256 against the checksums published with the release before it's installed; corrupted or interrupted downloads are rejected or resumed. Optional minisign signing (see `packaging/SIGNING.md`) adds cryptographic authenticity when enabled.
+**Trustworthy downloads.** Every update package is verified by SHA-256 against the checksums published with the release before it's installed; corrupted or interrupted downloads are rejected or resumed. Optional minisign signing (see `packaging/SIGNING.md`) adds cryptographic authenticity when enabled. Release notes are rendered as text, not raw HTML — a malicious link in a release body can't inject a script into the app.
 
-**Verification:** the update system ships with 100+ dedicated offline tests covering backup/restore, migration safety, download/verify, rollback, and signature checking; `pylint` holds at 10.00. The update sheet and its states were verified live in both light and dark themes. In-app install/relaunch on real DMG/EXE artifacts is validated during release QA.
+**Verification:** the update system was built in eight phases and then put through two independent rounds of adversarial review — multi-angle code review plus live browser testing of every state (checking, available, downloading, verifying, backing up, ready, installing, offline, error, rollback) — which caught and fixed nine real issues before release, including a data-loss gap in backup verification, an XSS path in release-notes rendering, and two settings/rollback race conditions. 133 dedicated offline tests cover backup/restore, migration safety, download/verify, rollback, and signature checking; `pylint` holds at 10.00 across every module. In-app install/relaunch was verified against a live server; final confirmation on built DMG/EXE artifacts happens as each platform's asset is published.
 
 No action is required on update: your holdings, settings, and `.env` are preserved.
 
