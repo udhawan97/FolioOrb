@@ -571,7 +571,10 @@ async def import_holdings(
     if dupes:
         raise HTTPException(
             status_code=400,
-            detail=f"Duplicate column name(s): {', '.join(dupes)}. Give each column a unique header.",
+            detail=(
+                f"Duplicate column name(s): {', '.join(dupes)}. "
+                "Give each column a unique header."
+            ),
         )
 
     template_rows, mode, column_mapping = _resolve_import_mode(header, data_rows, force_local)
