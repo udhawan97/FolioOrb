@@ -124,75 +124,119 @@ const features = [
 		<main>
 			<!-- ═══ ACT 1+2 · HERO ═══════════════════════════════════════════ -->
 			<section class="hero act" id="act-hero" data-hue="cyan">
-				<div class="hero-copy">
-					<span class="eyebrow reveal">Local-first portfolio intelligence</span>
-					<h1 class="display reveal">Your portfolio, finally speaks&nbsp;back.</h1>
-					<p class="lede reveal">
-						FolioSenseAI turns holdings, risk, news, and market context into plain-English
-						portfolio reads — running on your machine, Claude-optional, built for trust.
-					</p>
-
-					<div class="cta-row reveal">
-						<a id="dl-mac" class="btn btn-primary" href={RELEASES_LATEST} data-os="mac">
-							<span class="btn-title">Download for macOS</span>
-							<span class="btn-sub" data-role="meta">Apple Silicon · .dmg</span>
-						</a>
-						<a id="dl-win" class="btn btn-primary" href={RELEASES_LATEST} data-os="win">
-							<span class="btn-title">Download for Windows</span>
-							<span class="btn-sub" data-role="meta">64-bit .exe installer</span>
-						</a>
-					</div>
-
-					<div class="cta-secondary reveal">
-						<a href={doc('get-started/introduction')}>View Docs</a><span>·</span>
-						<a href={GITHUB}>View GitHub</a><span>·</span>
-						<a href={RELEASES}>Release Notes</a>
-						<details class="dev-builds">
-							<summary>Development builds</summary>
-							<div class="dev-panel">
-								<p>Rolling builds from the latest <code>main</code> merge. Unstable — for testing only.</p>
-								<a href={`${RELEASES}/tag/latest-main`}>Get the latest-main build ↗</a>
-							</div>
-						</details>
-					</div>
-
-					<ul class="trust-strip reveal" aria-label="At a glance">
-						<li>Local-first</li><li>Claude optional</li><li>Open source</li><li>SHA256 verifiable</li>
-					</ul>
-
-					<div id="release-strip" class="release-strip reveal" hidden>
-						<span class="chip" data-role="version">—</span>
-						<span class="chip" data-role="date">—</span>
-						<span class="chip" data-role="sha" hidden>—</span>
-						<a class="chip chip-link" data-role="release-link" href={RELEASES_LATEST}>View release ↗</a>
-					</div>
+				<div class="hero-decor" aria-hidden="true">
+					<div class="hero-glow"></div>
+					<div class="hero-orb hero-orb-a"></div>
+					<div class="hero-orb hero-orb-b"></div>
+					<div class="hero-streak"></div>
+					<div class="hero-glyph hero-glyph-mac"></div>
+					<div class="hero-glyph hero-glyph-win"></div>
+					<span class="hero-line hero-line-a"></span>
+					<span class="hero-dot hero-dot-1"></span>
+					<span class="hero-dot hero-dot-2"></span>
+					<span class="hero-dot hero-dot-3"></span>
+					<span class="hero-dot hero-dot-4"></span>
 				</div>
 
-				<div class="hero-stage reveal" id="hero-stage">
-					<div class="window-chrome grad-border" id="hero-window">
-						<div class="window-bar"><span></span><span></span><span></span></div>
-						<div class="hero-shot">
-							<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
-								alt="The FolioSenseAI dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
-							<div class="pulse-line" aria-hidden="true"></div>
-							<div class="spot-region" id="spot-region" aria-hidden="true">
-								<span class="spot-region-tip" id="spot-region-tip"></span>
-							</div>
+				<div class="hero-grid">
+					<div class="hero-content">
+						<span class="eyebrow reveal">Local-first portfolio intelligence</span>
+						<h1 class="display reveal">Your portfolio, finally speaks&nbsp;back.</h1>
+						<p class="lede reveal">
+							FolioSenseAI turns holdings, risk, news, and market context into plain-English
+							portfolio reads — running on your machine, Claude-optional, built for trust.
+						</p>
+
+						<div class="cta-row reveal">
+							<a id="dl-mac" class="btn btn-primary" href={RELEASES_LATEST} data-os="mac">
+								<span class="btn-icon btn-icon-mac" aria-hidden="true"></span>
+								<span class="btn-copy">
+									<span class="btn-title">Download for macOS</span>
+									<span class="btn-sub" data-role="meta">Apple Silicon · .dmg</span>
+								</span>
+							</a>
+							<a id="dl-win" class="btn btn-primary" href={RELEASES_LATEST} data-os="win">
+								<span class="btn-icon btn-icon-win" aria-hidden="true"></span>
+								<span class="btn-copy">
+									<span class="btn-title">Download for Windows</span>
+									<span class="btn-sub" data-role="meta">64-bit .exe installer</span>
+								</span>
+							</a>
+						</div>
+
+						<div class="action-pills reveal">
+							<a class="pill-action" href={doc('get-started/introduction')}>
+								<span class="pill-ic pill-ic-docs" aria-hidden="true"></span>View Docs
+							</a>
+							<a class="pill-action" href={GITHUB}>
+								<span class="pill-ic pill-ic-github" aria-hidden="true"></span>GitHub
+							</a>
+							<a class="pill-action" href={RELEASES}>
+								<span class="pill-ic pill-ic-notes" aria-hidden="true"></span>Release Notes
+							</a>
+							<details class="pill-dev">
+								<summary class="pill-action"><span class="pill-ic pill-ic-dev" aria-hidden="true"></span>Development Builds</summary>
+								<div class="dev-panel">
+									<p>Rolling builds from the latest <code>main</code> merge. Unstable — for testing only.</p>
+									<a href={`${RELEASES}/tag/latest-main`}>Get the latest-main build ↗</a>
+								</div>
+							</details>
+						</div>
+
+						<ul class="trust-strip reveal" aria-label="At a glance">
+							<li class="badge"><span class="badge-dot" aria-hidden="true"></span>Local-first</li>
+							<li class="badge"><span class="badge-dot" aria-hidden="true"></span>Claude optional</li>
+							<li class="badge"><span class="badge-dot" aria-hidden="true"></span>Open source</li>
+							<li class="badge"><span class="badge-dot" aria-hidden="true"></span>SHA256 verifiable</li>
+						</ul>
+
+						<div id="release-strip" class="release-strip reveal" hidden>
+							<span class="chip chip-meta">
+								<span class="chip-ic chip-ic-tag" aria-hidden="true"></span>
+								<span data-role="version">—</span>
+							</span>
+							<span class="chip chip-meta">
+								<span class="chip-ic chip-ic-cal" aria-hidden="true"></span>
+								<span data-role="date">—</span>
+							</span>
+							<span class="chip chip-meta" hidden>
+								<span class="chip-ic chip-ic-commit" aria-hidden="true"></span>
+								<span data-role="sha">—</span>
+							</span>
+							<a class="chip chip-link" data-role="release-link" href={RELEASES_LATEST}>
+								View release<span class="chip-arrow" aria-hidden="true">→</span>
+							</a>
 						</div>
 					</div>
 
-					<div class="chip-float chip-float--tl" data-depth="9" aria-hidden="true"><span class="dot dot-amber"></span> Risk · Moderate</div>
-					<div class="chip-float chip-float--tr" data-depth="-10" aria-hidden="true"><span class="dot dot-green"></span> MSFT · Buy</div>
-					<div class="chip-float chip-float--bl" data-depth="10" aria-hidden="true">β · 0.85×</div>
-					<div class="chip-float chip-float--br" data-depth="-8" aria-hidden="true"><span class="dot dot-cyan"></span> Theme · dividend income</div>
+					<div class="hero-visual reveal" id="hero-stage" aria-hidden="true">
+						<div class="product-preview">
+							<div class="window-chrome grad-border" id="hero-window">
+								<div class="window-bar"><span></span><span></span><span></span></div>
+								<div class="hero-shot">
+									<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
+										alt="The FolioSenseAI dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
+									<div class="pulse-line"></div>
+									<div class="spot-region" id="spot-region">
+										<span class="spot-region-tip" id="spot-region-tip"></span>
+									</div>
+								</div>
+							</div>
 
-					<!-- Transient "signal" chips that converge + dissolve on load. -->
-					<div class="signals" aria-hidden="true">
-						<span class="sig sig-1">AAPL +0.7%</span>
-						<span class="sig sig-2">Fed holds</span>
-						<span class="sig sig-3">semis ↑</span>
-						<span class="sig sig-4">VOO</span>
-						<span class="sig sig-5">β 0.85</span>
+							<div class="chip-float chip-float--tl" data-depth="7"><span class="dot dot-amber"></span> Risk · Moderate</div>
+							<div class="chip-float chip-float--tr" data-depth="-8"><span class="dot dot-green"></span> MSFT · Buy</div>
+							<div class="chip-float chip-float--bl" data-depth="8">β · 0.85×</div>
+							<div class="chip-float chip-float--br" data-depth="-6"><span class="dot dot-cyan"></span> Theme · dividend income</div>
+
+							<!-- Transient "signal" chips that converge + dissolve on load. -->
+							<div class="signals">
+								<span class="sig sig-1">AAPL +0.7%</span>
+								<span class="sig sig-2">Fed holds</span>
+								<span class="sig sig-3">semis ↑</span>
+								<span class="sig sig-4">VOO</span>
+								<span class="sig sig-5">β 0.85</span>
+							</div>
+						</div>
 					</div>
 				</div>
 			</section>
@@ -506,7 +550,7 @@ const features = [
 						fetch(`${TAGS_API}/${data.tag_name}`, { headers: { Accept: 'application/vnd.github+json' } })
 							.then((r) => (r.ok ? r.json() : null))
 							.then((ref) => { if (!ref?.object) return null; if (ref.object.type === 'commit') return ref.object.sha; return fetch(ref.object.url).then((r) => (r.ok ? r.json() : null)).then((t) => t?.object?.sha || null); })
-							.then((sha) => { if (sha) { const el = strip.querySelector('[data-role="sha"]'); if (el) { el.textContent = sha.slice(0, 7); el.hidden = false; } } })
+							.then((sha) => { if (sha) { const el = strip.querySelector('[data-role="sha"]'); if (el) { el.textContent = sha.slice(0, 7); const wrap = el.closest('.chip'); if (wrap) wrap.hidden = false; } } })
 							.catch(() => {});
 					}
 				}
@@ -583,8 +627,8 @@ const features = [
 				const hotspots = [
 					{ x: 2, y: 12, w: 26, h: 22, label: 'Live value & today’s P&L' },
 					{ x: 51, y: 12, w: 24, h: 20, label: 'What moved, in dollars' },
-					{ x: 2, y: 40, w: 40, h: 42, label: 'Look-through sector exposure' },
-					{ x: 43, y: 40, w: 55, h: 42, label: 'Today’s impact, in plain English' },
+					{ x: 1, y: 36.5, w: 40, h: 41.5, label: 'Look-through sector exposure' },
+					{ x: 42, y: 36.5, w: 57, h: 42, label: 'Today’s impact, in plain English' },
 				];
 				let hi = 0, timer = null, paused = false;
 				const place = (h) => { region.style.left = h.x + '%'; region.style.top = h.y + '%'; region.style.width = h.w + '%'; region.style.height = h.h + '%'; regionTip.textContent = h.label; };
