@@ -8,7 +8,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent.parent  # packaging/pyinstaller -> repo root
 sys.path.insert(0, str(ROOT))
@@ -34,6 +34,15 @@ curl_datas, curl_binaries, curl_hidden = collect_all("curl_cffi")
 datas += curl_datas
 binaries += curl_binaries
 hiddenimports += curl_hidden
+
+# certifi's CA bundle (cacert.pem) MUST ship: the in-app updater points its TLS
+# context at certifi.where() so HTTPS to GitHub verifies on the user's machine
+# (the frozen OpenSSL's default cert path is a build-machine location that won't
+# exist there). PyInstaller's built-in certifi hook usually collects it, but
+# make it explicit so this can never silently regress and reintroduce the
+# "always offline" bug.
+datas += collect_data_files("certifi")
+hiddenimports += ["certifi", "ssl"]
 
 # Heavy packages that are not in requirements.txt and are never imported by this
 # app, but can be present in a developer's ambient Python environment (e.g. from

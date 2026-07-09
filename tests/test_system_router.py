@@ -29,6 +29,19 @@ def test_version_endpoint(client):
     assert body["version"] == __version__
     assert body["is_frozen"] is False
     assert body["platform"] in {"macos", "windows", "other"}
+    # Post-update signals surfaced for the UI toast.
+    assert body["just_updated"] is False
+    assert body["update_failed"] is False
+
+
+def test_check_endpoint_surfaces_reason(client, monkeypatch):
+    monkeypatch.setattr(
+        update_service, "check_for_updates",
+        lambda force=False: {"status": "error", "reason": "tls", "error": "nope"},
+    )
+    body = client.get("/api/system/update/check").json()
+    assert body["status"] == "error"
+    assert body["reason"] == "tls"
 
 
 def test_check_endpoint_returns_state(client, monkeypatch):

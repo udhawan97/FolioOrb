@@ -20723,6 +20723,7 @@ body > .fs-update-toast.is-in { opacity: 1; transform: translate(-50%, 0); }
     font-weight: 700;
     flex-shrink: 0;
 }
+.fs-update-toast--warn .fs-update-toast-mark { background: var(--accent-yellow); color: #050508; }
 .fs-update-toast-title { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
 .fs-update-toast-sub { font-size: 0.74rem; color: var(--text-secondary); margin-top: 1px; }
 

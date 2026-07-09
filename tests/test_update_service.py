@@ -115,23 +115,111 @@ def test_offline_maps_to_offline_state(monkeypatch):
     assert state["status"] == "offline"
 
 
-def test_rate_limit_maps_to_error(monkeypatch):
-    def limited(url, headers):
-        return 403, {}, b""
+def test_rate_limit_maps_to_error_reason(monkeypatch):
+    for code in (403, 429):
+        monkeypatch.setattr(update_service, "_http_get", lambda u, h, c=code: (c, {}, b""))
+        state = update_service.check_for_updates(force=True)
+        assert state["status"] == "error"
+        assert state["reason"] == "rate_limited"
+        assert "rate limit" in state["error"].lower()
+        update_service._reset_for_tests()
 
-    monkeypatch.setattr(update_service, "_http_get", limited)
+
+def test_server_error_maps_to_error_reason(monkeypatch):
+    monkeypatch.setattr(update_service, "_http_get", lambda u, h: (503, {}, b""))
     state = update_service.check_for_updates()
     assert state["status"] == "error"
-    assert "Rate limited" in state["error"]
+    assert state["reason"] == "server"
 
 
-def test_malformed_json_maps_to_error(monkeypatch):
-    def bad(url, headers):
-        return 200, {"ETag": "e"}, b"{not json"
-
-    monkeypatch.setattr(update_service, "_http_get", bad)
+def test_malformed_json_maps_to_error_reason(monkeypatch):
+    monkeypatch.setattr(
+        update_service, "_http_get", lambda u, h: (200, {"ETag": "e"}, b"{not json")
+    )
     state = update_service.check_for_updates()
     assert state["status"] == "error"
+    assert state["reason"] == "malformed"
+
+
+def test_tls_failure_is_error_not_offline(monkeypatch):
+    """The frozen-app root cause: a cert failure must be an error/tls, not offline."""
+    import ssl
+    import urllib.error
+
+    def tls_fail(url, headers):
+        raise update_service.classify_network_error(
+            urllib.error.URLError(ssl.SSLCertVerificationError("unable to get local issuer"))
+        )
+
+    monkeypatch.setattr(update_service, "_http_get", tls_fail)
+    state = update_service.check_for_updates()
+    assert state["status"] == "error"
+    assert state["reason"] == "tls"
+    assert "securely" in state["error"].lower()
+
+
+def test_dns_and_timeout_are_offline_with_reason(monkeypatch):
+    import socket
+    import urllib.error
+
+    for exc, reason in [
+        (socket.gaierror("name resolution"), "dns"),
+        (TimeoutError("timed out"), "timeout"),
+        (ConnectionRefusedError("refused"), "unreachable"),
+    ]:
+        def boom(url, headers, e=exc):
+            raise update_service.classify_network_error(urllib.error.URLError(e))
+
+        monkeypatch.setattr(update_service, "_http_get", boom)
+        state = update_service.check_for_updates(force=True)
+        assert state["status"] == "offline", reason
+        assert state["reason"] == reason
+        update_service._reset_for_tests()
+
+
+def test_error_messages_are_sanitized(monkeypatch):
+    """A malicious detail with CRLF must not forge log lines / leak into the message."""
+    import urllib.error
+
+    def boom(url, headers):
+        raise update_service.classify_network_error(
+            urllib.error.URLError("boom\r\nFAKE LOG LINE injected")
+        )
+
+    monkeypatch.setattr(update_service, "_http_get", boom)
+    state = update_service.check_for_updates()
+    # The user-facing message is a fixed friendly string, never the raw detail.
+    assert "\n" not in (state.get("error") or "")
+    assert "FAKE LOG LINE" not in (state.get("error") or "")
+
+
+def test_ssl_context_verifies_with_a_ca_bundle():
+    """The frozen-app fix: the TLS context must actually verify and load CA certs.
+
+    A context that verifies but has NO CA certs loaded is exactly the broken
+    frozen state that produced the false "offline". certifi should give it certs.
+    """
+    import ssl
+
+    ctx = update_service._build_ssl_context()
+    assert isinstance(ctx, ssl.SSLContext)
+    assert ctx.verify_mode == ssl.CERT_REQUIRED
+    assert ctx.check_hostname is True
+    # certifi is a dependency, so the context must have real CA certs loaded.
+    assert len(ctx.get_ca_certs()) > 0
+
+
+def test_classify_network_error_unit():
+    import socket
+    import ssl
+    import urllib.error
+
+    tls = update_service.classify_network_error(
+        urllib.error.URLError(ssl.SSLError("handshake"))
+    )
+    assert isinstance(tls, update_service.UpdateTLSError)
+    dns = update_service.classify_network_error(urllib.error.URLError(socket.gaierror("x")))
+    assert isinstance(dns, update_service.UpdateOffline) and dns.reason == "dns"
 
 
 # ------------------------------- caching ----------------------------------- #

@@ -112,7 +112,28 @@ def test_launch_installer_windows_is_silent(monkeypatch):
     assert "/VERYSILENT" in args and "/SUPPRESSMSGBOXES" in args
 
 
-def test_launch_installer_macos_opens_dmg(monkeypatch):
+def test_launch_installer_macos_uses_bundle_swap(monkeypatch):
+    """When running as a real .app, macOS installs via the bundle swap — it must
+    NOT degrade to merely opening the DMG / releases page."""
+    from app.services import macos_updater
+
+    swapped = []
+    monkeypatch.setattr(macos_updater, "launch_swap", lambda dmg: swapped.append(dmg) or True)
+    opened = []
+    monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k: opened.append(a))
+    monkeypatch.setattr(update_service, "current_platform_key", lambda: "macos")
+
+    update_installer._launch_installer(Path("/x/app.dmg"))
+
+    assert swapped == [Path("/x/app.dmg")]
+    assert not opened  # did not fall back to `open`
+
+
+def test_launch_installer_macos_falls_back_when_not_a_bundle(monkeypatch):
+    """Dev/source run (not a .app): fall back to opening the DMG for manual install."""
+    from app.services import macos_updater
+
+    monkeypatch.setattr(macos_updater, "launch_swap", lambda dmg: False)
     calls = []
     monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k: calls.append((a, k)))
     monkeypatch.setattr(update_service, "current_platform_key", lambda: "macos")

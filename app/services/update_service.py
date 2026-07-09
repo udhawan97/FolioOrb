@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import socket
+import ssl
 import sys
 import threading
 import time
@@ -34,6 +36,29 @@ from app.services.log_safety import sanitize_for_log
 from app.version import __version__
 
 logger = logging.getLogger(__name__)
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    """A TLS context that verifies against certifi's CA bundle.
+
+    Critical for the PyInstaller-frozen app: the bundled OpenSSL's default
+    verify paths point at a build-machine location (e.g. Homebrew's
+    ``/opt/homebrew/etc/openssl@3/cert.pem``) that does not exist on a user's
+    machine, so ``urlopen``'s default context loads NO CA certs and every HTTPS
+    request fails cert verification — which the old code swallowed as "offline".
+    certifi ships a real CA bundle and is collected into the app, so pointing the
+    context at ``certifi.where()`` makes verification work everywhere.
+    """
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # pylint: disable=broad-except
+        # Fall back to the platform default rather than disabling verification.
+        return ssl.create_default_context()
+
+
+_SSL_CONTEXT = _build_ssl_context()
 
 REPO = os.getenv("FOLIO_UPDATE_REPO", "udhawan97/FolioSenseAI")
 API_BASE = "https://api.github.com"
@@ -60,11 +85,48 @@ class UpdateStatus(str, Enum):
 
 
 class UpdateOffline(Exception):
-    """Raised when the check cannot reach GitHub (no network / DNS / timeout)."""
+    """Genuine network unreachability (no route, DNS failure, connection timeout).
+
+    ``reason`` is a short machine code ("dns", "timeout", "unreachable") for
+    diagnostics; the user still sees the friendly "You're offline" state.
+    """
+
+    def __init__(self, reason: str = "unreachable", detail: str = ""):
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail
+
+
+class UpdateTLSError(Exception):
+    """TLS/certificate verification failure — reachable but not securely.
+
+    Distinct from offline: the network is up, but the certificate couldn't be
+    validated (the classic frozen-app missing-CA-bundle case, or a MITM proxy).
+    """
+
+    reason = "tls"
+
+    def __init__(self, detail: str = ""):
+        super().__init__(detail or "tls")
+        self.detail = detail
+
+
+class UpdateRateLimited(Exception):
+    """GitHub returned 403/429 — the unauthenticated rate limit was hit."""
+
+    reason = "rate_limited"
 
 
 class UpdateError(Exception):
-    """Raised for any other failure to obtain or parse release metadata."""
+    """Any other failure to obtain or parse release metadata.
+
+    ``reason`` distinguishes "malformed" (bad JSON), "server" (5xx) and
+    "unexpected" (other HTTP status) for the diagnostic surface.
+    """
+
+    def __init__(self, message: str, reason: str = "unexpected"):
+        super().__init__(message)
+        self.reason = reason
 
 
 @dataclass
@@ -89,12 +151,16 @@ class UpdateInfo:  # pylint: disable=too-many-instance-attributes
 
 
 @dataclass
-class _State:
+class _State:  # pylint: disable=too-many-instance-attributes
     status: UpdateStatus = UpdateStatus.IDLE
     current_version: str = __version__
     available: UpdateInfo | None = None
     last_checked_at: str | None = None
     error: str | None = None
+    # Machine-readable diagnostic for a failed check: "dns", "timeout",
+    # "unreachable", "tls", "rate_limited", "malformed", "server", "local", etc.
+    # None on success. Lets us distinguish failure modes without exposing detail.
+    reason: str | None = None
     downloaded_bytes: int = 0
     total_bytes: int = 0
 
@@ -105,6 +171,7 @@ class _State:
             "available": self.available.to_dict() if self.available else None,
             "last_checked_at": self.last_checked_at,
             "error": self.error,
+            "reason": self.reason,
             "downloaded_bytes": self.downloaded_bytes,
             "total_bytes": self.total_bytes,
         }
@@ -116,14 +183,21 @@ _cache: dict[str, Any] = {"etag": None, "fetched_at": 0.0, "payload": None}
 _cache_lock = threading.Lock()
 # Set once per process at startup: whether this launch is the first run on a
 # newly-installed version, and what version preceded it.
-_launch: dict[str, Any] = {"just_updated": False, "previous_version": None}
+_launch: dict[str, Any] = {
+    "just_updated": False,
+    "previous_version": None,
+    # True on the first start after a macOS in-app update swap failed and the old
+    # bundle was relaunched — the UI shows a "couldn't install" reassurance.
+    "update_failed": False,
+}
 
 
 def note_launch() -> dict[str, Any]:
     """Detect a post-update first run by comparing __version__ to last-seen.
 
     Records the current version as last-seen so the confirmation shows only once.
-    Called at startup; returns the launch info for convenience.
+    Also picks up a failed macOS bundle-swap marker. Called at startup; returns
+    the launch info for convenience.
     """
     try:
         from app import app_settings
@@ -137,6 +211,14 @@ def note_launch() -> dict[str, Any]:
             app_settings.save_settings({"last_seen_version": __version__})
     except Exception as exc:  # pylint: disable=broad-except
         logger.debug("note_launch failed: %s", type(exc).__name__)
+    try:
+        if current_platform_key() == "macos":
+            from app.services import macos_updater
+
+            if macos_updater.consume_failed_marker():
+                _launch["update_failed"] = True
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.debug("macOS update-marker check failed: %s", type(exc).__name__)
     return dict(_launch)
 
 
@@ -209,21 +291,50 @@ def _find_asset_url(assets: list[dict[str, Any]], filename: str) -> str | None:
 # --------------------------------------------------------------------------- #
 # HTTP (single injectable seam)
 # --------------------------------------------------------------------------- #
+def classify_network_error(exc: BaseException) -> Exception:
+    """Map a low-level urlopen/socket error to a typed update exception.
+
+    Crucially separates a TLS/certificate failure (reachable-but-not-secure)
+    from genuine unreachability (DNS/timeout/refused) — the old code lumped both
+    into "offline", which is exactly why the frozen app (a pure cert problem)
+    looked offline while online. Exposed (not underscored) so it can be
+    unit-tested with synthetic exceptions, no network required.
+    """
+    # urllib wraps the underlying cause in URLError.reason.
+    reason = getattr(exc, "reason", None)
+    candidates = [exc]
+    if isinstance(reason, BaseException):
+        candidates.append(reason)
+
+    for cand in candidates:
+        if isinstance(cand, ssl.SSLError):  # incl. SSLCertVerificationError
+            return UpdateTLSError(str(cand))
+    for cand in candidates:
+        if isinstance(cand, socket.gaierror):
+            return UpdateOffline("dns", str(cand))
+    for cand in candidates:
+        if isinstance(cand, (TimeoutError, socket.timeout)):
+            return UpdateOffline("timeout", str(cand))
+    return UpdateOffline("unreachable", str(reason if reason is not None else exc))
+
+
 def _http_get(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
     """Perform a GET and return ``(status, response_headers, body_bytes)``.
 
-    Tests monkeypatch this so the network is never touched. A 304 is returned as
-    a normal status (urllib raises for it, so it is caught and re-surfaced).
+    Uses the certifi-backed TLS context so the frozen app can verify GitHub's
+    certificate. Tests monkeypatch this so the network is never touched. A 304 is
+    returned as a normal status (urllib raises for it, so it is caught here).
     """
     request = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=10) as resp:
+        with urllib.request.urlopen(request, timeout=10, context=_SSL_CONTEXT) as resp:
             return resp.status, dict(resp.headers), resp.read()
     except urllib.error.HTTPError as exc:
-        # 304 Not Modified is expected with a cached ETag; surface it plainly.
+        # A real HTTP response (304/403/404/5xx) — surface the status to the
+        # caller, which maps it (rate limit, server error, etc.).
         return exc.code, dict(exc.headers or {}), b""
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise UpdateOffline(str(exc)) from exc
+        raise classify_network_error(exc) from exc
 
 
 def _fetch_latest_release(force: bool) -> dict[str, Any]:
@@ -251,15 +362,17 @@ def _fetch_latest_release(force: bool) -> dict[str, Any]:
         try:
             parsed = json.loads(body.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise UpdateError("Malformed release metadata") from exc
+            raise UpdateError("Malformed release metadata", reason="malformed") from exc
         with _cache_lock:
             _cache["etag"] = resp_headers.get("ETag")
             _cache["fetched_at"] = time.monotonic()
             _cache["payload"] = parsed
         return parsed
     if status in (403, 429):
-        raise UpdateError("Rate limited by GitHub; try again later")
-    raise UpdateError(f"Unexpected response status {status}")
+        raise UpdateRateLimited(f"GitHub rate limit (HTTP {status})")
+    if status >= 500:
+        raise UpdateError(f"GitHub server error (HTTP {status})", reason="server")
+    raise UpdateError(f"Unexpected response status {status}", reason="unexpected")
 
 
 def fetch_release_info(version: str) -> UpdateInfo | None:
@@ -272,7 +385,7 @@ def fetch_release_info(version: str) -> UpdateInfo | None:
     headers = {"Accept": "application/vnd.github+json", "User-Agent": _USER_AGENT}
     try:
         status, _headers, body = _http_get(url, headers)
-    except UpdateOffline:
+    except (UpdateOffline, UpdateTLSError):
         return None
     if status != 200:
         return None
@@ -329,14 +442,30 @@ def mark(status: "UpdateStatus", **fields: Any) -> dict[str, Any]:
     return _set_state(status=status, **fields)
 
 
+# Friendly, non-technical copy per failure reason. The reason code is also
+# returned so the UI/diagnostics can distinguish cases; the message is what a
+# user reads if the UI shows it.
+_REASON_MESSAGES = {
+    "tls": "Couldn't securely check for updates.",
+    "rate_limited": "GitHub's rate limit was reached. Try again a little later.",
+    "malformed": "Couldn't read the update information from GitHub.",
+    "server": "GitHub had a problem. Try again a little later.",
+    "unexpected": "Couldn't check for updates.",
+    "local": "Couldn't check for updates.",
+}
+
+
 def check_for_updates(force: bool = False) -> dict[str, Any]:
     """Check GitHub for a newer release and update the shared state.
 
-    Returns the resulting state snapshot. Never raises: network problems map to
-    the ``offline`` state and other failures to ``error`` with a sanitized
-    message, so callers (the API and the scheduler) can rely on it.
+    Never raises. Genuine unreachability maps to ``offline``; a TLS/cert failure,
+    rate limit, malformed metadata, server error, or a local exception map to
+    ``error`` with a machine-readable ``reason`` and a sanitized friendly
+    message. Every failure is logged (sanitized) to the update log.
     """
-    _set_state(status=UpdateStatus.CHECKING, error=None)
+    from app.services import update_log
+
+    _set_state(status=UpdateStatus.CHECKING, error=None, reason=None)
     try:
         payload = _fetch_latest_release(force)
         info = _release_to_info(payload)
@@ -344,24 +473,43 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
         _persist_last_checked(checked_at)
 
         if is_newer(info.version, __version__):
+            update_log.event(f"check: available version={info.version}")
             return _set_state(
                 status=UpdateStatus.AVAILABLE,
                 available=info,
                 last_checked_at=checked_at,
                 error=None,
+                reason=None,
             )
+        update_log.event(f"check: up_to_date version={__version__}")
         return _set_state(
             status=UpdateStatus.UP_TO_DATE,
             available=None,
             last_checked_at=checked_at,
             error=None,
+            reason=None,
         )
-    except UpdateOffline:
-        logger.debug("Update check offline")
-        return _set_state(status=UpdateStatus.OFFLINE)
-    except UpdateError as exc:
-        logger.warning("Update check failed: %s", sanitize_for_log(exc))
-        return _set_state(status=UpdateStatus.ERROR, error=str(exc))
+    except UpdateOffline as exc:
+        update_log.event(
+            f"check: offline reason={exc.reason} detail={sanitize_for_log(exc.detail)}"
+        )
+        return _set_state(status=UpdateStatus.OFFLINE, reason=exc.reason, error=None)
+    except (UpdateTLSError, UpdateRateLimited, UpdateError) as exc:
+        reason = getattr(exc, "reason", "unexpected")
+        update_log.event(f"check: error reason={reason} detail={sanitize_for_log(exc)}")
+        logger.warning("Update check failed (%s): %s", reason, sanitize_for_log(exc))
+        return _set_state(
+            status=UpdateStatus.ERROR,
+            reason=reason,
+            error=_REASON_MESSAGES.get(reason, _REASON_MESSAGES["unexpected"]),
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        # A bug in our own check path is a local failure, not "offline".
+        update_log.event(f"check: local error type={type(exc).__name__}")
+        logger.exception("Unexpected error during update check")
+        return _set_state(
+            status=UpdateStatus.ERROR, reason="local", error=_REASON_MESSAGES["local"]
+        )
 
 
 def _persist_last_checked(iso_timestamp: str) -> None:
@@ -414,4 +562,4 @@ def _reset_for_tests() -> None:
     with _state_lock:
         globals()["_state"] = _State()
     _scheduler["started"] = False
-    _launch.update({"just_updated": False, "previous_version": None})
+    _launch.update({"just_updated": False, "previous_version": None, "update_failed": False})

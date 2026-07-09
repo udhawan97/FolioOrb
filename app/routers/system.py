@@ -46,6 +46,7 @@ def get_version() -> dict:
         "platform": update_service.current_platform_key(),
         "just_updated": launch.get("just_updated", False),
         "previous_version": launch.get("previous_version"),
+        "update_failed": launch.get("update_failed", False),
     }
 
 

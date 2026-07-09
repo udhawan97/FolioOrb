@@ -236,7 +236,16 @@ def _launch_installer(path) -> None:
             [str(path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], close_fds=True
         )
     elif platform == "macos":
-        subprocess.Popen(["open", str(path)])  # noqa: S603,S607  pylint: disable=consider-using-with
+        # Real in-app update: a detached helper swaps the running .app bundle from
+        # the verified DMG and relaunches (see macos_updater). Only if we're not
+        # running from a swappable .app (dev/source) do we fall back to opening
+        # the DMG for a manual drag-install.
+        from app.services import macos_updater
+
+        if not macos_updater.launch_swap(Path(path)):
+            subprocess.Popen(  # noqa: S603,S607  pylint: disable=consider-using-with
+                ["open", str(path)]
+            )
     else:
         raise RuntimeError("In-app install is not supported on this platform")
 

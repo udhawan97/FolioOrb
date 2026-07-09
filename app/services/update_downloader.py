@@ -46,8 +46,16 @@ def archive_dir() -> Path:
 
 
 def _open(request: urllib.request.Request):
-    """Open an HTTP request. Injected in tests."""
-    return urllib.request.urlopen(request, timeout=30)  # noqa: S310 (pinned GitHub host)
+    """Open an HTTP request over a certifi-verified TLS context. Injected in tests.
+
+    Shares the update-check module's certifi-backed SSL context so the frozen
+    app can verify GitHub's certificate when downloading the DMG / installer and
+    the SHA256SUMS manifest — without it, downloads would fail cert verification
+    exactly like the check did (see update_service._build_ssl_context).
+    """
+    from app.services.update_service import _SSL_CONTEXT
+
+    return urllib.request.urlopen(request, timeout=30, context=_SSL_CONTEXT)  # noqa: S310
 
 
 def _content_length(resp) -> int | None:

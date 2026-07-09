@@ -17,6 +17,15 @@
     var RELEASES_URL = "https://github.com/udhawan97/FolioSenseAI/releases/latest";
     var POLL_MS = 800;
     var WORKING = { checking: 1, downloading: 1, verifying: 1, backing_up: 1, installing: 1 };
+    // Reason-specific titles for a failed check. "offline" is a separate status
+    // (real unreachability only) — a TLS/rate-limit/server failure is NOT offline.
+    var ERROR_TITLES = {
+        tls: "Couldn't securely check for updates",
+        rate_limited: "GitHub rate limit reached",
+        server: "GitHub had a problem",
+        malformed: "Couldn't read update info",
+        local: "Couldn't reach the app's update service"
+    };
 
     var el = {};
     var state = null;          // latest state snapshot from the backend
@@ -238,8 +247,13 @@
             setSecondary("Try Again", function () { runCheck(true); });
         } else if (status === "error") {
             setMark("alert", false);
-            el.updateSheetTitle.textContent = "Couldn't check for updates";
-            el.updateSub.textContent = "You're still on FolioSenseAI " + cur + ". Your data is untouched.";
+            // Title is specific to the failure reason so "offline" is never shown
+            // for a TLS/rate-limit/server problem; the backend also supplies a
+            // friendly `error` message we fall back to.
+            el.updateSheetTitle.textContent = ERROR_TITLES[state.reason]
+                || state.error || "Couldn't check for updates";
+            el.updateSub.textContent = "You're still on FolioSenseAI " + cur
+                + ". Your data is untouched.";
             setSecondary("Try Again", function () { runCheck(true); });
             show(el.updateTertiary, true);
             show(el.updateReleasesLink, true);
@@ -348,8 +362,14 @@
         getJSON("/api/system/update/check" + (force ? "?force=true" : ""))
             .then(function (s) { state = s; render(); refreshPassiveIndicators(); })
             .catch(function () {
-                state = state || {};
-                state.status = "offline";
+                // The backend check never throws — it returns a state with its
+                // own offline/tls/etc. reason. Reaching here means OUR OWN local
+                // API call failed (app service hiccup), which is a "local" error,
+                // NOT network offline. Don't mislabel it.
+                state = state || { current_version: (versionInfo && versionInfo.version) || "" };
+                state.status = "error";
+                state.reason = "local";
+                state.error = null;
                 render();
             });
     }
@@ -582,6 +602,8 @@
             refreshPassiveIndicators();
             if (versionInfo && versionInfo.just_updated) {
                 showUpdatedToast(versionInfo.version);
+            } else if (versionInfo && versionInfo.update_failed) {
+                showUpdatedToast(versionInfo.version, true);
             }
             // The desktop shell opens with ?rollback=1 after repeated failed
             // launches; surface the rollback offer immediately.
@@ -593,23 +615,28 @@
         });
     }
 
-    /* A calm, auto-dismissing confirmation on the first run after an update. */
-    function showUpdatedToast(version) {
+    /* A calm, auto-dismissing confirmation on the first run after an update —
+       or, when `failed` is set, that the update couldn't be installed. */
+    function showUpdatedToast(version, failed) {
         var toast = document.createElement("div");
-        toast.className = "fs-update-toast";
+        toast.className = "fs-update-toast" + (failed ? " fs-update-toast--warn" : "");
         toast.setAttribute("role", "status");
 
         var mark = document.createElement("span");
         mark.className = "fs-update-toast-mark";
-        mark.textContent = "✓";
+        mark.textContent = failed ? "!" : "✓";
 
         var body = document.createElement("div");
         var title = document.createElement("div");
         title.className = "fs-update-toast-title";
-        title.textContent = "Updated to FolioSenseAI " + version;
+        title.textContent = failed
+            ? "The update couldn't be installed"
+            : "Updated to FolioSenseAI " + version;
         var sub = document.createElement("div");
         sub.className = "fs-update-toast-sub";
-        sub.textContent = "Your holdings are intact — backup verified.";
+        sub.textContent = failed
+            ? "You're still on FolioSenseAI " + version + " — your data is safe."
+            : "Your holdings are intact — backup verified.";
         body.appendChild(title);
         body.appendChild(sub);
         toast.appendChild(mark);

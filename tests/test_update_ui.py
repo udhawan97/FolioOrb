@@ -50,6 +50,14 @@ def test_updates_js_exposes_api_and_states():
     assert "/api/system/update/settings" in js
     assert "/api/system/update/skip" in js
 
+    # Error taxonomy in the UI: reason-specific titles (TLS/rate-limit/etc.),
+    # and a local API failure must NOT be mislabeled as network "offline".
+    assert "ERROR_TITLES" in js
+    assert "Couldn't securely check for updates" in js
+    assert "GitHub rate limit reached" in js
+    assert 'state.reason = "local"' in js
+    assert "update_failed" in js  # macOS swap-failure toast
+
     # Every lifecycle state has a render branch.
     for status in (
         '"checking"', '"up_to_date"', '"available"', '"downloading"',
