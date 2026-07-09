@@ -1,5 +1,7 @@
+# pylint: disable=too-many-lines
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,11 +10,14 @@ from app.models import Portfolio, Holding, RealizedTrade, PortfolioSnapshot
 from app.schemas import HoldingCreate, HoldingUpdate, PortfolioCreate
 from app.config import settings
 from app.services.stock_service import (
+    get_all_quotes,
     get_portfolio_quotes,
     get_stock_data,
     normalize_ticker,
+    ticker_shape_is_safe,
     validate_ticker_symbol,
 )
+from app.services import holdings_csv
 from app.services.earnings_radar import get_earnings_events
 from app.services.portfolio_projection import get_cached_projection
 from app.services.portfolio_analytics import (
@@ -429,6 +434,204 @@ async def add_holding(
         "ticker": holding.ticker,
         "message": f"{data.ticker} added",
     }
+
+
+# ── CSV import / export ────────────────────────────────────────────────
+# Defined above the parameterized /holdings/{holding_id} routes so the static
+# "export"/"import" paths are never shadowed by the {holding_id} matcher.
+
+# Content types accepted outright, and those accepted only with a .csv filename
+# (browsers/tools often send these — or nothing at all — for a genuine .csv).
+_CSV_CONTENT_TYPES_DIRECT = {"text/csv", "application/vnd.ms-excel"}
+_CSV_CONTENT_TYPES_WITH_EXT = {"application/octet-stream", "text/plain", ""}
+
+
+@router.get("/holdings/export")
+async def export_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    """Stream the portfolio's active holdings as a clean CSV.
+
+    The output is exactly the strict-import template, so export → import round-trips.
+    Every cell is neutralized against spreadsheet formula injection.
+    """
+    _get_portfolio_or_404(portfolio_id, db)
+    holdings = (
+        db.query(Holding)
+        .filter(Holding.portfolio_id == portfolio_id, Holding.is_active.is_(True))
+        .order_by(Holding.ticker.asc())
+        .all()
+    )
+    filename = f"foliosense-holdings-p{portfolio_id}-{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        holdings_csv.build_export_csv(holdings),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _claude_configured() -> bool:
+    """Backend 'is Claude usable' check — mirrors ai_service.py's key idiom."""
+    return bool(settings.ANTHROPIC_API_KEY.strip())
+
+
+def _header_mismatch_detail(unrecognized: list[str], mode: str) -> dict:
+    """Structured 400 body for a messy header that couldn't be mapped."""
+    cols = ", ".join(unrecognized)
+    return {
+        "message": (
+            f"Some columns weren't recognized: {cols}. Match the template "
+            "(Export CSV shows it) or connect Claude in Settings and I'll map almost "
+            "any brokerage export."
+        ),
+        "mode": mode,
+        "unrecognized_columns": unrecognized,
+        "expected_columns": list(holdings_csv.CSV_COLUMNS),
+    }
+
+
+def _resolve_import_mode(header, data_rows, force_local):
+    """Decide the import path and return (template_rows, mode, column_mapping).
+
+    Clean header → strict local (zero tokens). Messy header with a key and not
+    force_local → Claude remap, falling back to strict on any RemapError. A messy
+    header we can't map (no key / forced local / remap failed) raises a 400.
+    """
+    unrecognized = holdings_csv.unrecognized_columns(header)
+    if not unrecognized:
+        return data_rows, "local", None
+
+    can_remap = (
+        not force_local
+        and _claude_configured()
+        and len(header) <= holdings_csv.MAX_HEADER_COLUMNS
+    )
+    if not can_remap:
+        raise HTTPException(
+            status_code=400, detail=_header_mismatch_detail(unrecognized, "local")
+        )
+
+    try:
+        mapping = holdings_csv.remap_columns_with_claude(header, data_rows)
+        return holdings_csv.apply_mapping(mapping, data_rows), "claude", mapping
+    except holdings_csv.RemapError:
+        # Deterministic fallback: a genuinely messy header can't be salvaged locally.
+        raise HTTPException(
+            status_code=400,
+            detail=_header_mismatch_detail(unrecognized, "claude_fallback"),
+        ) from None
+
+
+@router.post("/holdings/import")
+async def import_holdings(
+    file: UploadFile = File(...),
+    portfolio_id: int = 1,
+    force_local: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Import holdings from a CSV upload.
+
+    Local path (always available, no key): strict exact-schema parse. Claude path
+    (key configured, messy header, not force_local): Claude remaps the columns, then
+    the cleaned rows go through the SAME strict validation. Any Claude failure falls
+    back to the strict local parse — the import never hard-fails because Claude did.
+
+    Returns a per-row report (added/skipped/error). Bad rows never block good rows.
+    """
+    _get_portfolio_or_404(portfolio_id, db)
+
+    # Content-type allowlist; the ambiguous types only pass with a .csv filename.
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    filename = (file.filename or "").lower()
+    csv_named = filename.endswith(".csv")
+    if content_type not in _CSV_CONTENT_TYPES_DIRECT and not (
+        content_type in _CSV_CONTENT_TYPES_WITH_EXT and csv_named
+    ):
+        raise HTTPException(status_code=415, detail="Please upload a .csv file.")
+
+    raw = await file.read(holdings_csv.MAX_IMPORT_BYTES + 1)
+    if len(raw) > holdings_csv.MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is too large (limit {holdings_csv.MAX_IMPORT_BYTES // 1024} KB).",
+        )
+
+    try:
+        text = holdings_csv.decode_csv_bytes(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+
+    header, data_rows = holdings_csv.parse_csv_text(text)
+    if not header or not data_rows:
+        raise HTTPException(status_code=400, detail="The file has no data rows.")
+    if len(data_rows) > holdings_csv.MAX_IMPORT_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many rows (limit {holdings_csv.MAX_IMPORT_ROWS}).",
+        )
+    dupes = holdings_csv.duplicate_columns(header)
+    if dupes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Duplicate column name(s): {', '.join(dupes)}. Give each column a unique header.",
+        )
+
+    template_rows, mode, column_mapping = _resolve_import_mode(header, data_rows, force_local)
+
+    existing_tickers = {
+        normalize_ticker(t[0])
+        for t in db.query(Holding.ticker)
+        .filter(Holding.portfolio_id == portfolio_id, Holding.is_active.is_(True))
+        .all()
+    }
+
+    # Warm the quote cache once so per-row validation reads cache, not the network.
+    # Shape-check first: an unsafe symbol must never reach yfinance (it's rejected in
+    # process_import_rows anyway), so only shape-safe candidates get a network warm.
+    candidate_tickers = sorted(
+        t for t in (
+            {(r.get("ticker") or "").strip().upper() for r in template_rows}
+            - existing_tickers - {""}
+        )
+        if ticker_shape_is_safe(t)
+    )
+    if candidate_tickers:
+        get_all_quotes(candidate_tickers)
+
+    report_rows, to_insert = holdings_csv.process_import_rows(
+        template_rows, existing_tickers, validate_ticker_symbol
+    )
+
+    for create in to_insert:
+        db.add(Holding(
+            portfolio_id=portfolio_id,
+            ticker=create.ticker,
+            shares=create.shares or 0.0,
+            avg_cost=create.avg_cost,
+            notes=create.notes,
+            is_watchlist=create.is_watchlist or False,
+            hold_class=create.hold_class or "auto",
+        ))
+    if to_insert:
+        db.commit()
+
+    counts = holdings_csv.summarize(report_rows)
+    holdings_csv.log_import(portfolio_id, mode, counts)
+
+    result = {
+        "portfolio_id": portfolio_id,
+        "mode": mode,
+        **counts,
+        "rows": report_rows,
+        "summary": None,
+        "column_mapping": column_mapping,
+    }
+    if mode == "claude":
+        result["summary"] = holdings_csv.narrate_import_summary({
+            **result, "unmapped_columns": [
+                target for target, source in (column_mapping or {}).items()
+                if source is None
+            ],
+        })
+    return result
 
 
 @router.put("/holdings/{holding_id}")

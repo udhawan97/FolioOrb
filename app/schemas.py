@@ -34,9 +34,12 @@ class HoldingCreate(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=10,
                         description="Stock ticker symbol, e.g. VOO")
     shares: Optional[float] = Field(
-        default=0.0, ge=0, description="Number of shares (must be > 0 for positions)"
+        default=0.0, ge=0, allow_inf_nan=False,
+        description="Number of shares (must be > 0 for positions)",
     )
-    avg_cost: Optional[float] = Field(None, gt=0, description="Average purchase price per share")
+    avg_cost: Optional[float] = Field(
+        None, gt=0, allow_inf_nan=False, description="Average purchase price per share"
+    )
     notes: Optional[str] = Field(None, max_length=500)
     is_watchlist: Optional[bool] = False  # True = research-only, excluded from P&L
     hold_class: Optional[str] = Field(default="auto")

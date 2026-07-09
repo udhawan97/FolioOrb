@@ -60,6 +60,12 @@ def _cached_system(text: str) -> list[dict]:
     return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
 
 
+# Public aliases so sibling services (e.g. holdings_csv) can reuse the established
+# call scaffolding without tripping pylint's protected-access check.
+cached_system = _cached_system
+track_usage = _track_usage
+
+
 def claude_api_heartbeat(timeout: float = 2.0) -> dict:
     """Check whether the configured Claude API key can reach Anthropic."""
     if not settings.ANTHROPIC_API_KEY.strip():

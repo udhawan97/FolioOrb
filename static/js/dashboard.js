@@ -710,6 +710,10 @@ function setEngineScopedVisibility() {
     document.querySelectorAll("[data-engine-local-only]").forEach(el => {
         el.hidden = !local || !claudeAvailable;
     });
+
+    // The import panel always explains one mode — override the both-hidden
+    // (Claude-offline) case so exactly one copy block stays visible.
+    updateImportPanelMode();
 }
 
 function validateIntelligenceEngineUi() {
@@ -7983,6 +7987,7 @@ const DASHBOARD_SENPAI_TIP_QUOTES = [
     "Local Intelligence runs every verdict for free — Claude just adds the narration on top.",
     "The cost HUD tracks real token spend once Claude is connected, not just an estimate.",
     "Menu → Documentation has the full guide if you want the deep version of anything I say.",
+    "Export CSV backs up your book; Import brings one home — with Claude connected I'll read almost any broker's export.",
 ];
 
 // Roughly 1 in 4 quote cycles surfaces a tip instead of the mode-appropriate quote.
@@ -10375,6 +10380,7 @@ function initPortfolioManager() {
         if (!panel?.contains(e.target)) closePortfolioManager();
     });
     initManageHoldingsSearch();
+    initCsvImport();
 }
 
 function initManageHoldingsSearch() {
@@ -11004,6 +11010,150 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
         setAddHoldingBusy(e.target, false);
     }
 });
+
+
+// ── CSV import / export ─────────────────────────────────────────────────────
+let _importInFlight = false;
+
+// Show exactly one copy block. Authoritative over setEngineScopedVisibility's
+// three-state logic, which hides BOTH when Claude is offline — the import panel
+// must always explain the mode the user is actually in.
+function updateImportPanelMode() {
+    const local = isLocalIntelligenceMode();
+    const localCopy = document.getElementById("import-copy-local");
+    const claudeCopy = document.getElementById("import-copy-claude");
+    if (localCopy) localCopy.hidden = !local;
+    if (claudeCopy) claudeCopy.hidden = local;
+}
+
+function toggleCsvImportPanel() {
+    const panel = document.getElementById("import-csv-panel");
+    const btn = document.getElementById("import-csv-btn");
+    if (!panel) return;
+    const open = panel.hidden;
+    panel.hidden = !open;
+    btn?.setAttribute("aria-expanded", String(open));
+    if (open) updateImportPanelMode();
+}
+
+function downloadHoldingsTemplate() {
+    const csv = "﻿ticker,shares,avg_cost,is_watchlist,hold_class,notes\n"
+        + "VOO,10,412.5,false,auto,\n"
+        + "NVDA,0,,true,auto,Watching for a pullback\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "foliosense-holdings-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function handleImportFile(file) {
+    if (!file || _importInFlight) return;
+    _importInFlight = true;
+    const chooseBtn = document.getElementById("import-choose-btn");
+    const idleHtml = chooseBtn?.innerHTML;
+    if (chooseBtn) {
+        chooseBtn.disabled = true;
+        chooseBtn.innerHTML =
+            `${manageLucide("loader-2", "manage-lucide manage-lucide--btn manage-lucide--spin")} Importing…`;
+    }
+
+    const url = "/api/portfolio/holdings/import?portfolio_id=1"
+        + (isLocalIntelligenceMode() ? "&force_local=true" : "");
+    try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(url, { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+            renderImportResult(data);
+            if ((data.added || 0) > 0) {
+                showToast(`Imported ${data.added} holding${data.added === 1 ? "" : "s"}`, "success");
+                loadManageHoldings({ preserveExisting: true });
+                refreshPortfolioMutationInBackground();
+            }
+        } else {
+            renderImportError(data);
+        }
+    } catch (err) {
+        console.warn("CSV import failed:", err);
+        renderImportError({ detail: "Import failed — check the file and try again." });
+    } finally {
+        _importInFlight = false;
+        if (chooseBtn) {
+            chooseBtn.disabled = false;
+            if (idleHtml) chooseBtn.innerHTML = idleHtml;
+        }
+    }
+}
+
+function renderImportError(data) {
+    const box = document.getElementById("import-result");
+    if (!box) return;
+    const detail = data?.detail;
+    // Structured header-mismatch guidance (non-scary, actionable).
+    if (detail && typeof detail === "object" && Array.isArray(detail.unrecognized_columns)) {
+        const cols = detail.unrecognized_columns.map(c => `<code>${escapeHtml(c)}</code>`).join(", ");
+        const fellBack = detail.mode === "claude_fallback";
+        box.innerHTML = `
+            <div class="import-guidance">
+                ${fellBack ? `<div class="import-fallback-note">Claude assist didn't answer in time, so I ran the strict template check instead.</div>` : ""}
+                <p class="import-guidance-lead"><strong>Some columns weren't recognized:</strong> ${cols}.</p>
+                <p class="import-guidance-body">Two ways forward: match the template (Export CSV or Download
+                template shows the exact format), or connect Claude in Settings — Claude maps almost any
+                brokerage export onto it. Nothing was imported.</p>
+            </div>`;
+        return;
+    }
+    const text = typeof detail === "string" ? detail : (data?.message || "Import failed.");
+    box.innerHTML = `<div class="import-guidance"><p class="import-guidance-lead">${escapeHtml(text)}</p></div>`;
+}
+
+function renderImportResult(report) {
+    const box = document.getElementById("import-result");
+    if (!box) return;
+    const rows = Array.isArray(report.rows) ? report.rows : [];
+    const senpai = report.summary
+        ? `<div class="import-senpai-note"><img src="/static/img/brand/folio-orbit-icon.svg" alt="" class="import-senpai-orb">${escapeHtml(report.summary)}</div>`
+        : "";
+    const fallback = report.mode === "claude_fallback"
+        ? `<div class="import-fallback-note">Claude assist didn't answer in time, so I ran the strict template check instead — the results below follow the exact-format rules.</div>`
+        : "";
+    const counts = `<div class="import-counts">
+        <span class="import-count import-count--added">${report.added || 0} added</span>
+        <span class="import-count import-count--skipped">${report.skipped || 0} skipped</span>
+        <span class="import-count import-count--errors">${report.errors || 0} errors</span>
+    </div>`;
+
+    const notable = rows.filter(r => r.status !== "added");
+    const shown = notable.slice(0, 8);
+    const extra = notable.length - shown.length;
+    const rowsHtml = shown.map(r => `
+        <div class="import-result-row import-result-row--${escapeHtml(r.status)}">
+            <span class="import-row-num">row ${r.row}</span>
+            <span class="import-row-ticker">${escapeHtml(r.ticker || "—")}</span>
+            <span class="import-row-reason">${escapeHtml(r.reason || r.status)}</span>
+        </div>`).join("");
+    const more = extra > 0 ? `<div class="import-result-more">+${extra} more</div>` : "";
+
+    box.innerHTML = fallback + senpai + counts
+        + (rowsHtml ? `<div class="import-result-list">${rowsHtml}${more}</div>` : "");
+}
+
+function initCsvImport() {
+    const input = document.getElementById("import-csv-input");
+    if (!input || input.dataset.bound) return;
+    input.dataset.bound = "true";
+    input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (file) handleImportFile(file);
+        input.value = "";  // allow re-selecting the same file
+    });
+}
 
 
 function showToast(message, type = "success") {

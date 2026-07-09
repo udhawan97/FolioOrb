@@ -2356,6 +2356,68 @@
                     </form>
                 </div>
 
+                <div class="manage-import-export-bar">
+                    <a class="btn btn-sm manage-io-btn" id="export-csv-btn"
+                       href="/api/portfolio/holdings/export?portfolio_id=1" download
+                       title="Download your holdings as CSV — it's also the import template">
+                        <svg class="manage-lucide manage-lucide--btn" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                        Export CSV
+                    </a>
+                    <button type="button" class="btn btn-sm manage-io-btn" id="import-csv-btn"
+                            aria-expanded="false" aria-controls="import-csv-panel"
+                            onclick="toggleCsvImportPanel()">
+                        <svg class="manage-lucide manage-lucide--btn" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                        Import CSV
+                    </button>
+                </div>
+
+                <div class="manage-import-card" id="import-csv-panel" hidden>
+                    <div class="import-mode-copy import-mode-copy--local" id="import-copy-local" data-engine-local-only>
+                        <div class="import-mode-head">
+                            <span class="import-mode-pill import-mode-pill--local">
+                                <svg class="manage-lucide manage-lucide--inline" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+                                Local Intelligence
+                            </span>
+                            <span class="import-mode-title">Import holdings — template mode</span>
+                        </div>
+                        <p class="import-mode-body">
+                            Uses the exact FolioSense format — the same columns Export CSV gives you:
+                            <code>ticker, shares, avg_cost, is_watchlist, hold_class, notes</code>. Plain
+                            numbers, no currency symbols, up to 200 rows.
+                            <em>Have a raw brokerage export instead? Connect Claude in Settings and I'll map
+                            the columns for you.</em>
+                        </p>
+                    </div>
+                    <div class="import-mode-copy import-mode-copy--claude" id="import-copy-claude" data-engine-claude-only hidden>
+                        <div class="import-mode-head">
+                            <span class="import-mode-pill import-mode-pill--claude">
+                                <i class="bi bi-stars" aria-hidden="true"></i>
+                                Claude assist
+                            </span>
+                            <span class="import-mode-title">Import holdings — Claude assist</span>
+                        </div>
+                        <p class="import-mode-body">
+                            Drop in almost any brokerage CSV — I'll map <code>Symbol</code>/<code>Qty</code>/<code>Cost</code>-style
+                            columns onto the FolioSense format. Every row still passes the same strict checks
+                            before it touches your book. Clean template files skip Claude entirely — zero tokens.
+                        </p>
+                    </div>
+
+                    <div class="import-actions">
+                        <input type="file" id="import-csv-input" accept=".csv,text/csv"
+                               aria-label="Choose a CSV file to import" hidden>
+                        <button type="button" class="btn btn-success btn-sm import-choose-btn" id="import-choose-btn"
+                                onclick="document.getElementById('import-csv-input').click()">
+                            <svg class="manage-lucide manage-lucide--btn" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg>
+                            Choose CSV…
+                        </button>
+                        <button type="button" class="btn btn-sm import-template-link" onclick="downloadHoldingsTemplate()">
+                            Download template
+                        </button>
+                    </div>
+                    <div class="import-result" id="import-result" aria-live="polite"></div>
+                </div>
+
                 <div class="manage-list-section">
                     <div class="manage-list-toolbar">
                         <div class="manage-section-label manage-section-label--list">
