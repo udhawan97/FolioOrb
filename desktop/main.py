@@ -111,20 +111,57 @@ def main() -> int:
         print(f"FolioSenseAI {__version__} started and healthy at {base_url}")
         return 0
 
+    import webbrowser
+
     import webview
 
     # `?app=1` tells the dashboard it's running inside the native WebView so it
     # can switch to a lighter rendering profile (no backdrop-filter, fewer
     # ambient animations) for smooth scrolling. The in-browser experience is
     # unaffected. Tab switching is client-side, so this query persists.
-    webview.create_window(
+    window = webview.create_window(
         "FolioSenseAI",
         f"{base_url}/?app=1",
         width=1440,
         height=920,
         min_size=(1024, 720),
     )
-    webview.start()
+
+    def _check_for_updates() -> None:
+        # Drive the in-page update sheet from the native menu. Guarded inside JS
+        # so it's a no-op if the page hasn't finished loading updates.js.
+        try:
+            window.evaluate_js("window.FolioUpdates && window.FolioUpdates.openAndCheck()")
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    def _open_in_browser() -> None:
+        try:
+            webbrowser.open(f"{base_url}/")
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    # A native menu with "Check for Updates…" (per the update-system design) and
+    # an escape hatch to the default browser. pywebview cannot inject into the
+    # standard macOS application menu, so these live under a custom top-level
+    # menu. Wrapped defensively: a pywebview build without the menu API still
+    # launches the window normally.
+    try:
+        import webview.menu as wm
+
+        menu_items = [
+            wm.Menu(
+                "FolioSenseAI",
+                [
+                    wm.MenuAction("Check for Updates…", _check_for_updates),
+                    wm.MenuSeparator(),
+                    wm.MenuAction("Open in Browser", _open_in_browser),
+                ],
+            )
+        ]
+        webview.start(menu=menu_items)
+    except (ImportError, AttributeError, TypeError):
+        webview.start()
     return 0
 
 

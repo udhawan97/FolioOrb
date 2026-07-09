@@ -20292,3 +20292,379 @@ html.desktop-app .bg-grid,
 html.desktop-app body::before {
     animation: none !important;
 }
+
+/* ============================================================================
+   Software Update — nav pill, menu dot, and the centered update sheet.
+   Reuses the app's material tokens so it inherits dark/light automatically.
+   ========================================================================== */
+
+/* ── Nav pill ─────────────────────────────────────────────────────────────*/
+.fs-update-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.66rem;
+    border-radius: 999px;
+    border: 1px solid rgba(111, 214, 240, 0.3);
+    background: rgba(111, 214, 240, 0.1);
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: background 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.fs-update-pill:hover { background: rgba(111, 214, 240, 0.16); transform: translateY(-1px); }
+.fs-update-pill:active { transform: translateY(0); }
+.fs-update-pill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--brand-cyan);
+    box-shadow: 0 0 0 0 rgba(111, 214, 240, 0.5);
+    animation: fsUpdatePulse 2.4s var(--ease) infinite;
+}
+@keyframes fsUpdatePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(111, 214, 240, 0.45); }
+    70%  { box-shadow: 0 0 0 6px rgba(111, 214, 240, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(111, 214, 240, 0); }
+}
+@media (max-width: 720px) {
+    .fs-update-pill-label { display: none; }
+    .fs-update-pill { padding: 0.28rem 0.4rem; }
+}
+
+/* ── Menu-row dot ─────────────────────────────────────────────────────────*/
+.fs-update-menu-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand-cyan);
+    display: inline-block;
+    margin-left: 0.35rem;
+}
+
+/* ── Backdrop + sheet ─────────────────────────────────────────────────────*/
+/* Scoped with `body >` so these beat the app's global
+   `body > :not(.bg-orb) { position: relative; z-index: 1 }` rule (equal
+   specificity, later in source) — otherwise the overlay is pinned behind the
+   dashboard. */
+body > .fs-update-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(3, 3, 6, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity 0.2s var(--ease);
+}
+.fs-update-backdrop.is-open { opacity: 1; }
+
+body > .fs-update-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 2001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    pointer-events: none;
+}
+.fs-update-panel {
+    position: relative;
+    width: 100%;
+    max-width: 460px;
+    max-height: min(86vh, 720px);
+    overflow-y: auto;
+    background: var(--modal-surface);
+    border: 1px solid var(--hairline-hover);
+    border-radius: 18px;
+    box-shadow: var(--shadow-float);
+    backdrop-filter: blur(30px) saturate(160%);
+    -webkit-backdrop-filter: blur(30px) saturate(160%);
+    padding: 1.6rem 1.5rem 1.25rem;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    transition: opacity 0.22s var(--ease), transform 0.28s var(--spring);
+}
+.fs-update-sheet.is-open .fs-update-panel { opacity: 1; transform: translateY(0) scale(1); }
+
+.fs-update-close {
+    position: absolute;
+    top: 0.9rem;
+    right: 0.9rem;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.fs-update-close:hover { background: var(--surface-hover); color: var(--text-primary); }
+
+/* ── Status region ────────────────────────────────────────────────────────*/
+.fs-update-status {
+    display: flex;
+    align-items: center;
+    gap: 0.95rem;
+    padding-right: 2rem;
+}
+.fs-update-mark {
+    position: relative;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.fs-update-mark-img { width: 44px; height: 44px; display: block; }
+.fs-update-mark[data-tone="ok"]::after,
+.fs-update-mark[data-tone="alert"]::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 11px 11px;
+    border: 2px solid var(--modal-surface);
+}
+.fs-update-mark[data-tone="ok"]::after {
+    background-color: var(--accent-green);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.fs-update-mark[data-tone="alert"]::after {
+    background-color: var(--accent-yellow);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23050508' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 8v5'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+}
+.fs-update-spinner {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid rgba(111, 214, 240, 0.2);
+    border-top-color: var(--brand-cyan);
+    animation: fsUpdateSpin 0.8s linear infinite;
+}
+@keyframes fsUpdateSpin { to { transform: rotate(360deg); } }
+
+.fs-update-title {
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1.25;
+}
+.fs-update-sub {
+    margin-top: 0.2rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* ── Progress ─────────────────────────────────────────────────────────────*/
+.fs-update-progress { margin-top: 1.1rem; }
+.fs-update-progress-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--control-bg);
+    overflow: hidden;
+}
+.fs-update-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand-cyan), var(--brand-periwinkle));
+    transition: width 0.3s var(--ease);
+}
+.fs-update-progress-meta {
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Release notes ────────────────────────────────────────────────────────*/
+.fs-update-notes-wrap { margin-top: 1.15rem; }
+.fs-update-notes-label {
+    font-size: var(--ts-label);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    margin-bottom: 0.4rem;
+}
+.fs-update-notes {
+    max-height: 210px;
+    overflow-y: auto;
+    padding: 0.8rem 0.9rem;
+    border-radius: 12px;
+    background: var(--control-bg);
+    border: 1px solid var(--hairline-soft);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.fs-update-notes h4 {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0.7rem 0 0.35rem;
+}
+.fs-update-notes h4:first-child { margin-top: 0; }
+.fs-update-notes p { margin: 0 0 0.5rem; }
+.fs-update-notes ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+.fs-update-notes li { margin-bottom: 0.2rem; }
+.fs-update-notes strong { color: var(--text-primary); font-weight: 600; }
+.fs-update-notes code {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--brand-periwinkle);
+    background: rgba(151, 172, 236, 0.1);
+    padding: 0 3px;
+    border-radius: 3px;
+}
+.fs-update-notes a { color: var(--brand-cyan); text-decoration: none; }
+.fs-update-notes a:hover { text-decoration: underline; }
+
+/* ── Trust line ───────────────────────────────────────────────────────────*/
+.fs-update-trust {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    background: rgba(48, 209, 88, 0.08);
+    border: 1px solid rgba(48, 209, 88, 0.16);
+    font-size: 0.74rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+.fs-update-trust svg { color: var(--accent-green); flex-shrink: 0; margin-top: 1px; }
+
+/* ── Actions ──────────────────────────────────────────────────────────────*/
+.fs-update-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+}
+.fs-update-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 0.6rem 1.15rem;
+    font-family: var(--font-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: transform 0.15s var(--ease), filter 0.15s var(--ease), background 0.15s var(--ease);
+}
+.fs-update-btn--primary {
+    background: linear-gradient(180deg, var(--brand-cyan), #4bb8d9);
+    color: #04121a;
+    box-shadow: 0 8px 20px -10px rgba(111, 214, 240, 0.7);
+}
+.fs-update-btn--primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.fs-update-btn--primary:active { transform: translateY(0); }
+.fs-update-btn--ghost {
+    background: var(--control-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--hairline);
+}
+.fs-update-btn--ghost:hover { background: var(--control-hover); }
+
+.fs-update-tertiary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 0.8rem;
+}
+.fs-update-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.74rem;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.12s var(--ease);
+}
+.fs-update-link:hover { color: var(--text-primary); text-decoration: underline; }
+.fs-update-link:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+
+/* ── Preferences region ───────────────────────────────────────────────────*/
+.fs-update-prefs {
+    margin-top: 1.3rem;
+    padding-top: 1.05rem;
+    border-top: 1px solid var(--hairline-soft);
+}
+.fs-update-pref-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.35rem 0;
+}
+.fs-update-pref-label { font-size: 0.8rem; color: var(--text-secondary); }
+.fs-update-pref-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--hairline-soft);
+}
+.fs-update-version-line { font-size: 0.72rem; color: var(--text-tertiary); }
+
+/* ── iOS-style switch ─────────────────────────────────────────────────────*/
+.fs-switch {
+    position: relative;
+    width: 40px;
+    height: 24px;
+    border-radius: 999px;
+    border: none;
+    background: var(--control-hover);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s var(--ease);
+    padding: 0;
+}
+.fs-switch.is-on { background: var(--accent-green); }
+.fs-switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s var(--spring);
+}
+.fs-switch.is-on .fs-switch-thumb { transform: translateX(16px); }
+
+/* ── Reduced motion ───────────────────────────────────────────────────────*/
+@media (prefers-reduced-motion: reduce) {
+    .fs-update-pill-dot { animation: none; }
+    .fs-update-spinner { animation-duration: 1.4s; }
+    .fs-update-backdrop,
+    .fs-update-panel,
+    .fs-update-progress-fill,
+    .fs-switch,
+    .fs-switch-thumb { transition: none; }
+    .fs-update-panel { transform: none; }
+}

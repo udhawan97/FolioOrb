@@ -120,6 +120,12 @@
                 </div>
             </div>
             <div class="d-flex align-items-center gap-3">
+                <button class="fs-update-pill" id="update-pill" type="button" hidden
+                        aria-label="Update available" title="A new version is available"
+                        onclick="FolioUpdates.open()">
+                    <span class="fs-update-pill-dot" aria-hidden="true"></span>
+                    <span class="fs-update-pill-label">Update available</span>
+                </button>
                 <button class="hud-status-pill" id="hud-status-pill" type="button"
                         aria-expanded="false" aria-controls="hud-popover"
                         aria-label="Refresh in 5:00. Claude AI. Open live feed details."
@@ -283,6 +289,18 @@
                             <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-keyboard"></i></span>
                             <span class="nav-menu-label">Keyboard shortcuts</span>
                             <span class="nav-menu-key" aria-hidden="true"><i class="bi bi-question-lg"></i></span>
+                        </button>
+
+                        <div class="nav-menu-divider" aria-hidden="true"></div>
+                        <div class="nav-menu-section">Application</div>
+                        <button class="nav-menu-row nav-menu-row--btn" type="button" id="nav-software-update"
+                                aria-label="Software Update" onclick="FolioUpdates.open()">
+                            <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-arrow-repeat"></i></span>
+                            <span class="nav-menu-label">Software Update</span>
+                            <span class="nav-menu-trailing">
+                                <span class="nav-menu-value" id="nav-update-version">—</span>
+                                <span class="fs-update-menu-dot" id="nav-update-dot" hidden aria-label="Update available"></span>
+                            </span>
                         </button>
 
                     </div>
@@ -2076,12 +2094,85 @@
 
     </div><!-- /container -->
 
+    <!-- ── Software Update sheet ──────────────────────────────────────────── -->
+    <div class="fs-update-backdrop" id="update-backdrop" hidden></div>
+    <div class="fs-update-sheet" id="update-sheet" role="dialog" aria-modal="true"
+         aria-labelledby="update-sheet-title" aria-hidden="true" hidden>
+        <div class="fs-update-panel">
+            <button class="fs-update-close" id="update-close" type="button" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+
+            <div class="fs-update-status">
+                <span class="fs-update-mark" id="update-mark" data-tone="neutral" aria-hidden="true">
+                    <img class="fs-update-mark-img" src="/static/img/brand/folio-orbit-icon.svg" alt="">
+                    <span class="fs-update-spinner" id="update-spinner"></span>
+                </span>
+                <div class="fs-update-status-text">
+                    <div class="fs-update-title" id="update-sheet-title">Software Update</div>
+                    <div class="fs-update-sub" id="update-sub" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="fs-update-progress" id="update-progress" hidden>
+                <div class="fs-update-progress-track">
+                    <div class="fs-update-progress-fill" id="update-progress-fill"></div>
+                </div>
+                <div class="fs-update-progress-meta" id="update-progress-meta"></div>
+            </div>
+
+            <div class="fs-update-notes-wrap" id="update-notes-wrap" hidden>
+                <div class="fs-update-notes-label">What's new</div>
+                <div class="fs-update-notes" id="update-notes" tabindex="0"></div>
+            </div>
+
+            <div class="fs-update-trust" id="update-trust" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span id="update-trust-text">Your holdings and settings are preserved. A backup is saved automatically before anything changes.</span>
+            </div>
+
+            <div class="fs-update-actions" id="update-actions">
+                <button class="fs-update-btn fs-update-btn--primary" id="update-primary" type="button" hidden></button>
+                <button class="fs-update-btn fs-update-btn--ghost" id="update-secondary" type="button" hidden></button>
+            </div>
+            <div class="fs-update-tertiary" id="update-tertiary" hidden>
+                <a class="fs-update-link" id="update-notes-link" href="#" target="_blank" rel="noopener noreferrer" hidden>View full release notes ↗</a>
+                <button class="fs-update-link" id="update-skip" type="button" hidden>Skip this version</button>
+                <a class="fs-update-link" id="update-releases-link" href="https://github.com/udhawan97/FolioSenseAI/releases/latest" target="_blank" rel="noopener noreferrer" hidden>Get it from the releases page ↗</a>
+            </div>
+
+            <div class="fs-update-prefs">
+                <div class="fs-update-pref-row">
+                    <span class="fs-update-pref-label">Automatically check for updates</span>
+                    <button class="fs-switch" id="update-pref-auto" type="button" role="switch" aria-checked="true" aria-label="Automatically check for updates">
+                        <span class="fs-switch-thumb" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="fs-update-pref-row">
+                    <span class="fs-update-pref-label">Notify me when updates are available</span>
+                    <button class="fs-switch" id="update-pref-notify" type="button" role="switch" aria-checked="true" aria-label="Notify me when updates are available">
+                        <span class="fs-switch-thumb" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="fs-update-pref-foot">
+                    <span class="fs-update-version-line" id="update-version-line">FolioSenseAI</span>
+                    <button class="fs-update-link fs-update-restore" id="update-restore" type="button" disabled>Restore previous version…</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.0.0/dist/chartjs-chart-treemap.min.js"></script>
     <script defer src="/static/js/analytics-charts.js?v=15"></script>
     <script defer src="/static/js/dashboard.js?v=96"></script>
+    <script defer src="/static/js/updates.js?v=1"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>

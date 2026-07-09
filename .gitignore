@@ -49,3 +49,8 @@ Thumbs.db
 # === Logs ===
 *.log
 logs/
+
+# === App runtime data (source/dev mode writes these to the repo root) ===
+/settings.json
+/backups/
+/updates/

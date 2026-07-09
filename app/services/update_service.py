@@ -76,6 +76,7 @@ class UpdateInfo:  # pylint: disable=too-many-instance-attributes
     published_at: str | None
     notes_md: str
     channel: str  # "stable" or "dev"
+    release_url: str | None
     download_url: str | None
     asset_name: str | None
     size_bytes: int | None
@@ -245,6 +246,7 @@ def _release_to_info(payload: dict[str, Any]) -> UpdateInfo:
         published_at=payload.get("published_at"),
         notes_md=str(payload.get("body") or ""),
         channel=channel,
+        release_url=payload.get("html_url"),
         download_url=(asset or {}).get("browser_download_url"),
         asset_name=(asset or {}).get("name"),
         size_bytes=(asset or {}).get("size"),
