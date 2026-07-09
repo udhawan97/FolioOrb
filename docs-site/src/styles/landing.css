@@ -107,13 +107,8 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 	background: linear-gradient(var(--act-accent), transparent 75%); }
 .hero-streak::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent, rgba(255,255,255,0.6) 46%, transparent 60%); animation: hero-streak-sweep 9s linear infinite; }
 @keyframes hero-streak-sweep { 0% { transform: translateY(-120%); } 100% { transform: translateY(120%); } }
-.hero-glyph { position: absolute; opacity: 0.05; animation: hero-orb-float 20s ease-in-out infinite; }
-.hero-glyph-mac { top: 0%; right: 1%; width: 220px; height: 220px; background: var(--text);
-	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M16.4 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9s-1.8-.9-3-.8c-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2-.1 1.6-.7 3-.7s1.8.7 3 .7 2-1.1 2.8-2.2c.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-1-2.5-3.8zM14.1 5.6c.6-.8 1.1-1.9 1-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2-.5 2.7-1.3z'/%3E%3C/svg%3E") center/contain no-repeat;
-	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M16.4 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9s-1.8-.9-3-.8c-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2-.1 1.6-.7 3-.7s1.8.7 3 .7 2-1.1 2.8-2.2c.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-1-2.5-3.8zM14.1 5.6c.6-.8 1.1-1.9 1-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2-.5 2.7-1.3z'/%3E%3C/svg%3E") center/contain no-repeat; }
-.hero-glyph-win { bottom: -2%; left: -3%; width: 170px; height: 170px; background: var(--text); animation-delay: -9s;
-	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M3 5.5 10.2 4.5v6.9H3zM11 4.4 21 3v8.4H11zM3 12.6h7.2v6.9L3 18.5zM11 12.6h10V21l-10-1.4z'/%3E%3C/svg%3E") center/contain no-repeat;
-	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M3 5.5 10.2 4.5v6.9H3zM11 4.4 21 3v8.4H11zM3 12.6h7.2v6.9L3 18.5zM11 12.6h10V21l-10-1.4z'/%3E%3C/svg%3E") center/contain no-repeat; }
+.hero-glyph { position: absolute; opacity: 0.1; animation: hero-orb-float 20s ease-in-out infinite; pointer-events: none; }
+.hero-glyph-mark { top: -4%; right: 0%; width: 320px; height: 320px; }
 .hero-line { position: absolute; height: 1px; width: 38%; top: 9%; left: 0;
 	background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--act-accent) 45%, transparent), transparent); opacity: 0.5; }
 .hero-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--act-accent); box-shadow: 0 0 6px var(--act-accent); opacity: 0.4; animation: hero-dot-twinkle 5s ease-in-out infinite; }
