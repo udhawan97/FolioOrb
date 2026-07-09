@@ -16,7 +16,7 @@ from logging.handlers import RotatingFileHandler
 from app import paths
 from app.services.log_safety import sanitize_for_log
 
-_LOGGER_NAME = "foliosense.update"
+_LOGGER_NAME = "folioorb.update"
 _configured = {"done": False}
 
 

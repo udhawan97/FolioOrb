@@ -4,25 +4,25 @@ import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://udhawan97.github.io',
-  base: '/FolioSenseAI',
+  base: '/FolioOrb',
   integrations: [
     starlight({
-      title: 'FolioSenseAI',
-      description: 'Docs for FolioSenseAI, a local-first portfolio intelligence dashboard.',
+      title: 'FolioOrb',
+      description: 'Docs for FolioOrb, a local-first portfolio intelligence dashboard.',
       logo: {
         src: './src/assets/folio-orbit-icon.svg',
         replacesTitle: false,
       },
       favicon: '/assets/folio-orbit-icon.svg',
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/udhawan97/FolioSenseAI' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/udhawan97/FolioOrb' },
       ],
       customCss: ['./src/styles/custom.css'],
       components: {
         TableOfContents: './src/components/TableOfContents.astro',
       },
       editLink: {
-        baseUrl: 'https://github.com/udhawan97/FolioSenseAI/edit/main/docs-site/',
+        baseUrl: 'https://github.com/udhawan97/FolioOrb/edit/main/docs-site/',
       },
       sidebar: [
         {

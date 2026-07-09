@@ -1,6 +1,6 @@
 ---
 /**
- * FolioSenseAI landing page — v3 "private cockpit".
+ * FolioOrb landing page — v3 "private cockpit".
  *
  * A single cinematic story told in acts (hero → workflow → features → demo →
  * trust → download → developer), narrated by a Senpai scroll companion. Real
@@ -14,7 +14,7 @@
 import '../styles/landing.css';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const REPO = 'udhawan97/FolioSenseAI';
+const REPO = 'udhawan97/FolioOrb';
 const GITHUB = `https://github.com/${REPO}`;
 const RELEASES = `${GITHUB}/releases`;
 const RELEASES_LATEST = `${RELEASES}/latest`;
@@ -54,7 +54,7 @@ const features = [
     title: 'See the risk behind the return',
     body: 'Scatter, correlation, concentration, and drawdown — every number explained in a plain-English line beneath it.',
     img: 'risk-analytics-demo.webp',
-    alt: 'FolioSenseAI risk analytics: risk-return scatter, correlation matrix, and concentration dial.',
+    alt: 'FolioOrb risk analytics: risk-return scatter, correlation matrix, and concentration dial.',
     senpai: 'Concentration check: five sectors, one ego.',
   },
   {
@@ -62,14 +62,14 @@ const features = [
     title: 'A verdict for every position',
     body: 'Open a holding and its intelligence panel unfolds — rating, drivers, and what moved it today.',
     video: 'verdicts',
-    alt: 'FolioSenseAI holdings table expanding a position into its full intelligence panel.',
+    alt: 'FolioOrb holdings table expanding a position into its full intelligence panel.',
   },
   {
     key: 'news', accent: 'cyan', kicker: 'News themes',
     title: 'Headlines, mapped to your holdings',
     body: 'Grouped, deduplicated, and themed — only the news that touches what you own or watch.',
     video: 'news-v2',
-    alt: 'FolioSenseAI news feed with grouped, relevant headlines under each holding.',
+    alt: 'FolioOrb news feed with grouped, relevant headlines under each holding.',
     senpai: 'I read the news so it doesn’t read you.',
   },
 ];
@@ -121,10 +121,10 @@ const roadmap = [
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>FolioSenseAI — Your portfolio, finally speaks back.</title>
-		<meta name="description" content="Local-first portfolio intelligence for macOS and Windows. FolioSenseAI turns holdings, risk, news, and market context into plain-English portfolio reads — on your machine, Claude-optional, built for trust." />
+		<title>FolioOrb — Your portfolio, finally speaks back.</title>
+		<meta name="description" content="Local-first portfolio intelligence for macOS and Windows. FolioOrb turns holdings, risk, news, and market context into plain-English portfolio reads — on your machine, Claude-optional, built for trust." />
 		<link rel="icon" type="image/svg+xml" href={asset('folio-orbit-icon.svg')} />
-		<meta property="og:title" content="FolioSenseAI — Your portfolio, finally speaks back." />
+		<meta property="og:title" content="FolioOrb — Your portfolio, finally speaks back." />
 		<meta property="og:description" content="Local-first portfolio intelligence for macOS and Windows. Plain-English reads on holdings, risk, news, and market context." />
 		<meta property="og:type" content="website" />
 		<meta property="og:image" content={asset('og-hero.jpg')} />
@@ -142,7 +142,7 @@ const roadmap = [
 		<header class="topbar">
 			<a class="brand" href={base + '/'}>
 				<img src={asset('folio-orbit-icon.svg')} alt="" width="28" height="28" />
-				<span>FolioSenseAI</span>
+				<span>FolioOrb</span>
 			</a>
 			<nav class="topnav">
 				<a href={doc('get-started/introduction')}>Docs</a>
@@ -183,7 +183,7 @@ const roadmap = [
 						<span class="eyebrow reveal">Local-first portfolio intelligence</span>
 						<h1 class="display reveal">Your portfolio, finally speaks&nbsp;back.</h1>
 						<p class="lede reveal">
-							FolioSenseAI turns holdings, risk, news, and market context into plain-English
+							FolioOrb turns holdings, risk, news, and market context into plain-English
 							portfolio reads — running on your machine, Claude-optional, built for trust.
 						</p>
 
@@ -255,7 +255,7 @@ const roadmap = [
 								<div class="window-bar"><span></span><span></span><span></span></div>
 								<div class="hero-shot">
 									<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
-										alt="The FolioSenseAI dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
+										alt="The FolioOrb dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
 									<div class="pulse-line"></div>
 									<div class="spot-region" id="spot-region">
 										<span class="spot-region-tip" id="spot-region-tip"></span>
@@ -507,7 +507,7 @@ const roadmap = [
 				<div class="act-head reveal">
 					<span class="kicker">Staying current</span>
 					<h2 class="section-title">Updates that ask first — and never risk your data.</h2>
-					<p class="up-lede">FolioSenseAI keeps itself current the calm way: it tells you when there’s something new, backs up your portfolio before touching anything, and never installs without your go-ahead.</p>
+					<p class="up-lede">FolioOrb keeps itself current the calm way: it tells you when there’s something new, backs up your portfolio before touching anything, and never installs without your go-ahead.</p>
 				</div>
 
 				<div class="update-console grad-border reveal">
@@ -581,7 +581,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>The fine print, minus the lawyers:</strong> this roadmap is less of a blood oath and more of a friendly sneak peek. FolioSenseAI is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.</p>
+					<p class="rm-oath"><strong>The fine print, minus the lawyers:</strong> this roadmap is less of a blood oath and more of a friendly sneak peek. FolioOrb is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 			</section>
@@ -611,14 +611,14 @@ const roadmap = [
 					</div>
 
 					<div class="terminal" id="terminal">
-						<div class="term-bar"><span></span><span></span><span></span><span class="term-title">foliosenseai — zsh</span></div>
+						<div class="term-bar"><span></span><span></span><span></span><span class="term-title">folioorb — zsh</span></div>
 						<div class="term-tabs" role="tablist">
 							<button class="term-tab is-active" data-tab="clone" role="tab" type="button">Clone</button>
 							<button class="term-tab" data-tab="mac" role="tab" type="button">macOS · Linux</button>
 							<button class="term-tab" data-tab="win" role="tab" type="button">Windows</button>
 						</div>
 						<div class="term-body">
-							<pre class="term-pane is-active" data-tab="clone" data-copy={`git clone ${GITHUB}.git\ncd FolioSenseAI\n./scripts/setup.sh`}><span class="tl"><i>❯</i> git clone {GITHUB}.git</span><span class="tl"><i>❯</i> cd FolioSenseAI</span><span class="tl"><i>❯</i> ./scripts/setup.sh</span><span class="tl to"># venv + deps + first run → localhost:8000</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+							<pre class="term-pane is-active" data-tab="clone" data-copy={`git clone ${GITHUB}.git\ncd FolioOrb\n./scripts/setup.sh`}><span class="tl"><i>❯</i> git clone {GITHUB}.git</span><span class="tl"><i>❯</i> cd FolioOrb</span><span class="tl"><i>❯</i> ./scripts/setup.sh</span><span class="tl to"># venv + deps + first run → localhost:8000</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
 							<pre class="term-pane" data-tab="mac" data-copy={macCmd}><span class="tl to"># one-line install (reads the latest release)</span><span class="tl"><i>❯</i> {macCmd}</span><span class="tl to"># FOLIO_REF=latest-main … for the dev channel</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
 							<pre class="term-pane" data-tab="win" data-copy={winCmd}><span class="tl to"># PowerShell — one-line install</span><span class="tl"><i>❯</i> {winCmd}</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
 						</div>
@@ -663,7 +663,7 @@ const roadmap = [
 			<div class="footer-inner">
 				<div class="footer-brand">
 					<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" />
-					<strong class="footer-brand-name">FolioSenseAI</strong>
+					<strong class="footer-brand-name">FolioOrb</strong>
 				</div>
 				<nav class="footer-links">
 					<a href={GITHUB}>GitHub</a><a href={doc('get-started/introduction')}>Docs</a>

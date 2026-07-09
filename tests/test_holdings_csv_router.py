@@ -87,7 +87,7 @@ def test_export_headers_and_content(db, client):
     res = client.get("/api/portfolio/holdings/export")
     assert res.status_code == 200
     disp = res.headers["content-disposition"]
-    assert disp.startswith("attachment; filename=\"foliosense-holdings-p1-")
+    assert disp.startswith("attachment; filename=\"folioorb-holdings-p1-")
     body = res.content.decode("utf-8")
     assert body.startswith("﻿")
     assert TEMPLATE_HEADER in body

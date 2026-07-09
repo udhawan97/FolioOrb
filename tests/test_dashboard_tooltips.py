@@ -14,10 +14,10 @@ def test_tip_system_uses_delegation_for_dynamic_verdict_triggers():
     assert 'event.stopPropagation();\n    }, true)' not in js
     assert 'if (event.target.closest(".tip-trigger")) return;' in js
     assert "data-tip-title" in js
-    assert "FolioSense's take" in js
+    assert "FolioOrb's take" in js
     assert "Anchor mode" in js
     assert "Standard mode" in js
-    assert "How FolioSense decides" in js
+    assert "How FolioOrb decides" in js
     assert "It blends the signals that fit each holding" in js
 
 

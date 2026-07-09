@@ -441,7 +441,7 @@ def _update_env_file(key: str, value: str) -> None:
     other local accounts on the machine can't read it even though it's
     plaintext, which is the standard mitigation for local secret files (same
     approach used by ~/.netrc, ~/.aws/credentials, etc). This is intentional,
-    local-only storage: FolioSenseAI is a single-user, local-first app with no
+    local-only storage: FolioOrb is a single-user, local-first app with no
     server-side secrets store, so the key never leaves the user's machine.
     """
     env_path = data_dir() / ".env"
@@ -848,11 +848,11 @@ async def get_all_intelligence(db: Session = Depends(get_db)):
 
 # ── Analyst Recommendation endpoints ─────────────────────────────────────────
 
-VERDICT_BRAND_KICKER = "FolioSense \u00d7 Claude"
-VERDICT_BRAND_KICKER_LOCAL = "FolioSense Intelligence"
-VERDICT_FEELS_PREFIX = "FolioSense feels"
+VERDICT_BRAND_KICKER = "FolioOrb \u00d7 Claude"
+VERDICT_BRAND_KICKER_LOCAL = "FolioOrb Intelligence"
+VERDICT_FEELS_PREFIX = "FolioOrb feels"
 _VERDICT_DISCLAIMER = (
-    "FolioSense Intelligence \u2014 a signal read, not "
+    "FolioOrb Intelligence \u2014 a signal read, not "
     "financial advice. Verify before you trade."
 )
 _AI_VERDICT_DISCLAIMER = _VERDICT_DISCLAIMER
@@ -964,21 +964,21 @@ def _portfolio_fallback_quip(dominant_action: str, concentration_band: str) -> s
     if concentration_band == "high":
         return (
             "Claude sees the book leaning concentrated; "
-            "FolioSense is politely raising one eyebrow."
+            "FolioOrb is politely raising one eyebrow."
         )
     if dominant_action == "add":
         return (
-            "FolioSense sees more green lights than red flags, "
+            "FolioOrb sees more green lights than red flags, "
             "with Claude keeping the caveats close."
         )
     if dominant_action == "trim":
         return (
             "Claude thinks the portfolio has had a run; "
-            "FolioSense is checking the exits calmly."
+            "FolioOrb is checking the exits calmly."
         )
     if dominant_action == "needs-data":
         return (
-            "FolioSense wants more receipts before turning this portfolio read into a headline."
+            "FolioOrb wants more receipts before turning this portfolio read into a headline."
         )
     return (
         "Claude calls the portfolio balanced enough to be interesting, "
@@ -2346,7 +2346,7 @@ def _action_plan_fallback(core: dict) -> dict:
         )
 
     thesis = (
-        f"FolioSense local signals: {n_hold} hold · {n_add} add · "
+        f"FolioOrb local signals: {n_hold} hold · {n_add} add · "
         f"{n_trim} trim · {n_exit} exit. "
         f"Market: {regime_label}. "
         "Enable Claude AI in Settings for a cross-holding, risk-adjusted plan."

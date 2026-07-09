@@ -52,9 +52,9 @@ class Settings:
         "CORS_ALLOWED_ORIGINS",
         "http://localhost:8000,http://127.0.0.1:8000",
     )
-    APP_NAME: str = "FolioSenseAI"
+    APP_NAME: str = "FolioOrb"
     APP_DESCRIPTION: str = (
-        "FolioSenseAI helps explain portfolio movement by surfacing market context "
+        "FolioOrb helps explain portfolio movement by surfacing market context "
         "and AI-generated insights for holdings."
     )
     # Optional comma-separated tickers pre-loaded when the default portfolio is created.

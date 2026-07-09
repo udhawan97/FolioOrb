@@ -12,7 +12,7 @@ across headlines rather than a flat list.
 
 ## Market context
 
-Alongside your holdings, FolioSenseAI pulls:
+Alongside your holdings, FolioOrb pulls:
 
 - Live quotes and historical prices
 - US market open/closed status

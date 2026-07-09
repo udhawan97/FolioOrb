@@ -3,7 +3,7 @@ title: Optional Claude Setup
 description: Connect an Anthropic API key to unlock Claude-powered narration.
 ---
 
-FolioSenseAI works fully without Claude. Local Intelligence handles verdicts, scenarios,
+FolioOrb works fully without Claude. Local Intelligence handles verdicts, scenarios,
 exposure, and fallback summaries on its own. Add an Anthropic key when you want richer
 action plans, portfolio briefings, news themes, and insight copy.
 

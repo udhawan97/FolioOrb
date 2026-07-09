@@ -1,5 +1,5 @@
 """
-Timing signal helpers for FolioSense verdicts.
+Timing signal helpers for FolioOrb verdicts.
 
 The module is deterministic after price history is supplied. yfinance history
 fetches are batched, de-duped, and cached by ticker for the current calendar day.

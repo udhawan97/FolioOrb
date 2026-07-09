@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="FolioSenseAI helps explain portfolio movement by surfacing market context and AI-generated insights for holdings.">
-    <title>FolioSenseAI®</title>
+    <meta name="description" content="FolioOrb helps explain portfolio movement by surfacing market context and AI-generated insights for holdings.">
+    <title>FolioOrb®</title>
     <script>
         (() => {
             try {
-                const savedTextSize = localStorage.getItem("foliosense-text-size");
+                // Read the FolioOrb key, falling back to the pre-rename FolioSenseAI
+                // key so an existing user's saved text size still applies on the very
+                // first paint (before dashboard.js runs its full key migration).
+                const savedTextSize = localStorage.getItem("folioorb-text-size")
+                    || localStorage.getItem("foliosense-text-size");
                 document.documentElement.dataset.bsTheme = "dark";
                 const textSizes = ["compact", "standard", "comfortable"];
                 document.documentElement.dataset.textSize = textSizes.includes(savedTextSize) ? savedTextSize : "standard";
@@ -45,19 +49,19 @@
         <div class="container-fluid">
             <div class="brand-lockup-wrap">
                 <a class="navbar-brand brand-lockup fw-bold" id="brand-intro-trigger" href="/"
-                   aria-label="Meet FolioSenseAI" aria-controls="brand-intro-callout" aria-expanded="false"
-                   title="Meet FolioSenseAI">
+                   aria-label="Meet FolioOrb" aria-controls="brand-intro-callout" aria-expanded="false"
+                   title="Meet FolioOrb">
                     <span class="brand-icon-wrap brand-character" aria-hidden="true">
                         <img class="brand-icon brand-icon-dark" src="/static/img/brand/folio-orbit-icon.svg" alt="">
                         <img class="brand-icon brand-icon-light" src="/static/img/brand/folio-orbit-mark-light.svg" alt="">
                     </span>
-                    <span class="brand-wordmark">FolioSenseAI</span>
+                    <span class="brand-wordmark">FolioOrb</span>
                 </a>
                 <div class="brand-intro-callout" id="brand-intro-callout" role="status" aria-live="polite" aria-hidden="true">
                     <span class="brand-intro-version">v4</span>
-                    <span class="brand-intro-kicker">FolioSenseAI</span>
+                    <span class="brand-intro-kicker">FolioOrb</span>
                     <span class="brand-intro-title">Portfolio butler, at your service</span>
-                    <span class="brand-intro-copy">FolioSense and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.</span>
+                    <span class="brand-intro-copy">FolioOrb and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.</span>
                 </div>
 
                 <!-- ── API Key dropdown — triggered from brand icon area ── -->
@@ -87,7 +91,7 @@
                         </div>
                         <div class="api-key-guide-step">
                             <span class="api-key-guide-num">2</span>
-                            <span>Click <strong>API Keys</strong> in the left sidebar, then <strong>Create Key</strong>. Give it any name you like (e.g. "FolioSense").</span>
+                            <span>Click <strong>API Keys</strong> in the left sidebar, then <strong>Create Key</strong>. Give it any name you like (e.g. "FolioOrb").</span>
                         </div>
                         <div class="api-key-guide-step">
                             <span class="api-key-guide-num">3</span>
@@ -277,7 +281,7 @@
                                 <i class="bi bi-chat-heart" aria-hidden="true"></i>
                             </button>
                         </div>
-                        <a class="nav-menu-row nav-menu-row--btn" href="https://udhawan97.github.io/FolioSenseAI/"
+                        <a class="nav-menu-row nav-menu-row--btn" href="https://udhawan97.github.io/FolioOrb/"
                                 target="_blank" rel="noopener noreferrer"
                                 aria-label="Open documentation (opens in a new tab)">
                             <span class="nav-menu-icon" aria-hidden="true"><i class="bi bi-book"></i></span>
@@ -1560,7 +1564,7 @@
                             </div>
                             <button class="tip-trigger ms-auto"
                                 data-tip-title="Signal Board"
-                                data-tip-body="FolioSense's read on each holding at a glance — greener is buy/add, redder is trim/sell. Not financial advice."
+                                data-tip-body="FolioOrb's read on each holding at a glance — greener is buy/add, redder is trim/sell. Not financial advice."
                                 data-tip-hint="Intensity = confidence"
                                 data-tip-icon="bi-grid">
                                 <i class="bi bi-info-circle"></i>
@@ -1593,7 +1597,7 @@
                             </div>
                             <button class="tip-trigger ms-auto"
                                 data-tip-title="Portfolio Verdict Mix"
-                                data-tip-body="FolioSense's read on your whole book — weighted by how much you own of each holding, not just a count of tickers."
+                                data-tip-body="FolioOrb's read on your whole book — weighted by how much you own of each holding, not just a count of tickers."
                                 data-tip-hint="Not financial advice"
                                 data-tip-icon="bi-pie-chart">
                                 <i class="bi bi-info-circle"></i>
@@ -1604,7 +1608,7 @@
                                 <i class="bi bi-pie-chart perf-callout-icon"></i>
                                 <div class="perf-callout-text">
                                     <div class="perf-callout-title">No portfolio signals yet</div>
-                                    <div class="perf-callout-body">Set share counts to see how FolioSense views your overall book.</div>
+                                    <div class="perf-callout-body">Set share counts to see how FolioOrb views your overall book.</div>
                                 </div>
                             </div>
                             <div id="portfolio-outlook-loading" class="analytics-skeleton" aria-hidden="true">
@@ -1617,7 +1621,7 @@
                                 <div class="verdict-mix-stats" id="verdict-mix-stats"></div>
                                 <p class="portfolio-outlook-quip text-secondary small" id="portfolio-outlook-quip"></p>
                                 <p class="analytics-chart-caption">
-                                    Where your money sits on FolioSense&rsquo;s verdict scale — weighted by
+                                    Where your money sits on FolioOrb&rsquo;s verdict scale — weighted by
                                     position size, not just ticker count. Greener means more of the book leans
                                     add/buy; redder means more leans trim/sell.
                                 </p>
@@ -1638,7 +1642,7 @@
                             </div>
                             <button class="tip-trigger ms-auto"
                                 data-tip-title="Conviction Gap"
-                                data-tip-body="Flags positions where FolioSense's verdict tone doesn't match how large the bet is — e.g. trim on a big weight."
+                                data-tip-body="Flags positions where FolioOrb's verdict tone doesn't match how large the bet is — e.g. trim on a big weight."
                                 data-tip-hint="Not financial advice"
                                 data-tip-icon="bi-exclamation-diamond">
                                 <i class="bi bi-info-circle"></i>
@@ -1674,7 +1678,7 @@
                             <button class="tip-trigger ms-auto"
                                 data-tip-title="Confidence Spectrum"
                                 data-tip-body="How much of your book sits in each confidence band — weighted by allocation, not ticker count."
-                                data-tip-hint="From FolioSense verdicts"
+                                data-tip-hint="From FolioOrb verdicts"
                                 data-tip-icon="bi-distribute-vertical">
                                 <i class="bi bi-info-circle"></i>
                             </button>
@@ -1858,7 +1862,7 @@
                                 </span>
                             </span>
                             <span class="ai-agent-copy">
-                                <span class="ai-agent-kicker" id="ai-agent-kicker">FolioSense</span>
+                                <span class="ai-agent-kicker" id="ai-agent-kicker">FolioOrb</span>
                                 <span class="hub-line-stack">
                                     <span class="ai-agent-line hub-line hub-line--local" id="ai-agent-line">Watching holdings</span>
                                     <span class="ai-agent-line hub-line hub-line--claude" id="ai-agent-line-claude" aria-hidden="true">Claude Summaries</span>
@@ -2151,7 +2155,7 @@
             <div class="fs-update-tertiary" id="update-tertiary" hidden>
                 <a class="fs-update-link" id="update-notes-link" href="#" target="_blank" rel="noopener noreferrer" hidden>View full release notes ↗</a>
                 <button class="fs-update-link" id="update-skip" type="button" hidden>Skip this version</button>
-                <a class="fs-update-link" id="update-releases-link" href="https://github.com/udhawan97/FolioSenseAI/releases/latest" target="_blank" rel="noopener noreferrer" hidden>Get it from the releases page ↗</a>
+                <a class="fs-update-link" id="update-releases-link" href="https://github.com/udhawan97/FolioOrb/releases/latest" target="_blank" rel="noopener noreferrer" hidden>Get it from the releases page ↗</a>
             </div>
 
             <div class="fs-update-prefs">
@@ -2168,7 +2172,7 @@
                     </button>
                 </div>
                 <div class="fs-update-pref-foot">
-                    <span class="fs-update-version-line" id="update-version-line">FolioSenseAI</span>
+                    <span class="fs-update-version-line" id="update-version-line">FolioOrb</span>
                     <button class="fs-update-link fs-update-restore" id="update-restore" type="button" disabled>Restore previous version…</button>
                 </div>
             </div>
@@ -2257,7 +2261,7 @@
                     <button type="button" class="btn btn-success btn-sm" id="senpai-welcome-add-holding">
                         <i class="bi bi-plus-circle" aria-hidden="true"></i> Add your first holding
                     </button>
-                    <a href="https://udhawan97.github.io/FolioSenseAI/" target="_blank" rel="noopener noreferrer"
+                    <a href="https://udhawan97.github.io/FolioOrb/" target="_blank" rel="noopener noreferrer"
                        class="local-intel-guide-link small">Read the full docs</a>
                 </div>
             </div>
@@ -2382,7 +2386,7 @@
                             <span class="import-mode-title">Import holdings — template mode</span>
                         </div>
                         <p class="import-mode-body">
-                            Uses the exact FolioSense format — the same columns Export CSV gives you:
+                            Uses the exact FolioOrb format — the same columns Export CSV gives you:
                             <code>ticker, shares, avg_cost, is_watchlist, hold_class, notes</code>. Plain
                             numbers, no currency symbols, up to 200 rows.
                             <em>Have a raw brokerage export instead? Connect Claude in Settings and I'll map
@@ -2399,7 +2403,7 @@
                         </div>
                         <p class="import-mode-body">
                             Drop in almost any brokerage CSV — I'll map <code>Symbol</code>/<code>Qty</code>/<code>Cost</code>-style
-                            columns onto the FolioSense format. Every row still passes the same strict checks
+                            columns onto the FolioOrb format. Every row still passes the same strict checks
                             before it touches your book. Clean template files skip Claude entirely — zero tokens.
                         </p>
                     </div>

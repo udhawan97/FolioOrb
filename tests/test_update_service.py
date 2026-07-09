@@ -26,7 +26,7 @@ def isolate(tmp_path, monkeypatch):
 def _macos_assets(version="4.4.0"):
     return [
         {
-            "name": f"FolioSenseAI-macOS-arm64-v{version}.dmg",
+            "name": f"FolioOrb-macOS-arm64-v{version}.dmg",
             "size": 100_663_296,
             "browser_download_url": f"https://github.com/x/releases/download/v{version}/a.dmg",
         },
@@ -42,7 +42,7 @@ def _macos_assets(version="4.4.0"):
 def _release(tag, assets=None, body="What changed"):
     return {
         "tag_name": tag,
-        "name": f"FolioSenseAI {tag}",
+        "name": f"FolioOrb {tag}",
         "published_at": "2026-07-08T00:00:00Z",
         "body": body,
         "assets": assets if assets is not None else [],

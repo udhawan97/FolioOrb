@@ -31,7 +31,7 @@ def isolate(tmp_path, monkeypatch):
 def _info():
     return {
         "version": "4.4.0",
-        "asset_name": "FolioSenseAI-macOS-arm64-v4.4.0.dmg",
+        "asset_name": "FolioOrb-macOS-arm64-v4.4.0.dmg",
         "download_url": "https://github.com/x/releases/download/v4.4.0/app.dmg",
         "sha256_url": "https://github.com/x/releases/download/v4.4.0/SHA256SUMS.txt",
         "size_bytes": 4,

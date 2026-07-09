@@ -1,7 +1,7 @@
-; Inno Setup script for FolioSenseAI (per-user Windows installer).
+; Inno Setup script for FolioOrb (per-user Windows installer).
 ;
-; Compile in CI after PyInstaller has produced dist\FolioSenseAI\:
-;   iscc /DMyAppVersion=4.3.0 /DMyOutputName=FolioSenseAI-Windows-x64-v4.3.0-Setup packaging\windows\installer.iss
+; Compile in CI after PyInstaller has produced dist\FolioOrb\:
+;   iscc /DMyAppVersion=4.3.0 /DMyOutputName=FolioOrb-Windows-x64-v4.3.0-Setup packaging\windows\installer.iss
 ;
 ; MyAppVersion is always the numeric app version (used for the file's version
 ; metadata, which must be numeric). MyOutputName is the full installer filename
@@ -12,16 +12,16 @@
 ; Apps & Features, and a WebView2 runtime check so pywebview has a renderer on
 ; older Windows 10 machines (Windows 11 already ships it).
 
-#define MyAppName "FolioSenseAI"
+#define MyAppName "FolioOrb"
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
 #endif
 #ifndef MyOutputName
-  #define MyOutputName "FolioSenseAI-Windows-x64-Setup"
+  #define MyOutputName "FolioOrb-Windows-x64-Setup"
 #endif
 #define MyAppPublisher "Umang Dhawan"
-#define MyAppURL "https://github.com/udhawan97/FolioSenseAI"
-#define MyAppExeName "FolioSenseAI.exe"
+#define MyAppURL "https://github.com/udhawan97/FolioOrb"
+#define MyAppExeName "FolioOrb.exe"
 
 [Setup]
 AppId={{7C4B2E9A-3D5F-4A21-9E6C-1F0A8B7D2C34}
@@ -31,12 +31,12 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
-DefaultDirName={localappdata}\Programs\FolioSenseAI
+DefaultDirName={localappdata}\Programs\FolioOrb
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\..\dist\installer
 OutputBaseFilename={#MyOutputName}
-SetupIconFile=..\icons\FolioSenseAI.ico
+SetupIconFile=..\icons\FolioOrb.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 Compression=lzma2
@@ -61,7 +61,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\..\dist\FolioSenseAI\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "..\..\dist\FolioOrb\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

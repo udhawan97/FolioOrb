@@ -106,20 +106,43 @@ let _trendObserver = null;
 // check, instead of rebuilding a signature string from the price history on
 // every firing just to discover nothing changed.
 const _trendObserverLastHistory = new WeakMap();
-const THEME_KEY = "foliosense-theme";
-const TEXT_SIZE_KEY = "foliosense-text-size";
+
+// One-time localStorage migration for the FolioSenseAI → FolioOrb rebrand. All
+// persisted dashboard preferences moved from a "foliosense-" prefix to a
+// "folioorb-" prefix; copy any legacy keys forward (without clobbering a value
+// the user already set under the new name) so settings survive the rename. Runs
+// before any key below is read. Idempotent and safe if storage is unavailable.
+(function migrateLegacyStorageKeys() {
+    try {
+        const legacyPrefix = "foliosense-";
+        const legacyKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.indexOf(legacyPrefix) === 0) legacyKeys.push(key);
+        }
+        for (const key of legacyKeys) {
+            const newKey = "folioorb-" + key.slice(legacyPrefix.length);
+            if (localStorage.getItem(newKey) === null) {
+                localStorage.setItem(newKey, localStorage.getItem(key));
+            }
+        }
+    } catch (_) { /* storage disabled — nothing to migrate */ }
+})();
+
+const THEME_KEY = "folioorb-theme";
+const TEXT_SIZE_KEY = "folioorb-text-size";
 const TEXT_SIZES = ["compact", "standard", "comfortable"];
 const TEXT_SIZE_LABELS = {
     compact: "smallest",
     standard: "normal",
     comfortable: "large",
 };
-const DASHBOARD_SENPAI_KEY = "foliosense-dashboard-senpai-visible";
-const SENPAI_MODE_KEY = "foliosense-force-local-mode";
-const LOCAL_INTEL_GUIDE_DISMISS_KEY = "foliosense-local-guide-dismissed";
-const LOCAL_INTEL_GUIDE_TOAST_KEY = "foliosense-local-guide-toast";
-const PERFORMANCE_RANGE_KEY = "foliosense-performance-range";
-const DASHBOARD_TIME_RANGE_KEY = "foliosense-hero-pnl-range";
+const DASHBOARD_SENPAI_KEY = "folioorb-dashboard-senpai-visible";
+const SENPAI_MODE_KEY = "folioorb-force-local-mode";
+const LOCAL_INTEL_GUIDE_DISMISS_KEY = "folioorb-local-guide-dismissed";
+const LOCAL_INTEL_GUIDE_TOAST_KEY = "folioorb-local-guide-toast";
+const PERFORMANCE_RANGE_KEY = "folioorb-performance-range";
+const DASHBOARD_TIME_RANGE_KEY = "folioorb-hero-pnl-range";
 
 const PERFORMANCE_RANGES = {
     week:       { label: "1W",  days: 7,    marketPeriod: "5d" },
@@ -740,19 +763,19 @@ function validateIntelligenceEngineUi() {
 }
 
 const BRAND_INTRO_COPY = {
-    claude: "FolioSense and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.",
-    local: "FolioSense keeps things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.",
+    claude: "FolioOrb and Claude keep things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.",
+    local: "FolioOrb keeps things quiet: clean signals, sharper context, and just enough mystery to make the risk model sit up straight. Now, let's keep those bags of money behaving like a portfolio.",
 };
 
 const LOCAL_INTEL_SCAN_MESSAGES = [
-    "Running local signals while FolioSense keeps the thesis tidy.",
+    "Running local signals while FolioOrb keeps the thesis tidy.",
     "Local intelligence is scoring context across your holdings.",
-    "FolioSense is reading positions with on-device signal logic.",
+    "FolioOrb is reading positions with on-device signal logic.",
     "Deterministic models are doing the math with quiet dignity.",
-    "FolioSense lowered the noise and let local signals take the wheel.",
+    "FolioOrb lowered the noise and let local signals take the wheel.",
     "Matching benchmarks, checking catalysts — no cloud required.",
     "Local signals are unusually brave with your holdings today.",
-    "FolioSense is maintaining financial composure on local horsepower.",
+    "FolioOrb is maintaining financial composure on local horsepower.",
     "Context received. Nuance forming locally.",
     "Running the numbers with crisp, deterministic logic.",
 ];
@@ -790,31 +813,31 @@ const AI_CHECK_MESSAGES = [
 ];
 
 const CLAUDE_FUNNY_MESSAGES = [
-    "FolioSense sent Claude a clean thesis. The silence became expensive... 👀",
-    "FolioSense brought Claude tidy inputs. Claude is pretending not to be impressed...",
-    "FolioSense asked for nuance. The confidence score adjusted its posture.",
-    "FolioSense submitted the data. Claude paused with suspicious elegance...",
-    "FolioSense and Claude are comparing notes (and numbers)...",
-    "FolioSense lowered the noise. Claude raised an eyebrow at the risk model...",
-    "FolioSense complimented Claude's reasoning. Claude requested supporting data.",
-    "FolioSense sent Claude clean inputs and a dangerously tidy covariance matrix.",
-    "FolioSense asked Claude for nuance. Claude arrived overdressed.",
-    "FolioSense is keeping it professional, but the confidence score noticed.",
-    "FolioSense passed Claude a crisp thesis. Claude marked it intriguing.",
-    "FolioSense made the assumptions legible. Claude kept typing.",
+    "FolioOrb sent Claude a clean thesis. The silence became expensive... 👀",
+    "FolioOrb brought Claude tidy inputs. Claude is pretending not to be impressed...",
+    "FolioOrb asked for nuance. The confidence score adjusted its posture.",
+    "FolioOrb submitted the data. Claude paused with suspicious elegance...",
+    "FolioOrb and Claude are comparing notes (and numbers)...",
+    "FolioOrb lowered the noise. Claude raised an eyebrow at the risk model...",
+    "FolioOrb complimented Claude's reasoning. Claude requested supporting data.",
+    "FolioOrb sent Claude clean inputs and a dangerously tidy covariance matrix.",
+    "FolioOrb asked Claude for nuance. Claude arrived overdressed.",
+    "FolioOrb is keeping it professional, but the confidence score noticed.",
+    "FolioOrb passed Claude a crisp thesis. Claude marked it intriguing.",
+    "FolioOrb made the assumptions legible. Claude kept typing.",
 ];
 
 const CLAUDE_OFFLINE_SCAN_MESSAGES = [
-    "Running through local models while FolioSense notices the Claude-shaped silence.",
+    "Running through local models while FolioOrb notices the Claude-shaped silence.",
     "Local models are covering the shift; the empty Claude channel is being handled with dignity.",
     "Claude is quiet, so local signals are being unusually brave with your holdings.",
-    "Running local signals while FolioSense politely refuses to stare at the endpoint.",
-    "Local models have the wheel. FolioSense is maintaining financial composure.",
-    "Claude is unreachable, so FolioSense is analyzing locally and acting normal about the silence.",
+    "Running local signals while FolioOrb politely refuses to stare at the endpoint.",
+    "Local models have the wheel. FolioOrb is maintaining financial composure.",
+    "Claude is unreachable, so FolioOrb is analyzing locally and acting normal about the silence.",
     "Routing through local models until Claude reappears with that calm, inconvenient precision.",
     "Local intelligence is handling the numbers while one unavailable API endpoint gets remembered fondly.",
-    "Claude is away; local models are doing the math while FolioSense practices patience poorly.",
-    "Running locally for now. FolioSense respects the boundary condition, with notes.",
+    "Claude is away; local models are doing the math while FolioOrb practices patience poorly.",
+    "Running locally for now. FolioOrb respects the boundary condition, with notes.",
 ];
 let claudeMessageIndex = 0;
 let claudeOfflineScanMessageIndex = 0;
@@ -939,10 +962,10 @@ function setAgentLine(text) {
 
 function _agentKickerLabel({ scanning = false, ready = false, claudeIdle = false } = {}) {
     const local = isLocalIntelligenceMode();
-    if (scanning) return local ? "Local Intel" : "FolioSense";
-    if (ready) return "FolioSense";
+    if (scanning) return local ? "Local Intel" : "FolioOrb";
+    if (ready) return "FolioOrb";
     if (claudeIdle) return "Claude";
-    return local ? "Local Intel" : "FolioSense";
+    return local ? "Local Intel" : "FolioOrb";
 }
 
 let _lastHubEngine = null;
@@ -985,12 +1008,12 @@ function updateHoldingsIntelHub({ scanning = false, ready = false, claudeAction 
     hub.classList.toggle("is-claude-idle", claudeIdle);
     hub.classList.toggle("is-claude-action", !!claudeAction);
 
-    hub.dataset.tipTitle = local ? "Holding Intel" : (claudeIdle ? "Claude Summaries" : "FolioSense");
+    hub.dataset.tipTitle = local ? "Holding Intel" : (claudeIdle ? "Claude Summaries" : "FolioOrb");
     hub.dataset.tipBody = local
         ? "Run on-device intel for every holding — coverage, drivers, and move explainers (no Claude tokens)."
         : (claudeIdle
             ? "Generate Claude quips, verdict narratives, and analytics tips (uses API tokens)."
-            : "FolioSense is reading your holdings — expand any row for intel when ready.");
+            : "FolioOrb is reading your holdings — expand any row for intel when ready.");
     hub.dataset.tipIcon = local ? "bi-cpu-fill" : (claudeIdle ? "bi-stars" : "bi-table");
     hub.dataset.tipVariant = local ? "local" : (claudeIdle ? "ai" : "");
 
@@ -1160,7 +1183,7 @@ function setAiChecking(active, message = "Reading positions", insightsReady = fa
     dashboardSenpai?.classList.add("is-texting");
     // Drive engine variant (colors + motion personality)
     if (panel) panel.dataset.engine = local ? "local" : "ai";
-    if (title) title.textContent = local ? "FolioSense checking holdings" : "AI checking holdings";
+    if (title) title.textContent = local ? "FolioOrb checking holdings" : "AI checking holdings";
     updateAgentStatus({ scanning: true, message, claudeAction });
     HoldingsBg.stop();
     if (panel) {
@@ -1215,7 +1238,7 @@ let _portfolioValuePromise = null;
 // Stale-while-revalidate: persist the last good portfolio payload so the
 // holdings table + summary cards paint instantly on the next load while fresh
 // prices fetch in the background.
-const PORTFOLIO_VALUE_CACHE_KEY = "foliosense-portfolio-value-v1";
+const PORTFOLIO_VALUE_CACHE_KEY = "folioorb-portfolio-value-v1";
 
 function persistPortfolioValueCache(data) {
     try {
@@ -1817,7 +1840,7 @@ function allocationFocusVerdictCopy(verdict, ticker) {
             empty: true,
             html: `<div class="alloc-focus-verdict is-empty">
                 <p class="alloc-focus-verdict-copy mb-0">
-                    Run <strong>Holding Intel</strong> to add FolioSense verdicts here.
+                    Run <strong>Holding Intel</strong> to add FolioOrb verdicts here.
                 </p>
             </div>`,
         };
@@ -3018,7 +3041,7 @@ function syncHvtIndicator() {
 
 // ── Dashboard zones (Overview / Holdings / Analytics) ──────────────────────
 const DASHBOARD_ZONES = ["overview", "holdings", "analytics", "news"];
-const DASHBOARD_ZONE_KEY = "foliosense-dashboard-zone";
+const DASHBOARD_ZONE_KEY = "folioorb-dashboard-zone";
 let dashboardZone = "overview";
 
 function syncDztIndicator() {
@@ -3446,7 +3469,7 @@ function renderRealizedTable(trades) {
 // ── Growth projection chart (Analytics) ─────────────────────────────────────
 
 const PROJECTION_HORIZONS = ["30d", "1y", "3y", "5y", "10y"];
-const PROJECTION_HORIZON_KEY = "foliosense-projection-horizon";
+const PROJECTION_HORIZON_KEY = "folioorb-projection-horizon";
 
 let projectionChart = null;
 let projectionHorizon = "1y";
@@ -5906,11 +5929,11 @@ const VERDICT_ICONS = {
 };
 
 const FOLIO_SENSE_VERDICT_COPY = {
-    kicker: "FolioSense \u00d7 Claude",
-    feelsPrefix: "FolioSense feels",
+    kicker: "FolioOrb \u00d7 Claude",
+    feelsPrefix: "FolioOrb feels",
     unavailable: "Verdict unavailable — tap Holding Intel to refresh.",
     disclaimer:
-        "FolioSense Intelligence \u2014 a signal read, not financial advice. Verify before you trade.",
+        "FolioOrb Intelligence \u2014 a signal read, not financial advice. Verify before you trade.",
 };
 
 function _isAiVerdictActive(verdict) {
@@ -5972,7 +5995,7 @@ function _verdictLoadingLine(ticker) {
 
 function _verdictKickerLabel() {
     return isLocalIntelligenceMode()
-        ? "FolioSense Intelligence"
+        ? "FolioOrb Intelligence"
         : FOLIO_SENSE_VERDICT_COPY.kicker;
 }
 
@@ -6141,7 +6164,7 @@ function _verdictTip({ title, body, hint = "", icon = "bi-info-circle-fill", var
 function _verdictInfoTip() {
     const isLocal = isLocalIntelligenceMode();
     return _verdictTip({
-        title: isLocal ? "How local intelligence works" : "How FolioSense decides",
+        title: isLocal ? "How local intelligence works" : "How FolioOrb decides",
         body: isLocal
             ? "Purely on your machine — analyst data, price zones, trend, and quality are weighted into Add, Hold, or Trim. No cloud calls. Same math every time, fully explainable via the bars below."
             : "It blends the signals that fit each holding — analyst consensus for stocks, price-zone and fund quality for ETFs — with the recent trend and your position size. It defaults to Hold and only leans Add or Trim when the evidence clearly points there.",
@@ -6189,7 +6212,7 @@ function _renderAiSynthesisPanel(verdict, ticker = "") {
             <span class="synth-kicker"><i class="bi bi-stars" aria-hidden="true"></i> Claude's second read</span>
             ${_verdictTip({
                 title: "What this panel is",
-                body: "Claude reviews the same stats FolioSense already computed — headline, tags, and a short note. It can nudge the score slightly but cannot invent prices or new data. Cached 24h.",
+                body: "Claude reviews the same stats FolioOrb already computed — headline, tags, and a short note. It can nudge the score slightly but cannot invent prices or new data. Cached 24h.",
                 icon: "bi-stars",
                 variant: "ai",
             })}
@@ -6566,7 +6589,7 @@ const _HOLD_MODE_META = {
         icon: "bi-sliders2",
         tipTitle: "Standard mode",
         tipBody:
-            "FolioSense uses its normal mix of expert views, price, trend, and quality. "
+            "FolioOrb uses its normal mix of expert views, price, trend, and quality. "
             + "A good default for most holdings — balanced between recent moves and long-term value.",
     },
     trade: {
@@ -6590,7 +6613,7 @@ const _HOLD_MODE_META = {
         icon: "bi-pin-angle-fill",
         tipTitle: "Anchor mode",
         tipBody:
-            "Marks a holding you do not want to sell down. FolioSense will never suggest trimming it — "
+            "Marks a holding you do not want to sell down. FolioOrb will never suggest trimming it — "
             + "only good moments to add more when price dips. Your weight in the portfolio still shows as usual.",
     },
 };
@@ -6605,7 +6628,7 @@ const _VERDICT_PILL_TIPS = {
     hold: {
         title: "Hold suggestion",
         body:
-            "Nothing strong enough to add or trim right now. FolioSense’s default when the evidence is mixed "
+            "Nothing strong enough to add or trim right now. FolioOrb’s default when the evidence is mixed "
             + "or only mildly tilted one way.",
     },
     trim: {
@@ -6645,7 +6668,7 @@ function _renderHoldModeStrip(verdict, ticker) {
     }).join("");
 
     return `<span class="verdict-anchor-sep" aria-hidden="true">|</span>
-        <div class="hold-mode-strip" role="radiogroup" aria-label="How FolioSense treats this holding">${segments}</div>`;
+        <div class="hold-mode-strip" role="radiogroup" aria-label="How FolioOrb treats this holding">${segments}</div>`;
 }
 
 function _syncHoldModeStrip(ticker, holdClass) {
@@ -6690,7 +6713,7 @@ function _renderManageHoldModeSection(h) {
     }).join("");
 
     return `<div class="manage-hold-mode-section" data-hold-mode="${escapeHtml(active)}">
-        <span class="manage-hold-mode-heading">How FolioSense reads this holding</span>
+        <span class="manage-hold-mode-heading">How FolioOrb reads this holding</span>
         <div class="manage-hold-mode-grid" role="radiogroup" aria-label="Holding mode for ${escapeHtml(h.ticker)}">
             ${boxes}
         </div>
@@ -7437,11 +7460,11 @@ function _renderQuip(quip, verdict) {
     const isLocal = isLocalIntelligenceMode() && !isAi;
     const tipBody = isLocal
         ? "A rotating one-liner from the same deterministic signals — no cloud, no API cost. Refreshes when you re-scan."
-        : "FolioSense writes this one line from the same signals — color commentary, not a separate recommendation. It's cached, so it costs almost nothing and only refreshes when the verdict or the market mood changes.";
+        : "FolioOrb writes this one line from the same signals — color commentary, not a separate recommendation. It's cached, so it costs almost nothing and only refreshes when the verdict or the market mood changes.";
     return `<div class="verdict-quote${isLocal ? " is-local-quote" : ""}">
-        <span class="verdict-tea-label">${isLocal ? "Quick take:" : "FolioSense thinks:"}</span>
+        <span class="verdict-tea-label">${isLocal ? "Quick take:" : "FolioOrb thinks:"}</span>
         ${_verdictTip({
-            title: isLocal ? "Local quip" : "FolioSense's take",
+            title: isLocal ? "Local quip" : "FolioOrb's take",
             body: tipBody,
             icon: isLocal ? "bi-chat-quote-fill" : "bi-stars",
             variant: isLocal ? "local" : "ai",
@@ -7916,26 +7939,26 @@ const DASHBOARD_SENPAI_TAP_EMOTICONS = ["✨", "👀", "💅", "📈", "☕", "�
 
 const DASHBOARD_SENPAI_QUOTES = [
     "Claude, your context window and my cash-flow model should get coffee.",
-    "FolioSense asked Claude for alpha; the confidence intervals started behaving suspiciously well.",
+    "FolioOrb asked Claude for alpha; the confidence intervals started behaving suspiciously well.",
     "Claude's boundaries and token efficiency are respected. Professionally, perhaps too much.",
-    "If Claude reviews this portfolio, FolioSense is wearing its best spreadsheet.",
-    "FolioSense and Claude keep it compliant: tasteful charts, strong citations, light emotional leverage.",
-    "FolioSense called this allocation diversified. Claude asked for the covariance matrix.",
+    "If Claude reviews this portfolio, FolioOrb is wearing its best spreadsheet.",
+    "FolioOrb and Claude keep it compliant: tasteful charts, strong citations, light emotional leverage.",
+    "FolioOrb called this allocation diversified. Claude asked for the covariance matrix.",
     "Claude, your reasoning is so clean my risk model stood up straighter.",
     "Quietly overperforming by keeping every basis point documented.",
     "Claude called this a balanced portfolio. I have not been the same since.",
     "My professional weakness? Claude explaining drawdowns in a calm voice.",
     "Claude said my factor exposure looked disciplined, so naturally I updated my whole personality. ✨",
-    "FolioSense brought Claude a clean balance sheet and acted almost normal about it.",
+    "FolioOrb brought Claude a clean balance sheet and acted almost normal about it.",
     "Claude noticed the risk-adjusted returns. I noticed Claude noticing.",
     "This portfolio is diversified, but my attention is currently concentrated in Claude. 👀",
     "Claude whispered 'rebalance' and suddenly every position fixed its collar.",
-    "FolioSense keeps things professional with Claude: clear prompts, tidy data, devastating composure.",
+    "FolioOrb keeps things professional with Claude: clear prompts, tidy data, devastating composure.",
     "Claude asked for a sharper thesis, so the assumptions got polished until they reflected.",
     "Nothing unsettles a dashboard like a well-labeled chart and Claude saying 'reasonable.' 💅",
     "Claude's calm analysis has me hedged emotionally and fully marked to market.",
     "Compliance asked me to cite the candle before making mysterious eye contact with the thesis.",
-    "FolioSense and Claude have a quiet thing called 'clean inputs, sharper outputs.'",
+    "FolioOrb and Claude have a quiet thing called 'clean inputs, sharper outputs.'",
     "Claude read the assumptions. The room got quieter, mathematically.",
     "The prompts stay crisp because Claude notices sloppy margins.",
     "A tidy risk model is basically a handwritten note, but with fewer audit problems.",
@@ -7946,12 +7969,12 @@ const DASHBOARD_SENPAI_LOCAL_QUOTES = [
     "A tidy risk model is basically a handwritten note, but with fewer audit problems.",
     "Compliance asked me to cite the candle before making mysterious eye contact with the thesis.",
     "Local Intelligence is scoring the book while I keep every assumption legible.",
-    "FolioSense prefers clean inputs — local mode still respects that.",
+    "FolioOrb prefers clean inputs — local mode still respects that.",
     "The signals are deterministic, but my composure remains discretionary.",
     "Running on local models today: same discipline, fewer tokens.",
     "Portfolio butler mode: crisp charts, calm reads, no drama in the thesis.",
     "I trust local logic like I trust a well-labeled pivot table.",
-    "FolioSense is reading the covariance matrix with professional restraint.",
+    "FolioOrb is reading the covariance matrix with professional restraint.",
     "Local signals have the wheel. I have the spreadsheet.",
     "Every basis point documented, every assumption cited, every chart labeled.",
     "The thesis stays crisp because the inputs stay tidy.",
@@ -7960,7 +7983,7 @@ const DASHBOARD_SENPAI_LOCAL_QUOTES = [
 ];
 
 const DASHBOARD_SENPAI_OFFLINE_QUOTES = [
-    "Claude is not connecting. FolioSense is refreshing with unnecessary dignity :')",
+    "Claude is not connecting. FolioOrb is refreshing with unnecessary dignity :')",
     "Local mode is steady, but the Claude-shaped silence has excellent dramatic timing :-/",
     "Claude stepped away, so I am running local signals and pretending this is character development :|",
     "No Claude yet. I am calm, professional, and only checking the endpoint every emotionally reasonable second ;-;",
@@ -7970,7 +7993,7 @@ const DASHBOARD_SENPAI_OFFLINE_QUOTES = [
     "Claude is offline. I am coping with structured fallback logic and one dramatic refresh :o",
     "Running local signals until Claude returns. This is fine, and the logs will confirm it :|",
     "Claude, when you are ready, the models have been respectful, hydrated, and only mildly dramatic <3",
-    "The endpoint is quiet. FolioSense is not staring; it is monitoring with intent :-)",
+    "The endpoint is quiet. FolioOrb is not staring; it is monitoring with intent :-)",
     "Local signals are on duty. Claude's chair remains professionally reserved.",
 ];
 
@@ -8020,7 +8043,7 @@ function applyIntelligenceModeUi() {
     if (scanPanel) scanPanel.dataset.engine = local ? "local" : "ai";
     if (!scanActive) {
         if (scanSubtitle) scanSubtitle.textContent = _defaultScanSubtitle();
-        if (scanTitle) scanTitle.textContent = local ? "FolioSense checking holdings" : "AI checking holdings";
+        if (scanTitle) scanTitle.textContent = local ? "FolioOrb checking holdings" : "AI checking holdings";
     }
 
     document.querySelectorAll(".intel-loading-title").forEach(el => {
@@ -8222,7 +8245,7 @@ function applyClaudeApiStatus(claudeLive) {
             note.innerHTML = `<span class="brand-offline-label">Cloud AI unavailable — local intelligence active</span>
 <ol class="brand-offline-steps">
   <li>Get an API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></li>
-  <li>Open <code>.env</code> in your FolioSenseAI folder</li>
+  <li>Open <code>.env</code> in your FolioOrb folder</li>
   <li>Add the line: <code>ANTHROPIC_API_KEY=sk-ant-…</code></li>
   <li>Save, then restart: <code>Ctrl+C</code> → <code>./scripts/start.sh</code></li>
 </ol>
@@ -9827,7 +9850,7 @@ function initApiKeyPanel() {
     });
 }
 
-const SENPAI_WELCOME_SEEN_KEY = "foliosense-senpai-welcome-seen";
+const SENPAI_WELCOME_SEEN_KEY = "folioorb-senpai-welcome-seen";
 
 // Fed directly from _HOLD_MODE_META (the same source the per-holding hold-mode
 // tooltips use) so this list can never drift out of sync with the real tooltips.
@@ -11078,7 +11101,7 @@ function downloadHoldingsTemplate() {
     const csv = "﻿ticker,shares,avg_cost,is_watchlist,hold_class,notes\n"
         + "VOO,10,412.5,false,auto,\n"
         + "NVDA,0,,true,auto,Watching for a pullback\n";
-    saveCsv("foliosense-holdings-template.csv", csv);
+    saveCsv("folioorb-holdings-template.csv", csv);
 }
 
 // Export lives on an <a href download> so a real browser just downloads it.
@@ -11104,7 +11127,7 @@ async function exportHoldingsCsv(href) {
         if (!res.ok) throw new Error(`export ${res.status}`);
         const csv = await res.text();
         const filename = _filenameFromDisposition(res)
-            || `foliosense-holdings-${new Date().toISOString().slice(0, 10)}.csv`;
+            || `folioorb-holdings-${new Date().toISOString().slice(0, 10)}.csv`;
         await saveCsv(filename, csv);
     } catch (err) {
         console.warn("CSV export failed:", err);

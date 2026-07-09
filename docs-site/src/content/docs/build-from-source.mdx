@@ -1,11 +1,11 @@
 ---
 title: Build from source
-description: Run FolioSenseAI from source on any platform, and build the desktop installers yourself.
+description: Run FolioOrb from source on any platform, and build the desktop installers yourself.
 ---
 
 import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Everything you need to run or package FolioSenseAI is in the repository. This works on
+Everything you need to run or package FolioOrb is in the repository. This works on
 macOS (Apple Silicon or Intel), Windows, and Linux with **Python 3.11+**.
 
 ## Run from source
@@ -13,15 +13,15 @@ macOS (Apple Silicon or Intel), Windows, and Linux with **Python 3.11+**.
 <Tabs>
 	<TabItem label="macOS / Linux">
 	```bash
-	git clone https://github.com/udhawan97/FolioSenseAI.git
-	cd FolioSenseAI
+	git clone https://github.com/udhawan97/FolioOrb.git
+	cd FolioOrb
 	./scripts/setup.sh
 	```
 	</TabItem>
 	<TabItem label="Windows">
 	```powershell
-	git clone https://github.com/udhawan97/FolioSenseAI.git
-	cd FolioSenseAI
+	git clone https://github.com/udhawan97/FolioOrb.git
+	cd FolioOrb
 	.\scripts\setup.ps1
 	```
 	</TabItem>
@@ -46,15 +46,15 @@ python run.py
 
 For a quick source install without cloning manually, these download the latest release and
 set up a local environment. They're short and readable — open them first
-([mac](https://github.com/udhawan97/FolioSenseAI/blob/main/scripts/install-mac.sh),
-[win](https://github.com/udhawan97/FolioSenseAI/blob/main/scripts/install-win.ps1)).
+([mac](https://github.com/udhawan97/FolioOrb/blob/main/scripts/install-mac.sh),
+[win](https://github.com/udhawan97/FolioOrb/blob/main/scripts/install-win.ps1)).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioSenseAI/main/scripts/install-mac.sh | bash
+curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-mac.sh | bash
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/udhawan97/FolioSenseAI/main/scripts/install-win.ps1 | iex
+irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-win.ps1 | iex
 ```
 
 Set `FOLIO_REF` to install a specific tag or the dev channel, e.g.
@@ -68,7 +68,7 @@ installer tooling. You can reproduce a build locally on the matching OS.
 ```bash
 # Both platforms: freeze the app (onedir bundle)
 python -m pip install -r requirements.txt -r requirements-desktop.txt
-python -m PyInstaller packaging/pyinstaller/FolioSenseAI.spec
+python -m PyInstaller packaging/pyinstaller/FolioOrb.spec
 
 # macOS only: repair a PyInstaller BUNDLE quirk that can leave data-only
 # directories (static/, templates/, pytz's timezone data) as dangling
@@ -76,21 +76,21 @@ python -m PyInstaller packaging/pyinstaller/FolioSenseAI.spec
 python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
 
 # Sanity-check the frozen bundle boots
-#   macOS:   dist/FolioSenseAI.app/Contents/MacOS/FolioSenseAI --smoke
-#   Windows: dist\FolioSenseAI\FolioSenseAI.exe --smoke
+#   macOS:   dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
+#   Windows: dist\FolioOrb\FolioOrb.exe --smoke
 ```
 
 <Tabs>
 	<TabItem label="macOS .dmg">
 	```bash
 	brew install create-dmg
-	mkdir -p dist/dmg-src && cp -R dist/FolioSenseAI.app dist/dmg-src/
+	mkdir -p dist/dmg-src && cp -R dist/FolioOrb.app dist/dmg-src/
 	create-dmg \
-	  --volname "FolioSenseAI" \
-	  --volicon packaging/icons/FolioSenseAI.icns \
+	  --volname "FolioOrb" \
+	  --volicon packaging/icons/FolioOrb.icns \
 	  --app-drop-link 390 190 \
-	  --icon "FolioSenseAI.app" 150 190 \
-	  "dist/FolioSenseAI-macOS-arm64-local.dmg" "dist/dmg-src/"
+	  --icon "FolioOrb.app" 150 190 \
+	  "dist/FolioOrb-macOS-arm64-local.dmg" "dist/dmg-src/"
 	```
 	</TabItem>
 	<TabItem label="Windows .exe">
@@ -98,7 +98,7 @@ python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
 	choco install innosetup -y
 	& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
 	  /DMyAppVersion=4.4.1 `
-	  /DMyOutputName=FolioSenseAI-Windows-x64-local-Setup `
+	  /DMyOutputName=FolioOrb-Windows-x64-local-Setup `
 	  packaging\windows\installer.iss
 	```
 	</TabItem>
@@ -106,7 +106,7 @@ python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
 
 <Aside type="note">
 CI runs exactly these steps on GitHub-hosted macOS and Windows runners for every release —
-see [Releases &amp; versioning](/FolioSenseAI/releases-and-versioning/). Icons are
+see [Releases &amp; versioning](/FolioOrb/releases-and-versioning/). Icons are
 regenerated from the brand PNG with `scripts/make-icons.sh` (macOS only) and committed, so a
 build never needs cross-platform icon tooling.
 </Aside>

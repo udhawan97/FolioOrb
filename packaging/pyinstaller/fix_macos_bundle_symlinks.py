@@ -9,7 +9,7 @@ creates the Frameworks symlink but never materializes the Resources side —
 leaving a dangling symlink and a runtime FileNotFoundError / missing-data
 error the first time that path is touched.
 
-The onedir COLLECT output (dist/FolioSenseAI/_internal/...) always has the
+The onedir COLLECT output (dist/FolioOrb/_internal/...) always has the
 real files, since this bug is specific to the BUNDLE step, not COLLECT. This
 script walks the .app for broken symlinks and heals each one by copying the
 real file/directory from the onedir output. Run after `pyinstaller ...spec`

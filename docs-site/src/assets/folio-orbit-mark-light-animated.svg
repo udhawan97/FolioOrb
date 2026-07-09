@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-labelledby="title desc">
-  <title id="title">FolioSenseAI animated orbit mark</title>
+  <title id="title">FolioOrb animated orbit mark</title>
   <desc id="desc">A portfolio orbit logo with a slowly moving satellite and pulsing center.</desc>
   <defs>
     <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">

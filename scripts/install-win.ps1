@@ -1,5 +1,5 @@
-# One-command Windows installer (runs FolioSenseAI from source).
-# Usage (PowerShell): irm https://raw.githubusercontent.com/udhawan97/FolioSenseAI/main/scripts/install-win.ps1 | iex
+# One-command Windows installer (runs FolioOrb from source).
+# Usage (PowerShell): irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-win.ps1 | iex
 #
 # Installs the latest stable release by default. Set $env:FOLIO_REF to pin a tag
 # or track the dev channel before running, e.g.:
@@ -7,15 +7,15 @@
 #   $env:FOLIO_REF = "latest-main"  # newest main build
 #   $env:FOLIO_REF = "main"         # current main branch
 #
-# Prefer the .exe for a no-Python install: https://github.com/udhawan97/FolioSenseAI/releases/latest
+# Prefer the .exe for a no-Python install: https://github.com/udhawan97/FolioOrb/releases/latest
 $ErrorActionPreference = "Stop"
 
-$repo        = "udhawan97/FolioSenseAI"
-$installDir  = "$HOME\FolioSenseAI"
-$shortcut    = "$HOME\Desktop\FolioSenseAI.lnk"
+$repo        = "udhawan97/FolioOrb"
+$installDir  = "$HOME\FolioOrb"
+$shortcut    = "$HOME\Desktop\FolioOrb.lnk"
 
 Write-Host ""
-Write-Host "  FolioSenseAI Installer"
+Write-Host "  FolioOrb Installer"
 Write-Host "  ---------------------"
 Write-Host ""
 
@@ -76,7 +76,7 @@ Write-Host "  OK $pyVer"
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
-Write-Host "  Downloading FolioSenseAI ($ref)..."
+Write-Host "  Downloading FolioOrb ($ref)..."
 Invoke-WebRequest $releaseUrl -OutFile "$tmp\folio.zip" -UseBasicParsing
 
 Write-Host "  Extracting..."
@@ -84,9 +84,9 @@ Expand-Archive "$tmp\folio.zip" -DestinationPath $tmp
 
 # GitHub names the extracted folder after the ref (and strips a leading "v" on
 # version tags), so locate it instead of guessing the name.
-$extracted = Get-ChildItem -Path $tmp -Directory -Filter "FolioSenseAI-*" | Select-Object -First 1
+$extracted = Get-ChildItem -Path $tmp -Directory -Filter "FolioOrb-*" | Select-Object -First 1
 if (-not $extracted) {
-    Write-Host "  Download did not contain the expected FolioSenseAI folder."
+    Write-Host "  Download did not contain the expected FolioOrb folder."
     exit 1
 }
 
@@ -142,16 +142,16 @@ DEFAULT_HOLDINGS=
 # ── Desktop shortcut ─────────────────────────────────────────────────────────
 $wsh = New-Object -ComObject WScript.Shell
 $sc  = $wsh.CreateShortcut($shortcut)
-$sc.TargetPath       = "$installDir\FolioSenseAI.bat"
+$sc.TargetPath       = "$installDir\FolioOrb.bat"
 $sc.WorkingDirectory = $installDir
-$sc.Description      = "FolioSenseAI — Your folio, finally making sense."
+$sc.Description      = "FolioOrb — Your folio, finally making sense."
 $sc.Save()
 
 Write-Host ""
 Write-Host "  OK Installed to $installDir"
 Write-Host "  OK Desktop shortcut created — double-click it anytime to open the app"
 Write-Host ""
-Write-Host "  Starting FolioSenseAI — your browser will open in a moment..."
+Write-Host "  Starting FolioOrb — your browser will open in a moment..."
 Write-Host "  (Press Ctrl+C to stop)"
 Write-Host ""
 & $venvPy run.py

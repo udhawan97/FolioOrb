@@ -1,5 +1,5 @@
 /**
- * Capture retina product screenshots of the FolioSenseAI dashboard for the
+ * Capture retina product screenshots of the FolioOrb dashboard for the
  * landing page. Dev-only — Playwright and this script never ship to the site.
  *
  * Prereqs: the app must already be running with the seeded demo database

@@ -1,9 +1,9 @@
 ---
 title: Privacy & Data Handling
-description: What FolioSenseAI stores locally and what, if anything, leaves your machine.
+description: What FolioOrb stores locally and what, if anything, leaves your machine.
 ---
 
-FolioSenseAI is local-first, not cloud-hosted.
+FolioOrb is local-first, not cloud-hosted.
 
 | Data | Handling |
 | --- | --- |

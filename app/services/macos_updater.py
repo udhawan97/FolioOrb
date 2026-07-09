@@ -5,12 +5,12 @@ it runs — so the install hands off to a small **detached** shell script that:
 
 1. waits for this process to exit,
 2. mounts the already-downloaded, SHA-256/minisign-verified DMG,
-3. copies the new ``FolioSenseAI.app`` next to the installed one and atomically
+3. copies the new ``.app`` bundle next to the installed one and atomically
    swaps it in (restoring the old bundle if anything fails),
 4. detaches the DMG, clears quarantine, and relaunches the app.
 
 Data safety: the portfolio database and ``.env`` live in the per-user data
-directory (``~/Library/Application Support/FolioSenseAI``), never inside the
+directory (``~/Library/Application Support/FolioOrb``), never inside the
 bundle, so swapping the bundle cannot touch user data. The swap script only ever
 writes to the target bundle, the DMG, a temp mountpoint, and the update log /
 status markers.
@@ -52,8 +52,11 @@ for _ in $(seq 1 60); do /bin/kill -0 "$PID" 2>/dev/null || break; sleep 0.5; do
 MNT="$(/usr/bin/mktemp -d /tmp/folio-update.XXXXXX)"
 trap '/bin/rm -rf "$MNT"' EXIT
 /usr/bin/hdiutil attach "$DMG" -nobrowse -noverify -mountpoint "$MNT" -quiet || fail "mount"
-NEWAPP="$MNT/FolioSenseAI.app"
-if [ ! -d "$NEWAPP" ]; then /usr/bin/hdiutil detach "$MNT" -quiet 2>/dev/null; fail "no-app-in-dmg"; fi
+# Locate the .app inside the DMG by extension rather than a hardcoded name, so a
+# rebrand (FolioSenseAI.app -> FolioOrb.app) or any future rename can't break the
+# swap. Every FolioOrb DMG ships exactly one bundle, so take the first match.
+NEWAPP="$(ls -d "$MNT"/*.app 2>/dev/null | head -1)"
+if [ -z "$NEWAPP" ] || [ ! -d "$NEWAPP" ]; then /usr/bin/hdiutil detach "$MNT" -quiet 2>/dev/null; fail "no-app-in-dmg"; fi
 NEW="${BUNDLE}.new-$$"; OLD="${BUNDLE}.old-$$"
 if ! /usr/bin/ditto "$NEWAPP" "$NEW"; then
   /bin/rm -rf "$NEW"; /usr/bin/hdiutil detach "$MNT" -quiet 2>/dev/null; fail "copy"

@@ -391,7 +391,7 @@ def apply_mapping(mapping: dict, rows: list[dict]) -> list[dict]:
 # ── Import narration (Claude mode only) ──────────────────────────────────────────
 
 _NARRATE_SYSTEM = (
-    "You are Senpai, FolioSenseAI's dry-witted portfolio companion. In 1-2 sentences, "
+    "You are Senpai, FolioOrb's dry-witted portfolio companion. In 1-2 sentences, "
     "recap this CSV import for the user. Use only the supplied counts and reasons. "
     "Precise, warm, lightly amused; no financial advice; no markdown; no invented numbers."
 )

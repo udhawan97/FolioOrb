@@ -1,6 +1,6 @@
 ---
 title: Install on macOS
-description: Install the FolioSenseAI .dmg on Apple Silicon, clear the Gatekeeper warning, and find where your data lives.
+description: Install the FolioOrb .dmg on Apple Silicon, clear the Gatekeeper warning, and find where your data lives.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -10,10 +10,10 @@ macOS 11 Big Sur and later.
 
 <Steps>
 
-1. Download `FolioSenseAI-macOS-arm64-v4.4.1.dmg` from the
-   [latest release](https://github.com/udhawan97/FolioSenseAI/releases/latest).
+1. Download `FolioOrb-macOS-arm64-v5.0.0.dmg` from the
+   [latest release](https://github.com/udhawan97/FolioOrb/releases/latest).
 
-2. Open the `.dmg` and drag **FolioSenseAI** into **Applications**.
+2. Open the `.dmg` and drag **FolioOrb** into **Applications**.
 
 3. Launch it from Applications or Spotlight.
 
@@ -22,7 +22,7 @@ macOS 11 Big Sur and later.
 ## First launch: the Gatekeeper warning
 
 Because early builds aren't notarized, macOS blocks the first launch with a message like
-*"FolioSenseAI can't be opened because Apple cannot check it for malicious software."*
+*"FolioOrb can't be opened because Apple cannot check it for malicious software."*
 This is expected. To allow it:
 
 <Steps>
@@ -31,7 +31,7 @@ This is expected. To allow it:
 
 2. Open **System Settings → Privacy &amp; Security**.
 
-3. Scroll down to the message about FolioSenseAI being blocked and click **Open Anyway**.
+3. Scroll down to the message about FolioOrb being blocked and click **Open Anyway**.
 
 4. Confirm with **Open**. macOS remembers the choice — future launches are one click.
 
@@ -39,28 +39,28 @@ This is expected. To allow it:
 
 <Aside type="note" title="Why the warning?">
 It means the app isn't signed with a paid Apple Developer certificate — not that anything
-is wrong with it. You can [verify your download](/FolioSenseAI/download/#verify-your-download)
+is wrong with it. You can [verify your download](/FolioOrb/download/#verify-your-download)
 against the published `SHA256SUMS.txt` for extra confidence. Signing and notarization are on
-the [roadmap](/FolioSenseAI/releases-and-versioning/#code-signing-roadmap).
+the [roadmap](/FolioOrb/releases-and-versioning/#code-signing-roadmap).
 </Aside>
 
 ## Where your data lives
 
 | What | Location |
 | --- | --- |
-| Portfolio database | `~/Library/Application Support/FolioSenseAI/database/` |
-| Config (`.env`) | `~/Library/Application Support/FolioSenseAI/.env` |
+| Portfolio database | `~/Library/Application Support/FolioOrb/database/` |
+| Config (`.env`) | `~/Library/Application Support/FolioOrb/.env` |
 
 The app never writes inside `/Applications`, so updates and reinstalls leave your data
-untouched. See [Updating](/FolioSenseAI/updating/).
+untouched. See [Updating](/FolioOrb/updating/).
 
 ## Uninstall
 
-Drag **FolioSenseAI** from Applications to the Trash. To also remove your data, delete
-`~/Library/Application Support/FolioSenseAI`.
+Drag **FolioOrb** from Applications to the Trash. To also remove your data, delete
+`~/Library/Application Support/FolioOrb`.
 
 ## Intel Macs
 
 An Intel-native download isn't published yet. On an Intel Mac, use the
-[install script or build from source](/FolioSenseAI/build-from-source/) — both run fine
+[install script or build from source](/FolioOrb/build-from-source/) — both run fine
 with Python 3.11+.

@@ -12,7 +12,7 @@ def test_sign_verify_roundtrip():
     seed = bytes(range(32))
     pk = ed25519_pure.publickey(seed)
     assert len(pk) == 32
-    msg = b"abc123  FolioSenseAI-macOS-arm64-v4.4.0.dmg\n"
+    msg = b"abc123  FolioOrb-macOS-arm64-v4.4.0.dmg\n"
     sig = ed25519_pure.sign(msg, seed, pk)
     assert len(sig) == 64
     assert ed25519_pure.verify(pk, sig, msg) is True

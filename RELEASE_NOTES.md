@@ -1,3 +1,57 @@
+# FolioOrb v5.0.0 Release Notes
+
+**Release date:** July 9, 2026
+
+## ✦ FolioSenseAI is now FolioOrb
+
+> *Same app, same local-first portfolio intelligence — new name, new home. The
+> name "FolioSense" was already taken, so we've rebranded to **FolioOrb**. This
+> is a rename, not a rewrite: nothing about how the app works, what it stores, or
+> what leaves your machine has changed.*
+
+**What changed:** the product, the app window, the installers, the docs, and the
+repository are now **FolioOrb**. The project lives at
+[github.com/udhawan97/FolioOrb](https://github.com/udhawan97/FolioOrb) and the
+website at [udhawan97.github.io/FolioOrb](https://udhawan97.github.io/FolioOrb/).
+The in-app engine voice ("FolioSense Intelligence") is now "FolioOrb
+Intelligence".
+
+**Your data comes with you — automatically.** On first launch, a frozen FolioOrb
+build looks for an existing FolioSenseAI data directory and migrates your
+portfolio database, `.env`, update history, and logs into the new FolioOrb data
+directory — leaving the originals untouched as a fallback. Your saved dashboard
+preferences (theme, text size, layout, Senpai settings) carry over too: they're
+copied from the old `foliosense-*` browser-storage keys to the new `folioorb-*`
+keys the first time you open the rebranded dashboard. There is nothing to export,
+re-import, or set up again.
+
+| Old location (FolioSenseAI) | New location (FolioOrb) |
+| --- | --- |
+| `~/Library/Application Support/FolioSenseAI` (macOS) | `~/Library/Application Support/FolioOrb` |
+| `%APPDATA%\FolioSenseAI` (Windows) | `%APPDATA%\FolioOrb` |
+
+**Download assets and docs now use the FolioOrb name** —
+`FolioOrb-macOS-arm64-v5.0.0.dmg` and `FolioOrb-Windows-x64-v5.0.0-Setup.exe`.
+
+**No trading behavior, data model, or privacy posture changed** because of the
+rename. FolioOrb is still local-first, still Claude-optional, still places no
+trades, and still reports to nobody.
+
+## Upgrade Notes
+
+- **In-app update (macOS):** because the macOS app bundle is renamed
+  (`FolioSenseAI.app` → `FolioOrb.app`), an existing install may report the
+  in-app swap as "couldn't install" for this one release and leave your old app
+  in place — your data is never at risk. If that happens, download
+  `FolioOrb-macOS-arm64-v5.0.0.dmg` once from the releases page; your portfolio
+  migrates automatically on first launch. Future updates swap seamlessly again.
+- **In-app update (Windows):** upgrades in place; the installer keeps the same
+  application id so your existing install is recognized.
+- **From source:** `git pull` continues to work; your local `.env` and
+  `database/` are untouched.
+
+---
+
 # FolioSenseAI v4.5.2 Release Notes
 
 **Release date:** July 9, 2026

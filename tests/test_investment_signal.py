@@ -708,7 +708,7 @@ def test_portfolio_quip_cache_and_fallback(monkeypatch):
     assert "portfolio_health" in first
     assert first["portfolio_health"]["quip"]
     assert first["portfolio_health"]["brand"]["kicker"] == ai_router.VERDICT_BRAND_KICKER_LOCAL
-    assert "FolioSense" in first["signals"]["AAA"]["disclaimer"]
+    assert "FolioOrb" in first["signals"]["AAA"]["disclaimer"]
     assert len(calls) == 1
 
     asyncio.run(ai_router.get_all_investment_signals(db))

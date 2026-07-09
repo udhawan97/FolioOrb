@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One-command Mac installer (runs FolioSenseAI from source).
-# Usage: curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioSenseAI/main/scripts/install-mac.sh | bash
+# One-command Mac installer (runs FolioOrb from source).
+# Usage: curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-mac.sh | bash
 #
 # By default this installs the latest stable release. Override the ref to pin a
 # tag or track the dev channel:
@@ -8,15 +8,15 @@
 #   FOLIO_REF=latest-main curl ... | bash     # newest main build
 #   FOLIO_REF=main        curl ... | bash     # current main branch
 #
-# Prefer the .dmg for a no-Python install: https://github.com/udhawan97/FolioSenseAI/releases/latest
+# Prefer the .dmg for a no-Python install: https://github.com/udhawan97/FolioOrb/releases/latest
 set -euo pipefail
 
-REPO="udhawan97/FolioSenseAI"
-INSTALL_DIR="$HOME/Applications/FolioSenseAI"
-SHORTCUT="$HOME/Desktop/FolioSenseAI.command"
+REPO="udhawan97/FolioOrb"
+INSTALL_DIR="$HOME/Applications/FolioOrb"
+SHORTCUT="$HOME/Desktop/FolioOrb.command"
 
 echo ""
-echo "  FolioSenseAI Installer"
+echo "  FolioOrb Installer"
 echo "  ─────────────────────"
 echo ""
 
@@ -65,7 +65,7 @@ echo "  ✓ $("$PYTHON_BIN" --version)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "  Downloading FolioSenseAI ($REF)..."
+echo "  Downloading FolioOrb ($REF)..."
 curl -fsSL --progress-bar "$RELEASE_URL" -o "$TMP/folio.zip"
 
 echo "  Extracting..."
@@ -73,9 +73,9 @@ unzip -q "$TMP/folio.zip" -d "$TMP/"
 
 # GitHub names the extracted folder after the ref (and strips a leading "v" on
 # version tags), so locate it instead of guessing the name.
-EXTRACTED="$(find "$TMP" -maxdepth 1 -type d -name 'FolioSenseAI-*' | head -n1)"
+EXTRACTED="$(find "$TMP" -maxdepth 1 -type d -name 'FolioOrb-*' | head -n1)"
 if [[ -z "$EXTRACTED" ]]; then
-  echo "  Download did not contain the expected FolioSenseAI folder." >&2
+  echo "  Download did not contain the expected FolioOrb folder." >&2
   exit 1
 fi
 
@@ -123,16 +123,16 @@ fi
 cat > "$SHORTCUT" <<LAUNCHER
 #!/usr/bin/env bash
 cd "$INSTALL_DIR"
-exec bash FolioSenseAI.command
+exec bash FolioOrb.command
 LAUNCHER
 chmod +x "$SHORTCUT"
 xattr -d com.apple.quarantine "$SHORTCUT" 2>/dev/null || true
 
 echo ""
-echo "  ✓ Installed to ~/Applications/FolioSenseAI"
+echo "  ✓ Installed to ~/Applications/FolioOrb"
 echo "  ✓ Desktop shortcut created — double-click it anytime to open the app"
 echo ""
-echo "  Starting FolioSenseAI — your browser will open in a moment..."
+echo "  Starting FolioOrb — your browser will open in a moment..."
 echo "  (Press Ctrl+C to stop)"
 echo ""
 python run.py

@@ -1,11 +1,11 @@
 ---
 title: Updating
-description: How FolioSenseAI updates itself with your permission, and why your portfolio data survives every update.
+description: How FolioOrb updates itself with your permission, and why your portfolio data survives every update.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-FolioSenseAI can update itself — with your permission, and without ever putting your holdings
+FolioOrb can update itself — with your permission, and without ever putting your holdings
 at risk. Your database and config live in a separate per-user data directory, so they're
 preserved automatically, and a verified backup is taken before anything is installed.
 
@@ -27,7 +27,7 @@ downloads the update, verifies it, backs up your data, installs, and reopens on 
 — no manual dragging or running an installer yourself.
 
 <Aside type="tip" title="Your data is protected at every step">
-Before an update installs, FolioSenseAI takes a verified backup of your portfolio database and
+Before an update installs, FolioOrb takes a verified backup of your portfolio database and
 your settings. If that backup can't be made, the update is **paused** rather than risking your
 data. After updating, a quiet confirmation notes your holdings came through intact.
 </Aside>
@@ -38,7 +38,7 @@ installed; a corrupted or interrupted download is rejected or resumed automatica
 ### If an update misbehaves
 
 Open **Settings → Software Update → Restore previous version…** to roll back to the version you
-were on before. FolioSenseAI always snapshots your current data first, so nothing is lost
+were on before. FolioOrb always snapshots your current data first, so nothing is lost
 either way — you choose whether to also restore your pre-update data. If the app fails to start
 after an update, it offers the rollback for you automatically.
 
@@ -57,17 +57,17 @@ You can always update by hand instead:
 - **Windows** — run the newer `-Setup.exe`; it upgrades the existing install in place.
 
 Your holdings, snapshots, cached AI output, and `.env` all carry over. See where that data
-lives for [macOS](/FolioSenseAI/install-macos/#where-your-data-lives) and
-[Windows](/FolioSenseAI/install-windows/#where-your-data-lives).
+lives for [macOS](/FolioOrb/install-macos/#where-your-data-lives) and
+[Windows](/FolioOrb/install-windows/#where-your-data-lives).
 
 ## Installed from source or a script?
 
 ```bash
-cd FolioSenseAI
+cd FolioOrb
 git pull
 python -m pip install -r requirements.txt
 python run.py
 ```
 
-Re-running the [install scripts](/FolioSenseAI/build-from-source/#one-line-install-scripts)
+Re-running the [install scripts](/FolioOrb/build-from-source/#one-line-install-scripts)
 is also safe — they preserve your existing `.env` and `database/` files.

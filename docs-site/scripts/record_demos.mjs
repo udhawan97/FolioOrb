@@ -1,5 +1,5 @@
 /**
- * Record short product-demo video loops of the FolioSenseAI dashboard for the
+ * Record short product-demo video loops of the FolioOrb dashboard for the
  * landing page. Dev-only — Playwright and these recordings' source never ship
  * beyond the optimized files under public/assets/demos/.
  *

@@ -83,9 +83,9 @@ async def lifespan(_app: FastAPI):
 
 # Create the FastAPI application instance
 app = FastAPI(
-    title="FolioSenseAI",
+    title="FolioOrb",
     description=(
-        "FolioSenseAI helps explain portfolio movement by surfacing "
+        "FolioOrb helps explain portfolio movement by surfacing "
         "market context and AI-generated insights for holdings."
     ),
     version=__version__,

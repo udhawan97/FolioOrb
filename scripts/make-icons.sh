@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Regenerate the platform icon files from the 1024×1024 brand PNG.
 #
-#   packaging/icons/FolioSenseAI.icns   (macOS app bundle)
-#   packaging/icons/FolioSenseAI.ico    (Windows installer + exe)
+#   packaging/icons/FolioOrb.icns   (macOS app bundle)
+#   packaging/icons/FolioOrb.ico    (Windows installer + exe)
 #
 # The generated files are committed so CI never needs cross-platform icon
 # tooling. Run this only when the brand mark changes. Requires macOS (sips,
@@ -13,14 +13,14 @@ cd "$(dirname "$0")/.."
 
 SRC="static/img/brand/folio-orbit-icon-1024.png"
 OUT_DIR="packaging/icons"
-ICNS="$OUT_DIR/FolioSenseAI.icns"
-ICO="$OUT_DIR/FolioSenseAI.ico"
+ICNS="$OUT_DIR/FolioOrb.icns"
+ICO="$OUT_DIR/FolioOrb.ico"
 
 [[ -f "$SRC" ]] || { echo "Source icon not found: $SRC" >&2; exit 1; }
 mkdir -p "$OUT_DIR"
 
 # ── macOS .icns via an iconset ────────────────────────────────────────────────
-ICONSET="$(mktemp -d)/FolioSenseAI.iconset"
+ICONSET="$(mktemp -d)/FolioOrb.iconset"
 mkdir -p "$ICONSET"
 for size in 16 32 128 256 512; do
   sips -z "$size" "$size"       "$SRC" --out "$ICONSET/icon_${size}x${size}.png"   >/dev/null

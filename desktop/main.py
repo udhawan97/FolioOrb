@@ -1,4 +1,4 @@
-"""Desktop entry point for the packaged FolioSenseAI app.
+"""Desktop entry point for the packaged FolioOrb app.
 
 Runs the existing FastAPI application in-process on a loopback port and shows it
 in a native window (WKWebView on macOS, WebView2 on Windows) via pywebview.
@@ -111,15 +111,15 @@ def main() -> int:
 
     if not _wait_for_health(base_url, HEALTH_TIMEOUT_SECONDS):
         if _STARTUP_STATE["error"]:
-            print(f"FolioSenseAI failed to start: {_STARTUP_STATE['error']}", file=sys.stderr)
+            print(f"FolioOrb failed to start: {_STARTUP_STATE['error']}", file=sys.stderr)
         else:
-            print("FolioSenseAI failed to start within the timeout.", file=sys.stderr)
+            print("FolioOrb failed to start within the timeout.", file=sys.stderr)
         return 1
 
     if smoke:
         from app.version import __version__
 
-        print(f"FolioSenseAI {__version__} started and healthy at {base_url}")
+        print(f"FolioOrb {__version__} started and healthy at {base_url}")
         return 0
 
     return _launch_window(base_url)
@@ -206,7 +206,7 @@ def _launch_window(base_url: str) -> int:
     # unaffected. Tab switching is client-side, so this query persists.
     start_url = f"{base_url}/?app=1" + ("&rollback=1" if offer_rollback else "")
     window = webview.create_window(
-        "FolioSenseAI",
+        "FolioOrb",
         start_url,
         width=1440,
         height=920,
@@ -263,7 +263,7 @@ def _launch_window(base_url: str) -> int:
 
         menu_items = [
             wm.Menu(
-                "FolioSenseAI",
+                "FolioOrb",
                 [
                     wm.MenuAction("Check for Updates…", _check_for_updates),
                     wm.MenuSeparator(),
@@ -289,7 +289,7 @@ def _hard_exit(code: int) -> None:
     daemon threads (uvicorn's server thread, the cache-warmup thread, the
     update-check scheduler) may be mid-write to those same buffered streams. If a
     daemon holds the buffer lock at that moment, CPython aborts with a fatal
-    ``_enter_buffered_busy`` error — surfacing as a macOS "FolioSenseAI quit
+    ``_enter_buffered_busy`` error — surfacing as a macOS "FolioOrb quit
     unexpectedly" crash dialog on every quit (reproduced deterministically in the
     frozen build). A desktop app being closed needs no graceful teardown: daemon
     threads die with the process and the OS reclaims the loopback socket, so we
@@ -319,7 +319,7 @@ def _run() -> int:
         return exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
     except BaseException as exc:  # pylint: disable=broad-exception-caught
         try:
-            print(f"FolioSenseAI exited on error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            print(f"FolioOrb exited on error: {type(exc).__name__}: {exc}", file=sys.stderr)
         except Exception:  # pylint: disable=broad-except
             pass
         return 1

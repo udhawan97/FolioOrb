@@ -1,6 +1,6 @@
 ---
 title: Releases & versioning
-description: How FolioSenseAI is versioned, how the installers are built, and the code-signing roadmap.
+description: How FolioOrb is versioned, how the installers are built, and the code-signing roadmap.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -8,7 +8,7 @@ import { Image } from 'astro:assets';
 import pipeline from '../../assets/release-pipeline.svg';
 import channels from '../../assets/release-channels.svg';
 
-FolioSenseAI uses plain [semantic versioning](https://semver.org). The version lives in one
+FolioOrb uses plain [semantic versioning](https://semver.org). The version lives in one
 place — `app/version.py` — and flows into the app, the installers, and the release assets.
 
 ## How a release is built
@@ -35,9 +35,9 @@ previous release stays exactly as it was.
 
 | Asset | Description |
 | --- | --- |
-| `FolioSenseAI-macOS-arm64-v4.5.2.dmg` | macOS Apple Silicon installer |
-| `FolioSenseAI-Windows-x64-v4.5.2-Setup.exe` | Windows per-user installer |
-| `SHA256SUMS.txt` | Checksums for every asset — see [verifying downloads](/FolioSenseAI/download/#verify-your-download) |
+| `FolioOrb-macOS-arm64-v5.0.0.dmg` | macOS Apple Silicon installer |
+| `FolioOrb-Windows-x64-v5.0.0-Setup.exe` | Windows per-user installer |
+| `SHA256SUMS.txt` | Checksums for every asset — see [verifying downloads](/FolioOrb/download/#verify-your-download) |
 
 Development builds use the same names with `v4.5.2` replaced by `main-<short-sha>`.
 
@@ -56,6 +56,6 @@ forward, in order:
 
 <Aside type="note">
 Until signing lands, verifying the `SHA256SUMS.txt` and downloading only from the official
-[GitHub Releases](https://github.com/udhawan97/FolioSenseAI/releases) is the strongest
+[GitHub Releases](https://github.com/udhawan97/FolioOrb/releases) is the strongest
 guarantee that a build is genuine.
 </Aside>

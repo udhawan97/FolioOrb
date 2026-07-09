@@ -74,5 +74,5 @@ if ($NoStart) {
     exit 0
 }
 
-Write-Host "Starting FolioSenseAI at http://localhost:8000"
+Write-Host "Starting FolioOrb at http://localhost:8000"
 & $venvPython run.py

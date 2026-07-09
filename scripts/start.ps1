@@ -9,5 +9,5 @@ if (-not (Test-Path $venvPython)) {
 
 New-Item -ItemType Directory -Force -Path "database" | Out-Null
 
-Write-Host "Starting FolioSenseAI at http://localhost:8000"
+Write-Host "Starting FolioOrb at http://localhost:8000"
 & $venvPython run.py

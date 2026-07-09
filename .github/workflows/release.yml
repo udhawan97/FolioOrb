@@ -93,7 +93,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-desktop.txt
       - name: Build app bundle
-        run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioSenseAI.spec
+        run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
       - name: Repair macOS bundle data symlinks
         # PyInstaller's macOS BUNDLE step can leave dangling Frameworks -> Resources
         # symlinks for pure-data package trees (observed with static/, templates/,
@@ -101,7 +101,7 @@ jobs:
         run: python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
       - name: Smoke test the frozen bundle
         run: |
-          dist/FolioSenseAI.app/Contents/MacOS/FolioSenseAI --smoke
+          dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
       - name: Build DMG
         env:
           ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
@@ -109,16 +109,16 @@ jobs:
           set -euo pipefail
           brew install create-dmg
           mkdir -p dist/dmg-src dist/out
-          cp -R dist/FolioSenseAI.app dist/dmg-src/
-          DMG="dist/out/FolioSenseAI-macOS-arm64-${ASSET_TOKEN}.dmg"
+          cp -R dist/FolioOrb.app dist/dmg-src/
+          DMG="dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
           create-dmg \
-            --volname "FolioSenseAI" \
-            --volicon packaging/icons/FolioSenseAI.icns \
+            --volname "FolioOrb" \
+            --volicon packaging/icons/FolioOrb.icns \
             --window-size 540 380 \
             --icon-size 110 \
-            --icon "FolioSenseAI.app" 150 190 \
+            --icon "FolioOrb.app" 150 190 \
             --app-drop-link 390 190 \
-            --hide-extension "FolioSenseAI.app" \
+            --hide-extension "FolioOrb.app" \
             "$DMG" "dist/dmg-src/" || true
           if [[ ! -f "$DMG" ]]; then
             echo "DMG was not produced" >&2
@@ -147,7 +147,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-desktop.txt
       - name: Build app bundle
-        run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioSenseAI.spec
+        run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
       - name: Smoke test the frozen bundle
         shell: pwsh
         run: |
@@ -157,7 +157,7 @@ jobs:
           # actually diagnosable from the workflow log.
           $outFile = "smoke-stdout.log"
           $errFile = "smoke-stderr.log"
-          $proc = Start-Process -FilePath "dist\FolioSenseAI\FolioSenseAI.exe" -ArgumentList "--smoke" `
+          $proc = Start-Process -FilePath "dist\FolioOrb\FolioOrb.exe" -ArgumentList "--smoke" `
             -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru
           Write-Host "--- stdout ---"
           if (Test-Path $outFile) { Get-Content $outFile }
@@ -174,7 +174,7 @@ jobs:
           ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
         run: |
           choco install innosetup -y --no-progress
-          $outputName = "FolioSenseAI-Windows-x64-$env:ASSET_TOKEN-Setup"
+          $outputName = "FolioOrb-Windows-x64-$env:ASSET_TOKEN-Setup"
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           & $iscc "/DMyAppVersion=$env:APP_VERSION" "/DMyOutputName=$outputName" packaging\windows\installer.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
@@ -235,7 +235,7 @@ jobs:
           else
             gh release create "$TAG" release/* \
               --repo "$GITHUB_REPOSITORY" \
-              --title "FolioSenseAI $TAG" \
+              --title "FolioOrb $TAG" \
               --generate-notes \
               --verify-tag
           fi

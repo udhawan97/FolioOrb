@@ -1,6 +1,6 @@
-# PyInstaller build spec for FolioSenseAI (onedir desktop bundle).
+# PyInstaller build spec for FolioOrb (onedir desktop bundle).
 #
-#   pyinstaller packaging/pyinstaller/FolioSenseAI.spec
+#   pyinstaller packaging/pyinstaller/FolioOrb.spec
 #
 # Onedir (not onefile): faster startup, no temp self-extraction, fewer antivirus
 # false positives. The DMG / Inno installer wraps the resulting folder so users
@@ -14,8 +14,8 @@ ROOT = Path(SPECPATH).resolve().parent.parent  # packaging/pyinstaller -> repo r
 sys.path.insert(0, str(ROOT))
 from app.version import __version__  # noqa: E402
 
-ICON_ICNS = str(ROOT / "packaging" / "icons" / "FolioSenseAI.icns")
-ICON_ICO = str(ROOT / "packaging" / "icons" / "FolioSenseAI.ico")
+ICON_ICNS = str(ROOT / "packaging" / "icons" / "FolioOrb.icns")
+ICON_ICO = str(ROOT / "packaging" / "icons" / "FolioOrb.ico")
 
 # Bundled read-only resources (unpacked under sys._MEIPASS at runtime).
 datas = [
@@ -82,7 +82,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="FolioSenseAI",
+    name="FolioOrb",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -103,19 +103,19 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="FolioSenseAI",
+    name="FolioOrb",
 )
 
 if sys.platform == "darwin":
     app = BUNDLE(
         coll,
-        name="FolioSenseAI.app",
+        name="FolioOrb.app",
         icon=ICON_ICNS,
-        bundle_identifier="com.foliosenseai.app",
+        bundle_identifier="com.folioorb.app",
         version=__version__,
         info_plist={
-            "CFBundleName": "FolioSenseAI",
-            "CFBundleDisplayName": "FolioSenseAI",
+            "CFBundleName": "FolioOrb",
+            "CFBundleDisplayName": "FolioOrb",
             "CFBundleShortVersionString": __version__,
             "CFBundleVersion": __version__,
             "NSHighResolutionCapable": True,

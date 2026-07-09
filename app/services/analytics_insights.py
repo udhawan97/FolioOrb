@@ -50,7 +50,7 @@ MODULE_DIGEST: dict[str, str] = {
         "benchmark tilt, and your allocation table."
     ),
     "signals": (
-        "FolioSense verdicts on each holding, P&L attribution, conviction gaps, "
+        "FolioOrb verdicts on each holding, P&L attribution, conviction gaps, "
         "confidence spectrum, and your overall book tone."
     ),
     "markets": (
@@ -145,7 +145,7 @@ def build_local_analytics_insights(snapshot: dict[str, Any]) -> dict[str, Any]:
             f" and average confidence {signals.get('avg_confidence', 0):.0f}%."
         )
     else:
-        insights["signals"] = "Signals summarize FolioSense's read once holdings are set up."
+        insights["signals"] = "Signals summarize FolioOrb's read once holdings are set up."
 
     if markets.get("has_data"):
         name = markets.get("best_match_name") or "global equities"
@@ -455,10 +455,10 @@ def _widget_signals_insights(signals: dict, widgets: dict) -> dict[str, str]:
         )
         out["conviction-gap"] = _make_tip(
             "conviction-gap",
-            "Conviction gap analysis requires holdings with active FolioSense signals.",
+            "Conviction gap analysis requires holdings with active FolioOrb signals.",
         )
         for key in ("signal-board", "verdict-mix", "confidence-spectrum"):
-            out[key] = "Signals summarize FolioSense's read once holdings are set up."
+            out[key] = "Signals summarize FolioOrb's read once holdings are set up."
         return out
 
     out["contribution"] = _make_tip(

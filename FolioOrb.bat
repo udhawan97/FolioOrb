@@ -1,5 +1,5 @@
 @echo off
-title FolioSenseAI
+title FolioOrb
 cd /d "%~dp0"
 
 :: Check for Python
@@ -22,7 +22,7 @@ if errorlevel 1 (
 
 :: First run: set up the virtual environment and dependencies
 if not exist venv\ (
-    echo  Setting up FolioSenseAI for the first time — this takes about a minute...
+    echo  Setting up FolioOrb for the first time — this takes about a minute...
     echo.
     powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -NoStart
     if errorlevel 1 (
@@ -34,7 +34,7 @@ if not exist venv\ (
 )
 
 echo.
-echo  Starting FolioSenseAI...
+echo  Starting FolioOrb...
 echo  Your browser will open automatically at http://localhost:8000
 echo  Keep this window open while using the app.  Press Ctrl+C to stop.
 echo.

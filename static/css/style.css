@@ -1,5 +1,5 @@
 /* ============================================================================
-   style.css — FolioSenseAI
+   style.css — FolioOrb
    A refined, Apple-inspired dark "materials" design system layered on Bootstrap.
    Pure CSS: no markup changes required.
    ========================================================================== */
@@ -2120,7 +2120,7 @@ table tbody tr:hover {
     white-space: nowrap;
 }
 
-/* Unified holdings intel hub — FolioSense pill + holding intel + Claude summaries */
+/* Unified holdings intel hub — FolioOrb pill + holding intel + Claude summaries */
 .holdings-intel-hub {
     cursor: pointer;
     font: inherit;

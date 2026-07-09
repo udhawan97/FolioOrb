@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mac launcher — double-click this file to install (first run) and start FolioSenseAI.
+# Mac launcher — double-click this file to install (first run) and start FolioOrb.
 # First time only: right-click → Open to bypass the macOS security prompt.
 set -euo pipefail
 
@@ -11,13 +11,13 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 if [ ! -d venv ]; then
-    echo "Setting up FolioSenseAI for the first time — this takes about a minute..."
+    echo "Setting up FolioOrb for the first time — this takes about a minute..."
     echo
     bash scripts/setup.sh --no-start
 fi
 
 echo
-echo "Starting FolioSenseAI..."
+echo "Starting FolioOrb..."
 echo "Your browser will open automatically at http://localhost:8000"
 echo "Keep this window open while using the app.  Press Ctrl+C to stop."
 echo

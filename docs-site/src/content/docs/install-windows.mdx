@@ -1,6 +1,6 @@
 ---
 title: Install on Windows
-description: Install the FolioSenseAI Windows installer, clear the SmartScreen warning, and find where your data lives.
+description: Install the FolioOrb Windows installer, clear the SmartScreen warning, and find where your data lives.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -10,13 +10,13 @@ installs without administrator rights and registers a clean uninstaller.
 
 <Steps>
 
-1. Download `FolioSenseAI-Windows-x64-v4.4.1-Setup.exe` from the
-   [latest release](https://github.com/udhawan97/FolioSenseAI/releases/latest).
+1. Download `FolioOrb-Windows-x64-v5.0.0-Setup.exe` from the
+   [latest release](https://github.com/udhawan97/FolioOrb/releases/latest).
 
 2. Run it. If prompted about the WebView2 runtime, let it install — it's a small Microsoft
    component the app uses to render its window (already present on Windows 11).
 
-3. Finish the wizard and launch FolioSenseAI from the Start menu.
+3. Finish the wizard and launch FolioOrb from the Start menu.
 
 </Steps>
 
@@ -35,22 +35,22 @@ Because early builds aren't code-signed, Windows SmartScreen may show
 
 <Aside type="note" title="Why the warning?">
 SmartScreen flags installers it hasn't seen build reputation for yet. It doesn't mean the
-file is unsafe. You can [verify your download](/FolioSenseAI/download/#verify-your-download)
+file is unsafe. You can [verify your download](/FolioOrb/download/#verify-your-download)
 against the published `SHA256SUMS.txt`. Windows code signing is on the
-[roadmap](/FolioSenseAI/releases-and-versioning/#code-signing-roadmap).
+[roadmap](/FolioOrb/releases-and-versioning/#code-signing-roadmap).
 </Aside>
 
 ## Where your data lives
 
 | What | Location |
 | --- | --- |
-| Program files | `%LOCALAPPDATA%\Programs\FolioSenseAI` |
-| Portfolio database | `%APPDATA%\FolioSenseAI\database\` |
-| Config (`.env`) | `%APPDATA%\FolioSenseAI\.env` |
+| Program files | `%LOCALAPPDATA%\Programs\FolioOrb` |
+| Portfolio database | `%APPDATA%\FolioOrb\database\` |
+| Config (`.env`) | `%APPDATA%\FolioOrb\.env` |
 
 Your data sits outside the program folder, so updating or reinstalling never touches it.
 
 ## Uninstall
 
-Open **Settings → Apps → Installed apps**, find **FolioSenseAI**, and choose **Uninstall**.
-To also remove your data, delete `%APPDATA%\FolioSenseAI`.
+Open **Settings → Apps → Installed apps**, find **FolioOrb**, and choose **Uninstall**.
+To also remove your data, delete `%APPDATA%\FolioOrb`.

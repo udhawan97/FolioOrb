@@ -12,7 +12,7 @@
   <rect width="860" height="561" rx="16" fill="#0D0D10"/>
 
   <!-- ── Title ── -->
-  <text x="430" y="26" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#F4F4F5" text-anchor="middle" letter-spacing="-0.2">FolioSenseAI — Architecture at a Glance</text>
+  <text x="430" y="26" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#F4F4F5" text-anchor="middle" letter-spacing="-0.2">FolioOrb — Architecture at a Glance</text>
 
   <!-- ════════════════════════════════════════════════════════
        LAYER 1 · BROWSER

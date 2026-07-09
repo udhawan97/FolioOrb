@@ -19,9 +19,9 @@ def temp_data_dir(tmp_path, monkeypatch):
 def test_bundle_path_detects_app(monkeypatch):
     monkeypatch.setattr(
         macos_updater.sys, "executable",
-        "/Applications/FolioSenseAI.app/Contents/MacOS/FolioSenseAI",
+        "/Applications/FolioOrb.app/Contents/MacOS/FolioOrb",
     )
-    assert str(macos_updater.bundle_path()).endswith("/Applications/FolioSenseAI.app")
+    assert str(macos_updater.bundle_path()).endswith("/Applications/FolioOrb.app")
 
 
 def test_bundle_path_none_when_not_app(monkeypatch):
@@ -30,7 +30,7 @@ def test_bundle_path_none_when_not_app(monkeypatch):
 
 
 def test_launch_swap_writes_script_and_detaches(tmp_path, monkeypatch):
-    bundle = tmp_path / "FolioSenseAI.app"
+    bundle = tmp_path / "FolioOrb.app"
     bundle.mkdir()
     monkeypatch.setattr(macos_updater, "bundle_path", lambda: bundle)
     calls = []

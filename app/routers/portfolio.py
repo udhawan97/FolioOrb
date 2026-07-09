@@ -460,7 +460,7 @@ async def export_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
         .order_by(Holding.ticker.asc())
         .all()
     )
-    filename = f"foliosense-holdings-p{portfolio_id}-{date.today().isoformat()}.csv"
+    filename = f"folioorb-holdings-p{portfolio_id}-{date.today().isoformat()}.csv"
     return StreamingResponse(
         holdings_csv.build_export_csv(holdings),
         media_type="text/csv; charset=utf-8",

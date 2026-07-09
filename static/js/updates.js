@@ -1,5 +1,5 @@
 /* ==========================================================================
-   updates.js — FolioSenseAI in-app Software Update surface.
+   updates.js — FolioOrb in-app Software Update surface.
 
    One calm, single-surface sheet (modelled on the macOS Software Update pane):
    a status region on top that morphs across the update lifecycle, and a
@@ -14,7 +14,7 @@
 (function () {
     "use strict";
 
-    var RELEASES_URL = "https://github.com/udhawan97/FolioSenseAI/releases/latest";
+    var RELEASES_URL = "https://github.com/udhawan97/FolioOrb/releases/latest";
     var POLL_MS = 800;
     var WORKING = { checking: 1, downloading: 1, verifying: 1, backing_up: 1, installing: 1 };
     // Reason-specific titles for a failed check. "offline" is a separate status
@@ -216,17 +216,17 @@
 
         if (status === "checking") {
             el.updateSheetTitle.textContent = "Checking for updates…";
-            el.updateSub.textContent = "FolioSenseAI " + cur;
+            el.updateSub.textContent = "FolioOrb " + cur;
         } else if (status === "up_to_date") {
             setMark("ok", false);
             el.updateSheetTitle.textContent = "You're up to date";
-            el.updateSub.textContent = "FolioSenseAI " + cur + " is the latest version. Last checked "
+            el.updateSub.textContent = "FolioOrb " + cur + " is the latest version. Last checked "
                 + relativeTime(state.last_checked_at) + ".";
             setSecondary("Check Again", function () { runCheck(true); });
         } else if (status === "available" && avail) {
             renderAvailable(cur, avail);
         } else if (status === "downloading" && avail) {
-            el.updateSheetTitle.textContent = "Downloading FolioSenseAI " + avail.version;
+            el.updateSheetTitle.textContent = "Downloading FolioOrb " + avail.version;
             el.updateSub.textContent = "This continues if you close the window.";
             renderProgress();
             setSecondary("Cancel", cancelDownload);
@@ -238,12 +238,12 @@
             el.updateSub.textContent = "Saving a safety copy of your portfolio.";
         } else if (status === "installing") {
             el.updateSheetTitle.textContent = "Installing…";
-            el.updateSub.textContent = "FolioSenseAI will restart shortly.";
+            el.updateSub.textContent = "FolioOrb will restart shortly.";
         } else if (status === "ready" && avail) {
             renderReady(avail);
         } else if (status === "offline") {
             el.updateSheetTitle.textContent = "You're offline";
-            el.updateSub.textContent = "FolioSenseAI will check again when you're back online.";
+            el.updateSub.textContent = "FolioOrb will check again when you're back online.";
             setSecondary("Try Again", function () { runCheck(true); });
         } else if (status === "error") {
             setMark("alert", false);
@@ -252,7 +252,7 @@
             // friendly `error` message we fall back to.
             el.updateSheetTitle.textContent = ERROR_TITLES[state.reason]
                 || state.error || "Couldn't check for updates";
-            el.updateSub.textContent = "You're still on FolioSenseAI " + cur
+            el.updateSub.textContent = "You're still on FolioOrb " + cur
                 + ". Your data is untouched.";
             setSecondary("Try Again", function () { runCheck(true); });
             show(el.updateTertiary, true);
@@ -260,7 +260,7 @@
         } else {
             // idle / unknown — a neutral resting state.
             el.updateSheetTitle.textContent = "Software Update";
-            el.updateSub.textContent = "FolioSenseAI " + cur;
+            el.updateSub.textContent = "FolioOrb " + cur;
             setSecondary("Check for Updates", function () { runCheck(true); });
         }
 
@@ -273,7 +273,7 @@
         var size = humanSize(avail.size_bytes);
         if (size) { bits.push(size); }
         if (avail.restart_required) { bits.push("Requires relaunch"); }
-        el.updateSheetTitle.textContent = "FolioSenseAI " + avail.version + " is available";
+        el.updateSheetTitle.textContent = "FolioOrb " + avail.version + " is available";
         el.updateSub.textContent = bits.join(" · ");
 
         if (avail.notes_md) {
@@ -310,10 +310,10 @@
         el.updateSheetTitle.textContent = "Ready to install";
         show(el.updateTrust, true);
         if (versionInfo && versionInfo.platform === "windows") {
-            el.updateSub.textContent = "FolioSenseAI will close, update, and reopen. This takes under a minute.";
+            el.updateSub.textContent = "FolioOrb will close, update, and reopen. This takes under a minute.";
             setPrimary("Quit & Install", installNow);
         } else {
-            el.updateSub.textContent = "FolioSenseAI will close and open the installer. Drag it to Applications to finish.";
+            el.updateSub.textContent = "FolioOrb will close and open the installer. Drag it to Applications to finish.";
             setPrimary("Quit & Open Installer", installNow);
         }
         setSecondary("Later", close);
@@ -332,7 +332,7 @@
 
     function renderPrefs() {
         if (el.updateVersionLine && versionInfo) {
-            var line = "FolioSenseAI " + versionInfo.version;
+            var line = "FolioOrb " + versionInfo.version;
             if (state && state.last_checked_at) {
                 line += " · last checked " + relativeTime(state.last_checked_at);
             }
@@ -447,7 +447,7 @@
         setMark("neutral", false);
 
         var prev = (rollbackInfo && rollbackInfo.previous_version) || "the previous version";
-        el.updateSheetTitle.textContent = "Restore FolioSenseAI " + prev;
+        el.updateSheetTitle.textContent = "Restore FolioOrb " + prev;
         el.updateSub.textContent = "A safety copy of your current data is saved first. Your "
             + "holdings will be exactly as they are now unless you choose to restore the "
             + "earlier snapshot too.";
@@ -634,11 +634,11 @@
         title.className = "fs-update-toast-title";
         title.textContent = failed
             ? "The update couldn't be installed"
-            : "Updated to FolioSenseAI " + version;
+            : "Updated to FolioOrb " + version;
         var sub = document.createElement("div");
         sub.className = "fs-update-toast-sub";
         sub.textContent = failed
-            ? "You're still on FolioSenseAI " + version + " — your data is safe."
+            ? "You're still on FolioOrb " + version + " — your data is safe."
             : "Your holdings are intact — backup verified.";
         body.appendChild(title);
         body.appendChild(sub);

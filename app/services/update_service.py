@@ -60,11 +60,11 @@ def _build_ssl_context() -> ssl.SSLContext:
 
 _SSL_CONTEXT = _build_ssl_context()
 
-REPO = os.getenv("FOLIO_UPDATE_REPO", "udhawan97/FolioSenseAI")
+REPO = os.getenv("FOLIO_UPDATE_REPO", "udhawan97/FolioOrb")
 API_BASE = "https://api.github.com"
 RELEASES_LATEST_URL = f"{API_BASE}/repos/{REPO}/releases/latest"
 CACHE_TTL_SECONDS = 6 * 3600
-_USER_AGENT = f"FolioSenseAI-Updater/{__version__}"
+_USER_AGENT = f"FolioOrb-Updater/{__version__}"
 _SHASUMS_ASSET = "SHA256SUMS.txt"
 
 

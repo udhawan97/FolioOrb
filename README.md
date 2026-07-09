@@ -2,11 +2,11 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/img/brand/folio-orbit-mark-light-animated.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/img/brand/folio-orbit-mark-dark-animated.svg">
-    <img src="static/img/brand/folio-orbit-mark-dark-animated.svg" alt="FolioSenseAI" width="285">
+    <img src="static/img/brand/folio-orbit-mark-dark-animated.svg" alt="FolioOrb" width="285">
   </picture>
 </p>
 
-<h1 align="center">FolioSenseAI</h1>
+<h1 align="center">FolioOrb</h1>
 
 <p align="center"><em>Your folio, finally making sense.</em></p>
 
@@ -16,27 +16,27 @@
 </p>
 
 <p align="center">
-  <a href="https://udhawan97.github.io/FolioSenseAI/">
+  <a href="https://udhawan97.github.io/FolioOrb/">
     <img src="static/img/brand/visit-website.svg" alt="Explore the live website — real product demos, downloads, and docs" width="440">
   </a>
 </p>
 
 <p align="center">
-  <sub><a href="https://udhawan97.github.io/FolioSenseAI/"><strong>udhawan97.github.io/FolioSenseAI</strong></a> — watch the dashboard work, then download it.</sub>
+  <sub><a href="https://udhawan97.github.io/FolioOrb/"><strong>udhawan97.github.io/FolioOrb</strong></a> — watch the dashboard work, then download it.</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/udhawan97/FolioSenseAI/releases/latest"><img src="https://img.shields.io/github/v/release/udhawan97/FolioSenseAI?style=flat-square&color=brightgreen" alt="Latest release"></a>
-  <a href="https://github.com/udhawan97/FolioSenseAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/udhawan97/FolioSenseAI/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/udhawan97/FolioSenseAI/releases"><img src="https://img.shields.io/github/downloads/udhawan97/FolioSenseAI/total?style=flat-square&color=blue" alt="Downloads"></a>
+  <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><img src="https://img.shields.io/github/v/release/udhawan97/FolioOrb?style=flat-square&color=brightgreen" alt="Latest release"></a>
+  <a href="https://github.com/udhawan97/FolioOrb/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/udhawan97/FolioOrb/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
+  <a href="https://github.com/udhawan97/FolioOrb/releases"><img src="https://img.shields.io/github/downloads/udhawan97/FolioOrb/total?style=flat-square&color=blue" alt="Downloads"></a>
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
 </p>
 
 <p align="center">
-  <a href="https://udhawan97.github.io/FolioSenseAI/">🌐 Website</a> ·
-  <a href="https://udhawan97.github.io/FolioSenseAI/">📖 Docs</a> ·
-  <a href="https://github.com/udhawan97/FolioSenseAI/releases/latest">⬇️ Download</a> ·
+  <a href="https://udhawan97.github.io/FolioOrb/">🌐 Website</a> ·
+  <a href="https://udhawan97.github.io/FolioOrb/">📖 Docs</a> ·
+  <a href="https://github.com/udhawan97/FolioOrb/releases/latest">⬇️ Download</a> ·
   <a href="#what-it-does">🧠 Features</a> ·
   <a href="#for-developers">🛠️ Developers</a>
 </p>
@@ -49,18 +49,18 @@ Native desktop app — no Python, no terminal required.
 
 | Platform | Download | Guide |
 | --- | --- | --- |
-| **macOS** (Apple Silicon) | [**Download .dmg**](https://github.com/udhawan97/FolioSenseAI/releases/latest) | [Install on macOS](https://udhawan97.github.io/FolioSenseAI/install-macos/) |
-| **Windows** (x64) | [**Download .exe**](https://github.com/udhawan97/FolioSenseAI/releases/latest) | [Install on Windows](https://udhawan97.github.io/FolioSenseAI/install-windows/) |
+| **macOS** (Apple Silicon) | [**Download .dmg**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on macOS](https://udhawan97.github.io/FolioOrb/install-macos/) |
+| **Windows** (x64) | [**Download .exe**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on Windows](https://udhawan97.github.io/FolioOrb/install-windows/) |
 
-All builds live on [GitHub Releases](https://github.com/udhawan97/FolioSenseAI/releases). Prefer to run from source? See [For developers](#for-developers).
+All builds live on [GitHub Releases](https://github.com/udhawan97/FolioOrb/releases). Prefer to run from source? See [For developers](#for-developers).
 
-> **Heads up:** early builds aren't code-signed yet, so macOS and Windows show a first-launch warning. That's expected for an open-source app — the [install guides](https://udhawan97.github.io/FolioSenseAI/download/) show exactly what you'll see, and every release ships a `SHA256SUMS.txt` so you can [verify your download](https://udhawan97.github.io/FolioSenseAI/download/#verify-your-download).
+> **Heads up:** early builds aren't code-signed yet, so macOS and Windows show a first-launch warning. That's expected for an open-source app — the [install guides](https://udhawan97.github.io/FolioOrb/download/) show exactly what you'll see, and every release ships a `SHA256SUMS.txt` so you can [verify your download](https://udhawan97.github.io/FolioOrb/download/#verify-your-download).
 
 ## What It Does
 
 Most portfolio trackers stop at the number. Green means good, red means bad — and if you want to know *why*, that's a separate tab, a separate app, or a group chat with someone who read the news this morning and you didn't.
 
-FolioSenseAI closes that gap: holdings, live prices, risk math, market regime, news, and optional Claude-written narration, all in one place that runs on your laptop and reports to nobody. It doesn't connect to a brokerage and it doesn't place trades — but it will tell you, with a straight face, whether your "diversified" portfolio is actually just four tech stocks in a trench coat.
+FolioOrb closes that gap: holdings, live prices, risk math, market regime, news, and optional Claude-written narration, all in one place that runs on your laptop and reports to nobody. It doesn't connect to a brokerage and it doesn't place trades — but it will tell you, with a straight face, whether your "diversified" portfolio is actually just four tech stocks in a trench coat.
 
 | Do this | Get this |
 | --- | --- |
@@ -75,7 +75,7 @@ FolioSenseAI closes that gap: holdings, live prices, risk math, market regime, n
 > **Local Intelligence is not a downgraded mode.** It's the deterministic engine that runs the dashboard by default. Claude adds narration *on top* — it never gates the core experience, and everything it generates is cached in SQLite so refreshing doesn't mean paying again.
 
 <p align="center">
-  <img src="docs/dashboard.webp" alt="The FolioSenseAI dashboard showing a demo portfolio: total value, today's P&amp;L, sector map, and today's impact" width="820">
+  <img src="docs/dashboard.webp" alt="The FolioOrb dashboard showing a demo portfolio: total value, today's P&amp;L, sector map, and today's impact" width="820">
   <br>
   <sub><em>The real dashboard, running a demo portfolio. Local market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
 </p>
@@ -84,7 +84,7 @@ FolioSenseAI closes that gap: holdings, live prices, risk math, market regime, n
 
 <img src="static/img/brand/folio-orbit-icon.svg" alt="Senpai" width="54" align="left">
 
-**Senpai** is the small orbiting mark in the corner of the dashboard — it watches your portfolio so you don't have to stare at it alone. It reads the room: sharp when Claude is narrating, dry on Local Intelligence, quietly sympathetic when Claude is offline. Tap it for a new line; it also talks on its own, whether you asked it to or not. Senpai doesn't manage your portfolio. Senpai has *opinions* about your portfolio. [Say hello →](https://udhawan97.github.io/FolioSenseAI/meet-senpai/)
+**Senpai** is the small orbiting mark in the corner of the dashboard — it watches your portfolio so you don't have to stare at it alone. It reads the room: sharp when Claude is narrating, dry on Local Intelligence, quietly sympathetic when Claude is offline. Tap it for a new line; it also talks on its own, whether you asked it to or not. Senpai doesn't manage your portfolio. Senpai has *opinions* about your portfolio. [Say hello →](https://udhawan97.github.io/FolioOrb/meet-senpai/)
 
 <br clear="left">
 
@@ -101,9 +101,9 @@ The app already earns its spot in your dock — but this is very much the openin
 | 💸 | **Income & dividends view** | See what your portfolio pays *you* back for the privilege of holding it. | Being explored |
 | 🔮 | **A what-if simulator** | Preview a buy or a trim *before* you touch anything real. Regret-free rehearsals. | Being explored |
 
-> **The fine print, minus the lawyers:** This roadmap is less of a blood oath and more of a friendly sneak peek. FolioSenseAI is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.
+> **The fine print, minus the lawyers:** This roadmap is less of a blood oath and more of a friendly sneak peek. FolioOrb is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.
 
-Got a feature you'd fight for? [Open an issue](https://github.com/udhawan97/FolioSenseAI/issues/new) — Senpai reads every one and has opinions about most.
+Got a feature you'd fight for? [Open an issue](https://github.com/udhawan97/FolioOrb/issues/new) — Senpai reads every one and has opinions about most.
 
 ## Install
 
@@ -113,8 +113,8 @@ The [desktop downloads](#️-download) are the easy path. If you'd rather run fr
 <summary><strong>Run from source (any platform, Python 3.11+)</strong></summary>
 
 ```bash
-git clone https://github.com/udhawan97/FolioSenseAI.git
-cd FolioSenseAI
+git clone https://github.com/udhawan97/FolioOrb.git
+cd FolioOrb
 ./scripts/setup.sh          # Windows: .\scripts\setup.ps1
 ```
 
@@ -127,11 +127,11 @@ The setup script creates a virtual environment, installs dependencies, writes a 
 Downloads the latest release and sets up a local Python environment. Read them first — they're short: [mac](scripts/install-mac.sh) · [win](scripts/install-win.ps1).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioSenseAI/main/scripts/install-mac.sh | bash
+curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-mac.sh | bash
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/udhawan97/FolioSenseAI/main/scripts/install-win.ps1 | iex
+irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-win.ps1 | iex
 ```
 
 Set `FOLIO_REF` (e.g. `latest-main`) to install a specific tag or the dev channel.
@@ -140,7 +140,7 @@ Set `FOLIO_REF` (e.g. `latest-main`) to install a specific tag or the dev channe
 <details>
 <summary><strong>Optional Claude setup</strong></summary>
 
-FolioSenseAI works without Claude. To enable Claude-powered briefings and action plans, add an Anthropic key either in the dashboard (click the brand mark, paste an `sk-ant-*` key) or in `.env` (`ANTHROPIC_API_KEY=...`, then restart). The key format is validated before saving.
+FolioOrb works without Claude. To enable Claude-powered briefings and action plans, add an Anthropic key either in the dashboard (click the brand mark, paste an `sk-ant-*` key) or in `.env` (`ANTHROPIC_API_KEY=...`, then restart). The key format is validated before saving.
 </details>
 
 ## For Developers
@@ -216,14 +216,14 @@ docs-site/      Astro + Starlight docs + landing page
 
 ```bash
 python -m pip install -r requirements.txt -r requirements-desktop.txt
-python -m PyInstaller packaging/pyinstaller/FolioSenseAI.spec
+python -m PyInstaller packaging/pyinstaller/FolioOrb.spec
 python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist   # macOS only
 # Smoke-test the frozen bundle:
-#   macOS:   dist/FolioSenseAI.app/Contents/MacOS/FolioSenseAI --smoke
-#   Windows: dist\FolioSenseAI\FolioSenseAI.exe --smoke
+#   macOS:   dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
+#   Windows: dist\FolioOrb\FolioOrb.exe --smoke
 ```
 
-Then `create-dmg` (macOS) or `iscc` (Windows) wrap it into an installer. Full commands: [Build from source](https://udhawan97.github.io/FolioSenseAI/build-from-source/#build-the-desktop-installers).
+Then `create-dmg` (macOS) or `iscc` (Windows) wrap it into an installer. Full commands: [Build from source](https://udhawan97.github.io/FolioOrb/build-from-source/#build-the-desktop-installers).
 </details>
 
 ## Release Workflow
@@ -234,7 +234,7 @@ Version lives in one place — `app/version.py`. Pushing a `v*` tag builds both 
 main merge / v* tag → tests → build macOS + Windows → smoke test → GitHub Release → website buttons
 ```
 
-Details and the code-signing roadmap: [Releases &amp; versioning](https://udhawan97.github.io/FolioSenseAI/releases-and-versioning/).
+Details and the code-signing roadmap: [Releases &amp; versioning](https://udhawan97.github.io/FolioOrb/releases-and-versioning/).
 
 ## Troubleshooting Install
 
@@ -243,18 +243,18 @@ Details and the code-signing roadmap: [Releases &amp; versioning](https://udhawa
 
 | Symptom | Fix |
 | --- | --- |
-| macOS: *"Apple cannot check it for malicious software"* | Expected (unsigned). **System Settings → Privacy &amp; Security → Open Anyway**. [Steps](https://udhawan97.github.io/FolioSenseAI/install-macos/#first-launch-the-gatekeeper-warning) |
-| Windows: *"Windows protected your PC"* (SmartScreen) | Click **More info → Run anyway**. [Steps](https://udhawan97.github.io/FolioSenseAI/install-windows/#first-launch-the-smartscreen-warning) |
+| macOS: *"Apple cannot check it for malicious software"* | Expected (unsigned). **System Settings → Privacy &amp; Security → Open Anyway**. [Steps](https://udhawan97.github.io/FolioOrb/install-macos/#first-launch-the-gatekeeper-warning) |
+| Windows: *"Windows protected your PC"* (SmartScreen) | Click **More info → Run anyway**. [Steps](https://udhawan97.github.io/FolioOrb/install-windows/#first-launch-the-smartscreen-warning) |
 | Windows: blank window | Install the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) and relaunch |
-| Is my download genuine? | [Verify](https://udhawan97.github.io/FolioSenseAI/download/#verify-your-download) against the release's `SHA256SUMS.txt` |
+| Is my download genuine? | [Verify](https://udhawan97.github.io/FolioOrb/download/#verify-your-download) against the release's `SHA256SUMS.txt` |
 | Data missing after update | It isn't — data lives outside the app, in your user data directory |
 
-More setup and runtime help: [Troubleshooting &amp; FAQ](https://udhawan97.github.io/FolioSenseAI/troubleshooting/).
+More setup and runtime help: [Troubleshooting &amp; FAQ](https://udhawan97.github.io/FolioOrb/troubleshooting/).
 </details>
 
 ## Privacy
 
-FolioSenseAI is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Market data is requested from Yahoo Finance; Claude prompts are sent to Anthropic *only* when you enable Claude features. Generated AI summaries are cached locally. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioSenseAI/privacy/).
+FolioOrb is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Market data is requested from Yahoo Finance; Claude prompts are sent to Anthropic *only* when you enable Claude features. Generated AI summaries are cached locally. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioOrb/privacy/).
 
 ## Contributing
 
@@ -266,5 +266,5 @@ Released under the [MIT License](LICENSE). This project is for education, analys
 
 <p align="center">
   <sub>Built to make portfolio context easier to read, easier to question, and slightly less spreadsheet-haunted.<br>
-  If FolioSenseAI talked you out of panic-selling on a red Tuesday, a star costs nothing and Senpai will absolutely take credit for it.</sub>
+  If FolioOrb talked you out of panic-selling on a red Tuesday, a star costs nothing and Senpai will absolutely take credit for it.</sub>
 </p>

@@ -52,11 +52,11 @@ def test_compute_sha256(tmp_path):
 
 def test_parse_sha256sums_matches_by_basename():
     text = (
-        "aaa111  FolioSenseAI-macOS-arm64-v4.4.0.dmg\n"
-        "bbb222  FolioSenseAI-Windows-x64-v4.4.0-Setup.exe\n"
+        "aaa111  FolioOrb-macOS-arm64-v4.4.0.dmg\n"
+        "bbb222  FolioOrb-Windows-x64-v4.4.0-Setup.exe\n"
     )
-    assert dl.parse_sha256sums(text, "FolioSenseAI-macOS-arm64-v4.4.0.dmg") == "aaa111"
-    win = "some/path/FolioSenseAI-Windows-x64-v4.4.0-Setup.exe"
+    assert dl.parse_sha256sums(text, "FolioOrb-macOS-arm64-v4.4.0.dmg") == "aaa111"
+    win = "some/path/FolioOrb-Windows-x64-v4.4.0-Setup.exe"
     assert dl.parse_sha256sums(text, win) == "bbb222"
     assert dl.parse_sha256sums(text, "missing.dmg") is None
 

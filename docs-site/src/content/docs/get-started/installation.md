@@ -1,9 +1,9 @@
 ---
 title: Installation
-description: Ways to install FolioSenseAI — the desktop app, or from source.
+description: Ways to install FolioOrb — the desktop app, or from source.
 ---
 
-There are two ways to get FolioSenseAI:
+There are two ways to get FolioOrb:
 
 - **Desktop app (recommended)** — a native macOS or Windows download, no Python required.
   See [Download](../../download/), then [Install on macOS](../../install-macos/) or

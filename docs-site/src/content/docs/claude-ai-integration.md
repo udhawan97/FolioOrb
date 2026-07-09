@@ -3,7 +3,7 @@ title: Claude AI Integration
 description: How the optional Claude layer works, what it costs, and how it falls back.
 ---
 
-FolioSenseAI treats Claude as an enhancement layer, not a dependency. The distinction
+FolioOrb treats Claude as an enhancement layer, not a dependency. The distinction
 matters enough that it's worth spelling out exactly how it works.
 
 ## What Claude adds
@@ -36,7 +36,7 @@ stale enough to warrant a fresh one.
 
 ## Model
 
-FolioSenseAI calls `claude-haiku-4-5` via the Anthropic SDK for most narration —
+FolioOrb calls `claude-haiku-4-5` via the Anthropic SDK for most narration —
 summaries, briefings, news themes, and verdict quips — chosen for the latency and cost
 profile of a dashboard that expects frequent refreshes. The portfolio action plan uses
 `claude-sonnet-4-5`, which does the heavier cross-holding reasoning.

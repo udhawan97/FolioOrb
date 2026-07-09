@@ -1,11 +1,29 @@
 ---
 title: Release Notes
-description: What's new in FolioSenseAI, release by release.
+description: What's new in FolioOrb, release by release.
 ---
 
 The full changelog lives in
-[`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
+[`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
+
+## v5.0.0 — FolioSenseAI is now FolioOrb
+
+Same app, new name. "FolioSense" was already taken, so the product is now
+**FolioOrb** — a rename, not a rewrite.
+
+- **Your data comes with you, automatically.** On first launch, FolioOrb finds
+  your existing FolioSenseAI portfolio database and `.env` and migrates them into
+  the new FolioOrb data directory, leaving the originals as a fallback. Saved
+  dashboard preferences carry over too.
+- **New name everywhere** — app window, installers (`FolioOrb-macOS-arm64-*.dmg`,
+  `FolioOrb-Windows-x64-*-Setup.exe`), docs, and the repository at
+  [github.com/udhawan97/FolioOrb](https://github.com/udhawan97/FolioOrb).
+- **Nothing else changed** — no change to trading behavior (there is none), the
+  data model, or the privacy posture. Still local-first, still Claude-optional.
+- **Heads-up for existing macOS installs:** the one-time in-app update to v5.0.0
+  may report "couldn't install" because the app bundle is renamed — your data is
+  safe. Download the new `.dmg` once and your portfolio migrates on first launch.
 
 ## v4.5.2 — Reliability patch
 
@@ -47,7 +65,7 @@ No migration or `.env` change required.
   spreadsheet formula injection. The file you get *is* the import template.
 - **Import holdings, two ways.** *Local* (always available, no API key) does a strict,
   exact-schema parse of the template — deterministic, free, offline, and never gated.
-  *Claude assist* (when a key is set) maps almost any brokerage export onto the FolioSense
+  *Claude assist* (when a key is set) maps almost any brokerage export onto the FolioOrb
   format for you, and every mapped row still passes the same strict validation before it
   touches your book. Clean template files skip Claude entirely.
 - **A per-row report either way** — added, skipped (duplicates are skipped, never
@@ -65,7 +83,7 @@ No migration or `.env` change required.
 - **Real in-app updates on macOS**, not just "open the DMG." Update Now downloads, verifies,
   backs up your data, swaps in the new app, and relaunches automatically. Windows keeps its
   one-click silent install.
-- **A consent-first in-app update system.** FolioSenseAI checks quietly for new versions, shows
+- **A consent-first in-app update system.** FolioOrb checks quietly for new versions, shows
   a calm indicator when one's available, and never downloads or installs without an explicit
   click. Check any time from **Check for Updates…** in the app menu or **Settings → Software
   Update**.
@@ -159,26 +177,26 @@ No migration or `.env` change required.
 - **Result:** ~3× smoother scroll frame rate on the overview and analytics views in
   throttled testing, with janky frames cut by roughly two-thirds.
 
-## v4.3 — FolioSenseAI Goes Desktop
+## v4.3 — FolioOrb Goes Desktop
 
 - **One-click desktop installers** — no Python, no terminal. Download a native app for
-  [macOS (Apple Silicon)](https://github.com/udhawan97/FolioSenseAI/releases/latest) or
-  [Windows (x64)](https://github.com/udhawan97/FolioSenseAI/releases/latest) and launch it
+  [macOS (Apple Silicon)](https://github.com/udhawan97/FolioOrb/releases/latest) or
+  [Windows (x64)](https://github.com/udhawan97/FolioOrb/releases/latest) and launch it
   like any other app. The FastAPI server runs in-process behind a native window
 - **Automated release pipeline** — every tagged release builds, smoke-tests, and publishes
-  the `.dmg` and `.exe` to [GitHub Releases](https://github.com/udhawan97/FolioSenseAI/releases)
+  the `.dmg` and `.exe` to [GitHub Releases](https://github.com/udhawan97/FolioOrb/releases)
   with a `SHA256SUMS.txt`, so a broken build can never replace a good download
 - **Rolling `latest-main` builds** — every merge to `main` refreshes a prerelease with the
   newest installers, available under "Development builds" on the site for early testers
-- **Download-first website** — the [landing page](https://udhawan97.github.io/FolioSenseAI/)
+- **Download-first website** — the [landing page](https://udhawan97.github.io/FolioOrb/)
   detects your OS, links straight to the current installer, and shows live release
   version, date, and checksums
 - **Honest trust story** — early builds aren't code-signed yet, so the
-  [install guides](https://udhawan97.github.io/FolioSenseAI/download/) walk through the
+  [install guides](https://udhawan97.github.io/FolioOrb/download/) walk through the
   expected macOS Gatekeeper / Windows SmartScreen warnings and how to verify your download
 - **Local data stays put** — the installed app keeps your database and `.env` in the
-  per-user data directory (`~/Library/Application Support/FolioSenseAI` on macOS,
-  `%APPDATA%\FolioSenseAI` on Windows), never inside the app bundle
+  per-user data directory (`~/Library/Application Support/FolioOrb` on macOS,
+  `%APPDATA%\FolioOrb` on Windows), never inside the app bundle
 
 ## v4.2 — Meet Senpai, and Never Get Lost on Day One
 
@@ -205,5 +223,5 @@ No migration or `.env` change required.
 - Assorted fixes: font resize regression, a scroll-interception bug, and ticker
   management now triggering a fresh quote load without a full reload
 
-See the full [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioSenseAI/blob/main/RELEASE_NOTES.md)
+See the full [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 for prior versions and complete technical detail on each change.

@@ -78,7 +78,7 @@ def download_update(url, dest_path, on_progress=None, should_cancel=None) -> Pat
     part = dest_path.with_name(dest_path.name + ".part")
     existing = part.stat().st_size if part.exists() else 0
 
-    headers = {"User-Agent": "FolioSenseAI-Updater"}
+    headers = {"User-Agent": "FolioOrb-Updater"}
     if existing:
         headers["Range"] = f"bytes={existing}-"
 
@@ -155,7 +155,7 @@ def verify_download(path, sha256sums_text: str, filename: str) -> bool:
 
 def fetch_text(url: str) -> str:
     """Fetch a small text asset (e.g. SHA256SUMS.txt) via the same HTTP seam."""
-    request = urllib.request.Request(url, headers={"User-Agent": "FolioSenseAI-Updater"})
+    request = urllib.request.Request(url, headers={"User-Agent": "FolioOrb-Updater"})
     try:
         resp = _open(request)
         try:

@@ -76,5 +76,5 @@ if [[ "$NO_START" -eq 1 ]]; then
   exit 0
 fi
 
-echo "Starting FolioSenseAI at http://localhost:8000"
+echo "Starting FolioOrb at http://localhost:8000"
 python run.py

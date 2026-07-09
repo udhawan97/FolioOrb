@@ -11,5 +11,5 @@ fi
 source venv/bin/activate
 mkdir -p database
 
-echo "Starting FolioSenseAI at http://localhost:8000"
+echo "Starting FolioOrb at http://localhost:8000"
 python run.py
