@@ -16,6 +16,10 @@ from app.services.update_service import UpdateStatus
 @pytest.fixture(autouse=True)
 def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    # This file tests the install() orchestration itself, not the frozen-build
+    # guard (covered separately by test_install_refuses_when_not_frozen) — the
+    # tests run under pytest, which is never a frozen PyInstaller build.
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
     update_service._reset_for_tests()
     update_installer._reset_for_tests()
     yield
@@ -122,6 +126,21 @@ def test_install_requires_ready_state():
     assert update_installer.install()["status"] != "installing"
 
 
+def test_install_refuses_when_not_frozen(monkeypatch):
+    """A dev/web-mode server must refuse install() even if called directly."""
+    monkeypatch.setattr(paths, "is_frozen", lambda: False)
+    update_service.mark(UpdateStatus.READY)
+    update_installer._rt["path"] = Path("/x/Setup.exe")
+    launched = []
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
+
+    st = update_installer.install()
+
+    assert st["status"] == "error"
+    assert "packaged app" in st["error"].lower()
+    assert launched == []
+
+
 def _setup_file_db(tmp_path, monkeypatch):
     import sqlite3
 
@@ -153,12 +172,55 @@ def test_install_creates_verified_backup_and_rollback_point(tmp_path, monkeypatc
     st = update_installer.install()
 
     assert st["status"] == "installing"
-    rollback = app_settings.load_settings()["rollback_point"]
-    assert rollback is not None
-    assert Path(rollback["db_backup"]).exists()
-    assert backup_service.verify_backup(Path(rollback["db_backup"]), expected_min_holdings=1)
-    assert rollback["env_backup"] and Path(rollback["env_backup"]).exists()
-    assert rollback["version"]
+    # pylint infers "rollback_point" as the DEFAULTS literal's static None type
+    # and flags subscripting it; the runtime value is the merged dict set by
+    # save_settings() above.
+    # pylint: disable=unsubscriptable-object
+    rollback_point = app_settings.load_settings()["rollback_point"]
+    assert rollback_point is not None
+    assert Path(rollback_point["db_backup"]).exists()
+    assert backup_service.verify_backup(Path(rollback_point["db_backup"]), expected_min_holdings=1)
+    assert rollback_point["env_backup"] and Path(rollback_point["env_backup"]).exists()
+    assert rollback_point["version"]
+    # pylint: enable=unsubscriptable-object
+
+
+def test_install_rejects_backup_that_silently_lost_holdings(tmp_path, monkeypatch):
+    """Regression: verification must use the DB's real count, not a hardcoded 0.
+
+    A hardcoded expected_min_holdings=0 would accept a corrupted backup that
+    ended up with zero (or no) holdings even though the live DB has one — this
+    proves the fix catches exactly that case instead of proceeding to install.
+    """
+    from app.services import backup_service
+
+    _setup_file_db(tmp_path, monkeypatch)
+    installer = tmp_path / "Setup.exe"
+    installer.write_text("x")
+    update_service.mark(UpdateStatus.READY)
+    update_installer._rt["path"] = installer
+    launched = []
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
+
+    def _empty_backup(source_db, label, dest_dir=None, ts=None):
+        # Simulate a backup that "succeeded" but lost the holdings table.
+        dest_dir = dest_dir or backup_service.backups_dir()
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        empty = dest_dir / f"{label}-corrupt.db"
+        import sqlite3
+
+        conn = sqlite3.connect(str(empty))
+        conn.execute("CREATE TABLE unrelated (id INTEGER)")
+        conn.commit()
+        conn.close()
+        return empty
+
+    monkeypatch.setattr(backup_service, "create_backup", _empty_backup)
+
+    st = update_installer.install()
+
+    assert st["status"] == "error"
+    assert launched == []
 
 
 def test_install_aborts_when_backup_fails(tmp_path, monkeypatch):

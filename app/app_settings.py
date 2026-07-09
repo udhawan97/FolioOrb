@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,12 @@ from app import paths
 logger = logging.getLogger(__name__)
 
 SETTINGS_FILENAME = "settings.json"
+
+# Serializes save_settings()'s read-modify-write within this process — without
+# it, the background update-check scheduler and a concurrent user-triggered
+# write (e.g. skip-version, a settings toggle) can race and silently drop
+# whichever wrote first.
+_write_lock = threading.Lock()
 
 # Every persisted key and its default. Only keys listed here are stored or
 # returned — unknown keys in an on-disk file are ignored, which keeps the file
@@ -74,10 +81,11 @@ def save_settings(values: dict[str, Any]) -> dict[str, Any]:
     Only known keys (present in ``DEFAULTS``) are persisted. Returns the full
     merged settings so callers can echo the resulting state to the UI.
     """
-    merged = load_settings()
-    merged.update({key: value for key, value in values.items() if key in DEFAULTS})
-    _atomic_write(settings_path(), merged)
-    return merged
+    with _write_lock:
+        merged = load_settings()
+        merged.update({key: value for key, value in values.items() if key in DEFAULTS})
+        _atomic_write(settings_path(), merged)
+        return merged
 
 
 def _atomic_write(path: Path, data: dict[str, Any]) -> None:

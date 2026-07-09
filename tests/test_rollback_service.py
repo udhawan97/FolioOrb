@@ -10,6 +10,7 @@ import pytest
 from app import app_settings, paths
 from app.config import settings
 from app.services import backup_service, rollback_service, update_installer, update_service
+from app.services.update_service import UpdateStatus
 
 
 def _seed_db(path, tickers):
@@ -98,6 +99,50 @@ def test_rollback_aborts_if_safety_backup_fails(rollback_env, monkeypatch):
     assert result["status"] == "error"
     assert rollback_env["launched"] == []          # never handed off
     assert _holdings(rollback_env["live"]) == ["NEW"]  # data untouched
+
+
+def test_rollback_refuses_while_update_in_progress(rollback_env):
+    """Regression: rollback must not run concurrently with an active download/install.
+
+    Without this guard, the always-visible Restore button could be clicked
+    mid-download and interleave writes with the download thread's state
+    updates. The rollback point remains untouched and nothing is launched.
+    """
+    for busy_status in (
+        UpdateStatus.DOWNLOADING, UpdateStatus.VERIFYING,
+        UpdateStatus.BACKING_UP, UpdateStatus.INSTALLING,
+    ):
+        update_service.mark(busy_status)
+        result = rollback_service.rollback(restore_data=False)
+        assert result["status"] == "error"
+        assert "already in progress" in result["error"].lower()
+    assert rollback_env["launched"] == []
+
+
+def test_rollback_safety_backup_rejects_lost_holdings(rollback_env, monkeypatch):
+    """Regression: the pre-rollback safety backup must use the DB's real count.
+
+    A hardcoded expected_min_holdings=0 would accept a "successful" backup that
+    silently lost the holdings table — this proves the fix catches it and
+    refuses to proceed with the rollback.
+    """
+    def _empty_backup(source_db, label, dest_dir=None, ts=None):
+        dest_dir = dest_dir or backup_service.backups_dir()
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        empty = dest_dir / f"{label}-corrupt.db"
+        conn = sqlite3.connect(str(empty))
+        conn.execute("CREATE TABLE unrelated (id INTEGER)")
+        conn.commit()
+        conn.close()
+        return empty
+
+    monkeypatch.setattr(backup_service, "create_backup", _empty_backup)
+
+    result = rollback_service.rollback(restore_data=False)
+
+    assert result["status"] == "error"
+    assert rollback_env["launched"] == []
+    assert _holdings(rollback_env["live"]) == ["NEW"]  # untouched
 
 
 def test_rollback_without_installer_keeps_data_safe(rollback_env, monkeypatch):

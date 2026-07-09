@@ -97,6 +97,22 @@ def test_restore_refuses_unverified_backup(tmp_path):
     assert _holdings(live) == ["KEEP"]
 
 
+def test_count_holdings(tmp_path):
+    db = tmp_path / "portfolio.db"
+    _make_db(db, ["VOO", "AAPL"])
+    assert backup_service.count_holdings(db) == 2
+
+
+def test_count_holdings_missing_table_or_file_is_zero(tmp_path):
+    assert backup_service.count_holdings(tmp_path / "nope.db") == 0
+    empty = tmp_path / "notable.db"
+    conn = sqlite3.connect(str(empty))
+    conn.execute("CREATE TABLE unrelated (id INTEGER)")
+    conn.commit()
+    conn.close()
+    assert backup_service.count_holdings(empty) == 0
+
+
 def test_env_snapshot_and_restore(tmp_path, monkeypatch):
     from app import paths
 

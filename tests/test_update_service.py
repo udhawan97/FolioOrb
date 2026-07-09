@@ -32,7 +32,8 @@ def _macos_assets(version="4.4.0"):
         {
             "name": "SHA256SUMS.txt",
             "size": 200,
-            "browser_download_url": f"https://github.com/x/releases/download/v{version}/SHA256SUMS.txt",
+            "browser_download_url":
+                f"https://github.com/x/releases/download/v{version}/SHA256SUMS.txt",
         },
     ]
 

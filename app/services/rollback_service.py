@@ -33,6 +33,17 @@ from app.services.update_service import UpdateStatus
 
 logger = logging.getLogger(__name__)
 
+# Statuses that mean an update download/verify/backup/install is actively in
+# flight. Rollback refuses to start while one of these is active — running
+# both at once would interleave writes to update_service's shared state and
+# could overlap two OS-level install handoffs.
+_BUSY_STATUSES = {
+    UpdateStatus.DOWNLOADING.value,
+    UpdateStatus.VERIFYING.value,
+    UpdateStatus.BACKING_UP.value,
+    UpdateStatus.INSTALLING.value,
+}
+
 
 def _rollback_point() -> dict | None:
     from app import app_settings
@@ -50,8 +61,16 @@ def can_rollback() -> bool:
     return Path(point["db_backup"]).exists()
 
 
-def rollback(restore_data: bool = False) -> dict:
+def rollback(restore_data: bool = False) -> dict:  # pylint: disable=too-many-return-statements
     """Roll back to the previous version. See module docstring for the contract."""
+    current = update_service.get_state()
+    if current.get("status") in _BUSY_STATUSES:
+        return update_service.mark(
+            UpdateStatus.ERROR,
+            error="An update is already in progress. Wait for it to finish before restoring "
+            "a previous version.",
+        )
+
     rollback_point = _rollback_point()
     if not rollback_point or not rollback_point.get("db_backup"):
         return update_service.mark(
@@ -62,10 +81,10 @@ def rollback(restore_data: bool = False) -> dict:
 
     # 1. Always snapshot current data first — nothing newer is ever lost.
     try:
-        safety = backup_service.create_backup(
-            backup_service.live_db_path(), label="pre-rollback"
-        )
-        if not backup_service.verify_backup(safety, expected_min_holdings=0):
+        source_db = backup_service.live_db_path()
+        pre_count = backup_service.count_holdings(source_db)
+        safety = backup_service.create_backup(source_db, label="pre-rollback")
+        if not backup_service.verify_backup(safety, expected_min_holdings=pre_count):
             raise ValueError("safety backup failed verification")
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Pre-rollback safety backup failed: %s", type(exc).__name__)

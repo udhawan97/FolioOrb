@@ -52,12 +52,14 @@ def test_updates_js_exposes_api_and_states():
     # Every lifecycle state has a render branch.
     for status in (
         '"checking"', '"up_to_date"', '"available"', '"downloading"',
-        '"verifying"', '"backing_up"', '"ready"', '"offline"', '"error"',
+        '"verifying"', '"backing_up"', '"installing"', '"ready"', '"offline"', '"error"',
     ):
         assert status in js, status
 
-    # Notes are escaped before any limited formatting is applied (XSS guard).
+    # Notes are escaped before any limited formatting is applied (XSS guard) —
+    # quotes too, since the link rule inserts the captured URL into href="$2".
     assert 'replace(/&/g, "&amp;")' in js
+    assert 'replace(/"/g, "&quot;")' in js
     # Accessibility: focus trap + Escape handling.
     assert "trapFocus" in js
     assert 'e.key === "Escape"' in js
@@ -68,6 +70,17 @@ def test_updates_js_exposes_api_and_states():
     assert "openRollbackConfirm" in js
     assert "/api/system/rollback" in js
     assert "rollback=1" in js
+    # Rollback safety: checkbox resets on each open, Restore button gated on
+    # the live can_rollback signal (not just settings metadata) and disabled
+    # while an update is actively in progress.
+    assert "updateRollbackRestoreData.checked = false" in js
+    assert "rollbackInfo.can_rollback" in js
+    assert "WORKING[state.status]" in js
+    # Dismissing the sheet (X/Escape/backdrop) must clear rollbackMode, or the
+    # next open() incorrectly jumps straight back into rollback-confirm.
+    close_start = js.index("function close() {")
+    close_body = js[close_start:close_start + 700]
+    assert "rollbackMode = false" in close_body
 
 
 def test_update_styles_present():

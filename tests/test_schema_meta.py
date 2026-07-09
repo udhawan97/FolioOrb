@@ -77,6 +77,70 @@ def test_existing_data_is_backed_up_and_preserved(file_db):
     assert backup_service.verify_backup(backups[0], expected_min_holdings=1)
 
 
+def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
+    """Regression: verification must use the DB's real holdings count, not 0.
+
+    A hardcoded expected_min_holdings=0 would accept a "backup" that silently
+    ended up with zero rows even though the live DB has one — this proves the
+    fix (computing the real pre-backup count) catches that and skips the
+    otherwise-unsafe migration path.
+    """
+    engine, db_path = file_db
+    from app import models
+    from app.services import backup_service as bs
+
+    models.Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO portfolios (name) VALUES ('P')"))
+        conn.execute(
+            text(
+                "INSERT INTO holdings (portfolio_id, ticker, shares, avg_cost, is_active) "
+                "VALUES (1, 'AAPL', 1, 1, 1)"
+            )
+        )
+        schema_meta._ensure_app_meta(conn)
+        schema_meta._write_meta(conn, "schema_version", "0")
+
+    def _empty_backup(source_db, label, dest_dir=None, ts=None):
+        dest_dir = dest_dir or bs.backups_dir()
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        empty = dest_dir / f"{label}-corrupt.db"
+        conn = sqlite3.connect(str(empty))
+        conn.execute("CREATE TABLE unrelated (id INTEGER)")
+        conn.commit()
+        conn.close()
+        return empty
+
+    monkeypatch.setattr(bs, "create_backup", _empty_backup)
+
+    result = schema_meta.apply_migrations_safely(engine)
+
+    assert result.backed_up is False
+    assert result.backup_path is None
+
+
+def test_had_data_detects_non_holdings_user_tables(file_db):
+    """A DB with only verdict_snapshots (no holdings rows yet) still backs up first."""
+    engine, _ = file_db
+    from app import models
+
+    models.Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO verdict_snapshots (ticker, action, confidence, hold_class) "
+                "VALUES ('VOO', 'hold', 80, 'auto')"
+            )
+        )
+        schema_meta._ensure_app_meta(conn)
+        schema_meta._write_meta(conn, "schema_version", "0")
+
+    result = schema_meta.apply_migrations_safely(engine)
+
+    assert result.backed_up is True
+    assert result.backup_path is not None
+
+
 def test_failed_migration_restores_backup(file_db, monkeypatch):
     engine, db_path = file_db
     from app import models

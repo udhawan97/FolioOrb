@@ -6,6 +6,8 @@ filtering, and graceful recovery from a corrupt file — all against a temporary
 data directory so the real user settings are never touched.
 """
 import json
+import threading
+import time
 
 import pytest
 
@@ -49,6 +51,39 @@ def test_corrupt_file_falls_back_to_defaults(temp_data_dir):
 def test_non_object_json_falls_back_to_defaults(temp_data_dir):
     app_settings.settings_path().write_text("[1, 2, 3]", encoding="utf-8")
     assert app_settings.load_settings() == app_settings.DEFAULTS
+
+
+def test_concurrent_saves_do_not_lose_updates(temp_data_dir, monkeypatch):
+    """Regression: the background scheduler and a request thread must not race.
+
+    Without _write_lock serializing the read-modify-write, two concurrent
+    save_settings calls that each read the same stale baseline would silently
+    drop one of the two changes (e.g. a user's "skip this version" reverted by
+    the scheduler's last_checked_at write landing right after).
+    """
+    original_load = app_settings.load_settings
+
+    def slow_load():
+        result = original_load()
+        time.sleep(0.05)  # widen the race window between read and write
+        return result
+
+    monkeypatch.setattr(app_settings, "load_settings", slow_load)
+
+    t1 = threading.Thread(
+        target=app_settings.save_settings, args=({"auto_check_updates": False},)
+    )
+    t2 = threading.Thread(
+        target=app_settings.save_settings, args=({"notify_updates": False},)
+    )
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    final = original_load()
+    assert final["auto_check_updates"] is False
+    assert final["notify_updates"] is False
 
 
 def test_write_is_atomic_and_leaves_no_temp_files(temp_data_dir):

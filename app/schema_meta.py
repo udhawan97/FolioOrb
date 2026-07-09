@@ -38,6 +38,18 @@ MIN_COMPATIBLE_APP_VERSION = "4.3.0"
 
 _META_TABLE = "app_meta"
 
+# Tables that indicate the database already holds real user data. Checked by
+# name rather than just "holdings" so a database that has, say, realized
+# trades or verdict history but (temporarily) zero active holdings still gets
+# the backup-first treatment.
+_USER_DATA_TABLES = (
+    "holdings",
+    "realized_trades",
+    "verdict_snapshots",
+    "portfolio_snapshots",
+    "ai_summaries",
+)
+
 
 @dataclass
 class MigrationResult:
@@ -121,7 +133,7 @@ def apply_migrations_safely(engine: Engine) -> MigrationResult:
     with engine.begin() as conn:
         _ensure_app_meta(conn)
         stored = int(_read_meta(conn, "schema_version", "0") or 0)
-        had_data = _table_exists(conn, "holdings")
+        had_data = any(_table_exists(conn, name) for name in _USER_DATA_TABLES)
 
     needs_bump = stored < SCHEMA_VERSION
     backup_path = None
@@ -132,10 +144,13 @@ def apply_migrations_safely(engine: Engine) -> MigrationResult:
         try:
             from app.services import backup_service
 
-            backup_path = backup_service.create_backup(
-                backup_service.live_db_path(), label=f"pre-migrate-v{stored}"
-            )
-            backed_up = backup_service.verify_backup(backup_path, expected_min_holdings=0)
+            source_db = backup_service.live_db_path()
+            # The database's real current holdings count, so verification below
+            # can catch a backup that silently lost the table — a hardcoded
+            # expectation of 0 would let that slip through undetected.
+            pre_count = backup_service.count_holdings(source_db)
+            backup_path = backup_service.create_backup(source_db, label=f"pre-migrate-v{stored}")
+            backed_up = backup_service.verify_backup(backup_path, expected_min_holdings=pre_count)
             if not backed_up:
                 logger.error("Pre-migration backup failed verification: %s", backup_path.name)
                 backup_path = None

@@ -104,8 +104,13 @@
        then applies a tiny allow-list (headings, bold, bullets, links) so a
        malformed body can never inject markup. */
     function renderNotes(md) {
+        // Quotes are escaped too, not just &/</>: the link rule below inserts
+        // a captured URL into href="$2" — an unescaped " in the release body
+        // (e.g. via a malicious PR title pulled into --generate-notes) could
+        // otherwise break out of the attribute and inject an event handler.
         var escaped = String(md || "")
-            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         var lines = escaped.split(/\r?\n/);
         var html = [];
         var inList = false;
@@ -222,6 +227,9 @@
         } else if (status === "backing_up") {
             el.updateSheetTitle.textContent = "Backing up your data…";
             el.updateSub.textContent = "Saving a safety copy of your portfolio.";
+        } else if (status === "installing") {
+            el.updateSheetTitle.textContent = "Installing…";
+            el.updateSub.textContent = "FolioSenseAI will restart shortly.";
         } else if (status === "ready" && avail) {
             renderReady(avail);
         } else if (status === "offline") {
@@ -317,8 +325,15 @@
             setSwitch(el.updatePrefAuto, settings.auto_check_updates !== false);
             setSwitch(el.updatePrefNotify, settings.notify_updates !== false);
         }
-        var hasRollback = !!(settings && settings.rollback_point);
-        if (el.updateRestore) { el.updateRestore.disabled = !hasRollback; }
+        // Prefer the live, file-existence-checked signal (rollbackInfo) over the
+        // settings.json metadata alone — metadata can outlive a pruned/deleted
+        // backup file, which would otherwise leave the button enabled for a
+        // rollback that's guaranteed to fail server-side.
+        var hasRollback = rollbackInfo
+            ? !!rollbackInfo.can_rollback
+            : !!(settings && settings.rollback_point);
+        var busy = !!(state && WORKING[state.status]);
+        if (el.updateRestore) { el.updateRestore.disabled = !hasRollback || busy; }
     }
 
     function setSwitch(node, on) {
@@ -361,7 +376,16 @@
 
     function installNow() {
         postJSON("/api/system/update/install")
-            .then(function (s) { state = s; render(); })
+            .then(function (s) {
+                state = s;
+                // If the pre-install backup succeeded but the OS launch then
+                // failed, a rollback point now exists mid-session — refresh so
+                // the Restore button reflects it without needing a reload.
+                getJSON("/api/system/rollback/status")
+                    .then(function (r) { rollbackInfo = r; renderPrefs(); })
+                    .catch(function () {});
+                render();
+            })
             .catch(function () { showReleasesFallback(); });
     }
 
@@ -386,6 +410,9 @@
     /* ------------------------------------------------------------ rollback */
     function openRollbackConfirm() {
         rollbackMode = true;
+        // Always start unchecked: restoring pre-update data must be a choice
+        // made fresh each time, never carried over from an earlier Cancel.
+        if (el.updateRollbackRestoreData) { el.updateRollbackRestoreData.checked = false; }
         if (!sheetOpen) { open(); } else { renderRollbackConfirm(); }
     }
 
@@ -478,6 +505,12 @@
     function close() {
         if (!sheetOpen) { return; }
         sheetOpen = false;
+        // Dismissing the sheet (X button, Escape, backdrop click) must not leave
+        // rollback-confirm "sticky" — otherwise the next open() (e.g. from the
+        // nav pill or menu) would jump straight back into it instead of showing
+        // normal update status. Only the explicit Cancel action already clears
+        // this separately, but dismissal paths bypass that handler entirely.
+        rollbackMode = false;
         managePolling(false);
         el.updateBackdrop.classList.remove("is-open");
         el.updateSheet.classList.remove("is-open");

@@ -82,6 +82,26 @@ def _timestamp() -> str:
     return time.strftime("%Y%m%d-%H%M%S")
 
 
+def count_holdings(db_path: Path) -> int:
+    """Row count of the ``holdings`` table in ``db_path`` (0 if missing/absent).
+
+    Callers use this *before* taking a safety-critical backup so
+    ``verify_backup`` can be given the database's real current count instead of
+    a hardcoded ``0`` — otherwise a backup that silently lost the holdings
+    table would still pass verification (0 rows satisfies an expectation of 0).
+    """
+    db_path = Path(db_path)
+    if not db_path.exists():
+        return 0
+    conn = sqlite3.connect(str(db_path))
+    try:
+        return conn.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
+    except sqlite3.OperationalError:
+        return 0
+    finally:
+        conn.close()
+
+
 def create_backup(
     source_db: Path,
     label: str,

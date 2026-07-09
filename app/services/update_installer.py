@@ -8,11 +8,13 @@ verified installer off to the OS:
 * Windows: run the per-user Inno installer silently; it closes the running app,
   updates in place, and relaunches (see ``packaging/windows/installer.iss``).
 * macOS: open the verified DMG for the user to drag into Applications (an
-  unsigned ``.app`` is not swapped in place in this phase).
+  unsigned ``.app`` is not swapped in place currently).
 
-The pre-update backup and previous-version archiving are wired into this flow in
-the next phase; the ``backing_up`` state is reserved for it. Nothing here runs
-without the user first pressing Update Now / Quit & Install.
+Before the installer is launched, a verified pre-update backup of the database
+and ``.env`` is taken and recorded as the rollback point (see
+``_create_rollback_point``); if that backup can't be made, the install is
+paused rather than risking an un-revertable update. Nothing here runs without
+the user first pressing Update Now / Quit & Install.
 """
 from __future__ import annotations
 
@@ -138,7 +140,18 @@ def install() -> dict:
     A verified pre-update backup of the database (and ``.env``) is taken first
     and recorded as the rollback point. If that backup can't be made, the update
     is paused rather than risking an un-revertable install — nothing is changed.
+
+    Refuses outright on a non-frozen (source/dev) build: the client only ever
+    reaches this call from a packaged app, but the server enforces it too so a
+    direct API call against a dev server can't launch a downloaded binary.
     """
+    from app import paths
+
+    if not paths.is_frozen():
+        return update_service.mark(
+            UpdateStatus.ERROR, error="In-app install is only available in the packaged app."
+        )
+
     with _lock:
         state = update_service.get_state()
         if state.get("status") != "ready" or _rt["path"] is None:
@@ -190,14 +203,14 @@ def _create_rollback_point() -> dict | None:
     from app import app_settings
 
     try:
-        db_backup = backup_service.create_backup(
-            backup_service.live_db_path(), label=f"pre-update-v{__version__}"
-        )
+        source_db = backup_service.live_db_path()
+        pre_count = backup_service.count_holdings(source_db)
+        db_backup = backup_service.create_backup(source_db, label=f"pre-update-v{__version__}")
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Pre-update backup failed: %s", type(exc).__name__)
         return None
 
-    if not backup_service.verify_backup(db_backup, expected_min_holdings=0):
+    if not backup_service.verify_backup(db_backup, expected_min_holdings=pre_count):
         logger.error("Pre-update backup failed verification")
         return None
 
