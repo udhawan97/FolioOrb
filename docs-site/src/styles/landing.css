@@ -653,20 +653,72 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 	background: var(--panel-2); border: 1px solid color-mix(in srgb, var(--act-accent) 30%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--act-accent) 18%, transparent); }
 .up-note { max-width: 64ch; margin: 1.8rem auto 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
 
-/* Footer Senpai one-liner — interactive shuffle */
-.footer-brand-copy { min-width: 0; }
-.senpai-quip { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.1rem 0 0; padding: 0; max-width: 46ch; text-align: left;
-	background: none; border: none; cursor: pointer; color: var(--muted); font: inherit; font-size: 0.85rem; line-height: 1.4; }
-.senpai-quip .quip-text { border-bottom: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); transition: color var(--dur-micro) ease, border-color var(--dur-micro) ease; }
-.senpai-quip:hover .quip-text, .senpai-quip:focus-visible .quip-text { color: var(--text); border-bottom-color: var(--act-accent); }
-.quip-shuffle { flex: none; width: 13px; height: 13px; background: currentColor; opacity: 0.55; transition: opacity var(--dur-micro) ease, transform 0.4s var(--ease-out);
+/* Footer Senpai one-liner — a self-contained, shufflable pill.
+   The brand name sits on its own line; Senpai's quip lives in an accent-tinted
+   pill below it, so the two never bleed into each other. */
+.footer-brand-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 0.55rem; min-width: 0; }
+.footer-brand-name { font-size: 0.98rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); line-height: 1; }
+
+.senpai-quip {
+	display: inline-flex; align-items: center; gap: 0.6rem;
+	margin: 0; padding: 0.42rem 0.45rem 0.42rem 0.8rem; max-width: 48ch;
+	font: inherit; font-size: 0.85rem; line-height: 1.35; text-align: left; cursor: pointer;
+	color: var(--muted);
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--act-accent) 24%, var(--panel-border));
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--act-accent) 9%, transparent), transparent),
+		var(--panel);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	transition: border-color var(--dur-micro) ease, background var(--dur-micro) ease,
+		box-shadow var(--dur-micro) ease, transform var(--dur-micro) ease;
+}
+.senpai-quip:hover, .senpai-quip:focus-visible {
+	outline: none;
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--act-accent) 55%, transparent);
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--act-accent) 15%, transparent), transparent),
+		var(--panel-2);
+	box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--act-accent) 45%, transparent),
+		inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Pulsing "live" dot on the left. */
+.quip-dot {
+	flex: none; width: 6px; height: 6px; border-radius: 50%;
+	background: var(--act-accent);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--act-accent) 70%, transparent);
+	animation: quip-pulse 2.6s var(--ease-out) infinite;
+}
+
+.senpai-quip .quip-text { color: var(--muted); transition: color var(--dur-micro) ease; }
+.senpai-quip:hover .quip-text, .senpai-quip:focus-visible .quip-text { color: var(--text); }
+
+/* Shuffle icon in its own accent chip on the right. */
+.quip-shuffle-chip {
+	flex: none; display: inline-flex; align-items: center; justify-content: center;
+	width: 22px; height: 22px; border-radius: 50%;
+	background: color-mix(in srgb, var(--act-accent) 16%, transparent);
+	transition: background var(--dur-micro) ease, transform 0.45s var(--ease-out);
+}
+.senpai-quip:hover .quip-shuffle-chip, .senpai-quip:focus-visible .quip-shuffle-chip {
+	background: color-mix(in srgb, var(--act-accent) 30%, transparent);
+}
+.quip-shuffle {
+	width: 12px; height: 12px; background: var(--act-accent);
 	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat;
-	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat; }
-.senpai-quip:hover .quip-shuffle, .senpai-quip:focus-visible .quip-shuffle { opacity: 1; }
-.senpai-quip.shuffled .quip-shuffle { animation: quip-spin 0.45s var(--ease-out); }
-@keyframes quip-spin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3h5v5'/%3E%3Cpath d='M4 20 21 3'/%3E%3Cpath d='M21 16v5h-5'/%3E%3Cpath d='M15 15l6 6'/%3E%3Cpath d='M4 4l5 5'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.senpai-quip.shuffled .quip-shuffle-chip { animation: quip-spin 0.45s var(--ease-out); }
 .senpai-quip.shuffled .quip-text { animation: quip-fade 0.4s var(--ease-out); }
+@keyframes quip-spin { from { transform: rotate(0); } to { transform: rotate(180deg); } }
 @keyframes quip-fade { 0% { opacity: 0.35; transform: translateY(2px); } 100% { opacity: 1; transform: none; } }
+@keyframes quip-pulse {
+	0%, 100% { opacity: 1; box-shadow: 0 0 8px color-mix(in srgb, var(--act-accent) 70%, transparent); }
+	50% { opacity: 0.5; box-shadow: 0 0 3px color-mix(in srgb, var(--act-accent) 35%, transparent); }
+}
 
 @media (max-width: 960px) {
 	.update-console { grid-template-columns: 1fr; gap: 1.6rem; padding: 1.6rem; }
