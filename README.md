@@ -11,8 +11,8 @@
 <p align="center"><em>Your folio, finally making sense.</em></p>
 
 <p align="center">
-  A local-first portfolio intelligence dashboard that turns holdings, market data, risk signals,<br>
-  and news into plain-English answers to "wait, why did that happen?"
+  A portfolio dashboard that pulls in your holdings, live market data, risk signals, and news,<br>
+  then gives you plain hold, trim, or exit calls — with the reasoning laid out, not just a verdict.
 </p>
 
 <p align="center">
