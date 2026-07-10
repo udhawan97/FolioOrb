@@ -183,24 +183,17 @@ const roadmap = [
 						<span class="eyebrow reveal">Local-first portfolio intelligence</span>
 						<h1 class="display reveal">Your portfolio, finally speaks&nbsp;back.</h1>
 						<p class="lede reveal">
-							FolioOrb turns holdings, risk, news, and market context into plain-English
-							portfolio reads — running entirely on your machine, in your browser or as a
-							desktop app. Claude-optional, built for trust.
+							FolioOrb turns holdings, risk, news, and market context into
+							plain-English portfolio reads — running entirely on your machine.
+							Claude-optional, built for trust.
 						</p>
 
 						<div class="cta-row reveal">
-							<a id="dl-mac" class="btn btn-primary" href={RELEASES_LATEST} data-os="mac">
-								<span class="btn-icon btn-icon-mac" aria-hidden="true"></span>
+							<a class="btn btn-primary" href="#act-install">
+								<span class="btn-icon btn-icon-dl" aria-hidden="true"></span>
 								<span class="btn-copy">
-									<span class="btn-title">Download for macOS</span>
-									<span class="btn-sub" data-role="meta">Apple Silicon · .dmg</span>
-								</span>
-							</a>
-							<a id="dl-win" class="btn btn-primary" href={RELEASES_LATEST} data-os="win">
-								<span class="btn-icon btn-icon-win" aria-hidden="true"></span>
-								<span class="btn-copy">
-									<span class="btn-title">Download for Windows</span>
-									<span class="btn-sub" data-role="meta">64-bit .exe installer</span>
+									<span class="btn-title">Install FolioOrb</span>
+									<span class="btn-sub">Browser · macOS · Windows</span>
 								</span>
 							</a>
 						</div>
@@ -215,13 +208,6 @@ const roadmap = [
 							<a class="pill-action" href={RELEASES}>
 								<span class="pill-ic pill-ic-notes" aria-hidden="true"></span>Release Notes
 							</a>
-							<details class="pill-dev">
-								<summary class="pill-action"><span class="pill-ic pill-ic-dev" aria-hidden="true"></span>Development Builds</summary>
-								<div class="dev-panel">
-									<p>Rolling builds from the latest <code>main</code> merge. Unstable — for testing only.</p>
-									<a href={`${RELEASES}/tag/latest-main`}>Get the latest-main build ↗</a>
-								</div>
-							</details>
 						</div>
 
 						<ul class="trust-strip reveal" aria-label="At a glance">
@@ -478,29 +464,81 @@ const roadmap = [
 				</div>
 			</section>
 
-			<!-- ═══ ACT 8a · DOWNLOAD ════════════════════════════════════════ -->
-			<section class="act download" id="act-download" data-hue="cyan">
+			<!-- ═══ ACT 8a · INSTALL (the one install stop) ══════════════════ -->
+			<section class="act install" id="act-install" data-hue="cyan">
 				<div class="act-head reveal">
-					<span class="kicker">Desktop app</span>
-					<h2 class="section-title">Runs on your machine. No Python, no account.</h2>
+					<span class="kicker">Install</span>
+					<h2 class="section-title">Get FolioOrb — however you like to run it.</h2>
+					<p class="up-lede">Three ways in, one app. Whichever you pick, your holdings and settings stay local on your machine.</p>
 				</div>
-				<div class="dl-grid">
-					<article class="dl-card grad-border reveal" data-plat="mac">
+
+				<div class="dl-grid dl-grid--three reveal">
+					<!-- Path 1 · run locally in your browser, from source -->
+					<article class="dl-card grad-border" data-plat="web">
+						<span class="dl-glyph dl-glyph-web" aria-hidden="true"></span>
+						<div class="dl-head"><h3>In your browser</h3><span class="arch">macOS · Windows · Linux</span></div>
+						<p>Run it locally from source. One script, then it opens at <code>localhost:8000</code> — no installer, and nothing leaves your machine.</p>
+						<a class="dl-btn" href="#install-cmds">See the commands ↓</a>
+						<a class="dl-more" href={doc('build-from-source')}>Build-from-source guide →</a>
+					</article>
+
+					<!-- Path 2 · macOS desktop app -->
+					<article class="dl-card grad-border" data-plat="mac">
+						<span class="dl-rec" aria-hidden="true">Best for your Mac</span>
 						<span class="dl-glyph dl-glyph-mac" aria-hidden="true"></span>
-						<div class="dl-head"><h3>macOS</h3><span class="arch">arm64 · Apple Silicon</span></div>
-						<p>A native app window — no terminal. macOS 11 Big Sur and newer.</p>
-						<a class="dl-btn" href={RELEASES_LATEST} data-os="mac" data-role="card-dl">Download .dmg</a>
+						<div class="dl-head"><h3>macOS app</h3><span class="arch">arm64 · Apple Silicon</span></div>
+						<p>A native app window — no terminal, no Python to install. macOS 11 Big Sur and newer.</p>
+						<a id="dl-mac" class="dl-btn" href={RELEASES_LATEST} data-os="mac">Download .dmg</a>
 						<a class="dl-more" href={doc('install-macos')}>Install guide →</a>
 					</article>
-					<article class="dl-card grad-border reveal" data-plat="win">
+
+					<!-- Path 3 · Windows desktop app -->
+					<article class="dl-card grad-border" data-plat="win">
+						<span class="dl-rec" aria-hidden="true">Best for your PC</span>
 						<span class="dl-glyph dl-glyph-win" aria-hidden="true"></span>
-						<div class="dl-head"><h3>Windows</h3><span class="arch">x64 · Windows 10/11</span></div>
-						<p>A clean per-user installer — no admin rights. Uninstalls cleanly.</p>
-						<a class="dl-btn" href={RELEASES_LATEST} data-os="win" data-role="card-dl">Download .exe</a>
+						<div class="dl-head"><h3>Windows app</h3><span class="arch">x64 · Windows 10/11</span></div>
+						<p>A clean per-user installer — no admin rights, and it uninstalls cleanly.</p>
+						<a id="dl-win" class="dl-btn" href={RELEASES_LATEST} data-os="win">Download .exe</a>
 						<a class="dl-more" href={doc('install-windows')}>Install guide →</a>
 					</article>
 				</div>
-				<p class="dl-note reveal">Prefer not to install? You can also <a href={doc('build-from-source')}>run FolioOrb as a local web app from source</a> — on macOS, Windows, or Linux. On the desktop app, early builds aren’t code-signed yet, so macOS and Windows show a first-launch warning — expected for an open-source app. The <a href={doc('download')}>install guides</a> show exactly what you’ll see.</p>
+
+				<!-- Exact, verified commands — one terminal, three ways to run -->
+				<div class="install-cmds reveal" id="install-cmds">
+					<div class="terminal" id="terminal">
+						<div class="term-bar"><span></span><span></span><span></span><span class="term-title">folioorb — zsh</span></div>
+						<div class="term-tabs" role="tablist">
+							<button class="term-tab is-active" data-tab="clone" role="tab" type="button">From source</button>
+							<button class="term-tab" data-tab="mac" role="tab" type="button">macOS · one-line</button>
+							<button class="term-tab" data-tab="win" role="tab" type="button">Windows · one-line</button>
+						</div>
+						<div class="term-body">
+							<pre class="term-pane is-active" data-tab="clone" data-copy={`git clone ${GITHUB}.git\ncd FolioOrb\n./scripts/setup.sh`}><span class="tl"><i>❯</i> git clone {GITHUB}.git</span><span class="tl"><i>❯</i> cd FolioOrb</span><span class="tl"><i>❯</i> ./scripts/setup.sh</span><span class="tl to"># venv + deps + first run → localhost:8000</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+							<pre class="term-pane" data-tab="mac" data-copy={macCmd}><span class="tl to"># one-line install (reads the latest release)</span><span class="tl"><i>❯</i> {macCmd}</span><span class="tl to"># FOLIO_REF=latest-main … for the dev channel</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+							<pre class="term-pane" data-tab="win" data-copy={winCmd}><span class="tl to"># PowerShell — one-line install</span><span class="tl"><i>❯</i> {winCmd}</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
+						</div>
+					</div>
+
+					<div class="install-aside">
+						<p class="install-lead">Every path is the same FolioOrb — a compact FastAPI&nbsp;+&nbsp;SQLite app with no frontend build step. The one-line installers set up Python and drop a desktop shortcut for you; from-source hands you the whole repo to pull apart.</p>
+						<div class="dev-verify">
+							<span class="tc-hash" aria-hidden="true"></span>
+							<div><b>Every release ships checksums.</b>
+								<div class="code code--inline" data-copy={'shasum -a 256 -c SHA256SUMS.txt'}>
+									<code>shasum -a 256 -c SHA256SUMS.txt</code>
+									<button class="copy" type="button" aria-label="Copy command">Copy</button>
+								</div>
+							</div>
+						</div>
+						<div class="install-links">
+							<a class="pill" href={doc('releases-and-versioning')}>Releases &amp; versioning →</a>
+							<a class="pill" href={`${RELEASES}/tag/latest-main`}>Latest-main build →</a>
+							<a class="pill" href={GITHUB}>GitHub repository →</a>
+						</div>
+					</div>
+				</div>
+
+				<p class="dl-note reveal">Early desktop builds aren’t code-signed yet, so macOS and Windows show a first-launch warning — expected for an open-source app. The <a href={doc('download')}>install guides</a> show exactly what you’ll see and how to get past it.</p>
 			</section>
 
 			<!-- ═══ ACT 8¼ · HOW UPDATES WORK ════════════════════════════════ -->
@@ -587,45 +625,6 @@ const roadmap = [
 				</div>
 			</section>
 
-			<!-- ═══ ACT 8b · DEVELOPER CONSOLE ═══════════════════════════════ -->
-			<section class="act dev" id="act-dev" data-hue="peri">
-				<div class="dev-console grad-border reveal">
-					<div class="dev-pitch">
-						<span class="kicker">Web app · from source</span>
-						<h2>Or run it in your browser.</h2>
-						<p>FolioOrb is a compact FastAPI + SQLite web app with no frontend build step. Clone it, run one script, and it opens in your browser at localhost:8000 — on macOS, Windows, or Linux. No installer required, and you can pull it apart one service at a time.</p>
-						<div class="dev-pills">
-							<a class="pill" href={doc('build-from-source')}>Build from source →</a>
-							<a class="pill" href={doc('releases-and-versioning')}>Release &amp; versioning →</a>
-							<a class="pill" href={`${RELEASES}/tag/latest-main`}>Latest-main build →</a>
-							<a class="pill" href={GITHUB}>GitHub repository →</a>
-						</div>
-						<div class="dev-verify">
-							<span class="tc-hash" aria-hidden="true"></span>
-							<div><b>Every release ships checksums.</b>
-								<div class="code code--inline" data-copy={'shasum -a 256 -c SHA256SUMS.txt'}>
-									<code>shasum -a 256 -c SHA256SUMS.txt</code>
-									<button class="copy" type="button" aria-label="Copy command">Copy</button>
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<div class="terminal" id="terminal">
-						<div class="term-bar"><span></span><span></span><span></span><span class="term-title">folioorb — zsh</span></div>
-						<div class="term-tabs" role="tablist">
-							<button class="term-tab is-active" data-tab="clone" role="tab" type="button">Clone</button>
-							<button class="term-tab" data-tab="mac" role="tab" type="button">macOS · Linux</button>
-							<button class="term-tab" data-tab="win" role="tab" type="button">Windows</button>
-						</div>
-						<div class="term-body">
-							<pre class="term-pane is-active" data-tab="clone" data-copy={`git clone ${GITHUB}.git\ncd FolioOrb\n./scripts/setup.sh`}><span class="tl"><i>❯</i> git clone {GITHUB}.git</span><span class="tl"><i>❯</i> cd FolioOrb</span><span class="tl"><i>❯</i> ./scripts/setup.sh</span><span class="tl to"># venv + deps + first run → localhost:8000</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
-							<pre class="term-pane" data-tab="mac" data-copy={macCmd}><span class="tl to"># one-line install (reads the latest release)</span><span class="tl"><i>❯</i> {macCmd}</span><span class="tl to"># FOLIO_REF=latest-main … for the dev channel</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
-							<pre class="term-pane" data-tab="win" data-copy={winCmd}><span class="tl to"># PowerShell — one-line install</span><span class="tl"><i>❯</i> {winCmd}</span><button class="copy term-copy" type="button" aria-label="Copy command">Copy</button></pre>
-						</div>
-					</div>
-				</div>
-			</section>
 		</main>
 
 		<!-- ═══ SENPAI SPOTLIGHT · standalone, above the footer ═══════════ -->
@@ -682,8 +681,11 @@ const roadmap = [
 				return p.includes('mac') ? 'mac' : p.includes('win') ? 'win' : 'other';
 			})();
 			if (os !== 'other') {
-				document.querySelectorAll('.btn[data-os]').forEach((b) => {
+				document.querySelectorAll('[data-os]').forEach((b) => {
 					b.classList.add(b.getAttribute('data-os') === os ? 'is-preferred' : 'is-secondary');
+				});
+				document.querySelectorAll('.dl-card[data-plat]').forEach((c) => {
+					if (c.getAttribute('data-plat') === os) c.classList.add('is-preferred');
 				});
 			}
 
@@ -696,7 +698,6 @@ const roadmap = [
 				const dmg = pick(data.assets, '.dmg'), exe = pick(data.assets, '.exe');
 				const setBtn = (id, a) => { const b = document.getElementById(id); if (!b || !a) return; b.href = a.browser_download_url; const m = b.querySelector('[data-role="meta"]'); if (m) m.textContent = `${data.tag_name} · ${fmtBytes(a.size)}`; };
 				setBtn('dl-mac', dmg); setBtn('dl-win', exe);
-				document.querySelectorAll('[data-role="card-dl"]').forEach((el) => { const a = el.getAttribute('data-os') === 'mac' ? dmg : exe; if (a) el.href = a.browser_download_url; });
 				const strip = document.getElementById('release-strip');
 				if (strip) {
 					const set = (r, t) => { const el = strip.querySelector(`[data-role="${r}"]`); if (el) el.textContent = t; };
@@ -848,10 +849,9 @@ const roadmap = [
 				'act-features': 'Beta 0.85 — you’ll lag the rip, dodge the worst of the dip.',
 				'act-demo': 'Fake holdings. Real workflow. Commentary: complimentary.',
 				'act-trust': 'Local-first. Your database never texts anyone.',
-				'act-download': 'Pick your platform. I’ll behave. Mostly.',
+				'act-install': 'Browser, Mac, or Windows — pick your poison. I’ll behave. Mostly.',
 				'act-updates': 'Updates knock first, back up your data, and wait for a yes.',
 				'act-roadmap': 'More features are brewing. No dates — I’m an orb, not an oracle.',
-				'act-dev': 'Or build me yourself. I’m flattered either way.',
 			};
 			if (rail && orb && bubble && localStorage.getItem('fs-rail') !== 'off') {
 				rail.classList.add('on');
