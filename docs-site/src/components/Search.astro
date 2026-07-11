@@ -81,29 +81,40 @@
       this.loadError = false;
       this.searchToken = 0; // guards against out-of-order async renders
 
-      this.toggle.addEventListener('click', () => (this.isOpen ? this.close(true) : this.open()));
-      this.clearBtn.addEventListener('click', () => this.close(true));
-      this.input.addEventListener('input', () => this.onInput());
-      this.input.addEventListener('keydown', (e) => this.onInputKey(e));
-      this.panel.addEventListener('keydown', (e) => this.onPanelKey(e));
+      // One AbortController wires up every listener — element, document, and
+      // window — so a single abort() on disconnect removes them all and avoids
+      // double-registration if the element is ever reconnected.
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+
+      this.toggle.addEventListener('click', () => (this.isOpen ? this.close(true) : this.open()), { signal });
+      this.clearBtn.addEventListener('click', () => this.close(true), { signal });
+      this.input.addEventListener('input', () => this.onInput(), { signal });
+      this.input.addEventListener('keydown', (e) => this.onInputKey(e), { signal });
+      this.panel.addEventListener('keydown', (e) => this.onPanelKey(e), { signal });
 
       // Collapse on outside click and on the ⌘K / Ctrl+K shortcut.
-      this.onDocClick = (e) => {
-        if (this.isOpen && !this.contains(e.target)) this.close(false);
-      };
-      this.onShortcut = (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-          e.preventDefault();
-          this.isOpen ? this.close(false) : this.open();
-        }
-      };
-      document.addEventListener('click', this.onDocClick);
-      window.addEventListener('keydown', this.onShortcut);
+      document.addEventListener(
+        'click',
+        (e) => {
+          if (this.isOpen && !this.contains(e.target)) this.close(false);
+        },
+        { signal }
+      );
+      window.addEventListener(
+        'keydown',
+        (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            this.isOpen ? this.close(false) : this.open();
+          }
+        },
+        { signal }
+      );
     }
 
     disconnectedCallback() {
-      document.removeEventListener('click', this.onDocClick);
-      window.removeEventListener('keydown', this.onShortcut);
+      this.controller?.abort();
     }
 
     get isOpen() {
@@ -201,11 +212,15 @@
         );
         return;
       }
-      const search = await pf.debouncedSearch(q, {}, 240);
-      if (search === null || token !== this.searchToken) return; // debounced away / superseded
-      const data = await Promise.all(search.results.slice(0, 6).map((r) => r.data()));
-      if (token !== this.searchToken) return;
-      this.renderResults(q, data);
+      try {
+        const result = await pf.debouncedSearch(q, {}, 240);
+        if (result === null || token !== this.searchToken) return; // debounced away / superseded
+        const data = await Promise.all(result.results.slice(0, 6).map((r) => r.data()));
+        if (token !== this.searchToken) return;
+        this.renderResults(q, data);
+      } catch {
+        if (token === this.searchToken) this.renderMessage('Search is unavailable right now.');
+      }
     }
 
     renderResults(q, results) {
@@ -263,9 +278,10 @@
     showPanel() {
       if (!this.isOpen) return; // a late async render must not resurrect a closed panel
       this.panel.hidden = false;
-      // Next frame so the drop transition runs from the hidden state.
+      // Next frame so the drop transition runs from the hidden state. Re-check
+      // hidden too: the box may have been cleared before this frame fired.
       requestAnimationFrame(() => {
-        if (this.isOpen) this.panel.dataset.show = 'true';
+        if (this.isOpen && !this.panel.hidden) this.panel.dataset.show = 'true';
       });
     }
 
@@ -422,7 +438,10 @@
     inset-inline-end: 0;
     top: calc(100% + 0.5rem);
     z-index: 100; /* own stacking context, above page content */
-    width: min(30rem, 88vw);
+    /* Right-anchored to the pill, which Starlight insets up to 4rem from the
+       viewport edge on mobile (hamburger space). Cap width to that inset plus a
+       margin so the panel never spills off the LEFT edge on narrow docs pages. */
+    width: min(30rem, calc(100vw - 5rem));
     max-height: min(70vh, 32rem);
     overflow-y: auto;
     padding: 0.5rem;
@@ -457,10 +476,15 @@
     text-decoration: none;
     line-height: 1.35;
   }
-  fo-search .fo-search__result-link:hover,
-  fo-search .fo-search__result-link:focus-visible {
+  fo-search .fo-search__result-link:hover {
     background: var(--sl-color-accent-low);
-    outline: none;
+  }
+  fo-search .fo-search__result-link:focus-visible {
+    /* A visible accent ring — the accent-low background alone is ~1:1 against
+       the panel surface, so keyboard focus would otherwise be invisible. */
+    background: var(--sl-color-accent-low);
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: -2px;
   }
   fo-search .fo-search__result-sub {
     font-weight: 400;
@@ -483,6 +507,11 @@
     background: transparent;
     color: var(--sl-color-accent);
     font-weight: 600;
+  }
+  :root[data-theme='light'] fo-search .fo-search__excerpt mark {
+    /* The base accent is only ~3.2:1 on the light panel; the high-contrast
+       accent clears AA (4.5:1) for this small highlighted text. */
+    color: var(--sl-color-accent-high);
   }
   fo-search .fo-search__message {
     margin: 0;
