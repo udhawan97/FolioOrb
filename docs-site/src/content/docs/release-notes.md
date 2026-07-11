@@ -7,6 +7,22 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.3.0 — Honest When Things Go Wrong
+
+- **Never a scary $0.** If market data can't be reached, the dashboard keeps your last-known
+  values and shows an honest "unavailable" status instead of $0 with a green "synced" check —
+  and it no longer writes that $0 into your performance history (which left a permanent fake
+  cliff in the P&L/drawdown charts).
+- **Honest about your Claude key.** Saving a key now verifies it actually reaches Anthropic
+  before claiming "connected," you can disconnect Claude from the key panel, and the offline
+  setup steps point at the one-click panel instead of "edit .env and restart in a terminal."
+- **No accidental sales from a typo.** Reducing a holding's share count now asks before booking
+  a realized sale, and mid-typing keystrokes no longer book phantom sales.
+- **Smaller edges filed down.** First-run/empty portfolios get an "Add your first holding"
+  prompt; remove/world-markets/news failures surface clearly instead of silently; stale hero
+  tiles clear on an empty portfolio; and Cmd/Ctrl shortcuts no longer double-fire.
+- Installing over any 5.2.x keeps everything in place.
+
 ## v5.2.1 — DCA, Polished
 
 - **Bulk actions ask first.** "Apply all" and "Skip all" now confirm with the count and dollar

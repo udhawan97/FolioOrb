@@ -21,6 +21,7 @@ from app.paths import data_dir
 from app.services.ai_service import (
     MODEL,
     ACTION_PLAN_MODEL,
+    claude_api_heartbeat,
     get_cached_claude_heartbeat,
     get_accumulated_usage,
     generate_etf_profile_seed,
@@ -496,7 +497,43 @@ def configure_api_key(body: _ApiKeyBody):
     reinitialize_client(raw)
 
     logger.info("Anthropic API key updated via dashboard (key not logged)")
-    return {"success": True, "message": "API key saved and connected. AI features are now live."}
+
+    # A well-formed key can still be revoked, mistyped, or unreachable. Verify it
+    # actually reaches Anthropic before claiming "connected" — otherwise the user
+    # is told AI is live while every panel silently serves local fallbacks.
+    heartbeat = claude_api_heartbeat()
+    if heartbeat.get("live"):
+        return {
+            "success": True,
+            "connected": True,
+            "message": "API key saved and connected. AI features are now live.",
+        }
+    return {
+        "success": True,
+        "connected": False,
+        "message": (
+            "Key saved, but I couldn't reach Anthropic with it — double-check the "
+            "key is correct and still active. Local Intelligence keeps running in "
+            "the meantime."
+        ),
+    }
+
+
+@router.delete("/configure-key")
+def remove_api_key():
+    """Remove the stored Anthropic key and fall back to Local Intelligence only."""
+    try:
+        _update_env_file("ANTHROPIC_API_KEY", "")
+    except OSError as exc:
+        logger.error("Failed to clear API key in .env: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Could not update key on disk.") from exc
+
+    reinitialize_client("")
+    logger.info("Anthropic API key removed via dashboard")
+    return {
+        "success": True,
+        "message": "Claude disconnected. Local Intelligence is still running.",
+    }
 
 
 @router.get("/summary/{ticker}")

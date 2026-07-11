@@ -172,6 +172,30 @@ def _compute_portfolio(portfolio_id, db):
     return result, total_value, total_daily_change, total_cost_basis
 
 
+def _valuation_degraded(portfolio_id, result, db):
+    """True when the portfolio holds priceable positions but *none* could be
+    priced — i.e. quotes are unavailable (offline / data-provider outage), so the
+    computed totals collapse to a misleading $0.
+
+    Detected from the already-computed ``result`` (no extra quote fetch): if the
+    database has real, non-watchlist positions with shares but the priced result
+    contains none of them, the whole quote batch failed. A partial outage (some
+    priced) is *not* degraded — the total is only slightly understated.
+    """
+    priceable = (
+        db.query(Holding)
+        .filter(
+            Holding.portfolio_id == portfolio_id,
+            Holding.is_active.is_(True),
+            Holding.is_watchlist.is_(False),
+            Holding.shares > 0,
+        )
+        .count()
+    )
+    priced = sum(1 for h in result if not h.get("is_watchlist"))
+    return priceable > 0 and priced == 0
+
+
 def _cumulative_realized(portfolio_id, db):
     """Sum of all realized gains/losses recorded for a portfolio."""
     total = (
@@ -712,8 +736,11 @@ async def remove_realized_trade(trade_id: int, db: Session = Depends(get_db)):
     db.delete(trade)
     db.commit()
 
-    # Past snapshots remain history; only today's snapshot is corrected.
-    _upsert_daily_snapshot(portfolio_id, _compute_portfolio(portfolio_id, db), db)
+    # Past snapshots remain history; only today's snapshot is corrected — but not
+    # while quotes are unavailable, which would stamp today at a misleading $0.
+    totals = _compute_portfolio(portfolio_id, db)
+    if not _valuation_degraded(portfolio_id, totals[0], db):
+        _upsert_daily_snapshot(portfolio_id, totals, db)
     return {"ticker": ticker, "message": f"Removed realized sale for {ticker}"}
 
 
@@ -746,13 +773,26 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
     totals = _compute_portfolio(portfolio_id, db)
     result, total_value, total_daily_change, total_cost_basis = totals
 
-    # Record/refresh today's snapshot and get cumulative P&L figures.
-    unrealized, realized, total_return = _upsert_daily_snapshot(portfolio_id, totals, db)
+    degraded = _valuation_degraded(portfolio_id, result, db)
+    if degraded:
+        # Quotes are unavailable — the $0 totals are an artifact, not reality.
+        # Report figures without persisting a bogus snapshot (which would leave a
+        # permanent $0 cliff in the performance/drawdown charts); the client keeps
+        # its last-known values instead of rendering $0.
+        realized = _cumulative_realized(portfolio_id, db)
+        unrealized = round(
+            sum(i["unrealized_gain"] for i in result if not i.get("is_watchlist")), 2
+        )
+        total_return = round(unrealized + realized, 2)
+    else:
+        # Record/refresh today's snapshot and get cumulative P&L figures.
+        unrealized, realized, total_return = _upsert_daily_snapshot(portfolio_id, totals, db)
     total_return_pct = round(
         (total_return / total_cost_basis * 100) if total_cost_basis > 0 else 0, 2
     )
 
     return {
+        "degraded": degraded,
         "total_value": round(total_value, 2),
         "total_daily_change": round(total_daily_change, 2),
         "total_daily_change_pct": round(

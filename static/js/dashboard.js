@@ -1287,22 +1287,33 @@ function renderPortfolioValueData(data) {
         renderAllocation();
         renderPortfolioSnapshot();
 
+        // These hero tiles must be *cleared* when the portfolio is empty, not left
+        // showing yesterday's winner next to a $0 total (an internal contradiction).
+        const bestEl = document.getElementById("best-performer");
         if (data.best_performer) {
-            const el = document.getElementById("best-performer");
-            el.dataset.ticker = data.best_performer.ticker;
-            el.innerHTML = `${escapeHtml(data.best_performer.ticker)} <span style="font-size:.85em;opacity:.8">${formatPct(data.best_performer.day_change_pct)}</span>`;
+            bestEl.dataset.ticker = data.best_performer.ticker;
+            bestEl.innerHTML = `${escapeHtml(data.best_performer.ticker)} <span style="font-size:.85em;opacity:.8">${formatPct(data.best_performer.day_change_pct)}</span>`;
+        } else if (bestEl) {
+            bestEl.dataset.ticker = "";
+            bestEl.textContent = "--";
         }
+        const worstEl = document.getElementById("worst-performer");
         if (data.worst_performer) {
-            const el = document.getElementById("worst-performer");
-            el.dataset.ticker = data.worst_performer.ticker;
-            el.innerHTML = `${escapeHtml(data.worst_performer.ticker)} <span style="font-size:.85em;opacity:.8">${formatPct(data.worst_performer.day_change_pct)}</span>`;
+            worstEl.dataset.ticker = data.worst_performer.ticker;
+            worstEl.innerHTML = `${escapeHtml(data.worst_performer.ticker)} <span style="font-size:.85em;opacity:.8">${formatPct(data.worst_performer.day_change_pct)}</span>`;
+        } else if (worstEl) {
+            worstEl.dataset.ticker = "";
+            worstEl.textContent = "--";
         }
+        const largestEl = document.getElementById("largest-holding");
         if (data.holdings.length) {
             const largest = data.holdings.reduce((a, b) =>
                 a.current_value > b.current_value ? a : b);
-            const el = document.getElementById("largest-holding");
-            el.dataset.ticker = largest.ticker;
-            el.innerHTML = `${escapeHtml(largest.ticker)} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
+            largestEl.dataset.ticker = largest.ticker;
+            largestEl.innerHTML = `${escapeHtml(largest.ticker)} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
+        } else if (largestEl) {
+            largestEl.dataset.ticker = "";
+            largestEl.textContent = "--";
         }
 
         // Show holdings immediately; sparklines fill in when trend data arrives.
@@ -1352,6 +1363,35 @@ async function loadPortfolioValue() {
         const res = await fetch("/api/portfolio/value");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+
+        if (data.degraded) {
+            // The local server answered, but market data is unreachable, so the
+            // totals collapse to a misleading $0. Don't render $0 with a green
+            // "synced" check, and don't cache it — keep the last-known values and
+            // show an honest "unavailable" status instead.
+            const subEl = document.getElementById("hud-pop-sync-sub");
+            const iconEl = document.getElementById("hud-sync-icon");
+            if (_hasLoadedOnce) {
+                if (subEl) subEl.textContent = "Market data unavailable — showing last known prices";
+                if (iconEl) iconEl.innerHTML = `<i class="bi bi-exclamation-circle" style="color:var(--bs-warning)"></i>`;
+            } else {
+                _lastDashboardSyncText = "Prices unavailable";
+                const popUpdatedEl = document.getElementById("hud-pop-updated");
+                if (popUpdatedEl) popUpdatedEl.textContent = _lastDashboardSyncText;
+                if (subEl) subEl.textContent = "Couldn't reach market data";
+                if (iconEl) iconEl.innerHTML = `<i class="bi bi-exclamation-circle" style="color:var(--bs-warning)"></i>`;
+                const tbody = document.getElementById("holdings-table");
+                if (tbody) {
+                    tbody.querySelectorAll("tr[data-empty-state]").forEach(r => r.remove());
+                    const tr = tbody.insertRow();
+                    tr.dataset.emptyState = "degraded";
+                    tr.innerHTML = `<td colspan="9" class="text-center py-4 text-secondary">
+                        <i class="bi bi-exclamation-circle me-2"></i>Couldn't reach market data — check your connection and refresh.
+                    </td>`;
+                }
+            }
+            return; // skip rendering $0 and skip caching
+        }
 
         // Data arrived — record the sync time and mark success before any rendering
         // that could throw. The catch block only fires for actual network/API failures.
@@ -4181,6 +4221,23 @@ function updateHoldingsTable(holdings, trendData = {}) {
                 <div class="research-empty-title">No research holdings yet</div>
                 <div class="research-empty-body">Add a ticker in research mode to track ideas without affecting your P&L.</div>
                 <button class="btn btn-sm btn-outline-warning mt-2" onclick="openPortfolioManager()">Add research holding</button>
+            </div>
+        </td>`;
+        return;
+    }
+
+    // Default view with no holdings: give first-run (and delete-all) users a clear
+    // call to action instead of a blank table.
+    if (holdings.length === 0 && holdingsViewFilter !== "research") {
+        tbody.querySelectorAll("tr").forEach(row => row.remove());
+        const tr = tbody.insertRow();
+        tr.dataset.emptyState = "empty";
+        tr.innerHTML = `<td colspan="9" class="text-center py-4">
+            <div class="research-empty-state">
+                <i class="bi bi-briefcase research-empty-icon"></i>
+                <div class="research-empty-title">No holdings yet</div>
+                <div class="research-empty-body">Add your first position to start tracking value, P&L, and signals.</div>
+                <button class="btn btn-sm btn-outline-primary mt-2" onclick="openPortfolioManager()">Add your first holding</button>
             </div>
         </td>`;
         return;
@@ -8407,7 +8464,7 @@ function applyClaudeApiStatus(claudeLive) {
             const note = document.createElement("span");
             note.className = "senpai-offline-note";
             note.id = "senpai-offline-note";
-            note.textContent = "Local Intelligence is running the numbers for now. Add an Anthropic API key in .env to enable cloud AI quips and richer commentary.";
+            note.textContent = "Local Intelligence is running the numbers for now. Click the key icon by the logo to add an Anthropic API key and enable cloud AI quips and richer commentary.";
             bubble.appendChild(note);
         }
 
@@ -8418,9 +8475,9 @@ function applyClaudeApiStatus(claudeLive) {
             note.innerHTML = `<span class="brand-offline-label">Cloud AI unavailable — local intelligence active</span>
 <ol class="brand-offline-steps">
   <li>Get an API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></li>
-  <li>Open <code>.env</code> in your FolioOrb folder</li>
-  <li>Add the line: <code>ANTHROPIC_API_KEY=sk-ant-…</code></li>
-  <li>Save, then restart: <code>Ctrl+C</code> → <code>./scripts/start.sh</code></li>
+  <li>Click the <strong>key icon</strong> next to the FolioOrb logo</li>
+  <li>Paste your <code>sk-ant-…</code> key and hit <strong>Save &amp; Connect</strong></li>
+  <li>That's it — it connects live, no restart needed</li>
 </ol>
 <p class="brand-offline-reunion">"Add your key, and you will finally reunite two lost loves."</p>`;
             callout.appendChild(note);
@@ -9313,8 +9370,12 @@ function initHudPopover() {
 document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+    // Don't hijack browser/OS combos: Cmd/Ctrl+R, Cmd+T, etc. must not also trigger
+    // single-key app shortcuts (refresh, theme, …).
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     if (e.key === "Escape") {
+        if (closeSenpaiWelcomeGuide()) return;
         if (closePortfolioManager()) return;
         hideKeyboardHelp();
         return;
@@ -9882,10 +9943,23 @@ function initApiKeyPanel() {
     // Full format check (mirrors the server-side regex)
     const KEY_FORMAT_RE = /^sk-ant-[A-Za-z0-9_\-]{20,300}$/;
 
+    const removeRow = document.getElementById("api-key-remove-row");
+    const removeBtn = document.getElementById("api-key-remove");
+
+    // Reflect whether a key is already configured: show a Disconnect control so the
+    // panel isn't a pure "first-run setup" wizard for someone who's already connected.
+    function reflectKeyState() {
+        if (!removeRow) return;
+        const status = _lastClaudeHeartbeat?.status;
+        const configured = status && status !== "missing_key";
+        removeRow.hidden = !configured;
+    }
+
     function openPanel() {
         panel.classList.add("is-open");
         panel.setAttribute("aria-hidden", "false");
         trigger.setAttribute("aria-expanded", "true");
+        reflectKeyState();
         input.focus();
     }
 
@@ -9905,6 +9979,29 @@ function initApiKeyPanel() {
     });
 
     closeBtn.addEventListener("click", closePanel);
+
+    if (removeBtn) {
+        removeBtn.addEventListener("click", async () => {
+            if (!confirm("Disconnect Claude and remove the saved API key? Local Intelligence keeps running.")) return;
+            removeBtn.disabled = true;
+            try {
+                const res = await fetch("/api/ai/configure-key", { method: "DELETE" });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    showToast(data.message || "Claude disconnected — Local Intelligence is still running.", "success");
+                    status.textContent = "";
+                    if (typeof loadClaudeHeartbeat === "function") await loadClaudeHeartbeat();
+                    reflectKeyState();
+                } else {
+                    showToast(apiErrorMessage(data, "Couldn't remove the key"), "danger");
+                }
+            } catch {
+                showToast("Network error — check the server is running.", "danger");
+            } finally {
+                removeBtn.disabled = false;
+            }
+        });
+    }
 
     // Close when clicking outside
     document.addEventListener("click", (e) => {
@@ -9996,18 +10093,21 @@ function initApiKeyPanel() {
             const data = await res.json();
 
             if (res.ok && data.success) {
-                status.textContent = "Connected! AI features are now live.";
-                status.className = "api-key-status status-ok";
+                // The backend now verifies the key actually reaches Anthropic. Don't
+                // claim "connected" when it couldn't — say so and keep the panel open.
+                const connected = data.connected !== false;
+                status.textContent = connected
+                    ? "Connected! AI features are now live."
+                    : (data.message || "Key saved, but couldn't reach Anthropic — double-check it.");
+                status.className = connected ? "api-key-status status-ok" : "api-key-status status-err";
                 hint.textContent = "";
                 hint.className = "api-key-hint";
                 input.value = "";
                 saveBtn.disabled = true;
 
-                // Trigger a fresh heartbeat so the HUD updates immediately
-                setTimeout(() => {
-                    closePanel();
-                    if (typeof loadClaudeHeartbeat === "function") loadClaudeHeartbeat();
-                }, 1400);
+                // Refresh the HUD heartbeat immediately; only auto-close on success.
+                if (typeof loadClaudeHeartbeat === "function") loadClaudeHeartbeat();
+                if (connected) setTimeout(closePanel, 1400);
             } else {
                 const msg = typeof data.detail === "string" ? data.detail : "Could not save key. Try again.";
                 status.textContent = msg;
@@ -10039,17 +10139,24 @@ function renderSenpaiWelcomeHoldModes() {
     }).join("");
 }
 
+// Module-level so the global Escape handler can dismiss the welcome guide too.
+// Returns true if it actually closed a visible guide.
+function closeSenpaiWelcomeGuide() {
+    const guide = document.getElementById("senpai-welcome-guide");
+    if (!guide || !guide.classList.contains("is-visible")) return false;
+    guide.classList.remove("is-visible");
+    guide.setAttribute("aria-hidden", "true");
+    try { localStorage.setItem(SENPAI_WELCOME_SEEN_KEY, "1"); } catch (_) {}
+    return true;
+}
+
 function initSenpaiWelcomeGuide() {
     const guide = document.getElementById("senpai-welcome-guide");
     if (!guide) return;
 
     renderSenpaiWelcomeHoldModes();
 
-    function close() {
-        guide.classList.remove("is-visible");
-        guide.setAttribute("aria-hidden", "true");
-        try { localStorage.setItem(SENPAI_WELCOME_SEEN_KEY, "1"); } catch (_) {}
-    }
+    const close = closeSenpaiWelcomeGuide;
 
     document.getElementById("senpai-welcome-dismiss")?.addEventListener("click", close);
 
@@ -10150,7 +10257,10 @@ let _cachedWorldMarketsForAnalytics = [];
 async function loadWorldMarkets() {
     try {
         const res = await fetch("/api/stocks/world-markets");
-        if (!res.ok) return;
+        // Throw (don't silently return) so a non-OK status hits the catch below and
+        // replaces the shimmer skeletons with the "unavailable" fallback instead of
+        // spinning forever.
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const { markets } = await res.json();
         _cachedWorldMarketsForAnalytics = markets || [];
         const strip = document.getElementById("world-markets-strip");
@@ -10666,7 +10776,7 @@ function bindManageHoldingInputs(card, holdingId) {
         input.addEventListener("blur", () => {
             clearTimeout(manageAutoSaveTimers.get(holdingId));
             manageAutoSaveTimers.delete(holdingId);
-            updateHolding(holdingId, { silent: true });
+            updateHolding(holdingId, { silent: true, viaBlur: true });
         });
     });
 }
@@ -10800,10 +10910,39 @@ async function updateHolding(holdingId, options = {}) {
         || card?.querySelector(".manage-hold-mode-box.is-active")?.dataset.holdMode
         || "auto";
 
+    // Reducing a real position books a realized sale on the backend. Defer that to
+    // blur (the final value), so intermediate keystrokes while typing a smaller
+    // number — e.g. "1" on the way to "10" — never book a phantom sale, and confirm
+    // once on blur so a typo-correction isn't silently recorded as a sale.
+    const originalShares = Number(sharesInput?.defaultValue);
+    const isReduction = !isWatchlist
+        && Number.isFinite(originalShares)
+        && Number.isFinite(shares)
+        && shares < originalShares;
+    if (isReduction && !options.viaBlur) {
+        return; // wait for blur to resolve the final value
+    }
+
     if (!isWatchlist && (!Number.isFinite(shares) || shares <= 0)) {
         if (silent) setManageSaveStatus(holdingId, "error");
         else showToast("Shares must be a positive number", "danger");
         return;
+    }
+
+    if (isReduction) {
+        const soldQty = Number((originalShares - shares).toFixed(4));
+        const ticker = card?.dataset.ticker || "this holding";
+        const ok = window.confirm(
+            `Reduce ${ticker} from ${originalShares} to ${shares} shares?\n\n`
+            + `This records a sale of ${soldQty} share(s) at today's price in your `
+            + `realized P&L. Correcting a typo? Cancel and it stays unchanged.`
+        );
+        if (!ok) {
+            if (sharesInput) sharesInput.value = sharesInput.defaultValue;  // revert
+            setManageSaveStatus(holdingId, "saved");
+            card?.classList.remove("is-saving");
+            return;
+        }
     }
     if (isWatchlist && sharesRaw && (!Number.isFinite(shares) || shares < 0)) {
         if (silent) setManageSaveStatus(holdingId, "error");
@@ -10831,8 +10970,16 @@ async function updateHolding(holdingId, options = {}) {
     });
     card?.classList.remove("is-saving");
     if (res.ok) {
+        // Re-baseline the inputs so a subsequent edit compares against the value we
+        // just saved, not the original render value (keeps reduction detection correct).
+        if (sharesInput && payload.shares !== undefined) sharesInput.defaultValue = String(shares);
+        if (costInput) costInput.defaultValue = costInput.value;
         if (silent) setManageSaveStatus(holdingId, "saved");
         else showToast("Holding updated!", "success");
+        if (isReduction) {
+            const soldQty = Number((originalShares - shares).toFixed(4));
+            showToast(`Recorded a sale of ${soldQty} ${card?.dataset.ticker || ""} — adjust it in the P&L tab`, "warning");
+        }
         refreshPortfolioMutationInBackground();
         refreshAiVerdicts();
     } else {
@@ -11001,6 +11148,9 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
             isWatchlist ? "success" : "warning"
         );
         refreshPortfolioMutationInBackground();
+    } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(apiErrorMessage(err, `Couldn't remove ${ticker} — please try again`), "danger");
     }
 }
 
@@ -12308,10 +12458,21 @@ function _newsShowFeed(show) {
     if (el) el.hidden = !show;
 }
 
-/** Show/hide the empty state. */
-function _newsShowEmpty(show) {
+/** Show/hide the empty state. When `isError`, distinguish a load failure from
+ *  genuinely-no-news so the user isn't told "no news" when the feed just failed. */
+function _newsShowEmpty(show, isError = false) {
     const el = document.getElementById("news-empty");
-    if (el) el.hidden = !show;
+    if (!el) return;
+    el.hidden = !show;
+    if (!show) return;
+    const title = el.querySelector(".news-empty-title");
+    const body = el.querySelector(".news-empty-body");
+    if (title) title.textContent = isError
+        ? "Couldn't load news"
+        : "No recent news for your holdings.";
+    if (body) body.textContent = isError
+        ? "Check your connection and refresh — news refreshes every 15 minutes."
+        : "Add holdings or check back later — news refreshes every 15 minutes.";
 }
 
 /** Clear the AI briefing/themes section text (used when switching to local). */
@@ -12486,7 +12647,7 @@ async function loadNewsZone() {
     } catch (err) {
         console.warn("News feed fetch failed:", err);
         _newsShowFeed(false);
-        _newsShowEmpty(true);
+        _newsShowEmpty(true, true);  // distinguish load failure from genuinely-no-news
     } finally {
         _newsShowLoading(false);
     }

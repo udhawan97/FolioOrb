@@ -1289,6 +1289,30 @@ body > .navbar {
 .api-key-status.status-ok  { color: var(--accent-green); }
 .api-key-status.status-err { color: var(--accent-red); }
 
+.api-key-remove-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--hairline, rgba(255,255,255,0.08));
+}
+.api-key-remove-row[hidden] { display: none; }
+.api-key-remove-note { font-size: 0.66rem; color: var(--text-tertiary); }
+.api-key-remove-btn {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--accent-red);
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--accent-red) 40%, transparent);
+    border-radius: 980px;
+    padding: 0.22rem 0.7rem;
+    white-space: nowrap;
+}
+.api-key-remove-btn:hover { background: color-mix(in srgb, var(--accent-red) 12%, transparent); }
+.api-key-remove-btn:disabled { opacity: 0.5; }
+
 [data-bs-theme="light"] .api-key-panel {
     background: rgba(252, 252, 255, 0.98);
     border-color: rgba(0,0,0,0.1);

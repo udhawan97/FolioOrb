@@ -421,3 +421,57 @@ def test_non_watchlist_share_reduction_still_records_realized_trade(monkeypatch)
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "REAL").first()
     assert trade is not None
     assert trade.shares_sold == 6
+
+
+# ── Degraded valuation (quotes unavailable) ──────────────────────────────────
+
+def _err_quote(_tickers):
+    return [{"ticker": "VOO", "error": "unavailable"}]
+
+
+def test_valuation_degraded_when_all_quotes_error(monkeypatch):
+    db = make_db()
+    add_holding(db, "VOO", shares=10, avg_cost=400)
+    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", _err_quote)
+    rows, *_ = portfolio_router._compute_portfolio(1, db)
+    assert portfolio_router._valuation_degraded(1, rows, db) is True
+
+
+def test_valuation_not_degraded_when_priced(monkeypatch):
+    db = make_db()
+    add_holding(db, "VOO", shares=10, avg_cost=400)
+    monkeypatch.setattr(
+        portfolio_router, "get_portfolio_quotes", lambda _t: [quote("VOO", 456)]
+    )
+    rows, *_ = portfolio_router._compute_portfolio(1, db)
+    assert portfolio_router._valuation_degraded(1, rows, db) is False
+
+
+def test_empty_portfolio_is_not_degraded(monkeypatch):
+    # No priceable positions → a $0 total is genuine, not an outage.
+    db = make_db()
+    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", lambda _t: [])
+    rows, *_ = portfolio_router._compute_portfolio(1, db)
+    assert portfolio_router._valuation_degraded(1, rows, db) is False
+
+
+def test_value_endpoint_degraded_flags_and_skips_snapshot(monkeypatch):
+    db = make_db()
+    add_holding(db, "VOO", shares=10, avg_cost=400)
+    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", _err_quote)
+    resp = portfolio_router.get_portfolio_value(portfolio_id=1, db=db)
+    assert resp["degraded"] is True
+    assert resp["total_value"] == 0
+    # Crucially, no bogus $0 snapshot is persisted for today.
+    assert db.query(PortfolioSnapshot).count() == 0
+
+
+def test_value_endpoint_writes_snapshot_when_priced(monkeypatch):
+    db = make_db()
+    add_holding(db, "VOO", shares=10, avg_cost=400)
+    monkeypatch.setattr(
+        portfolio_router, "get_portfolio_quotes", lambda _t: [quote("VOO", 456)]
+    )
+    resp = portfolio_router.get_portfolio_value(portfolio_id=1, db=db)
+    assert resp["degraded"] is False
+    assert db.query(PortfolioSnapshot).count() == 1

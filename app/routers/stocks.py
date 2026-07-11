@@ -109,7 +109,7 @@ def get_price(ticker: str):
 @router.get("/history/batch")
 def get_batch_history(
     tickers: str | None = None,
-    period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|10y|ytd)$"),
+    period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|10y|ytd|max)$"),
 ):
     """
     Fetch historical prices for multiple tickers at once.
@@ -137,7 +137,7 @@ def get_batch_history(
 def get_price_history(
     ticker: str,
     # Query parameter with a strict list of allowed values; defaults to 1 month
-    period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|10y|ytd)$"),
+    period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|10y|ytd|max)$"),
 ):
     """
     Return OHLCV (open/high/low/close/volume) price history for a ticker.

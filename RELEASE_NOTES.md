@@ -1,3 +1,61 @@
+# FolioOrb v5.3.0 Release Notes
+
+**Release date:** July 11, 2026
+
+## Headline
+
+A resilience-and-honesty pass across the whole app: when the internet drops or a
+key is wrong, FolioOrb now tells you the truth instead of quietly showing $0,
+corrupting your history, or dead-ending — and a few sharp edges got filed down.
+
+## What's New
+
+### 🛡️ Never a scary $0 on a bad connection
+
+If market data can't be reached, the dashboard used to show **$0.00 with a green
+"synced" checkmark** — and, worse, it wrote that $0 into your performance history,
+leaving a permanent fake cliff in the P&L and drawdown charts. Now an unreachable
+data provider is detected: the app keeps your **last-known values**, shows an
+honest "market data unavailable" status, and **does not** persist a bogus $0 day.
+
+### 🔑 Honest about your Claude key
+
+Saving an API key now actually checks it can reach Anthropic before saying
+"connected." A revoked or mistyped (but well-formed) key is saved with a clear
+"couldn't reach Anthropic — double-check it" message instead of a false all-clear.
+You can also **disconnect Claude** right from the key panel now, dropping back to
+Local Intelligence without hunting down a file. And the offline setup steps point
+you at the one-click key panel — no more "edit .env and restart in a terminal,"
+which a desktop user can't do anyway.
+
+### ✋ No more accidental "sales" from a typo
+
+Correcting a holding's share count (e.g. fixing a fat-fingered 100 → 10) used to
+silently book a "sale" of the difference into your realized P&L. Now reducing
+shares asks first — "records a sale of N at today's price; correcting a typo?
+Cancel" — and mid-typing keystrokes no longer book phantom sales.
+
+### ✨ Smaller sharp edges, filed down
+
+- A brand-new (or emptied) portfolio shows a friendly **"Add your first holding"**
+  prompt instead of a blank table.
+- Removing a holding, a stuck world-markets strip, and a failed news load now
+  fail **loudly and clearly** instead of silently.
+- Best/worst/largest tiles clear when the portfolio empties (no stale winner next
+  to a $0 total).
+- Browser/OS shortcuts (Cmd/Ctrl+R, etc.) no longer double-fire app shortcuts, and
+  Escape now dismisses the welcome guide.
+
+## Under the hood
+
+The valuation endpoint reports a `degraded` flag (detected without an extra quote
+fetch) and skips the snapshot write when quotes are down; the key-config endpoint
+verifies reachability and gained a `DELETE` to disconnect. New tests cover the
+degraded path and the key flow. Installing over any 5.2.x keeps everything in
+place; still no brokerage connection and still not financial advice.
+
+---
+
 # FolioOrb v5.2.1 Release Notes
 
 **Release date:** July 11, 2026
