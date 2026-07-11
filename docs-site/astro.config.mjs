@@ -19,6 +19,7 @@ export default defineConfig({
       ],
       customCss: ['./src/styles/custom.css'],
       components: {
+        Search: './src/components/Search.astro',
         TableOfContents: './src/components/TableOfContents.astro',
       },
       editLink: {

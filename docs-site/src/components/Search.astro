@@ -1,0 +1,505 @@
+---
+/**
+ * Expanding-search-button override for Starlight's default `Search` component.
+ *
+ * Starlight ships a full-width search box that opens a modal. We keep the same
+ * backend — Pagefind, which Starlight builds into `${BASE_URL}pagefind/` — but
+ * replace the trigger + UI with a quiet magnifier button that springs open into
+ * an inline pill, dropping a floating results panel beneath it.
+ *
+ * We talk to Pagefind through its raw JS API (`pagefind/pagefind.js`) rather
+ * than `@pagefind/default-ui`, so the pill input, the floating panel, and the
+ * brand-accent term highlighting are all ours to style. The index only exists
+ * after `astro build`, so search is inert on the dev server (handled below).
+ */
+---
+
+<fo-search>
+  <div class="fo-search__box" data-state="collapsed">
+    <button
+      type="button"
+      class="fo-search__toggle"
+      aria-label="Search"
+      aria-expanded="false"
+      aria-keyshortcuts="Control+K"
+    >
+      <svg class="fo-search__glass" viewBox="0 0 24 24" width="20" height="20" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+    </button>
+
+    <input
+      class="fo-search__input"
+      type="search"
+      placeholder="Search docs"
+      aria-label="Search docs"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      enterkeyhint="search"
+      disabled
+    />
+
+    <button type="button" class="fo-search__clear" aria-label="Close search" tabindex="-1">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6 6 18"></path>
+      </svg>
+    </button>
+
+    <kbd class="fo-search__hint" aria-hidden="true"><kbd>Ctrl</kbd><kbd>K</kbd></kbd>
+  </div>
+
+  <div class="fo-search__panel" role="region" aria-label="Search results" hidden></div>
+</fo-search>
+
+{/* Swap the Ctrl hint for ⌘ on Apple devices before first paint. */}
+<script is:inline>
+  (() => {
+    const hint = document.querySelector('.fo-search__hint > kbd');
+    const toggle = document.querySelector('.fo-search__toggle');
+    if (!hint || !toggle) return;
+    if (/(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+      hint.textContent = '⌘';
+      toggle.setAttribute('aria-keyshortcuts', 'Meta+K');
+    }
+  })();
+</script>
+
+<script>
+  class FoSearch extends HTMLElement {
+    connectedCallback() {
+      this.box = this.querySelector('.fo-search__box');
+      this.toggle = this.querySelector('.fo-search__toggle');
+      this.input = this.querySelector('.fo-search__input');
+      this.clearBtn = this.querySelector('.fo-search__clear');
+      this.panel = this.querySelector('.fo-search__panel');
+
+      this.pagefind = null; // lazily imported Pagefind module
+      this.loadError = false;
+      this.searchToken = 0; // guards against out-of-order async renders
+
+      this.toggle.addEventListener('click', () => (this.isOpen ? this.close(true) : this.open()));
+      this.clearBtn.addEventListener('click', () => this.close(true));
+      this.input.addEventListener('input', () => this.onInput());
+      this.input.addEventListener('keydown', (e) => this.onInputKey(e));
+      this.panel.addEventListener('keydown', (e) => this.onPanelKey(e));
+
+      // Collapse on outside click and on the ⌘K / Ctrl+K shortcut.
+      this.onDocClick = (e) => {
+        if (this.isOpen && !this.contains(e.target)) this.close(false);
+      };
+      this.onShortcut = (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          this.isOpen ? this.close(false) : this.open();
+        }
+      };
+      document.addEventListener('click', this.onDocClick);
+      window.addEventListener('keydown', this.onShortcut);
+    }
+
+    disconnectedCallback() {
+      document.removeEventListener('click', this.onDocClick);
+      window.removeEventListener('keydown', this.onShortcut);
+    }
+
+    get isOpen() {
+      return this.box.dataset.state === 'open';
+    }
+
+    open() {
+      if (this.isOpen) return;
+      this.box.dataset.state = 'open';
+      this.toggle.setAttribute('aria-expanded', 'true');
+      this.input.disabled = false;
+      this.input.focus();
+      this.loadPagefind(); // warm the index while the user starts typing
+      if (this.input.value.trim()) this.onInput();
+    }
+
+    /** Collapse back to the icon. `returnFocus` restores focus to the toggle (for Esc / ✕). */
+    close(returnFocus) {
+      if (!this.isOpen) return;
+      this.searchToken++; // invalidate any in-flight search so it can't re-open the panel
+      this.box.dataset.state = 'collapsed';
+      this.toggle.setAttribute('aria-expanded', 'false');
+      this.input.value = '';
+      this.input.disabled = true;
+      this.hidePanel();
+      if (returnFocus) this.toggle.focus();
+    }
+
+    onInputKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.close(true);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.firstResult()?.focus();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        this.firstResult()?.click(); // follow the top hit
+      }
+    }
+
+    onPanelKey(e) {
+      const links = [...this.panel.querySelectorAll('.fo-search__result-link')];
+      const i = links.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        (links[i + 1] || links[0])?.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (i <= 0) this.input.focus();
+        else links[i - 1].focus();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.close(true);
+      }
+    }
+
+    firstResult() {
+      return this.panel.querySelector('.fo-search__result-link');
+    }
+
+    onInput() {
+      const q = this.input.value.trim();
+      if (!q) {
+        this.searchToken++; // drop any in-flight search for a now-empty box
+        this.hidePanel();
+        return;
+      }
+      this.search(q);
+    }
+
+    /** Import Pagefind's runtime once. Absent on the dev server (no build index). */
+    async loadPagefind() {
+      if (this.pagefind || this.loadError) return this.pagefind;
+      try {
+        const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+        const mod = await import(/* @vite-ignore */ `${base}/pagefind/pagefind.js`);
+        await mod.options?.({ baseUrl: import.meta.env.BASE_URL });
+        this.pagefind = mod;
+      } catch {
+        this.loadError = true;
+      }
+      return this.pagefind;
+    }
+
+    async search(q) {
+      const token = ++this.searchToken;
+      const pf = await this.loadPagefind();
+      if (token !== this.searchToken) return; // a newer keystroke won
+      if (!pf) {
+        this.renderMessage(
+          import.meta.env.DEV
+            ? 'Search runs on the built site — try `astro build && astro preview`.'
+            : 'Search is unavailable right now.'
+        );
+        return;
+      }
+      const search = await pf.debouncedSearch(q, {}, 240);
+      if (search === null || token !== this.searchToken) return; // debounced away / superseded
+      const data = await Promise.all(search.results.slice(0, 6).map((r) => r.data()));
+      if (token !== this.searchToken) return;
+      this.renderResults(q, data);
+    }
+
+    renderResults(q, results) {
+      this.panel.textContent = '';
+      if (!results.length) {
+        this.renderMessage(`No results for “${q}”.`);
+        return;
+      }
+      for (const r of results) {
+        const item = document.createElement('div');
+        item.className = 'fo-search__result';
+
+        const link = document.createElement('a');
+        link.className = 'fo-search__result-link';
+        link.href = r.url;
+        link.textContent = (r.meta && r.meta.title) || r.url;
+        item.append(link);
+
+        // Prefer up to two section-level sub-results; fall back to the excerpt.
+        const subs = (r.sub_results || []).slice(0, 2);
+        if (subs.length) {
+          for (const sub of subs) {
+            const subLink = document.createElement('a');
+            subLink.className = 'fo-search__result-link fo-search__result-sub';
+            subLink.href = sub.url;
+            const title = document.createElement('span');
+            title.className = 'fo-search__result-sub-title';
+            title.textContent = sub.title || '';
+            const ex = document.createElement('span');
+            ex.className = 'fo-search__excerpt';
+            ex.innerHTML = sub.excerpt || ''; // Pagefind-generated, wraps matches in <mark>
+            subLink.append(title, ex);
+            item.append(subLink);
+          }
+        } else if (r.excerpt) {
+          const ex = document.createElement('p');
+          ex.className = 'fo-search__excerpt';
+          ex.innerHTML = r.excerpt;
+          item.append(ex);
+        }
+        this.panel.append(item);
+      }
+      this.showPanel();
+    }
+
+    renderMessage(text) {
+      this.panel.textContent = '';
+      const p = document.createElement('p');
+      p.className = 'fo-search__message';
+      p.textContent = text;
+      this.panel.append(p);
+      this.showPanel();
+    }
+
+    showPanel() {
+      if (!this.isOpen) return; // a late async render must not resurrect a closed panel
+      this.panel.hidden = false;
+      // Next frame so the drop transition runs from the hidden state.
+      requestAnimationFrame(() => {
+        if (this.isOpen) this.panel.dataset.show = 'true';
+      });
+    }
+
+    hidePanel() {
+      delete this.panel.dataset.show;
+      this.panel.hidden = true;
+      this.panel.textContent = '';
+    }
+  }
+
+  if (!customElements.get('fo-search')) customElements.define('fo-search', FoSearch);
+</script>
+
+<style is:global>
+  /* Namespaced by the <fo-search> tag, so these globals never leak. Unlayered on
+     purpose: they sit above Starlight's @layer styles without !important. */
+  fo-search {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    height: 100%;
+    --fo-spring: cubic-bezier(0.16, 0.7, 0.3, 1);
+    /* Elevated surface: in dark mode gray-6 is LIGHTER than the near-black page
+       (elevation lifts toward white); in light mode it reads as a clean card. */
+    --fo-surface: var(--sl-color-gray-6);
+  }
+
+  fo-search .fo-search__box {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-start: auto; /* right-anchor within the header's free column */
+    height: 2.5rem;
+    max-width: 100%;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    transition:
+      background 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+
+  fo-search .fo-search__box[data-state='open'] {
+    /* Nearly opaque so the logo/nav never bleed through when it overlays the
+       header on mobile; a touch of glass on top. */
+    background: color-mix(in srgb, var(--fo-surface) 92%, transparent);
+    border-color: var(--sl-color-gray-5);
+    box-shadow: var(--sl-shadow-md);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  fo-search .fo-search__box:focus-within {
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sl-color-accent) 55%, transparent);
+  }
+
+  fo-search .fo-search__toggle {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-1);
+    cursor: pointer;
+  }
+  fo-search .fo-search__box[data-state='collapsed'] .fo-search__toggle:hover {
+    color: var(--sl-color-white);
+    background: color-mix(in srgb, var(--sl-color-gray-5) 60%, transparent);
+  }
+
+  fo-search .fo-search__input {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--sl-color-white);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    opacity: 0;
+    outline: none;
+    transition:
+      width 0.46s var(--fo-spring),
+      opacity 0.24s ease,
+      padding 0.3s ease;
+  }
+  fo-search .fo-search__box[data-state='open'] .fo-search__input {
+    width: min(24rem, 68vw);
+    padding-inline-end: 0.25rem;
+    opacity: 1;
+  }
+  fo-search .fo-search__input::placeholder {
+    color: var(--sl-color-gray-3);
+  }
+  /* Hide the native search clear control; we render our own ✕. */
+  fo-search .fo-search__input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  fo-search .fo-search__clear {
+    flex: none;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-inline-end: 0.25rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    cursor: pointer;
+  }
+  fo-search .fo-search__clear:hover {
+    color: var(--sl-color-white);
+    background: color-mix(in srgb, var(--sl-color-gray-5) 70%, transparent);
+  }
+  fo-search .fo-search__box[data-state='open'] .fo-search__clear {
+    display: inline-flex;
+  }
+
+  fo-search .fo-search__hint {
+    display: none; /* wide viewports only; hidden on mobile */
+    align-items: center;
+    gap: 0.25rem;
+    margin-inline-end: 0.6rem;
+    color: var(--sl-color-gray-3);
+  }
+  fo-search .fo-search__hint > kbd {
+    padding-inline: 0.35rem;
+    border-radius: 0.25rem;
+    background: color-mix(in srgb, var(--sl-color-gray-5) 60%, transparent);
+    font-family: var(--__sl-font);
+    font-size: var(--sl-text-2xs);
+    line-height: 1.5;
+  }
+  @media (min-width: 50rem) {
+    fo-search .fo-search__box[data-state='collapsed'] .fo-search__hint {
+      display: inline-flex;
+    }
+  }
+
+  /* ── Floating results panel ─────────────────────────────────────────────── */
+  fo-search .fo-search__panel {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 100; /* own stacking context, above page content */
+    width: min(30rem, 88vw);
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    padding: 0.5rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--sl-color-gray-5);
+    background: var(--fo-surface); /* fully opaque — page text must never show through */
+    box-shadow: var(--sl-shadow-lg);
+    opacity: 0;
+    transform: translateY(-6px);
+    transition:
+      opacity 0.2s ease,
+      transform 0.24s var(--fo-spring);
+  }
+  fo-search .fo-search__panel[data-show='true'] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  fo-search .fo-search__result {
+    padding: 0.35rem 0.25rem;
+  }
+  fo-search .fo-search__result + .fo-search__result {
+    border-top: 1px solid color-mix(in srgb, var(--sl-color-gray-5) 70%, transparent);
+  }
+
+  fo-search .fo-search__result-link {
+    display: block;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.5rem;
+    color: var(--sl-color-white);
+    font-weight: 600;
+    text-decoration: none;
+    line-height: 1.35;
+  }
+  fo-search .fo-search__result-link:hover,
+  fo-search .fo-search__result-link:focus-visible {
+    background: var(--sl-color-accent-low);
+    outline: none;
+  }
+  fo-search .fo-search__result-sub {
+    font-weight: 400;
+  }
+  fo-search .fo-search__result-sub-title {
+    display: block;
+    color: var(--sl-color-gray-1);
+    font-weight: 600;
+    font-size: var(--sl-text-sm);
+  }
+  fo-search .fo-search__excerpt {
+    display: block;
+    margin: 0.15rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 400;
+  }
+  fo-search .fo-search__excerpt mark {
+    /* Matched query terms in the brand accent. */
+    background: transparent;
+    color: var(--sl-color-accent);
+    font-weight: 600;
+  }
+  fo-search .fo-search__message {
+    margin: 0;
+    padding: 0.75rem 0.65rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  /* Respect reduced-motion: no spring, no drop — states switch near-instantly. */
+  @media (prefers-reduced-motion: reduce) {
+    fo-search .fo-search__box,
+    fo-search .fo-search__input,
+    fo-search .fo-search__panel {
+      transition-duration: 0.01ms;
+    }
+    fo-search .fo-search__panel {
+      transform: none;
+    }
+  }
+</style>
