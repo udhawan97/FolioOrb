@@ -7,6 +7,18 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.4.0 — More Than One Portfolio
+
+- **Multiple portfolios.** A switcher in the top bar lets you create, rename, delete, and switch
+  between portfolios — give your taxable account, IRA, and experiments their own scoreboards.
+- **Everything re-scopes.** Value, P&L, holdings, every analytics chart, news, DCA plans, and the
+  AI briefings/action-plans all follow the portfolio you're viewing. The Manage panel names the
+  one you're editing.
+- **Cleanly separated.** Each portfolio's data — including its cached AI narratives (namespaced
+  per portfolio) — stays its own; switching never shows another portfolio's content. "My
+  Portfolio" is always present and can't be deleted; new portfolios start empty.
+- Installing over any 5.3.x keeps your holdings as the default portfolio.
+
 ## v5.3.1 — Accurate Sales, Working Links
 
 - **Record a sale at the real price and date.** Reducing a holding now lets you enter the actual

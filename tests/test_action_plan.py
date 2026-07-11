@@ -105,7 +105,7 @@ def _patch_core(monkeypatch):
     monkeypatch.setattr(
         ai_router,
         "_collect_portfolio_signals_core",
-        lambda db: dict(_CORE_RESULT),
+        lambda db, portfolio_id=1: dict(_CORE_RESULT),
     )
 
 

@@ -592,7 +592,10 @@ async def get_stock_summary(
 
 
 @router.get("/summaries/all")
-async def get_all_summaries(db: Session = Depends(get_db)):
+async def get_all_summaries(
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """
     Get or generate AI summaries for all active portfolio holdings.
     Returns cached summaries immediately, generates new ones for missing or stale tickers.
@@ -600,7 +603,7 @@ async def get_all_summaries(db: Session = Depends(get_db)):
     """
     results = {}
 
-    active_tickers = _active_portfolio_tickers(db)
+    active_tickers = _active_portfolio_tickers(db, portfolio_id)
     quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
 
     # Fetch every stock summary for the active tickers in one query, then keep the
@@ -728,7 +731,10 @@ async def get_move_explanation(ticker: str):
 
 
 @router.get("/move-explanations/all")
-async def get_all_move_explanations(db: Session = Depends(get_db)):
+async def get_all_move_explanations(
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """
     Explain today's move for all portfolio holdings.
     Fetches SPY/QQQ benchmark data once, then processes each holding in turn.
@@ -737,7 +743,10 @@ async def get_all_move_explanations(db: Session = Depends(get_db)):
     """
     benchmarks = get_benchmark_data()
     benchmark_cache: dict = {}  # shared cache for per-holding primary benchmarks
-    quotes = {q["ticker"]: q for q in get_all_quotes(_active_portfolio_tickers(db))}
+    quotes = {
+        q["ticker"]: q
+        for q in get_all_quotes(_active_portfolio_tickers(db, portfolio_id))
+    }
     results: dict[str, dict] = {}
 
     for ticker, stock_data in quotes.items():
@@ -831,12 +840,15 @@ _FALLBACK_INTEL_BASE = {
 
 
 @router.get("/intelligence/all/batch")
-async def get_all_intelligence(db: Session = Depends(get_db)):
+async def get_all_intelligence(
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """
     Return holding intelligence for all portfolio holdings.
     Combines structured coverage data (sectors, countries, benchmarks) for every holding.
     """
-    active_tickers = _active_portfolio_tickers(db)
+    active_tickers = _active_portfolio_tickers(db, portfolio_id)
     quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
 
     # Phase 1: build all intel dicts (existing behaviour)
@@ -895,6 +907,22 @@ _VERDICT_DISCLAIMER = (
 )
 _AI_VERDICT_DISCLAIMER = _VERDICT_DISCLAIMER
 _PORTFOLIO_CACHE_TICKER = "BOOK"
+
+
+def _portfolio_cache_ticker(portfolio_id: int = 1) -> str:
+    """
+    AISummary.ticker sentinel for portfolio-LEVEL AI caches (briefing, action
+    plan, analytics insights, portfolio-state signature).
+
+    AISummary has no portfolio_id column, so the portfolio id is folded into the
+    sentinel ticker (``BOOK:<id>``) to keep each portfolio's book-level narrative
+    isolated — portfolio 2 must never read portfolio 1's cached BOOK entry.
+    Per-ticker summaries use real ticker strings and stay shared across
+    portfolios, so they are left untouched.
+    """
+    return f"{_PORTFOLIO_CACHE_TICKER}:{portfolio_id}"
+
+
 _ACTION_CACHE_CODE = {"add": "a", "hold": "h", "trim": "t", "needs-data": "n"}
 _MOOD_CACHE_CODE = {
     "hot": "hot", "warm": "warm", "neutral": "neut", "cooling": "cool", "cold": "cold"
@@ -1046,12 +1074,16 @@ def _hydrate_cached_verdict(sig_dict: dict, cached_text: str | None) -> bool:
 
 
 @router.get("/investment-signal/{ticker}")
-async def get_investment_signal_single(ticker: str, db: Session = Depends(get_db)):
+async def get_investment_signal_single(
+    ticker: str,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """
     Return deterministic investment signal + quip for a single ticker.
     """
     ticker = ticker.upper()
-    meta = _holding_meta(db)
+    meta = _holding_meta(db, portfolio_id)
     holding = meta.get(ticker, {})
     is_watchlist = holding.get("is_watchlist", False)
     hold_class = holding.get("hold_class", "auto")
@@ -1105,7 +1137,9 @@ async def get_investment_signal_single(ticker: str, db: Session = Depends(get_db
     return sig_dict
 
 
-def _collect_portfolio_signals_core(db: Session) -> dict:  # pylint: disable=too-many-locals
+def _collect_portfolio_signals_core(
+    db: Session, portfolio_id: int = 1
+) -> dict:  # pylint: disable=too-many-locals
     """
     Shared signal pipeline: active tickers → per-ticker deterministic signal dicts.
 
@@ -1118,8 +1152,8 @@ def _collect_portfolio_signals_core(db: Session) -> dict:  # pylint: disable=too
     Error tickers carry ``{"_signal_error": True, **_NEEDS_DATA_SIGNAL}`` so the
     callers can distinguish build failures from legitimate needs-data verdicts.
     """
-    active_tickers = _active_portfolio_tickers(db)
-    holding_meta = _holding_meta(db)
+    active_tickers = _active_portfolio_tickers(db, portfolio_id)
+    holding_meta = _holding_meta(db, portfolio_id)
     quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
     history_map = get_batched_history_closes(active_tickers)
     alloc_map = _compute_allocation_pcts(holding_meta, quotes)
@@ -1194,6 +1228,7 @@ def _collect_portfolio_signals_core(db: Session) -> dict:  # pylint: disable=too
 async def get_all_investment_signals(  # pylint: disable=too-many-statements,too-many-branches
     db: Session = Depends(get_db),
     force_local: bool = False,
+    portfolio_id: int = 1,
 ):
     """
     Return investment signals for all active portfolio holdings.
@@ -1201,7 +1236,8 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
     (summary_type='verdict') with price-drift invalidation.
     Pass force_local=true to skip Claude quip generation and use deterministic fallbacks.
     """
-    core = _collect_portfolio_signals_core(db)
+    core = _collect_portfolio_signals_core(db, portfolio_id)
+    book_ticker = _portfolio_cache_ticker(portfolio_id)
     active_tickers = core["active_tickers"]
     holding_meta = core["holding_meta"]
     portfolio_exposure = core["portfolio_exposure"]
@@ -1300,7 +1336,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
     portfolio_cached = (
         db.query(AISummary)
         .filter(
-            AISummary.ticker == _PORTFOLIO_CACHE_TICKER,
+            AISummary.ticker == book_ticker,
             AISummary.summary_type == portfolio_state["summary_type"],
         )
         .order_by(AISummary.generated_at.desc())
@@ -1342,7 +1378,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
         if include_portfolio_quip:
             quip_inputs.append(
                 {
-                    "ticker": _PORTFOLIO_CACHE_TICKER,
+                    "ticker": book_ticker,
                     "action": portfolio_state["dominant_action"],
                     "confidence": 60,
                     "market_mood": "neutral",
@@ -1387,14 +1423,14 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                     ticker, type(exc).__name__,
                 )
         if include_portfolio_quip:
-            book_bundle = new_bundles.get(_PORTFOLIO_CACHE_TICKER) or {}
+            book_bundle = new_bundles.get(book_ticker) or {}
             portfolio_quip = book_bundle.get("quip") or _portfolio_fallback_quip(
                 portfolio_state["dominant_action"],
                 portfolio_state["concentration_band"],
             )
             try:
                 db.add(AISummary(
-                    ticker=_PORTFOLIO_CACHE_TICKER,
+                    ticker=book_ticker,
                     summary_type=portfolio_state["summary_type"],
                     summary_text=encode_verdict_cache(portfolio_quip, None),
                     price_when_generated=None,
@@ -1456,9 +1492,12 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
 
 
 @router.get("/portfolio-exposure")
-async def get_portfolio_exposure(db: Session = Depends(get_db)):
+async def get_portfolio_exposure(
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """Look-through sector, country, and theme exposure for the active portfolio."""
-    holding_meta = _holding_meta(db)
+    holding_meta = _holding_meta(db, portfolio_id)
     tickers = list(holding_meta.keys())
     quotes = {q["ticker"]: q for q in get_all_quotes(tickers)}
     alloc_map = _compute_allocation_pcts(holding_meta, quotes)
@@ -1555,12 +1594,15 @@ async def get_analyst_recommendation_single(ticker: str):
 
 
 @router.get("/analyst-recommendations/all")
-async def get_all_analyst_recommendations(db: Session = Depends(get_db)):
+async def get_all_analyst_recommendations(
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """
     Return analyst consensus for all portfolio holdings.
     Iterates active portfolio holdings; ETFs resolve to ETF quality.
     """
-    active_tickers = _active_portfolio_tickers(db)
+    active_tickers = _active_portfolio_tickers(db, portfolio_id)
     # Pre-fetch history in one batched/parallel call so per-ticker ETF price-signal
     # lookups (below) reuse it instead of each issuing its own yfinance history call.
     history_map = get_batched_history_closes(active_tickers)
@@ -1621,7 +1663,9 @@ def _briefing_cache_type(range_key: str) -> str:
     return f"{_BRIEFING_CACHE_TYPE}_{range_key}"
 
 
-def _period_portfolio_pl(db: Session, total_value: float, calendar_days: int) -> dict | None:
+def _period_portfolio_pl(
+    db: Session, total_value: float, calendar_days: int, portfolio_id: int = 1
+) -> dict | None:
     """
     Portfolio P&L over the range, from daily snapshot history — the same
     semantics the hero P&L card uses (closest snapshot at/after the cutoff,
@@ -1630,7 +1674,7 @@ def _period_portfolio_pl(db: Session, total_value: float, calendar_days: int) ->
     from app.routers.portfolio import _portfolio_snapshots  # lazy — no circular dep
 
     rows = [
-        r for r in _portfolio_snapshots(1, db)
+        r for r in _portfolio_snapshots(portfolio_id, db)
         if r.get("date") and r.get("total_value") is not None
     ]
     if not rows:
@@ -1648,7 +1692,7 @@ def _period_portfolio_pl(db: Session, total_value: float, calendar_days: int) ->
     return {"dollar": round(change, 2), "pct": round(change / start_value * 100, 2)}
 
 
-def _briefing_snapshot(db: Session) -> tuple[dict, list[dict]]:
+def _briefing_snapshot(db: Session, portfolio_id: int = 1) -> tuple[dict, list[dict]]:
     """
     Build the compact portfolio snapshot fed to Haiku (and used for the local
     briefing lead line).  Returns (snapshot_dict, non_watchlist_holdings).
@@ -1659,11 +1703,13 @@ def _briefing_snapshot(db: Session) -> tuple[dict, list[dict]]:
     )
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(1, db)
+    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(
+        portfolio_id, db
+    )
     non_watchlist = [h for h in holdings_rows if not h.get("is_watchlist")]
 
     total_unrealized = sum(float(h.get("unrealized_gain") or 0) for h in non_watchlist)
-    realized = _cumulative_realized(1, db)
+    realized = _cumulative_realized(portfolio_id, db)
     total_return_dollar = round(total_unrealized + realized, 2)
     total_return_pct = (
         round(total_return_dollar / total_cost_basis * 100, 2) if total_cost_basis > 0 else 0.0
@@ -1737,7 +1783,9 @@ def _briefing_snapshot(db: Session) -> tuple[dict, list[dict]]:
     return snapshot, non_watchlist
 
 
-def _briefing_period_snapshot(db: Session, range_key: str) -> tuple[dict, list[dict]]:
+def _briefing_period_snapshot(
+    db: Session, range_key: str, portfolio_id: int = 1
+) -> tuple[dict, list[dict]]:
     """
     Range-aware snapshot variant: swaps the day-scoped fields for period ones
     (daily-close lookbacks for movers, snapshot history for portfolio P&L) so
@@ -1745,7 +1793,7 @@ def _briefing_period_snapshot(db: Session, range_key: str) -> tuple[dict, list[d
     """
     from app.services.portfolio_analytics import compute_range_rows
 
-    snapshot, non_watchlist = _briefing_snapshot(db)
+    snapshot, non_watchlist = _briefing_snapshot(db, portfolio_id)
     cfg = _BRIEFING_RANGES[range_key]
     period = compute_range_rows(non_watchlist, range_key)
     rows = period.get("holdings") or {}
@@ -1759,7 +1807,9 @@ def _briefing_period_snapshot(db: Session, range_key: str) -> tuple[dict, list[d
 
     snapshot["period_label"] = cfg["phrase"]
     snapshot["period_pl"] = (
-        _period_portfolio_pl(db, snapshot["total_value"], cfg["calendar_days"])
+        _period_portfolio_pl(
+            db, snapshot["total_value"], cfg["calendar_days"], portfolio_id
+        )
         or {"dollar": period.get("net_change"), "pct": period.get("net_change_pct")}
     )
     snapshot["best_period"] = (
@@ -1781,7 +1831,7 @@ def _briefing_period_snapshot(db: Session, range_key: str) -> tuple[dict, list[d
     return snapshot, non_watchlist
 
 
-def _briefing_local_period(db: Session, range_key: str) -> dict:
+def _briefing_local_period(db: Session, range_key: str, portfolio_id: int = 1) -> dict:
     """
     Local briefing over a non-day range: deterministic period digest from daily
     closes. Move explainers are day-scoped, so period movers carry no
@@ -1791,7 +1841,7 @@ def _briefing_local_period(db: Session, range_key: str) -> dict:
 
     cfg = _BRIEFING_RANGES[range_key]
     phrase = cfg["phrase"]
-    _snapshot, non_watchlist = _briefing_snapshot(db)
+    _snapshot, non_watchlist = _briefing_snapshot(db, portfolio_id)
     period = compute_range_rows(non_watchlist, range_key)
     rows = period.get("holdings") or {}
 
@@ -1841,9 +1891,9 @@ def _briefing_local_period(db: Session, range_key: str) -> dict:
     }
 
 
-def _briefing_local(db: Session) -> dict:
+def _briefing_local(db: Session, portfolio_id: int = 1) -> dict:
     """Compute local briefing using move_explainer. Never calls Claude."""
-    snapshot, non_watchlist = _briefing_snapshot(db)
+    snapshot, non_watchlist = _briefing_snapshot(db, portfolio_id)
     active_tickers = [h["ticker"] for h in non_watchlist]
     quotes = {q["ticker"]: q for q in get_all_quotes(active_tickers)}
     benchmarks = get_benchmark_data()
@@ -1970,6 +2020,7 @@ async def get_portfolio_summary(
     mode: str = "ai",
     time_range: str = Query("day", alias="range"),
     force_refresh: bool = False,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """
@@ -1984,12 +2035,13 @@ async def get_portfolio_summary(
     if mode not in ("ai", "local"):
         mode = "ai"
     range_key = _normalize_briefing_range(time_range)
+    book_ticker = _portfolio_cache_ticker(portfolio_id)
 
     if mode == "local":
         try:
             if range_key == "day":
-                return _briefing_local(db)
-            return _briefing_local_period(db, range_key)
+                return _briefing_local(db, portfolio_id)
+            return _briefing_local_period(db, range_key, portfolio_id)
         except Exception as exc:
             logger.error("Local briefing failed; exception_type=%s", type(exc).__name__)
             raise HTTPException(
@@ -2002,7 +2054,7 @@ async def get_portfolio_summary(
         cached = (
             db.query(AISummary)
             .filter(
-                AISummary.ticker == _PORTFOLIO_CACHE_TICKER,
+                AISummary.ticker == book_ticker,
                 AISummary.summary_type == cache_type,
             )
             .order_by(AISummary.generated_at.desc())
@@ -2019,9 +2071,9 @@ async def get_portfolio_summary(
     # Build snapshot; surface 500 so the card can show a clear error
     try:
         if range_key == "day":
-            snapshot, _ = _briefing_snapshot(db)
+            snapshot, _ = _briefing_snapshot(db, portfolio_id)
         else:
-            snapshot, _ = _briefing_period_snapshot(db, range_key)
+            snapshot, _ = _briefing_period_snapshot(db, range_key, portfolio_id)
     except Exception as exc:
         logger.error("Briefing snapshot failed; exception_type=%s", type(exc).__name__)
         raise HTTPException(
@@ -2039,7 +2091,7 @@ async def get_portfolio_summary(
         }
         try:
             db.add(AISummary(
-                ticker=_PORTFOLIO_CACHE_TICKER,
+                ticker=book_ticker,
                 summary_type=cache_type,
                 summary_text=json.dumps(payload),
                 price_when_generated=None,
@@ -2095,10 +2147,10 @@ def _merge_ai_widget_insights(local_widgets: dict, ai_widgets: dict) -> dict:
     return merged
 
 
-def _cache_analytics_insights(db: Session, payload: dict) -> None:
+def _cache_analytics_insights(db: Session, payload: dict, portfolio_id: int = 1) -> None:
     try:
         db.add(AISummary(
-            ticker=_PORTFOLIO_CACHE_TICKER,
+            ticker=_portfolio_cache_ticker(portfolio_id),
             summary_type=_ANALYTICS_INSIGHTS_CACHE_TYPE,
             summary_text=json.dumps(payload),
             price_when_generated=None,
@@ -2116,6 +2168,7 @@ def _cache_analytics_insights(db: Session, payload: dict) -> None:
 async def get_analytics_insights(
     mode: str = "ai",
     force_refresh: bool = False,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """
@@ -2135,7 +2188,7 @@ async def get_analytics_insights(
 
     if mode == "local":
         try:
-            snapshot = build_analytics_snapshot(db)
+            snapshot = build_analytics_snapshot(db, portfolio_id)
             return build_local_analytics_insights(snapshot)
         except Exception as exc:
             logger.error(
@@ -2151,7 +2204,7 @@ async def get_analytics_insights(
         cached = (
             db.query(AISummary)
             .filter(
-                AISummary.ticker == _PORTFOLIO_CACHE_TICKER,
+                AISummary.ticker == _portfolio_cache_ticker(portfolio_id),
                 AISummary.summary_type == _ANALYTICS_INSIGHTS_CACHE_TYPE,
             )
             .order_by(AISummary.generated_at.desc())
@@ -2167,7 +2220,7 @@ async def get_analytics_insights(
                 pass
 
     try:
-        snapshot = build_analytics_snapshot(db)
+        snapshot = build_analytics_snapshot(db, portfolio_id)
     except Exception as exc:
         logger.error("Analytics snapshot failed; exception_type=%s", type(exc).__name__)
         raise HTTPException(
@@ -2190,7 +2243,7 @@ async def get_analytics_insights(
             "widget_insights_version": _ANALYTICS_WIDGET_INSIGHTS_VERSION,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
-        _cache_analytics_insights(db, payload)
+        _cache_analytics_insights(db, payload, portfolio_id)
         return payload
 
     except Exception as exc:
@@ -2214,7 +2267,9 @@ _GAP_TYPE_LABEL: dict[str, str] = {
 }
 
 
-def _action_plan_snapshot(db: Session, core: dict) -> dict:  # pylint: disable=too-many-locals
+def _action_plan_snapshot(
+    db: Session, core: dict, portfolio_id: int = 1
+) -> dict:  # pylint: disable=too-many-locals
     """
     Build the compact snapshot sent to Claude for the action plan.
     Fuses per-ticker signal data, portfolio exposure, risk metrics, regime,
@@ -2237,7 +2292,7 @@ def _action_plan_snapshot(db: Session, core: dict) -> dict:  # pylint: disable=t
 
     # Portfolio value + per-holding total_return_pct from the portfolio compute layer
     try:
-        holdings_rows, total_value, _, _ = _compute_portfolio(1, db)
+        holdings_rows, total_value, _, _ = _compute_portfolio(portfolio_id, db)
     except Exception as exc:
         logger.warning(
             "Action plan _compute_portfolio failed; exception_type=%s",
@@ -2454,6 +2509,7 @@ def _action_plan_fallback(core: dict) -> dict:
 async def get_action_plan(
     force_refresh: bool = False,
     force_local: bool = False,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """
@@ -2465,7 +2521,8 @@ async def get_action_plan(
     Falls back deterministically when Claude is unavailable or force_local=True.
     """
     # Build portfolio state signature for cache invalidation
-    core = _collect_portfolio_signals_core(db)
+    core = _collect_portfolio_signals_core(db, portfolio_id)
+    book_ticker = _portfolio_cache_ticker(portfolio_id)
 
     # Local-only path: skip Claude entirely — return deterministic buckets instantly
     if force_local:
@@ -2485,7 +2542,7 @@ async def get_action_plan(
         cached = (
             db.query(AISummary)
             .filter(
-                AISummary.ticker == _PORTFOLIO_CACHE_TICKER,
+                AISummary.ticker == book_ticker,
                 AISummary.summary_type == cache_summary_type,
             )
             .order_by(AISummary.generated_at.desc())
@@ -2501,7 +2558,7 @@ async def get_action_plan(
 
     # Build compact snapshot for Claude
     try:
-        snapshot = _action_plan_snapshot(db, core)
+        snapshot = _action_plan_snapshot(db, core, portfolio_id)
     except Exception as exc:
         logger.warning(
             "Action plan snapshot failed; exception_type=%s",
@@ -2521,7 +2578,7 @@ async def get_action_plan(
         }
         try:
             db.add(AISummary(
-                ticker=_PORTFOLIO_CACHE_TICKER,
+                ticker=book_ticker,
                 summary_type=cache_summary_type,
                 summary_text=json.dumps(payload),
                 price_when_generated=None,

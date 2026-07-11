@@ -722,7 +722,13 @@ def test_portfolio_quip_cache_and_fallback(monkeypatch):
     assert changed["portfolio_health"]["dominant_action"] == "trim"
     assert len(calls) == 2, "portfolio quip should refresh when state signature changes"
 
-    cached_rows = db.query(AISummary).filter(AISummary.ticker == "BOOK").all()
+    # Portfolio-level quip cache is namespaced per portfolio (BOOK:<id>) so a
+    # second portfolio can't read this one's cached book narrative.
+    cached_rows = (
+        db.query(AISummary)
+        .filter(AISummary.ticker == ai_router._portfolio_cache_ticker(1))
+        .all()
+    )
     assert cached_rows
 
 

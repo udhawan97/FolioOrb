@@ -4128,6 +4128,95 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
     padding: 0.3rem 0.2rem 0.1rem;
 }
 
+/* ── Portfolio switcher ──────────────────────────────────────────────── */
+.portfolio-switcher { position: relative; display: inline-flex; }
+
+.portfolio-switcher-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 12rem;
+}
+.portfolio-switcher-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 8rem;
+}
+.portfolio-switcher-caret { opacity: 0.7; flex-shrink: 0; }
+
+.portfolio-switcher-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    left: 0;
+    min-width: 15rem;
+    z-index: 12500;
+    padding: 0.4rem;
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    box-shadow: 0 16px 44px -12px rgba(0, 0, 0, 0.5);
+}
+.portfolio-switcher-menu[hidden] { display: none; }
+
+.portfolio-switcher-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 8px;
+}
+.portfolio-switcher-row.is-active { background: color-mix(in srgb, var(--accent-blue) 12%, transparent); }
+.portfolio-switcher-row:hover { background: color-mix(in srgb, var(--text-secondary) 10%, transparent); }
+
+.portfolio-switcher-pick {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.45rem 0.55rem;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: left;
+}
+.portfolio-switcher-pick span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.portfolio-switcher-pick .bi-check-circle-fill { color: var(--accent-blue); }
+.portfolio-switcher-pick .bi-circle { color: var(--text-tertiary); }
+
+.portfolio-switcher-row-actions { display: inline-flex; gap: 0.1rem; padding-right: 0.2rem; }
+.portfolio-switcher-icon {
+    padding: 0.3rem 0.4rem;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+.portfolio-switcher-icon:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-secondary) 14%, transparent); }
+.portfolio-switcher-icon--danger:hover { color: var(--accent-red); }
+
+.portfolio-switcher-new {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+    padding: 0.5rem 0.55rem;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--hairline);
+    color: var(--accent-blue);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.portfolio-switcher-new:hover { background: color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+
 /* ── Record-a-sale dialog (share reduction) ──────────────────────────── */
 /* `body >` needed to out-specify `body > *:not(.bg-orb)`, which otherwise pins
    every direct body child to position:relative / z-index:1 (would trap this

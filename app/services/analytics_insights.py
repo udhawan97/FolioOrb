@@ -668,7 +668,7 @@ def _signals_snapshot(
     }
 
 
-def build_analytics_snapshot(db) -> dict[str, Any]:
+def build_analytics_snapshot(db, portfolio_id: int = 1) -> dict[str, Any]:
     """Compact cross-tab snapshot for analytics insights."""
     from app.models import PortfolioSnapshot
     from app.routers.portfolio import _compute_portfolio, _cumulative_realized
@@ -690,11 +690,13 @@ def build_analytics_snapshot(db) -> dict[str, Any]:
     from app.services.stock_service import get_all_quotes
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(1, db)
+    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(
+        portfolio_id, db
+    )
     non_watchlist = [h for h in holdings_rows if not h.get("is_watchlist")]
 
     total_unrealized = sum(float(h.get("unrealized_gain") or 0) for h in non_watchlist)
-    realized = _cumulative_realized(1, db)
+    realized = _cumulative_realized(portfolio_id, db)
     total_return_dollar = round(total_unrealized + realized, 2)
     total_return_pct = (
         round(total_return_dollar / total_cost_basis * 100, 2) if total_cost_basis > 0 else 0.0
@@ -706,7 +708,7 @@ def build_analytics_snapshot(db) -> dict[str, Any]:
 
     snapshots = (
         db.query(PortfolioSnapshot)
-        .filter(PortfolioSnapshot.portfolio_id == 1)
+        .filter(PortfolioSnapshot.portfolio_id == portfolio_id)
         .order_by(PortfolioSnapshot.snapshot_date.asc())
         .all()
     )

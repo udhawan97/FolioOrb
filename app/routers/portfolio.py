@@ -6,7 +6,10 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Portfolio, Holding, RealizedTrade, PortfolioSnapshot
+from app.models import (
+    Portfolio, Holding, RealizedTrade, PortfolioSnapshot,
+    DcaPlan, DcaContribution, AISummary,
+)
 from app.schemas import HoldingCreate, HoldingUpdate, PortfolioCreate
 from app.config import settings
 from app.services.stock_service import (
@@ -252,7 +255,7 @@ def _realized_stats_by_ticker(portfolio_id, db):
     return stats
 
 
-def _record_reduction(holding, old_shares, new_shares, db, sale_price=None, sale_date=None):
+def _record_reduction(holding, old_shares, new_shares, db, *, sale_price=None, sale_date=None):
     """
     If a holding's share count dropped, log the realized gain/loss for the sold
     shares.
@@ -357,8 +360,62 @@ async def create_portfolio(
 async def get_portfolios(db: Session = Depends(get_db)):
     """Return a list of all portfolios (id and name only)."""
     _ensure_default_portfolio(db)
-    portfolios = db.query(Portfolio).all()
+    portfolios = db.query(Portfolio).order_by(Portfolio.id).all()
     return [{"id": p.id, "name": p.name} for p in portfolios]
+
+
+@router.patch("/{portfolio_id}")
+async def rename_portfolio(
+    portfolio_id: int, data: PortfolioCreate, db: Session = Depends(get_db)
+):
+    """Rename a portfolio (and optionally update its description)."""
+    portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    portfolio.name = data.name
+    if data.description is not None:
+        portfolio.description = data.description
+    db.commit()
+    return {"id": portfolio.id, "name": portfolio.name, "message": "Portfolio renamed"}
+
+
+@router.delete("/{portfolio_id}")
+async def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
+    """Delete a portfolio and everything scoped to it.
+
+    Guards: the default portfolio (id 1, auto-recreated) and the last remaining
+    portfolio can't be deleted. The models use plain foreign keys with no
+    ``ON DELETE CASCADE``, so every child table is cleared explicitly here.
+    """
+    if portfolio_id == 1:
+        raise HTTPException(status_code=400, detail="The default portfolio can't be deleted.")
+    if db.query(Portfolio).count() <= 1:
+        raise HTTPException(status_code=400, detail="You can't delete your only portfolio.")
+    portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    # Explicit cascade across every portfolio-scoped table.
+    _pid = portfolio_id
+    plan_ids = [row[0] for row in db.query(DcaPlan.id).filter(DcaPlan.portfolio_id == _pid).all()]
+    if plan_ids:
+        db.query(DcaContribution).filter(
+            DcaContribution.plan_id.in_(plan_ids)
+        ).delete(synchronize_session=False)
+    db.query(DcaPlan).filter(DcaPlan.portfolio_id == _pid).delete(synchronize_session=False)
+    db.query(RealizedTrade).filter(RealizedTrade.portfolio_id == _pid).delete(synchronize_session=False)
+    db.query(PortfolioSnapshot).filter(
+        PortfolioSnapshot.portfolio_id == _pid
+    ).delete(synchronize_session=False)
+    # Portfolio-level AI cache rows are namespaced BOOK:<id>; per-ticker summaries are shared.
+    db.query(AISummary).filter(
+        AISummary.ticker == f"BOOK:{_pid}"
+    ).delete(synchronize_session=False)
+    # Holdings (and their PriceSnapshots) cascade via the ORM relationship.
+    name = portfolio.name
+    db.delete(portfolio)
+    db.commit()
+    return {"message": f"Deleted portfolio '{name}'"}
 
 
 # ── Holdings Endpoints ─────────────────────────────────────────────────
@@ -1076,7 +1133,9 @@ async def get_conviction_gaps(portfolio_id: int = 1, db: Session = Depends(get_d
 
     _get_portfolio_or_404(portfolio_id, db)
     result, _total, _daily, _cost = _compute_portfolio(portfolio_id, db)
-    sig_payload = await get_all_investment_signals(db=db, force_local=True)
+    sig_payload = await get_all_investment_signals(
+        portfolio_id=portfolio_id, db=db, force_local=True
+    )
     return compute_conviction_gaps(result, sig_payload.get("signals") or {})
 
 
@@ -1087,7 +1146,9 @@ async def get_confidence_spectrum(portfolio_id: int = 1, db: Session = Depends(g
 
     _get_portfolio_or_404(portfolio_id, db)
     result, _total, _daily, _cost = _compute_portfolio(portfolio_id, db)
-    sig_payload = await get_all_investment_signals(db=db, force_local=True)
+    sig_payload = await get_all_investment_signals(
+        portfolio_id=portfolio_id, db=db, force_local=True
+    )
     return compute_confidence_spectrum(result, sig_payload.get("signals") or {})
 
 

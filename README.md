@@ -78,6 +78,7 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | --- | --- |
 | 📊 Add holdings and watchlist tickers | Live value, cost basis, daily change, unrealized gain, and allocation |
 | ✂️ Record a sale | Reduce a holding and it logs the realized gain/loss — at the *actual* sale price and date you choose, not just today's |
+| 🗂️ Keep separate portfolios | Give your taxable, IRA, and fun-money accounts their own scoreboards — the whole dashboard re-scopes to the one you pick |
 | 🧭 Open a ticker | A Hold / Add / Trim / Exit verdict with confidence, horizon, and scenario context |
 | ✅ Check the action plan | Bucketed portfolio moves with thesis text, priorities, and regime context |
 | 📈 Open Analytics | Performance, risk, exposure, beta, drawdown, volatility, sector tilt, and signals |
@@ -174,7 +175,6 @@ FolioOrb already earns a place on your machine — but this is very much the ope
 | | On the radar | The gist | Status |
 | --- | --- | --- | --- |
 | ⚖️ | **Target weights & drift** | Set the mix you're aiming for, then see at a glance how far today's prices have nudged you off plan. | Next up in the lab |
-| 🗂️ | **More than one portfolio** | Give your retirement account and your fun-money account their own separate scoreboards. | On the radar |
 | 🧾 | **Tax-season trade export** | Hand your accountant a tidy CSV of every closed trade — the detail behind the year-end recap. | Next up in the lab |
 | 💸 | **Income & dividends view** | See what your portfolio pays *you* back for the privilege of holding it. | Being explored |
 | 🔮 | **A what-if simulator** | Preview a buy or a trim *before* you touch anything real. Regret-free rehearsals. | Being explored |

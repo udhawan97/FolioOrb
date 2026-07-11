@@ -4,6 +4,41 @@
  * Runs automatically when the page loads.
  */
 
+// ── Active portfolio ──────────────────────────────────────────────────────
+// Which portfolio the dashboard is showing. Persisted so a reload keeps it.
+const ACTIVE_PORTFOLIO_KEY = "folioorb-active-portfolio";
+let activePortfolioId = 1;
+try {
+    const saved = parseInt(localStorage.getItem(ACTIVE_PORTFOLIO_KEY), 10);
+    if (Number.isFinite(saved) && saved > 0) activePortfolioId = saved;
+} catch (_) { /* localStorage unavailable — default to 1 */ }
+
+// Single chokepoint for portfolio scoping: stamp the active portfolio_id onto
+// every portfolio-scoped API call. This covers every fetch site (dashboard.js,
+// analytics-charts.js, and any future one) without threading an id through ~60
+// call sites — so a switch can never leak one portfolio's data into another.
+// Global endpoints (heartbeat, configure-key, verdict-report, /api/stocks, …)
+// simply ignore the extra query param.
+(function installPortfolioFetchScope() {
+    const realFetch = window.fetch.bind(window);
+    const SCOPED = /^\/api\/(portfolio|ai|news|dca)\//;
+    window.fetch = function scopedFetch(input, init) {
+        // Only string URLs are rewritten — every fetch in the app passes a string,
+        // and reconstructing a Request could consume a POST body. Request-object
+        // inputs (none today) pass through untouched.
+        if (typeof input === "string") {
+            try {
+                const u = new URL(input, window.location.origin);
+                if (u.origin === window.location.origin && SCOPED.test(u.pathname)) {
+                    u.searchParams.set("portfolio_id", String(activePortfolioId));
+                    input = u.pathname + u.search + u.hash;
+                }
+            } catch (_) { /* malformed URL — pass through untouched */ }
+        }
+        return realFetch(input, init);
+    };
+})();
+
 const toNumber = (n, fallback = 0) => {
     const value = Number(n);
     return Number.isFinite(value) ? value : fallback;
@@ -1238,12 +1273,15 @@ let _portfolioValuePromise = null;
 // Stale-while-revalidate: persist the last good portfolio payload so the
 // holdings table + summary cards paint instantly on the next load while fresh
 // prices fetch in the background.
-const PORTFOLIO_VALUE_CACHE_KEY = "folioorb-portfolio-value-v1";
+// Keyed per portfolio so switching never paints the previous portfolio's value.
+function _portfolioValueCacheKey() {
+    return `folioorb-portfolio-value-v1:${activePortfolioId}`;
+}
 
 function persistPortfolioValueCache(data) {
     try {
         localStorage.setItem(
-            PORTFOLIO_VALUE_CACHE_KEY,
+            _portfolioValueCacheKey(),
             JSON.stringify({ ts: Date.now(), data })
         );
     } catch (_) { /* quota or private mode — caching is best-effort */ }
@@ -1251,7 +1289,7 @@ function persistPortfolioValueCache(data) {
 
 function readPortfolioValueCache() {
     try {
-        const raw = localStorage.getItem(PORTFOLIO_VALUE_CACHE_KEY);
+        const raw = localStorage.getItem(_portfolioValueCacheKey());
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || !parsed.data || !Array.isArray(parsed.data.holdings)) return null;
@@ -9375,6 +9413,8 @@ document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     if (e.key === "Escape") {
+        const swMenu = document.getElementById("portfolio-switcher-menu");
+        if (swMenu && !swMenu.hidden) { closeSwitcherMenu(); return; }
         if (closeSenpaiWelcomeGuide()) return;
         if (closePortfolioManager()) return;
         hideKeyboardHelp();
@@ -10212,6 +10252,7 @@ async function initDashboard() {
     initPerformanceTabs();
     initProjectionControls();
     initPortfolioManager();
+    initPortfolioSwitcher();
     initPortfolioBriefing();
     initDesktopLinkHandler();
     requestAnimationFrame(syncHvtIndicator);
@@ -10678,6 +10719,141 @@ function closePortfolioManager() {
     popover.setAttribute("aria-hidden", "true");
     setPortfolioManagerTriggerState(false);
     return true;
+}
+
+// ── Portfolio switcher ──────────────────────────────────────────────────────
+// Switching persists the active id and reloads the page: the single most
+// reliable way to re-scope every panel and cache (the fetch chokepoint +
+// per-portfolio value cache do the rest), with no risk of a stale in-memory
+// cache leaking the previous portfolio's data.
+let _portfolios = [];
+
+async function loadPortfolios() {
+    try {
+        const res = await fetch("/api/portfolio/");
+        if (!res.ok) return;
+        _portfolios = await res.json();
+    } catch (_) { return; }
+    if (_portfolios.length && !_portfolios.some(p => p.id === activePortfolioId)) {
+        // The saved portfolio no longer exists (deleted in another session). The
+        // early data loads already fired against the dead id — fall back to the
+        // first portfolio and reload so every panel re-scopes cleanly.
+        activePortfolioId = _portfolios[0].id;
+        try { localStorage.setItem(ACTIVE_PORTFOLIO_KEY, String(activePortfolioId)); } catch (_) { /* ignore */ }
+        location.reload();
+        return;
+    }
+    renderPortfolioSwitcher();
+    updateExportAnchor();
+}
+
+function renderPortfolioSwitcher() {
+    const label = document.getElementById("portfolio-switcher-label");
+    const list = document.getElementById("portfolio-switcher-list");
+    const active = _portfolios.find(p => p.id === activePortfolioId);
+    if (label) label.textContent = active ? active.name : "Portfolio";
+    // Name the portfolio being edited in the Manage modal, so a multi-portfolio
+    // user always knows which book their edits land in.
+    const title = document.getElementById("portfolio-manager-title");
+    if (title) title.textContent = active ? `Manage · ${active.name}` : "Manage Portfolio";
+    if (!list) return;
+    list.innerHTML = _portfolios.map(p => `
+        <div class="portfolio-switcher-row${p.id === activePortfolioId ? " is-active" : ""}" role="none" data-pid="${p.id}">
+            <button type="button" class="portfolio-switcher-pick" role="menuitem" onclick="switchPortfolio(${p.id})">
+                <i class="bi ${p.id === activePortfolioId ? "bi-check-circle-fill" : "bi-circle"}" aria-hidden="true"></i>
+                <span>${escapeHtml(p.name)}</span>
+            </button>
+            <span class="portfolio-switcher-row-actions">
+                <button type="button" class="portfolio-switcher-icon" title="Rename" aria-label="Rename ${escapeHtml(p.name)}" onclick="renamePortfolioPrompt(${p.id})"><i class="bi bi-pencil"></i></button>
+                ${p.id === 1 ? "" : `<button type="button" class="portfolio-switcher-icon portfolio-switcher-icon--danger" title="Delete" aria-label="Delete ${escapeHtml(p.name)}" onclick="deletePortfolioConfirm(${p.id})"><i class="bi bi-trash"></i></button>`}
+            </span>
+        </div>`).join("");
+}
+
+function switchPortfolio(id) {
+    closeSwitcherMenu();
+    if (id === activePortfolioId) return;
+    try { localStorage.setItem(ACTIVE_PORTFOLIO_KEY, String(id)); } catch (_) { /* ignore */ }
+    location.reload();
+}
+
+async function createNewPortfolio() {
+    closeSwitcherMenu();
+    const name = window.prompt("Name your new portfolio:", "New Portfolio");
+    if (name === null) return;
+    try {
+        const res = await fetch("/api/portfolio/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name.trim() || "New Portfolio" }),
+        });
+        if (!res.ok) { showToast("Couldn't create portfolio", "danger"); return; }
+        const data = await res.json();
+        switchPortfolio(data.id);
+    } catch (_) { showToast("Couldn't create portfolio", "danger"); }
+}
+
+async function renamePortfolioPrompt(id) {
+    const current = (_portfolios.find(p => p.id === id) || {}).name || "";
+    const name = window.prompt("Rename portfolio:", current);
+    if (name === null || !name.trim()) return;
+    try {
+        const res = await fetch(`/api/portfolio/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name.trim() }),
+        });
+        if (!res.ok) { showToast("Couldn't rename portfolio", "danger"); return; }
+        await loadPortfolios();
+        showToast("Portfolio renamed", "success");
+    } catch (_) { showToast("Couldn't rename portfolio", "danger"); }
+}
+
+async function deletePortfolioConfirm(id) {
+    const p = _portfolios.find(x => x.id === id);
+    if (!p) return;
+    if (!window.confirm(`Delete portfolio "${p.name}" and all its holdings, trades, and DCA plans? This can't be undone.`)) return;
+    try {
+        const res = await fetch(`/api/portfolio/${id}`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showToast(apiErrorMessage(data, "Couldn't delete portfolio"), "danger"); return; }
+        try { localStorage.removeItem(`folioorb-portfolio-value-v1:${id}`); } catch (_) { /* ignore */ }
+        if (id === activePortfolioId) {
+            switchPortfolio(1);  // deleted the active one → drop to the default (reloads)
+        } else {
+            await loadPortfolios();
+            showToast(data.message || "Portfolio deleted", "success");
+        }
+    } catch (_) { showToast("Couldn't delete portfolio", "danger"); }
+}
+
+function updateExportAnchor() {
+    const a = document.getElementById("export-csv-btn");
+    if (a) a.setAttribute("href", `/api/portfolio/holdings/export?portfolio_id=${activePortfolioId}`);
+}
+
+function closeSwitcherMenu() {
+    const menu = document.getElementById("portfolio-switcher-menu");
+    if (menu) menu.hidden = true;
+    document.getElementById("portfolio-switcher-trigger")?.setAttribute("aria-expanded", "false");
+}
+
+function initPortfolioSwitcher() {
+    const trigger = document.getElementById("portfolio-switcher-trigger");
+    const menu = document.getElementById("portfolio-switcher-menu");
+    if (!trigger || !menu) return;
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const open = menu.hidden;
+        menu.hidden = !open;
+        trigger.setAttribute("aria-expanded", String(open));
+    });
+    document.getElementById("portfolio-switcher-new")?.addEventListener("click", createNewPortfolio);
+    document.addEventListener("click", (e) => {
+        const wrap = document.getElementById("portfolio-switcher");
+        if (!menu.hidden && wrap && !wrap.contains(e.target)) closeSwitcherMenu();
+    });
+    loadPortfolios();
 }
 
 function initPortfolioManager() {

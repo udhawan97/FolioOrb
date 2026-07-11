@@ -117,15 +117,15 @@ def test_scheduled_date_beyond_history_is_skipped():
 
 
 def test_zero_or_negative_amount_yields_nothing():
-    assert dca_service.plan_contributions(
+    assert not dca_service.plan_contributions(
         "daily", 0.0, date(2026, 6, 4), date(2026, 6, 9), CLOSES
-    ) == []
+    )
 
 
 def test_empty_closes_yields_nothing():
-    assert dca_service.plan_contributions(
+    assert not dca_service.plan_contributions(
         "daily", 50.0, date(2026, 6, 4), date(2026, 6, 9), []
-    ) == []
+    )
 
 
 # ── apply / undo cost-basis math ─────────────────────────────────────────────

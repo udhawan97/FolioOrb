@@ -1,3 +1,43 @@
+# FolioOrb v5.4.0 Release Notes
+
+**Release date:** July 11, 2026
+
+## Headline
+
+Multiple portfolios. Give your taxable account, your IRA, and your fun-money
+experiments their own separate scoreboards — each with its own holdings, P&L,
+analytics, DCA plans, and AI narratives.
+
+## What's New
+
+### 🗂️ More than one portfolio
+
+A portfolio switcher now lives in the top bar. Create as many portfolios as you
+like, rename them, delete the ones you're done with, and switch between them in a
+click — the whole dashboard (value, P&L, holdings, every analytics chart, news,
+DCA plans, and the AI briefings/action-plans) re-scopes to the one you're
+viewing. The Manage panel names the portfolio you're editing so there's never any
+doubt which book a change lands in.
+
+Everything stays cleanly separated: each portfolio's data is its own, and — the
+part that's easy to get wrong — the AI's cached briefings and action plans are
+namespaced per portfolio, so switching never shows you another portfolio's
+narrative. Your first portfolio ("My Portfolio") is always there and can't be
+deleted; new ones start empty with a friendly "add your first holding" prompt.
+
+## Under the hood
+
+The frontend scopes every portfolio API call through a single chokepoint (so no
+panel can leak the wrong portfolio's data), the AI router and analytics snapshot
+take a `portfolio_id` throughout, and the portfolio-level AI cache is keyed
+`BOOK:<id>`. New create/rename/delete endpoints delete every child row
+explicitly (holdings, trades, snapshots, DCA plans + contributions, and the
+portfolio's AI cache). Installing over any 5.3.x keeps your existing holdings as
+the default portfolio. New tests for portfolio management and AI scoping; still
+no brokerage connection and still not financial advice.
+
+---
+
 # FolioOrb v5.3.1 Release Notes
 
 **Release date:** July 11, 2026
