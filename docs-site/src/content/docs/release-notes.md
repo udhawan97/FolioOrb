@@ -7,6 +7,21 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.2.0 — Auto-Invest, On Your Terms
+
+- **DCA auto-invest plans, simulated locally.** The most-asked question — "can it sync my
+  broker's auto-invest?" — answered the local-first way. Set a ticker, a dollar amount, and a
+  cadence (daily / weekly / monthly); each interval books a buy at that day's *real* close into
+  a review bucket. Weekends and holidays snap to the next trading day.
+- **Nothing moves until you say so.** Every booked buy waits for you to **Apply** it (shares and
+  average cost update), **Skip** it, or leave it. Applies are reversible with **Undo**; skips can
+  be **Restored**. A past start date backfills the full history, with a double-count guard if you
+  already hold the ticker.
+- **Catches up after you've been away.** Reopen the app after a week and it fills in every missed
+  buy, idempotently — never double-booking. A badge shows how many are waiting.
+- Installing over any 5.1.x keeps all holdings, settings, and `.env`. Still no brokerage
+  connection; still not financial advice.
+
 ## v5.1.0 — Looking Back, Honestly
 
 - **Year-end realized recap.** The Realized gains tab now opens with a year-by-year recap of

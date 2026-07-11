@@ -82,6 +82,7 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 📈 Open Analytics | Performance, risk, exposure, beta, drawdown, volatility, sector tilt, and signals |
 | 🗞️ Open News | Grouped headlines for everything you hold or watch, plus optional Claude themes |
 | 📥 Import / export CSV | Move holdings in and out — a strict template locally, or let Claude map a messy brokerage export onto it |
+| 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply — or undo — one tap at a time |
 | 🔐 Paste a Claude key | The dashboard validates it, writes `.env`, and reconnects — no restart |
 
 > **Local Intelligence is not a downgraded mode.** It's the deterministic engine that runs the dashboard by default. Claude adds narration *on top* — it never gates the core experience, and everything it generates is cached in SQLite so refreshing doesn't mean paying again.

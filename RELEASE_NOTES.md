@@ -1,3 +1,47 @@
+# FolioOrb v5.2.0 Release Notes
+
+**Release date:** July 11, 2026
+
+## Headline
+
+v5.2.0 answers the most-asked question — *"can it sync my Robinhood/Fidelity
+auto-invest?"* — the local-first way: it doesn't connect to your broker, it
+**mirrors** the recurring buy on your own machine, and never touches your
+holdings until you say so.
+
+## What's New
+
+### 🔁 DCA auto-invest plans, simulated locally
+
+Set a plan once — a ticker, a dollar amount, and a cadence (daily, weekly, or
+monthly) — and FolioOrb does what your broker's auto-invest does, but on-device.
+Each interval it books a buy priced at that day's **real closing price**
+(weekends and holidays snap to the next trading day, just like a real fill) into
+a *pending review bucket*. Nothing changes in your portfolio until you review it.
+
+For every booked buy you choose: **Apply** it (your holding's shares and average
+cost update), **Skip** it, or leave it for later. Every Apply is fully
+reversible with **Undo**, and a skipped buy can be **Restored**. Set a start date
+in the past and it backfills the whole history from real closes — with a
+double-count guard if you already hold that ticker.
+
+Because the app isn't always running, it *catches up* on open: reopen after a
+week away and it fills in every buy you missed, idempotently — never
+double-booking an interval. A badge on the DCA button tells you how many buys
+are waiting.
+
+## Under the hood
+
+New local endpoints under `/api/dca` (plan CRUD, catch-up, apply/skip/undo/
+restore, bulk apply/skip) backed by two new tables (`dca_plans`,
+`dca_contributions`) added additively as schema v2 — the backup-first migration
+path means installing over any 5.1.x keeps every holding, setting, and `.env` in
+place. The date/price/cost engine is a pure, fully-tested module; historical
+closes come from the same yfinance layer the rest of the app uses. 40 new tests;
+still no brokerage connection and still not financial advice.
+
+---
+
 # FolioOrb v5.1.0 Release Notes
 
 **Release date:** July 11, 2026

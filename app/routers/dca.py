@@ -69,6 +69,7 @@ def _contribution_dict(c: DcaContribution) -> dict:
     return {
         "id": c.id,
         "plan_id": c.plan_id,
+        "ticker": c.plan.ticker if c.plan else None,
         "scheduled_date": c.scheduled_date,
         "exec_date": c.exec_date,
         "price": round(c.price, 4),

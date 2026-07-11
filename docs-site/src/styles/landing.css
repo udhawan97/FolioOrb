@@ -404,6 +404,23 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 @keyframes swap-local { 0%,42% { opacity: 1; } 52%,100% { opacity: 0; } }
 @keyframes swap-claude { 0%,48% { opacity: 0; } 58%,100% { opacity: 1; } }
 
+/* DCA review-bucket artifact (Act 4, Moment F) */
+.artifact-dca .dca-art-head { display: flex; align-items: center; gap: 0.55rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.artifact-dca .dca-art-head b { font-size: 1rem; }
+.dca-art-terms { font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dca-art-badge { margin-left: auto; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--act-accent); background: color-mix(in srgb, var(--act-accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--act-accent) 25%, transparent); padding: 0.2rem 0.5rem; border-radius: 999px; }
+.dca-art-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.5rem 0.9rem; padding: 0.55rem 0.7rem; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--panel-2); margin-bottom: 0.5rem; }
+.dca-art-row:last-child { margin-bottom: 0; }
+.dca-art-date { font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dca-art-detail { font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.dca-art-detail b { font-weight: 650; }
+.dca-art-actions { display: inline-flex; gap: 0.4rem; }
+.dca-art-apply, .dca-art-skip { font-size: 0.74rem; font-weight: 600; padding: 0.24rem 0.72rem; border-radius: 999px; white-space: nowrap; }
+.dca-art-apply { color: #04170c; background: var(--green); }
+.dca-art-skip { color: var(--muted); border: 1px solid var(--panel-border); }
+.dca-art-row--done { opacity: 0.7; }
+.dca-art-status { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); padding: 0.16rem 0.5rem; border-radius: 999px; }
+
 /* ── DEMO PANEL (Act 5) ───────────────────────────────────────── */
 .demo-badge { display: inline-block; margin-top: 0.9rem; font-size: 0.78rem; color: var(--act-accent); background: color-mix(in srgb, var(--act-accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--act-accent) 25%, transparent); padding: 0.3rem 0.8rem; border-radius: 999px; }
 .demo-card { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; border-radius: var(--radius); padding: 1.8rem; }

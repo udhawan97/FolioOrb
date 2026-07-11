@@ -11506,30 +11506,46 @@ function renderDcaPlans(plans) {
         const applied = p.applied_count
             ? `${formatCurrency(p.applied_amount)} → ${p.applied_shares.toFixed(4)} sh @ ${formatCurrency(p.applied_avg_cost)}`
             : "nothing applied yet";
-        const nextBit = p.is_active
-            ? (p.next_date ? `next buy ${escapeHtml(p.next_date)}` : "")
-            : "paused";
+        const badge = p.is_active
+            ? (p.next_date
+                ? `<span class="dca-plan-next">Next buy ${escapeHtml(p.next_date)}</span>`
+                : "")
+            : `<span class="dca-plan-flag">Paused</span>`;
         return `
         <div class="dca-plan-card${p.is_active ? "" : " dca-plan-card--paused"}" data-plan-id="${p.id}">
-            <div class="dca-plan-main">
-                <span class="dca-plan-ticker">${escapeHtml(p.ticker)}</span>
-                <span class="dca-plan-terms">${formatCurrency(p.amount)} ${escapeHtml(p.frequency)}</span>
-                <span class="dca-plan-next">${nextBit}</span>
+            <div class="dca-plan-head">
+                <div class="dca-plan-id">
+                    <span class="dca-plan-ticker">${escapeHtml(p.ticker)}</span>
+                    <span class="dca-plan-terms">${formatCurrency(p.amount)} · ${escapeHtml(p.frequency)}</span>
+                </div>
+                ${badge}
             </div>
             <div class="dca-plan-sub">Applied so far: ${applied}</div>
             <div class="dca-plan-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="dcaTogglePause(${p.id}, ${p.is_active})">
+                <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaTogglePause(${p.id}, ${p.is_active})">
                     ${p.is_active ? "Pause" : "Resume"}
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="dcaEditAmount(${p.id}, ${p.amount})">
-                    Edit $
+                <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaEditAmount(${p.id}, ${p.amount})">
+                    Edit amount
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="dcaDeletePlan(${p.id}, '${escapeHtml(p.ticker)}')">
+                <button type="button" class="btn btn-sm dca-chip-btn dca-chip-btn--danger" onclick="dcaDeletePlan(${p.id}, '${escapeHtml(p.ticker)}')">
                     Delete
                 </button>
             </div>
         </div>`;
     }).join("");
+}
+
+function dcaBuyRow(c, endHtml) {
+    return `
+        <div class="dca-buy-row" data-cid="${c.id}">
+            <span class="dca-buy-date">${escapeHtml(c.exec_date)}</span>
+            <span class="dca-buy-detail">
+                <span class="dca-buy-shares">${c.shares.toFixed(4)} sh</span>
+                <span class="dca-buy-meta">@ ${formatCurrency(c.price)} · ${formatCurrency(c.amount)}</span>
+            </span>
+            <span class="dca-buy-end">${endHtml}</span>
+        </div>`;
 }
 
 function renderDcaPending(pending, plans) {
@@ -11547,25 +11563,22 @@ function renderDcaPending(pending, plans) {
     });
 
     list.innerHTML = [...byPlan.entries()].map(([planId, buys]) => {
-        const ticker = planById[planId]?.ticker || "?";
-        const rows = buys.map(c => `
-            <div class="dca-buy-row" data-cid="${c.id}">
-                <span class="dca-buy-date">${escapeHtml(c.exec_date)}</span>
-                <span class="dca-buy-detail">${c.shares.toFixed(4)} sh @ ${formatCurrency(c.price)} · ${formatCurrency(c.amount)}</span>
-                <span class="dca-buy-actions">
-                    <button type="button" class="btn btn-sm btn-success" onclick="dcaApply(${c.id})">Apply</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="dcaSkip(${c.id})">Skip</button>
-                </span>
-            </div>`).join("");
+        const ticker = planById[planId]?.ticker || buys[0].ticker || "?";
+        const rows = buys.map(c => dcaBuyRow(c, `
+            <button type="button" class="btn btn-sm btn-success dca-act-btn" onclick="dcaApply(${c.id})">Apply</button>
+            <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaSkip(${c.id})">Skip</button>
+        `)).join("");
         const bulk = buys.length > 1 ? `
             <span class="dca-bulk-actions">
-                <button type="button" class="btn btn-sm btn-link" onclick="dcaApplyAll(${planId})">Apply all ${buys.length}</button>
-                <button type="button" class="btn btn-sm btn-link dca-bulk-skip" onclick="dcaSkipAll(${planId})">Skip all</button>
+                <button type="button" class="btn btn-sm btn-link dca-bulk-link" onclick="dcaApplyAll(${planId})">Apply all ${buys.length}</button>
+                <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" onclick="dcaSkipAll(${planId})">Skip all</button>
             </span>` : "";
         return `
         <div class="dca-pending-group">
             <div class="dca-pending-group-head">
-                <span class="dca-plan-ticker">${escapeHtml(ticker)}</span>${bulk}
+                <span class="dca-group-ticker">${escapeHtml(ticker)}</span>
+                <span class="dca-group-count">${buys.length} buy${buys.length === 1 ? "" : "s"} awaiting</span>
+                ${bulk}
             </div>
             ${rows}
         </div>`;
@@ -11596,14 +11609,20 @@ async function loadDcaHistory() {
         }
         listEl.innerHTML = rows.map(c => {
             const action = c.status === "applied"
-                ? `<button type="button" class="btn btn-sm btn-outline-secondary" onclick="dcaUndo(${c.id})">Undo</button>`
-                : `<button type="button" class="btn btn-sm btn-outline-secondary" onclick="dcaRestore(${c.id})">Restore</button>`;
+                ? `<button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaUndo(${c.id})">Undo</button>`
+                : `<button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaRestore(${c.id})">Restore</button>`;
+            const ticker = c.ticker ? `<span class="dca-buy-ticker">${escapeHtml(c.ticker)}</span>` : "";
+            const end = `
+                <span class="dca-buy-status dca-buy-status--${c.status}">${escapeHtml(c.status)}</span>
+                ${action}`;
             return `
-            <div class="dca-buy-row dca-buy-row--${c.status}">
-                <span class="dca-buy-date">${escapeHtml(c.exec_date)}</span>
-                <span class="dca-buy-detail">${c.shares.toFixed(4)} sh @ ${formatCurrency(c.price)} · ${formatCurrency(c.amount)}</span>
-                <span class="dca-buy-status">${escapeHtml(c.status)}</span>
-                <span class="dca-buy-actions">${action}</span>
+            <div class="dca-buy-row dca-buy-row--${c.status}" data-cid="${c.id}">
+                <span class="dca-buy-date">${ticker}${escapeHtml(c.exec_date)}</span>
+                <span class="dca-buy-detail">
+                    <span class="dca-buy-shares">${c.shares.toFixed(4)} sh</span>
+                    <span class="dca-buy-meta">@ ${formatCurrency(c.price)} · ${formatCurrency(c.amount)}</span>
+                </span>
+                <span class="dca-buy-end">${end}</span>
             </div>`;
         }).join("");
     } catch (err) {
