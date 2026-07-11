@@ -910,6 +910,7 @@
                             </div>
                             <div class="tab-pane fade" id="realized-gains-pane"
                                  role="tabpanel" aria-labelledby="realized-gains-tab" tabindex="0">
+                                <div id="realized-recap" class="realized-recap" hidden></div>
                                 <div class="realized-table-wrap">
                                     <table class="table table-dark table-sm mb-0 realized-table">
                                         <thead class="text-secondary small">
@@ -1627,6 +1628,41 @@
                                 </p>
                                 <p class="analytics-widget-insight" data-widget-insight="verdict-mix"></p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 g-md-4 mb-3">
+                <div class="col-12">
+                    <div class="card bg-dark border-secondary analytics-chart-card" id="verdict-report-card">
+                        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                            <i class="bi bi-clipboard-check analytics-card-icon"></i>
+                            <div class="analytics-card-titles">
+                                <span>Verdict report card</span>
+                                <span class="analytics-card-sub">how past calls have aged</span>
+                            </div>
+                            <button class="tip-trigger ms-auto"
+                                data-tip-title="Verdict Report Card"
+                                data-tip-body="How FolioOrb's past Add / Trim / Hold calls have done since the call, measured against the current price. A call ages well if an Add rose, a Trim fell, or a Hold stayed within &plusmn;10%. Not financial advice."
+                                data-tip-hint="Return since the call, not a forward bet"
+                                data-tip-icon="bi-clipboard-check">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="verdict-report-empty" class="perf-callout" style="display:none">
+                                <i class="bi bi-clipboard-check perf-callout-icon"></i>
+                                <div class="perf-callout-text">
+                                    <div class="perf-callout-title">No graded calls yet</div>
+                                    <div class="perf-callout-body">Open holdings to log verdicts &mdash; calls become gradeable after a few days.</div>
+                                </div>
+                            </div>
+                            <div id="verdict-report-body" class="verdict-report" hidden></div>
+                            <p class="analytics-chart-caption">
+                                Grades each past call by its return <em>since</em> the call vs. the current price
+                                &mdash; an honest look-back, not a forward prediction. Small samples are noisy; not
+                                financial advice.
+                            </p>
                         </div>
                     </div>
                 </div>

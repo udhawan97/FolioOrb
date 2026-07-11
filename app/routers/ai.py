@@ -84,6 +84,7 @@ from app.services.verdict_calibration import (
     compute_calibration_buckets,
     log_verdict_snapshot,
 )
+from app.services.verdict_report import build_verdict_report
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -1435,6 +1436,23 @@ async def get_portfolio_exposure(db: Session = Depends(get_db)):
 async def get_verdict_calibration(db: Session = Depends(get_db)):
     """Lightweight calibration buckets from logged verdict snapshots."""
     return calibration_summary(db)
+
+
+@router.get("/verdict-report")
+async def get_verdict_report(db: Session = Depends(get_db)):
+    """Scorecard of how past verdicts have aged vs. the current price.
+
+    Reads the most recent logged verdict snapshots and grades each Add / Trim /
+    Hold call by the holding's return *since* the call. Verdict snapshots are
+    global (not per-portfolio), so this endpoint takes no portfolio_id.
+    """
+    snapshots = (
+        db.query(VerdictSnapshot)
+        .order_by(VerdictSnapshot.generated_at.desc())
+        .limit(500)
+        .all()
+    )
+    return build_verdict_report(snapshots)
 
 
 @router.get("/intelligence/{ticker}/deep")

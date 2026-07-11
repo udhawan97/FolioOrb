@@ -12909,6 +12909,159 @@ tr.research-holding-row:hover {
     color: #8a5600;
 }
 
+/* ── Year-end realized recap (Realized gains tab) ─────────────────────────── */
+.realized-recap {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.025);
+}
+.realized-recap-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.realized-recap-title {
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-secondary);
+}
+.realized-recap-years { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.realized-recap-year {
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: .72rem;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.realized-recap-year:hover { color: var(--text-primary); border-color: var(--accent-cyan); }
+.realized-recap-year.is-active {
+    background: rgba(111, 214, 240, 0.14);
+    border-color: rgba(111, 214, 240, 0.4);
+    color: var(--accent-cyan);
+    font-weight: 600;
+}
+.realized-recap-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1.3fr;
+    gap: 10px;
+}
+.realized-recap-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.realized-recap-stat-label {
+    font-size: .66rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.realized-recap-stat-value {
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.realized-recap-stat--hero .realized-recap-stat-value { font-size: 1.15rem; }
+.realized-recap-highlights { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.realized-recap-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--hairline);
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+}
+.realized-recap-chip-label {
+    font-size: .64rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--text-tertiary);
+}
+@media (max-width: 640px) {
+    .realized-recap-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Verdict report card (Signals tab) ────────────────────────────────────── */
+.verdict-report { display: flex; flex-direction: column; gap: 14px; }
+.verdict-report-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.verdict-report-hero { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.verdict-report-hero-rate {
+    font-size: 1.7rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.verdict-report-hero-label { font-size: .78rem; color: var(--text-secondary); }
+.verdict-report-pending { color: var(--text-tertiary); }
+.verdict-report-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.verdict-report-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 5px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--hairline);
+    min-width: 62px;
+}
+.verdict-report-action-name { font-size: .64rem; text-transform: uppercase; letter-spacing: .03em; color: var(--text-tertiary); }
+.verdict-report-action-rate { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.verdict-report-action-sample { font-size: .64rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.verdict-report-ledger { display: flex; flex-direction: column; }
+.verdict-report-row {
+    display: grid;
+    grid-template-columns: minmax(46px, 0.7fr) auto 1fr auto 20px;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 2px;
+    border-top: 1px solid var(--hairline-soft);
+    font-size: .82rem;
+    font-variant-numeric: tabular-nums;
+}
+.verdict-report-row:first-child { border-top: none; }
+.verdict-report-tag {
+    justify-self: start;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: .66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+}
+.verdict-report-tag--add { background: rgba(48, 209, 88, 0.14); color: var(--accent-green); }
+.verdict-report-tag--trim { background: rgba(255, 69, 58, 0.14); color: var(--accent-red); }
+.verdict-report-tag--hold { background: rgba(255, 214, 10, 0.14); color: rgba(255, 214, 10, 0.92); }
+.verdict-report-mark { text-align: center; font-weight: 700; }
+.verdict-report-mark--hit { color: var(--accent-green); }
+.verdict-report-mark--miss { color: var(--accent-red); }
+[data-bs-theme="light"] .realized-recap,
+[data-bs-theme="light"] .realized-recap-chip,
+[data-bs-theme="light"] .verdict-report-action {
+    background: rgba(0, 0, 0, 0.03);
+}
+[data-bs-theme="light"] .verdict-report-tag--hold { color: #8a5600; }
+/* Bright yellow .text-warning has no light-theme override and is unreadable on
+   the light card, so darken it specifically for the verdict hit-rate numbers. */
+[data-bs-theme="light"] .verdict-report-hero-rate.text-warning,
+[data-bs-theme="light"] .verdict-report-action-rate.text-warning { color: #8a5600; }
+
 /* Light theme overrides */
 [data-bs-theme="light"] .holdings-view-tabs {
     background: rgba(0, 0, 0, 0.045);

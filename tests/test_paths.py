@@ -1,3 +1,4 @@
+# pylint: disable=protected-access,unused-argument,wrong-import-position,wrong-import-order
 """Source-mode behavior of app.paths.
 
 In a normal checkout the app is not frozen, so resources and writable data both

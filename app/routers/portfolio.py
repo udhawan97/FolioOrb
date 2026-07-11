@@ -19,6 +19,7 @@ from app.services.stock_service import (
 )
 from app.services import holdings_csv
 from app.services.earnings_radar import get_earnings_events
+from app.services.realized_recap import build_realized_recap
 from app.services.portfolio_projection import get_cached_projection
 from app.services.portfolio_analytics import (
     compute_risk_metrics,
@@ -841,6 +842,32 @@ async def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
             for s in snapshots
         ],
     }
+
+
+@router.get("/realized-summary")
+async def get_realized_summary(
+    portfolio_id: int = 1,
+    year: int | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Year-by-year recap of realized (closed-trade) P&L for a portfolio.
+
+    Aggregates every stored `RealizedTrade` — not just the last 100 the P&L
+    ledger shows — grouped by the calendar year of each sale. `year` selects
+    which year to detail; it defaults to the most recent year with trades and
+    falls back to that default for an unknown year. Stored data only, no live
+    quotes.
+    """
+    _get_portfolio_or_404(portfolio_id, db)
+    trades = (
+        db.query(RealizedTrade)
+        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .order_by(RealizedTrade.created_at.asc())
+        .all()
+    )
+    recap = build_realized_recap(trades, year=year)
+    recap["portfolio_id"] = portfolio_id
+    return recap
 
 
 @router.get("/projection")

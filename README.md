@@ -171,8 +171,7 @@ FolioOrb already earns a place on your machine — but this is very much the ope
 | --- | --- | --- | --- |
 | ⚖️ | **Target weights & drift** | Set the mix you're aiming for, then see at a glance how far today's prices have nudged you off plan. | Next up in the lab |
 | 🗂️ | **More than one portfolio** | Give your retirement account and your fun-money account their own separate scoreboards. | On the radar |
-| 🧾 | **A verdict report card** | The dashboard grading its own past Hold / Add / Trim calls — in public, no less. | On the radar |
-| 🧮 | **Year-end realized recap** | A tidy "what did I actually lock in this year?" summary for when tax season comes knocking. | Next up in the lab |
+| 🧾 | **Tax-season trade export** | Hand your accountant a tidy CSV of every closed trade — the detail behind the year-end recap. | Next up in the lab |
 | 💸 | **Income & dividends view** | See what your portfolio pays *you* back for the privilege of holding it. | Being explored |
 | 🔮 | **A what-if simulator** | Preview a buy or a trim *before* you touch anything real. Regret-free rehearsals. | Being explored |
 

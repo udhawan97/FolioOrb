@@ -1,3 +1,44 @@
+# FolioOrb v5.1.0 Release Notes
+
+**Release date:** July 11, 2026
+
+## Headline
+
+v5.1.0 adds two honest ways to look *backward*: a year-by-year recap of the gains
+you actually locked in, and a report card that grades FolioOrb's own past calls
+by how they've since aged.
+
+## What's New
+
+### 🧮 Year-end realized recap
+
+The Realized gains tab (Analytics → Performance) now opens with a recap of your
+closed trades, bucketed by calendar year. Pick a year and see the realized P&L and
+return, how many sales and tickers it covered, your winners-vs-losers count, and
+the single best and worst position of the year. It reads *every* stored trade —
+not just the last hundred — straight from your local database, no live quotes
+needed. Tax season, with slightly less dread.
+
+### 🧾 A verdict report card
+
+The Signals tab (Analytics) gets an honest look in the mirror: FolioOrb grades its
+own past Add / Trim / Hold calls by how the holding has actually done *since* the
+call. An Add that rose counts; a Trim that fell counts; a Hold that stayed within
+±10% counts. You get an overall "aged well" rate, a per-action breakdown, and a
+ledger of recent calls with their return-since and a ✓ or ✗. Calls need a few days
+to mature before they're graded, and it's a look-back, not a forward bet — small
+samples are noisy, and none of it is financial advice.
+
+## Under the hood
+
+Both features are new local endpoints (`/api/portfolio/realized-summary`,
+`/api/ai/verdict-report`) with dedicated tests. The verdict card prices its tickers
+through the shared cached-quote layer with a hard latency cap, so it can never stall
+a refresh. Nothing about your data or configuration changes — installing over any
+5.0.x keeps everything in place.
+
+---
+
 # FolioOrb v5.0.0 Release Notes
 
 **Release date:** July 9, 2026

@@ -7,6 +7,18 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.1.0 — Looking Back, Honestly
+
+- **Year-end realized recap.** The Realized gains tab now opens with a year-by-year recap of
+  your closed trades — realized P&L and return, sales and tickers covered, winners vs losers,
+  and the best and worst position of the year. Reads every stored trade from your local
+  database; no live quotes. Switch years with the toggle.
+- **A verdict report card.** The Signals tab grades FolioOrb's own past Add / Trim / Hold calls
+  by how each holding has done *since* the call — an overall "aged well" rate, a per-action
+  breakdown, and a ledger with a ✓/✗ per call. A look-back, not a forward bet; small samples
+  are noisy and it's not financial advice.
+- Installing over any 5.0.x keeps all holdings, settings, and `.env`.
+
 ## v5.0.0 — FolioOrb
 
 FolioOrb is the native desktop app for local-first portfolio intelligence.

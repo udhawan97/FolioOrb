@@ -3219,6 +3219,7 @@ async function loadPnl() {
         renderHeroPnl();
 
         renderRealizedTable(data.trades || []);
+        loadRealizedRecap();
     } catch (err) {
         console.warn("Unable to load P&L:", err);
     }
@@ -3463,6 +3464,178 @@ function renderRealizedTable(trades) {
             </td>
         `;
     });
+}
+
+
+// ── Year-end realized recap (Analytics · Realized gains tab) ────────────────
+
+// Remembers an explicit year pick so a background loadPnl() refresh doesn't snap
+// the recap back to the latest year. null → follow the most-recent year.
+let _realizedRecapYear = null;
+
+async function loadRealizedRecap(year) {
+    const host = document.getElementById("realized-recap");
+    if (!host) return;
+    if (year != null) _realizedRecapYear = Number(year);
+    const active = year != null ? year : _realizedRecapYear;
+    try {
+        const qs = active != null ? `?year=${encodeURIComponent(active)}` : "";
+        const res = await fetch(`/api/portfolio/realized-summary${qs}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        renderRealizedRecap(await res.json());
+    } catch (err) {
+        console.warn("Unable to load realized recap:", err);
+        host.hidden = true;
+    }
+}
+
+function renderRealizedRecap(data) {
+    const host = document.getElementById("realized-recap");
+    if (!host) return;
+    const years = Array.isArray(data?.years) ? data.years : [];
+    if (!years.length || data.year == null) {
+        host.hidden = true;
+        host.innerHTML = "";
+        return;
+    }
+    const summary = data.summary || {};
+    const yearButtons = years.map(y =>
+        `<button type="button" class="realized-recap-year${y === data.year ? " is-active" : ""}"
+                 data-recap-year="${y}" aria-pressed="${y === data.year}">${y}</button>`
+    ).join("");
+    const pctStr = summary.return_pct == null ? "" :
+        ` <span class="${valueClass(summary.return_pct)}">(${formatOptionalPct(summary.return_pct)})</span>`;
+
+    const highlight = (label, item, cls) => item
+        ? `<div class="realized-recap-chip">
+               <span class="realized-recap-chip-label">${label}</span>
+               <span class="fw-bold">${escapeHtml(item.ticker)}</span>
+               <span class="${cls}">${formatSignedCurrency(item.realized_gain)}</span>
+           </div>`
+        : "";
+
+    host.innerHTML = `
+        <div class="realized-recap-head">
+            <span class="realized-recap-title">Realized recap</span>
+            <div class="realized-recap-years" role="group" aria-label="Recap year">${yearButtons}</div>
+        </div>
+        <div class="realized-recap-grid">
+            <div class="realized-recap-stat realized-recap-stat--hero">
+                <span class="realized-recap-stat-label">${data.year} realized P&amp;L</span>
+                <span class="realized-recap-stat-value ${colorClass(summary.realized_gain)}">${formatSignedCurrency(summary.realized_gain)}${pctStr}</span>
+            </div>
+            <div class="realized-recap-stat">
+                <span class="realized-recap-stat-label">Sales</span>
+                <span class="realized-recap-stat-value">${toNumber(summary.trade_count).toFixed(0)}</span>
+            </div>
+            <div class="realized-recap-stat">
+                <span class="realized-recap-stat-label">Tickers</span>
+                <span class="realized-recap-stat-value">${toNumber(summary.tickers).toFixed(0)}</span>
+            </div>
+            <div class="realized-recap-stat">
+                <span class="realized-recap-stat-label">Winners / losers</span>
+                <span class="realized-recap-stat-value"><span class="text-success">${toNumber(summary.winners).toFixed(0)}</span> / <span class="text-danger">${toNumber(summary.losers).toFixed(0)}</span></span>
+            </div>
+        </div>
+        <div class="realized-recap-highlights">
+            ${highlight("Best", data.best, "text-success")}
+            ${highlight("Worst", data.worst, "text-danger")}
+        </div>
+    `;
+    host.hidden = false;
+    host.querySelectorAll("[data-recap-year]").forEach(btn => {
+        btn.addEventListener("click", () => loadRealizedRecap(btn.dataset.recapYear));
+    });
+}
+
+
+// ── Verdict report card (Analytics · Signals tab) ───────────────────────────
+
+const _VERDICT_ACTION_LABELS = { add: "Add", trim: "Trim", hold: "Hold" };
+
+function _verdictRateClass(rate) {
+    if (rate == null) return "";
+    if (rate >= 60) return "text-success";
+    if (rate >= 40) return "text-warning";
+    return "text-danger";
+}
+
+let _verdictReportLoaded = false;
+
+async function loadVerdictReportCard() {
+    const body = document.getElementById("verdict-report-body");
+    if (!body) return;
+    try {
+        const res = await fetch("/api/ai/verdict-report");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        renderVerdictReport(await res.json());
+        _verdictReportLoaded = true;
+    } catch (err) {
+        console.warn("Unable to load verdict report:", err);
+        // Keep a card we've already populated; only fall to the empty state on a
+        // cold first load, so one flaky refresh doesn't blank a working card.
+        if (!_verdictReportLoaded) renderVerdictReport(null);
+    }
+}
+
+function renderVerdictReport(data) {
+    const body = document.getElementById("verdict-report-body");
+    const empty = document.getElementById("verdict-report-empty");
+    if (!body) return;
+
+    if (!data || toNumber(data.graded_count) < 1) {
+        body.hidden = true;
+        body.innerHTML = "";
+        if (empty) {
+            empty.style.display = "";
+            const pending = toNumber(data?.pending_young) + toNumber(data?.pending_price);
+            const line = empty.querySelector(".perf-callout-body");
+            if (line) {
+                // Set both directions so a later pending==0 render restores the default copy.
+                line.textContent = pending > 0
+                    ? `${pending} call${pending === 1 ? "" : "s"} logged — grades appear once they're at least ${data.min_age_days || 3} days old and priceable.`
+                    : "Open holdings to log verdicts — calls become gradeable after a few days.";
+            }
+        }
+        return;
+    }
+    if (empty) empty.style.display = "none";
+
+    const overall = data.hit_rate;
+    const byAction = (data.by_action || []).map(b =>
+        `<div class="verdict-report-action">
+            <span class="verdict-report-action-name">${_VERDICT_ACTION_LABELS[b.action] || escapeHtml(String(b.action))}</span>
+            <span class="verdict-report-action-rate ${_verdictRateClass(b.hit_rate)}">${b.hit_rate == null ? "--" : b.hit_rate + "%"}</span>
+            <span class="verdict-report-action-sample">${toNumber(b.hits).toFixed(0)}/${toNumber(b.total).toFixed(0)}</span>
+         </div>`
+    ).join("");
+
+    const ledger = (data.ledger || []).map(g => {
+        const days = g.days_ago === 0 ? "today" : g.days_ago === 1 ? "1d ago" : `${toNumber(g.days_ago).toFixed(0)}d ago`;
+        const action = _VERDICT_ACTION_LABELS[g.action] ? g.action : "hold";
+        return `<div class="verdict-report-row">
+            <span class="fw-bold">${escapeHtml(g.ticker)}</span>
+            <span class="verdict-report-tag verdict-report-tag--${action}">${_VERDICT_ACTION_LABELS[g.action] || escapeHtml(String(g.action))}</span>
+            <span class="text-secondary small">${days}</span>
+            <span class="text-end ${valueClass(g.return_since_pct)}">${formatOptionalPct(g.return_since_pct)}</span>
+            <span class="verdict-report-mark ${g.hit ? "verdict-report-mark--hit" : "verdict-report-mark--miss"}">${g.hit ? "✓" : "✗"}</span>
+        </div>`;
+    }).join("");
+
+    const pending = toNumber(data.pending_young) + toNumber(data.pending_price);
+    const pendingNote = pending > 0 ? ` · <span class="verdict-report-pending">${pending} still maturing</span>` : "";
+
+    body.innerHTML = `
+        <div class="verdict-report-summary">
+            <div class="verdict-report-hero">
+                <span class="verdict-report-hero-rate ${_verdictRateClass(overall)}">${overall == null ? "--" : overall + "%"}</span>
+                <span class="verdict-report-hero-label">aged well · ${toNumber(data.hit_count).toFixed(0)}/${toNumber(data.graded_count).toFixed(0)} calls${pendingNote}</span>
+            </div>
+            <div class="verdict-report-actions">${byAction}</div>
+        </div>
+        <div class="verdict-report-ledger">${ledger}</div>
+    `;
+    body.hidden = false;
 }
 
 
@@ -8767,6 +8940,7 @@ function refreshDashboardData({
         loadPnl(),
         refreshRangePerformanceIfActive(),
         loadEarningsRadar(),
+        loadVerdictReportCard(),
     ];
     if (includeManageHoldings && isPortfolioManagerOpen()) {
         jobs.push(loadManageHoldings({ preserveExisting: true }));
