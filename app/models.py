@@ -121,6 +121,9 @@ class VerdictSnapshot(Base):
     __tablename__ = "verdict_snapshots"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Which portfolio this verdict was logged for. Nullable for rows written
+    # before per-portfolio scoping (backfilled to the default portfolio 1).
+    portfolio_id = Column(Integer, nullable=True, index=True)
     ticker = Column(String(10), nullable=False, index=True)
     action = Column(String(20), nullable=False)
     confidence = Column(Integer, nullable=False, default=0)

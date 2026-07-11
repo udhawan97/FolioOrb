@@ -1,3 +1,34 @@
+# FolioOrb v5.4.1 Release Notes
+
+**Release date:** July 11, 2026
+
+## Headline
+
+The last thing that wasn't per-portfolio now is: your verdict track record. The
+Signals "how did my past calls age?" report card and the calibration stats are
+scoped to the portfolio you're viewing, instead of mixing calls across all of
+them.
+
+## What's New
+
+### 🎯 Verdict history is per-portfolio
+
+Each portfolio now keeps its own record of the Add / Trim / Hold calls made for
+it. Open the Signals tab in your IRA and you'll see how *its* calls aged — not a
+blend of every portfolio's. New verdicts are tagged with the portfolio they were
+logged for; verdicts recorded before this update are kept and attributed to your
+default portfolio.
+
+## Under the hood
+
+Adds the additive `verdict_snapshots.portfolio_id` column (schema v4, backup-first
+migration, existing rows backfilled to portfolio 1) and threads `portfolio_id`
+through the verdict log, calibration buckets, and the `verdict-report` /
+`verdict-calibration` endpoints. Installing over any 5.4.0 keeps everything in
+place; new test proves no cross-portfolio verdict bleed.
+
+---
+
 # FolioOrb v5.4.0 Release Notes
 
 **Release date:** July 11, 2026

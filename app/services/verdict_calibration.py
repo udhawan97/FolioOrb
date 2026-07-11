@@ -28,10 +28,12 @@ def log_verdict_snapshot(
     ai_score: Optional[int],
     price_at_scan: Optional[float],
     hold_class: str = "auto",
+    portfolio_id: int = 1,
 ) -> None:
-    """Persist one verdict snapshot per scan."""
+    """Persist one verdict snapshot per scan, scoped to a portfolio."""
     try:
         db.add(VerdictSnapshot(
+            portfolio_id=portfolio_id,
             ticker=ticker.upper(),
             action=action,
             confidence=confidence,
@@ -71,9 +73,10 @@ def compute_calibration_buckets(
     db: Session,
     *,
     window: str = "1m",
+    portfolio_id: int = 1,
 ) -> list[dict]:
     """
-    Compute hit rates by predicted confidence band.
+    Compute hit rates by predicted confidence band for one portfolio.
     Uses stored snapshots; forward returns require price_at_scan (reporting only
     until historical prices are backfilled).
     """
@@ -81,7 +84,10 @@ def compute_calibration_buckets(
     cutoff = datetime.now(timezone.utc) - timedelta(days=days + 90)
     rows = (
         db.query(VerdictSnapshot)
-        .filter(VerdictSnapshot.generated_at >= cutoff)
+        .filter(
+            VerdictSnapshot.portfolio_id == portfolio_id,
+            VerdictSnapshot.generated_at >= cutoff,
+        )
         .order_by(VerdictSnapshot.generated_at.desc())
         .limit(500)
         .all()
@@ -117,6 +123,7 @@ def calibration_footnote(
     action: str,
     confidence: int,
     buckets: Optional[list[dict]] = None,
+    portfolio_id: int = 1,
 ) -> dict | None:
     """Return footnote when enough samples exist for similar calls.
 
@@ -127,7 +134,7 @@ def calibration_footnote(
     """
     band = _predicted_band(confidence)
     if buckets is None:
-        buckets = compute_calibration_buckets(db, window="1m")
+        buckets = compute_calibration_buckets(db, window="1m", portfolio_id=portfolio_id)
     match = next((b for b in buckets if b["predicted_band"] == band), None)
     if not match or match["sample_size"] < _MIN_SAMPLE_FOR_FOOTNOTE:
         return None
@@ -148,9 +155,9 @@ def calibration_footnote(
     }
 
 
-def calibration_summary(db: Session) -> dict:
+def calibration_summary(db: Session, portfolio_id: int = 1) -> dict:
     """Lightweight summary for API response."""
-    buckets = compute_calibration_buckets(db)
+    buckets = compute_calibration_buckets(db, portfolio_id=portfolio_id)
     total = sum(b["sample_size"] for b in buckets)
     return {
         "total_snapshots": total,

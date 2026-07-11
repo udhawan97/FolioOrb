@@ -7,6 +7,14 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.4.1 — Per-Portfolio Verdict History
+
+- **Your track record follows the portfolio.** The Signals "how did my past calls age?" report
+  card and calibration stats now scope to the portfolio you're viewing, instead of blending Add /
+  Trim / Hold calls across all of them.
+- Verdicts logged before this update are kept and attributed to your default portfolio (additive
+  schema v4 migration). Installing over any 5.4.0 keeps everything in place.
+
 ## v5.4.0 — More Than One Portfolio
 
 - **Multiple portfolios.** A switcher in the top bar lets you create, rename, delete, and switch

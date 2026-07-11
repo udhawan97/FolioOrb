@@ -32,7 +32,10 @@ logger = logging.getLogger(__name__)
 # by create_all, so MIN_COMPATIBLE_APP_VERSION is unchanged.
 # v3 adds the additive dca_plans.catchup_floor column (ALTER in
 # ensure_startup_migrations) — still additive, MIN_COMPATIBLE unchanged.
-SCHEMA_VERSION = 3
+# v4 adds the additive verdict_snapshots.portfolio_id column (ALTER + backfill
+# to portfolio 1) for per-portfolio verdict history — additive, MIN_COMPATIBLE
+# unchanged.
+SCHEMA_VERSION = 4
 
 # Oldest app version whose ORM models can still read this schema. Additive-only
 # migrations (new tables/columns/indexes) keep this unchanged, so a normal

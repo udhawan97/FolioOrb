@@ -114,6 +114,26 @@ def ensure_startup_migrations(target_engine=None):
             conn.execute(
                 text("ALTER TABLE dca_plans ADD COLUMN catchup_floor VARCHAR(10)")
             )
+
+        # v4: per-portfolio verdict history. Add the column, then backfill any
+        # pre-scoping rows to the default portfolio so their history isn't lost.
+        verdict_cols = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(verdict_snapshots)")).fetchall()
+        }
+        if verdict_cols and "portfolio_id" not in verdict_cols:
+            conn.execute(
+                text("ALTER TABLE verdict_snapshots ADD COLUMN portfolio_id INTEGER")
+            )
+            conn.execute(
+                text("UPDATE verdict_snapshots SET portfolio_id = 1 WHERE portfolio_id IS NULL")
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_verdict_snapshots_portfolio "
+                    "ON verdict_snapshots (portfolio_id, generated_at)"
+                )
+            )
         if "verdict_snapshots" not in tables:
             conn.execute(
                 text(

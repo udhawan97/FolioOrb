@@ -140,8 +140,8 @@ def client(monkeypatch):
                            connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(bind=engine)
     session = sessionmaker(bind=engine)()
-    session.add(VerdictSnapshot(ticker="AAPL", action="add", confidence=70, local_score=70,
-                                price_at_scan=100.0,
+    session.add(VerdictSnapshot(portfolio_id=1, ticker="AAPL", action="add", confidence=70,
+                                local_score=70, price_at_scan=100.0,
                                 generated_at=datetime.now(timezone.utc) - timedelta(days=30)))
     session.commit()
     # No live quotes in tests: price the fan-out deterministically.
@@ -170,4 +170,30 @@ def test_endpoint_empty_when_no_snapshots(monkeypatch):
     body = TestClient(app).get("/api/ai/verdict-report").json()
     assert body["graded_count"] == 0
     assert body["hit_rate"] is None
-    assert body["ledger"] == []
+    assert not body["ledger"]
+
+
+def test_verdict_report_is_scoped_per_portfolio(monkeypatch):
+    # Two portfolios, each with its own logged verdict — the report must only
+    # ever return the queried portfolio's calls, never the other's.
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(bind=engine)()
+    when = datetime.now(timezone.utc) - timedelta(days=30)
+    session.add(VerdictSnapshot(portfolio_id=1, ticker="AAPL", action="add", confidence=70,
+                                local_score=70, price_at_scan=100.0, generated_at=when))
+    session.add(VerdictSnapshot(portfolio_id=2, ticker="MSFT", action="add", confidence=70,
+                                local_score=70, price_at_scan=100.0, generated_at=when))
+    session.commit()
+    monkeypatch.setattr(verdict_report, "_fetch_current_prices",
+                        lambda tickers: {t: 120.0 for t in tickers})
+    app = FastAPI()
+    app.include_router(ai_router.router)
+    app.dependency_overrides[get_db] = lambda: session
+    client = TestClient(app)
+
+    p1 = client.get("/api/ai/verdict-report?portfolio_id=1").json()
+    p2 = client.get("/api/ai/verdict-report?portfolio_id=2").json()
+    assert [row["ticker"] for row in p1["ledger"]] == ["AAPL"]
+    assert [row["ticker"] for row in p2["ledger"]] == ["MSFT"]

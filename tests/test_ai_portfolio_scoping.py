@@ -157,6 +157,9 @@ _SCOPED_ENDPOINTS = [
     ai_router.get_portfolio_summary,
     ai_router.get_analytics_insights,
     ai_router.get_action_plan,
+    # Verdict history is now per-portfolio too (v5.4.1).
+    ai_router.get_verdict_calibration,
+    ai_router.get_verdict_report,
 ]
 
 _GLOBAL_ENDPOINTS = [
@@ -169,8 +172,6 @@ _GLOBAL_ENDPOINTS = [
     ai_router.get_holding_intelligence_single,
     ai_router.get_holding_intelligence_deep,
     ai_router.get_analyst_recommendation_single,
-    ai_router.get_verdict_calibration,
-    ai_router.get_verdict_report,
 ]
 
 

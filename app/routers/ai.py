@@ -289,11 +289,12 @@ def _enrich_intelligence_dict(intel_dict: dict, stock_data: dict | None) -> dict
     return intel_dict
 
 
-def _recent_add_count(db: Session, ticker: str, days: int = 30) -> int:
+def _recent_add_count(db: Session, ticker: str, days: int = 30, portfolio_id: int = 1) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     return (
         db.query(VerdictSnapshot)
         .filter(
+            VerdictSnapshot.portfolio_id == portfolio_id,
             VerdictSnapshot.ticker == ticker.upper(),
             VerdictSnapshot.action == "add",
             VerdictSnapshot.generated_at >= cutoff,
@@ -302,13 +303,15 @@ def _recent_add_count(db: Session, ticker: str, days: int = 30) -> int:
     )
 
 
-def _user_context(meta: dict, quote_data: dict | None, db: Session, ticker: str) -> dict:
+def _user_context(
+    meta: dict, quote_data: dict | None, db: Session, ticker: str, portfolio_id: int = 1
+) -> dict:
     quote = quote_data or {}
     return {
         "shares": meta.get("shares"),
         "avg_cost": meta.get("avg_cost"),
         "current_price": quote.get("current_price"),
-        "recent_add_count": _recent_add_count(db, ticker),
+        "recent_add_count": _recent_add_count(db, ticker, portfolio_id=portfolio_id),
     }
 
 
@@ -1123,7 +1126,7 @@ async def get_investment_signal_single(
         regime=regime,
         peer_relative=peer,
         event_context=event_ctx,
-        user_context=_user_context(holding, quote_data, db, ticker),
+        user_context=_user_context(holding, quote_data, db, ticker, portfolio_id),
     )
     sig_dict = signal_to_dict(sig)
     scan_snapshot_changed = attach_since_last_scan(db, ticker, sig_dict)
@@ -1202,7 +1205,7 @@ def _collect_portfolio_signals_core(
                 peer_relative=peer,
                 exposure_context=exp_ctx,
                 event_context=event_ctx,
-                user_context=_user_context(meta, quote_data, db, ticker),
+                user_context=_user_context(meta, quote_data, db, ticker, portfolio_id),
             )
             signals[ticker] = signal_to_dict(sig)
         except Exception as exc:  # pylint: disable=broad-except
@@ -1250,7 +1253,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
     scan_snapshot_changed = False
     # Calibration buckets are portfolio-wide (not ticker-specific), so compute them
     # once here instead of re-querying/re-aggregating on every loop iteration below.
-    calibration_buckets = compute_calibration_buckets(db, window="1m")
+    calibration_buckets = compute_calibration_buckets(db, window="1m", portfolio_id=portfolio_id)
 
     for ticker in active_tickers:
         try:
@@ -1274,7 +1277,8 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
             quote_data = quotes.get(ticker) or {}
 
             footnote = calibration_footnote(
-                db, action=action, confidence=confidence, buckets=calibration_buckets
+                db, action=action, confidence=confidence,
+                buckets=calibration_buckets, portfolio_id=portfolio_id,
             )
             if footnote:
                 sig_dict["calibration_footnote"] = footnote
@@ -1287,6 +1291,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                 ai_score=None,
                 price_at_scan=quote_data.get("current_price"),
                 hold_class=hold_class,
+                portfolio_id=portfolio_id,
             )
             scan_snapshot_changed = (
                 attach_since_last_scan(db, ticker, sig_dict) or scan_snapshot_changed
@@ -1485,7 +1490,7 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
         "count": len(signals),
         "portfolio_exposure": portfolio_exposure,
         "portfolio_health": portfolio_health,
-        "calibration_summary": calibration_summary(db),
+        "calibration_summary": calibration_summary(db, portfolio_id),
         "regime": regime,
         "claude_live": claude_live,
     }
@@ -1509,21 +1514,21 @@ async def get_portfolio_exposure(
 
 
 @router.get("/verdict-calibration")
-async def get_verdict_calibration(db: Session = Depends(get_db)):
-    """Lightweight calibration buckets from logged verdict snapshots."""
-    return calibration_summary(db)
+async def get_verdict_calibration(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    """Lightweight calibration buckets from this portfolio's verdict snapshots."""
+    return calibration_summary(db, portfolio_id)
 
 
 @router.get("/verdict-report")
-async def get_verdict_report(db: Session = Depends(get_db)):
-    """Scorecard of how past verdicts have aged vs. the current price.
+async def get_verdict_report(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    """Scorecard of how this portfolio's past verdicts have aged vs. current price.
 
-    Reads the most recent logged verdict snapshots and grades each Add / Trim /
-    Hold call by the holding's return *since* the call. Verdict snapshots are
-    global (not per-portfolio), so this endpoint takes no portfolio_id.
+    Reads the most recent logged verdict snapshots for the portfolio and grades
+    each Add / Trim / Hold call by the holding's return *since* the call.
     """
     snapshots = (
         db.query(VerdictSnapshot)
+        .filter(VerdictSnapshot.portfolio_id == portfolio_id)
         .order_by(VerdictSnapshot.generated_at.desc())
         .limit(500)
         .all()
