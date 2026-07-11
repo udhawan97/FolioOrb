@@ -11528,6 +11528,9 @@ function renderDcaPlans(plans) {
                 <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaEditAmount(${p.id}, ${p.amount})">
                     Edit amount
                 </button>
+                ${p.applied_count ? `<button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaUndoAll(${p.id}, ${p.applied_count}, '${escapeHtml(p.ticker)}')">
+                    Undo applied
+                </button>` : ""}
                 <button type="button" class="btn btn-sm dca-chip-btn dca-chip-btn--danger" onclick="dcaDeletePlan(${p.id}, '${escapeHtml(p.ticker)}')">
                     Delete
                 </button>
@@ -11563,20 +11566,24 @@ function renderDcaPending(pending, plans) {
     });
 
     list.innerHTML = [...byPlan.entries()].map(([planId, buys]) => {
-        const ticker = planById[planId]?.ticker || buys[0].ticker || "?";
+        const plan = planById[planId];
+        const ticker = plan?.ticker || buys[0].ticker || "?";
+        const terms = plan ? `${formatCurrency(plan.amount)} ${escapeHtml(plan.frequency)}` : "";
+        const total = buys.reduce((sum, c) => sum + c.amount, 0);
         const rows = buys.map(c => dcaBuyRow(c, `
             <button type="button" class="btn btn-sm btn-success dca-act-btn" onclick="dcaApply(${c.id})">Apply</button>
             <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaSkip(${c.id})">Skip</button>
         `)).join("");
         const bulk = buys.length > 1 ? `
             <span class="dca-bulk-actions">
-                <button type="button" class="btn btn-sm btn-link dca-bulk-link" onclick="dcaApplyAll(${planId})">Apply all ${buys.length}</button>
-                <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" onclick="dcaSkipAll(${planId})">Skip all</button>
+                <button type="button" class="btn btn-sm btn-link dca-bulk-link" onclick="dcaApplyAll(${planId}, ${buys.length}, ${total}, '${escapeHtml(ticker)}')">Apply all ${buys.length}</button>
+                <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" onclick="dcaSkipAll(${planId}, ${buys.length}, '${escapeHtml(ticker)}')">Skip all</button>
             </span>` : "";
         return `
         <div class="dca-pending-group">
             <div class="dca-pending-group-head">
                 <span class="dca-group-ticker">${escapeHtml(ticker)}</span>
+                ${terms ? `<span class="dca-group-terms">${terms}</span>` : ""}
                 <span class="dca-group-count">${buys.length} buy${buys.length === 1 ? "" : "s"} awaiting</span>
                 ${bulk}
             </div>
@@ -11632,7 +11639,13 @@ async function loadDcaHistory() {
 
 // ── DCA actions ──────────────────────────────────────────────────────────────
 
+// One DCA mutation at a time: a second click while a request is in flight is
+// ignored, so double-taps can't fire a duplicate apply (and hit a 400) or race.
+let _dcaActionInFlight = false;
+
 async function _dcaPost(path, okMessage) {
+    if (_dcaActionInFlight) return null;
+    _dcaActionInFlight = true;
     try {
         const res = await fetch(path, { method: "POST" });
         const data = await res.json().catch(() => ({}));
@@ -11645,6 +11658,8 @@ async function _dcaPost(path, okMessage) {
     } catch {
         showToast("DCA action failed — is the app online?", "danger");
         return null;
+    } finally {
+        _dcaActionInFlight = false;
     }
 }
 
@@ -11662,11 +11677,28 @@ async function dcaApply(cid) {
     }
 }
 
-async function dcaApplyAll(planId) {
+async function dcaApplyAll(planId, count, total, ticker) {
+    if (!window.confirm(
+        `Apply all ${count} pending ${ticker} buys — ${formatCurrency(total)} into your holding?`
+        + `\n\nYou can reverse them later with "Undo applied".`
+    )) return;
     const data = await _dcaPost(`/api/dca/plans/${planId}/apply-pending`);
     if (data) {
         showToast(`Applied ${data.applied} buys to ${data.ticker}`, "success");
         _dcaAfterHoldingsChange();
+    }
+}
+
+async function dcaUndoAll(planId, count, ticker) {
+    if (!window.confirm(
+        `Reverse all ${count} applied ${ticker} buys? Your holding's shares and average cost `
+        + `roll back exactly, and the buys return to the pending bucket.`
+    )) return;
+    const data = await _dcaPost(`/api/dca/plans/${planId}/undo-applied`);
+    if (data) {
+        showToast(`Reversed ${data.undone} buys for ${data.ticker}`, "success");
+        _dcaAfterHoldingsChange();
+        loadDcaHistory();
     }
 }
 
@@ -11676,7 +11708,11 @@ async function dcaSkip(cid) {
     if (data) loadDcaPanel();
 }
 
-async function dcaSkipAll(planId) {
+async function dcaSkipAll(planId, count, ticker) {
+    if (!window.confirm(
+        `Skip all ${count} pending ${ticker} buys? They won't be applied and won't reappear `
+        + `(the plan itself stays active — pause it if you want to stop future buys).`
+    )) return;
     const data = await _dcaPost(`/api/dca/plans/${planId}/skip-pending`);
     if (data) {
         showToast(`Skipped ${data.skipped} buys for ${data.ticker}`, "success");

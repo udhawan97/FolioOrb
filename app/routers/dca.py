@@ -23,6 +23,9 @@ from app.routers.portfolio import _get_portfolio_or_404
 
 router = APIRouter(prefix="/api/dca", tags=["dca"])
 
+# Below this many shares a position is treated as empty (fractional-share dust).
+_ZERO_EPS = 1e-9
+
 
 # ── Serialization ──────────────────────────────────────────────────────
 
@@ -142,6 +145,29 @@ async def create_plan(
 ):
     """Create a DCA plan and backfill its past buys into the pending bucket."""
     _get_portfolio_or_404(portfolio_id, db)
+
+    # Guard against an exact-duplicate active plan (same ticker + cadence + amount),
+    # which would silently double-book every interval. Different amounts or
+    # cadences are allowed — this only blocks a literal repeat.
+    duplicate = (
+        db.query(DcaPlan)
+        .filter(
+            DcaPlan.portfolio_id == portfolio_id,
+            DcaPlan.ticker == data.ticker,
+            DcaPlan.frequency == data.frequency,
+            DcaPlan.amount == data.amount,
+            DcaPlan.is_active.is_(True),
+        )
+        .first()
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"You already have an active {data.frequency} "
+                f"${data.amount:g} {data.ticker} plan."
+            ),
+        )
 
     # Network check: reject an invalid symbol before storing the plan.
     validation = validate_ticker_symbol(data.ticker)
@@ -378,12 +404,15 @@ async def restore_contribution(cid: int, db: Session = Depends(get_db)):
     return {"message": "Buy restored to pending", "contribution": _contribution_dict(c)}
 
 
-@router.post("/contributions/{cid}/undo")
-async def undo_contribution(cid: int, db: Session = Depends(get_db)):
-    """Reverse an applied buy exactly and return it to the pending bucket."""
-    c = _get_contribution_or_404(cid, db)
-    if c.status != "applied":
-        raise HTTPException(status_code=400, detail="Only applied buys can be undone")
+def _reverse_contribution(c: DcaContribution, db: Session) -> str | None:
+    """Reverse one applied buy on its holding and return it to *pending*.
+
+    Exact inverse of :func:`_apply_contribution`. If the reversal empties the
+    holding (all its shares came from now-undone buys), the holding is
+    soft-deleted — a zero-share position is not a position, matching how the
+    rest of the app treats a holding reduced to nothing. Returns a note string
+    if the holding had already been removed, else ``None``.
+    """
     holding = (
         db.query(Holding).filter(Holding.id == c.applied_holding_id).first()
         if c.applied_holding_id
@@ -396,9 +425,39 @@ async def undo_contribution(cid: int, db: Session = Depends(get_db)):
         )
         holding.shares = new_shares
         holding.avg_cost = new_avg
+        if new_shares <= _ZERO_EPS:
+            holding.is_active = False
     else:
         note = "Holding no longer exists; buy returned to pending without changing holdings."
     c.status = "pending"
     c.applied_holding_id = None
+    return note
+
+
+@router.post("/contributions/{cid}/undo")
+async def undo_contribution(cid: int, db: Session = Depends(get_db)):
+    """Reverse an applied buy exactly and return it to the pending bucket."""
+    c = _get_contribution_or_404(cid, db)
+    if c.status != "applied":
+        raise HTTPException(status_code=400, detail="Only applied buys can be undone")
+    note = _reverse_contribution(c, db)
     db.commit()
     return {"message": note or "Buy undone", "contribution": _contribution_dict(c)}
+
+
+@router.post("/plans/{plan_id}/undo-applied")
+async def undo_all_applied(plan_id: int, db: Session = Depends(get_db)):
+    """Reverse every applied buy for a plan at once (symmetric with apply-all)."""
+    plan = db.query(DcaPlan).filter(DcaPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="DCA plan not found")
+    applied = (
+        db.query(DcaContribution)
+        .filter(DcaContribution.plan_id == plan_id, DcaContribution.status == "applied")
+        .order_by(DcaContribution.exec_date.desc())
+        .all()
+    )
+    for c in applied:
+        _reverse_contribution(c, db)
+    db.commit()
+    return {"undone": len(applied), "ticker": plan.ticker}

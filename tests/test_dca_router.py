@@ -116,6 +116,16 @@ def test_create_plan_rejects_invalid_ticker(client, monkeypatch):
     assert res.status_code == 400
 
 
+def test_create_plan_rejects_exact_duplicate(client):
+    assert _create_weekly_plan(client, amount=50.0).status_code == 200
+    # Same ticker + cadence + amount → rejected as a double-book.
+    dup = _create_weekly_plan(client, amount=50.0)
+    assert dup.status_code == 400
+    assert "already have" in dup.json()["detail"].lower()
+    # A different amount is a distinct plan and is allowed.
+    assert _create_weekly_plan(client, amount=75.0).status_code == 200
+
+
 def test_create_plan_rejects_future_start(client):
     res = client.post(
         "/api/dca/plans",
@@ -219,6 +229,20 @@ def test_undo_requires_applied_status(client):
     assert client.post(f"/api/dca/contributions/{cid}/undo").status_code == 400
 
 
+def test_undo_to_zero_deactivates_dca_created_holding(client, db):
+    # No pre-existing holding: apply creates one, undo empties it → soft-deleted,
+    # so it never lingers as a $0 active position.
+    _create_weekly_plan(client, days_back=0, amount=50.0)
+    cid = _first_pending_id(client)
+    client.post(f"/api/dca/contributions/{cid}/apply")
+    holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
+    assert holding.is_active is True and holding.shares > 0
+    client.post(f"/api/dca/contributions/{cid}/undo")
+    db.refresh(holding)
+    assert holding.shares == pytest.approx(0.0)
+    assert holding.is_active is False
+
+
 def test_skip_then_restore_roundtrip(client):
     _create_weekly_plan(client, days_back=0)
     cid = _first_pending_id(client)
@@ -257,6 +281,33 @@ def test_skip_all_pending(client):
     res = client.post(f"/api/dca/plans/{plan_id}/skip-pending")
     assert res.json()["skipped"] == 4
     assert client.get("/api/dca/contributions?status=pending").json()["contributions"] == []
+
+
+def test_undo_all_applied_reverses_everything(client, db):
+    plan_id = _create_weekly_plan(client, days_back=21, amount=50.0).json()["plan"]["id"]
+    client.post(f"/api/dca/plans/{plan_id}/apply-pending")  # 4 buys → 2.0 sh
+    res = client.post(f"/api/dca/plans/{plan_id}/undo-applied")
+    assert res.json()["undone"] == 4
+    # Every buy back to pending, and the DCA-created holding is emptied + retired.
+    assert len(client.get("/api/dca/contributions?status=pending").json()["contributions"]) == 4
+    assert client.get("/api/dca/contributions?status=applied").json()["contributions"] == []
+    holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
+    assert holding.shares == pytest.approx(0.0)
+    assert holding.is_active is False
+
+
+def test_undo_all_keeps_holding_with_manual_shares(client, db):
+    # A pre-existing manual position must survive undo-all of the plan's buys.
+    db.add(Holding(portfolio_id=1, ticker="VOO", shares=10, avg_cost=200,
+                   is_active=True, is_watchlist=False, hold_class="auto"))
+    db.commit()
+    plan_id = _create_weekly_plan(client, days_back=21, amount=50.0).json()["plan"]["id"]
+    client.post(f"/api/dca/plans/{plan_id}/apply-pending")
+    client.post(f"/api/dca/plans/{plan_id}/undo-applied")
+    holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
+    assert holding.shares == pytest.approx(10.0)
+    assert holding.avg_cost == pytest.approx(200.0)
+    assert holding.is_active is True
 
 
 # ── Plan update / delete ─────────────────────────────────────────────────────

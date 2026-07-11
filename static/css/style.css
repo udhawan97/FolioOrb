@@ -4004,6 +4004,7 @@ body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
 }
 
 .dca-group-ticker { font-weight: 700; font-size: 0.86rem; }
+.dca-group-terms { font-size: 0.76rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .dca-group-count { font-size: 0.72rem; color: var(--text-tertiary); }
 
 .dca-bulk-actions { margin-left: auto; display: inline-flex; gap: 0.35rem; }
