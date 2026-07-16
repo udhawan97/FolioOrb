@@ -271,11 +271,64 @@ jobs:
           > macOS/Windows warnings and how to verify your download with SHA256SUMS.txt.
           EOF
           )
-          # Recreate so the prerelease only ever holds the newest build.
-          gh release delete latest-main --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest-main release/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Latest main build" \
-            --notes "$NOTES" \
-            --prerelease \
-            --target "$GITHUB_SHA"
+          (cd release && shasum -a 256 --check SHA256SUMS.txt)
+
+          # Refresh in place so a failed update cannot delete the last good
+          # development build. Asset names include the commit, so upload the
+          # new set first, move the rolling tag, then prune stale assets.
+          if gh release view latest-main --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload latest-main release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+            gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/git/refs/tags/latest-main" \
+              --raw-field sha="$GITHUB_SHA" \
+              -F force=true \
+              --silent
+            gh release edit latest-main \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Latest main build" \
+              --notes "$NOTES" \
+              --prerelease \
+              --target "$GITHUB_SHA"
+
+            while IFS=$'\t' read -r asset_api asset_name; do
+              if [[ ! -f "release/${asset_name}" ]]; then
+                gh api --method DELETE \
+                  "${asset_api#https://api.github.com/}" \
+                  --silent
+              fi
+            done < <(
+              gh release view latest-main \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[] | [.apiUrl, .name] | @tsv'
+            )
+          else
+            gh release create latest-main release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Latest main build" \
+              --notes "$NOTES" \
+              --prerelease \
+              --target "$GITHUB_SHA"
+          fi
+
+          # Verify the remote release before declaring the rolling channel
+          # refreshed. This catches tag drift and stale/missing assets.
+          ACTUAL_SHA="$(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/latest-main" \
+              --jq '.object.sha'
+          )"
+          if [[ "$ACTUAL_SHA" != "$GITHUB_SHA" ]]; then
+            echo "latest-main points to ${ACTUAL_SHA}, expected ${GITHUB_SHA}" >&2
+            exit 1
+          fi
+
+          diff -u \
+            <(find release -maxdepth 1 -type f -printf '%f\n' | sort) \
+            <(
+              gh release view latest-main \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name' | sort
+            )
