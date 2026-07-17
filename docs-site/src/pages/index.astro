@@ -110,6 +110,17 @@ const roadmap = [
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>FolioOrb — Your portfolio, finally speaks back.</title>
+
+		{/* Two voices: Space Grotesk is the product speaking English, IBM Plex
+		    Mono is the instrument reporting values. Plex Sans bridges them —
+		    it shares a skeleton with Plex Mono, so the data rows and the prose
+		    read as one system. */}
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+		/>
 		<meta name="description" content="Local-first portfolio intelligence you run yourself — in your browser as a web app, or as a desktop app for macOS and Windows. FolioOrb turns holdings, risk, news, and market context into plain-English portfolio reads — on your machine, Claude-optional, built for trust." />
 		<link rel="icon" type="image/svg+xml" href={asset('folio-orbit-icon.svg')} />
 		<meta property="og:title" content="FolioOrb — Your portfolio, finally speaks back." />
@@ -135,7 +146,8 @@ const roadmap = [
 			<nav class="topnav">
 				<a href={doc('get-started/introduction')}>Docs</a>
 				<a href={RELEASES}>Releases</a>
-				<a href={GITHUB} class="ghost">GitHub ↗</a>
+				<a href={GITHUB}>GitHub</a>
+				<a href="#act-install" class="ghost">Install</a>
 			</nav>
 		</header>
 
@@ -155,21 +167,21 @@ const roadmap = [
 			<section class="hero act" id="act-hero" data-hue="cyan">
 				<div class="hero-decor" aria-hidden="true">
 					<div class="hero-glow"></div>
-					<div class="hero-orb hero-orb-a"></div>
-					<div class="hero-orb hero-orb-b"></div>
 					<div class="hero-streak"></div>
 					<img class="hero-glyph hero-glyph-mark" src={asset('folio-orbit-mark-dark-animated.svg')} alt="" width="360" height="360" />
 					<span class="hero-line hero-line-a"></span>
-					<span class="hero-dot hero-dot-1"></span>
-					<span class="hero-dot hero-dot-2"></span>
-					<span class="hero-dot hero-dot-3"></span>
-					<span class="hero-dot hero-dot-4"></span>
 				</div>
 
-				<div class="hero-grid">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">The cockpit</p>
+				</div>
+
+				<div class="act-body hero-grid">
 					<div class="hero-content">
 						<span class="eyebrow reveal">Local-first portfolio intelligence</span>
-						<h1 class="display reveal">Your portfolio, finally speaks&nbsp;back.</h1>
+						<h1 class="display reveal">Your portfolio, finally <em>speaks&nbsp;back.</em></h1>
 						<p class="lede reveal">
 							FolioOrb turns holdings, risk, news, and market context into
 							plain-English portfolio reads — running entirely on your machine.
@@ -227,7 +239,6 @@ const roadmap = [
 					<div class="hero-visual reveal" id="hero-stage" aria-hidden="true">
 						<div class="product-preview">
 							<div class="window-chrome grad-border" id="hero-window">
-								<div class="window-bar"><span></span><span></span><span></span></div>
 								<div class="hero-shot">
 									<img src={shot('hero-cockpit-v3.webp')} width="2400" height="1508" fetchpriority="high"
 										alt="The FolioOrb dashboard cockpit: total value, today's P&L, sector map, and today's impact for a demo portfolio." />
@@ -238,10 +249,13 @@ const roadmap = [
 								</div>
 							</div>
 
-							<div class="chip-float chip-float--tl" data-depth="7"><span class="dot dot-amber"></span> Risk · Moderate</div>
+							{/* Two annotation chips, on the sides the region tour never
+							    reaches. There used to be four ringing the whole frame;
+							    they collided with the tour's own tooltip and re-labelled
+							    values the screenshot already shows. The tour is the real
+							    annotation — it points at the actual region and names it. */}
 							<div class="chip-float chip-float--tr" data-depth="-8"><span class="dot dot-green"></span> MSFT · Buy</div>
 							<div class="chip-float chip-float--bl" data-depth="8">β · 0.85×</div>
-							<div class="chip-float chip-float--br" data-depth="-6"><span class="dot dot-cyan"></span> Theme · dividend income</div>
 
 							<!-- Transient "signal" chips that converge + dissolve on load. -->
 							<div class="signals">
@@ -258,8 +272,14 @@ const roadmap = [
 
 			<!-- ═══ ACT 3 · WORKFLOW ═════════════════════════════════════════ -->
 			<section class="act workflow" id="act-workflow" data-hue="teal">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">The workflow</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">The workflow</span>
 					<h2 class="section-title">Know what changed. Understand why. Decide what to do next.</h2>
 				</div>
 
@@ -312,12 +332,19 @@ const roadmap = [
 						))}
 					</ol>
 				</div>
+				</div>
 			</section>
 
 			<!-- ═══ ACT 4 · FEATURES ═════════════════════════════════════════ -->
 			<section class="act features" id="act-features" data-hue="cyan">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">What it does</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Feature intelligence</span>
 					<h2 class="section-title">Every claim, with the product behind it.</h2>
 				</div>
 
@@ -332,7 +359,6 @@ const roadmap = [
 						</div>
 						<figure class="moment-visual">
 							<div class="window-chrome window-chrome--sm">
-								<div class="window-bar"><span></span><span></span><span></span></div>
 								{f.video ? (
 									<video class="demo-loop" muted loop playsinline preload="none"
 										width="1600" height="1000" poster={demo(`${f.video}-poster.webp`)} aria-label={f.alt}>
@@ -414,12 +440,19 @@ const roadmap = [
 						</div>
 					</figure>
 				</article>
+				</div>
 			</section>
 
 			<!-- ═══ ACT 5 · DEMO PORTFOLIO ═══════════════════════════════════ -->
 			<section class="act demo" id="act-demo" data-hue="amber">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">A worked example</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">A worked example</span>
 					<h2 class="section-title">Demo data. Real workflow.</h2>
 					<span class="demo-badge">Demo holdings only · no real portfolio required</span>
 				</div>
@@ -454,12 +487,19 @@ const roadmap = [
 						<p class="demo-note">Risk, news, exposure, and market context — translated into plain English.</p>
 					</div>
 				</div>
+				</div>
 			</section>
 
 			<!-- ═══ ACT 7 · TRUST ════════════════════════════════════════════ -->
 			<section class="act trust" id="act-trust" data-hue="teal">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">Trust</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Trust &amp; local-first</span>
 					<h2 class="section-title">Open source. Traceable builds. Your data stays on your machine.</h2>
 				</div>
 				<div class="trust-console grad-border reveal">
@@ -480,12 +520,19 @@ const roadmap = [
 						</div>
 					</div>
 				</div>
+				</div>
 			</section>
 
 			<!-- ═══ ACT 8a · INSTALL (the one install stop) ══════════════════ -->
 			<section class="act install" id="act-install" data-hue="cyan">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">Install</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Install</span>
 					<h2 class="section-title">Get FolioOrb — however you like to run it.</h2>
 					<p class="up-lede">Three ways in, one app. Whichever you pick, your holdings and settings stay local on your machine.</p>
 				</div>
@@ -524,7 +571,7 @@ const roadmap = [
 				<!-- Exact, verified commands — one terminal, three ways to run -->
 				<div class="install-cmds reveal" id="install-cmds">
 					<div class="terminal" id="terminal">
-						<div class="term-bar"><span></span><span></span><span></span><span class="term-title">folioorb — zsh</span></div>
+						<div class="term-bar"><span class="term-title">folioorb — zsh</span></div>
 						<div class="term-tabs" role="tablist">
 							<button class="term-tab is-active" data-tab="clone" role="tab" type="button">From source</button>
 							<button class="term-tab" data-tab="mac" role="tab" type="button">macOS · one-line</button>
@@ -557,12 +604,19 @@ const roadmap = [
 				</div>
 
 				<p class="dl-note reveal">Early desktop builds aren’t code-signed yet, so macOS and Windows show a first-launch warning — expected for an open-source app. The <a href={doc('download')}>install guides</a> show exactly what you’ll see and how to get past it.</p>
+				</div>
 			</section>
 
 			<!-- ═══ ACT 8¼ · HOW UPDATES WORK ════════════════════════════════ -->
 			<section class="act updates" id="act-updates" data-hue="teal">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">Staying current</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Staying current</span>
 					<h2 class="section-title">Updates that ask first — and never risk your data.</h2>
 					<p class="up-lede">FolioOrb keeps itself current the calm way: it tells you when there’s something new, backs up your portfolio before touching anything, and never installs without your go-ahead.</p>
 				</div>
@@ -570,7 +624,7 @@ const roadmap = [
 				<div class="update-console grad-border reveal">
 					<!-- A representative Software Update panel, as it appears inside the app. -->
 					<figure class="up-panel" aria-label="The in-app Software Update panel">
-						<div class="up-panel-bar" aria-hidden="true"><span></span><span></span><span></span><b>Software Update</b></div>
+						<div class="up-panel-bar" aria-hidden="true"><b>Software Update</b></div>
 						<div class="up-panel-body">
 							<div class="up-status">
 								<span class="up-avail"><span class="up-avail-dot"></span>Update available</span>
@@ -616,10 +670,18 @@ const roadmap = [
 				</div>
 
 				<p class="up-note reveal">No silent installs — every update waits for your explicit go-ahead, and there’s deliberately no “install automatically” to switch on. Prefer to do it by hand? <a href={doc('updating')}>Manual updates</a> carry your holdings, snapshots, and settings over untouched.</p>
+				</div>
 			</section>
 
 			<!-- ═══ ACT 8½ · ROADMAP ═════════════════════════════════════════ -->
 			<section class="act roadmap" id="act-roadmap" data-hue="green">
+				<div class="act-rail" aria-hidden="true">
+					<span class="act-rail-tick"></span>
+					<span class="act-rail-line"></span>
+					<p class="act-rail-label">What is next</p>
+				</div>
+
+				<div class="act-body">
 				<div class="act-head reveal">
 					<span class="kicker">The road ahead</span>
 					<h2 class="section-title">This is just the beginning.</h2>
@@ -640,6 +702,7 @@ const roadmap = [
 				<div class="rm-outro reveal">
 					<p class="rm-oath"><strong>The fine print, minus the lawyers:</strong> this roadmap is less of a blood oath and more of a friendly sneak peek. FolioOrb is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
+				</div>
 				</div>
 			</section>
 
@@ -677,16 +740,21 @@ const roadmap = [
 			</div>
 		</section>
 
-		<footer class="footer">
+		<footer class="footer" data-hue="cyan">
 			<div class="footer-inner">
-				<div class="footer-brand">
-					<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" />
-					<strong class="footer-brand-name">FolioOrb</strong>
+				{/* The page argues one thing the whole way down. The footer says it
+				    rather than dissolving into a sitemap. */}
+				<p class="footer-stmt">Your holdings never <em>leave the&nbsp;room.</em></p>
+				<div class="footer-meta">
+					<div class="footer-brand">
+						<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" />
+						<strong class="footer-brand-name">FolioOrb</strong>
+					</div>
+					<nav class="footer-links">
+						<a href={GITHUB}>GitHub</a><a href={doc('get-started/introduction')}>Docs</a>
+						<a href={RELEASES}>Releases</a><a href={`${GITHUB}/blob/main/LICENSE`}>Apache 2.0 License</a>
+					</nav>
 				</div>
-				<nav class="footer-links">
-					<a href={GITHUB}>GitHub</a><a href={doc('get-started/introduction')}>Docs</a>
-					<a href={RELEASES}>Releases</a><a href={`${GITHUB}/blob/main/LICENSE`}>Apache 2.0 License</a>
-				</nav>
 			</div>
 		</footer>
 

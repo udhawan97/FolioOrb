@@ -1,0 +1,139 @@
+/* Hallmark · genre: atmospheric · macrostructure: Split Studio · theme: Cockpit (preserved)
+ * polish: HP1 vertical-rail (instrument bezel) · nav: N5 floating pill · footer: Ft5 statement
+ * enrichment: none (real screenshots, chrome removed)
+ * paper: oklch(11.70% 0.0089 284.95) · accent: oklch(82.38% 0.1023 216.40) cool-cyan
+ * display: Space Grotesk · body: IBM Plex Sans · data: IBM Plex Mono
+ * axes: dark paper / grotesk-sans display / cool accent
+ * contrast: pass — every accent ≥ 7.0:1 on paper
+ *
+ * FolioOrb design tokens. Shared by the landing page (landing.css) and the
+ * Starlight docs (custom.css) so both surfaces speak with one voice.
+ *
+ * The palette is user-locked: these OKLCH values round-trip to the original
+ * hex bit-for-bit (#050508, #6fd6f0, #97acec, #5fe0c8, #f0b45f, #57d98a).
+ * OKLCH is used so lightness ramps and color-mix() behave predictably —
+ * not to restyle. Do not "improve" these hues.
+ */
+
+:root {
+	/* ── Paper ─────────────────────────────────────────────────────
+	   Four elevation steps. Cards sit on paper-2/3; atmospheric uses
+	   elevation rather than hairlines to separate surfaces. */
+	--color-paper: oklch(11.70% 0.0089 284.95); /* #050508 */
+	--color-paper-2: oklch(15.33% 0.0149 284.51); /* #0b0b12 */
+	--color-paper-3: oklch(19% 0.016 284.5);
+	--color-paper-4: oklch(24% 0.018 284.5);
+
+	/* ── Ink ───────────────────────────────────────────────────────── */
+	--color-ink: oklch(97.07% 0.0027 286.35); /* #f5f5f7 · 18.7:1 */
+	--color-ink-2: oklch(69.01% 0.0174 285.93); /* #9a9aa6 ·  7.3:1 */
+	--color-ink-3: oklch(52% 0.015 285.9); /* de-emphasis only, never body */
+
+	/* ── Accent hues — the per-act chapter tints ───────────────────
+	   Five hues, one per act. Locked by brief. Each is ≥ 7:1 on paper. */
+	--color-cyan: oklch(82.38% 0.1023 216.4); /* #6fd6f0 · 12.2:1 */
+	--color-peri: oklch(75.25% 0.0956 270.03); /* #97acec ·  9.1:1 */
+	--color-teal: oklch(82.8% 0.1194 178.95); /* #5fe0c8 · 12.6:1 */
+	--color-amber: oklch(80.89% 0.1236 74.02); /* #f0b45f · 11.1:1 */
+	--color-amber-2: oklch(73.44% 0.1373 43.11); /* #f08a5f */
+	--color-green: oklch(79.34% 0.1611 153.67); /* #57d98a · 11.3:1 */
+	--color-red: oklch(71.16% 0.1812 22.84); /* #ff6b6b ·  7.3:1 */
+
+	/* Live accent pair — rebound per act by [data-hue]. */
+	--color-accent: var(--color-cyan);
+	--color-accent-2: var(--color-peri);
+
+	/* Ink that sits ON an accent fill (buttons, tags). 11.3:1 on cyan. */
+	--color-on-accent: oklch(16% 0.03 240);
+
+	/* Terminal / code surfaces — a touch deeper than paper so the
+	   instrument's own output reads as inset. */
+	--color-code-paper: oklch(10% 0.008 285);
+	--color-code-ink: oklch(91% 0.031 250);
+
+	/* ── Rules & surfaces ──────────────────────────────────────────── */
+	--color-rule: oklch(100% 0 0 / 0.09);
+	--color-rule-strong: oklch(100% 0 0 / 0.16);
+	--color-surface: oklch(100% 0 0 / 0.04);
+	--color-surface-2: oklch(100% 0 0 / 0.06);
+	--color-focus: var(--color-accent);
+
+	/* ── Type ──────────────────────────────────────────────────────
+	   2+1. Display speaks English; data speaks machine. The outlier
+	   (mono) carries exactly one role: values the machine computed —
+	   tickers, prices, β, versions, hashes, terminal. Never prose. */
+	--font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+	--font-body: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+	--font-data: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	/* Scale — major third (1.25) off a 16px body. */
+	--text-xs: 0.75rem;
+	--text-sm: 0.875rem;
+	--text-base: 1rem;
+	--text-md: 1.125rem;
+	--text-lg: 1.5625rem;
+	--text-xl: 1.9531rem;
+	--text-2xl: 2.4414rem;
+	--text-3xl: 3.0518rem;
+	--text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
+	--text-display-s: clamp(2rem, 3.5vw + 0.5rem, 3.25rem);
+
+	/* ── Space — 4pt scale ─────────────────────────────────────────── */
+	--space-2xs: 0.25rem;
+	--space-xs: 0.5rem;
+	--space-sm: 0.75rem;
+	--space-md: 1rem;
+	--space-lg: 1.5rem;
+	--space-xl: 2.5rem;
+	--space-2xl: 4rem;
+	--space-3xl: 6.5rem;
+	--page-gutter: 1.5rem;
+
+	/* ── Geometry ──────────────────────────────────────────────────── */
+	--radius-sm: 8px;
+	--radius: 14px;
+	--radius-lg: 20px;
+	--rule-hair: 1px;
+	--maxw: 1140px;
+
+	/* ── Motion ────────────────────────────────────────────────────
+	   Three primitives, page-wide: reveal-fade, tape-scroll,
+	   confidence-fill. Everything else was decoration and is gone. */
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+	--dur-micro: 150ms;
+	--dur-reveal: 460ms;
+
+	/* ── Stacking ──────────────────────────────────────────────────
+	   Sticky pairing rule: the N5 pill is fixed, so in-page sticky
+	   heads dock beneath it via --banner-height and lose on z-index. */
+	--banner-height: 68px;
+	--z-sticky: 10;
+	--z-sticky-nav: 20;
+}
+
+/* Per-act chapter tint. The rail makes these shifts legible instead of
+   accidental — see .act-rail in landing.css. */
+[data-hue='cyan'] {
+	--color-accent: var(--color-cyan);
+	--color-accent-2: var(--color-peri);
+}
+[data-hue='teal'] {
+	--color-accent: var(--color-teal);
+	--color-accent-2: var(--color-cyan);
+}
+[data-hue='amber'] {
+	--color-accent: var(--color-amber);
+	--color-accent-2: var(--color-amber-2);
+	--color-on-accent: oklch(18% 0.04 60);
+}
+[data-hue='green'] {
+	--color-accent: var(--color-green);
+	--color-accent-2: var(--color-teal);
+	--color-on-accent: oklch(17% 0.04 150);
+}
+[data-hue='peri'] {
+	--color-accent: var(--color-peri);
+	--color-accent-2: var(--color-cyan);
+}
