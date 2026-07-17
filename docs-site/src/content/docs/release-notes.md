@@ -25,6 +25,8 @@ in the repository. Highlights of the current release below.
 - **Cleanly separated.** Each portfolio's data — including its cached AI narratives (namespaced
   per portfolio) — stays its own; switching never shows another portfolio's content. "My
   Portfolio" is always present and can't be deleted; new portfolios start empty.
+- Deleting a non-default portfolio also removes its holdings, trades, snapshots, verdict history,
+  DCA plans and contributions, and Portfolio-scoped AI cache as one lifecycle operation.
 - Installing over any 5.3.x keeps your holdings as the default portfolio.
 
 ## v5.3.1 — Accurate Sales, Working Links

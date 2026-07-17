@@ -18,12 +18,12 @@
 
   <text class="hdr2" x="20" y="34">STABLE CHANNEL — DEFAULT</text>
   <rect class="box2" x="20" y="46" width="150" height="46" rx="10"/>
-  <text class="lbl2" x="95" y="66" text-anchor="middle">Push tag v5.0.1</text>
+  <text class="lbl2" x="95" y="66" text-anchor="middle">Push tag v5.4.1</text>
   <text class="sub2" x="95" y="82" text-anchor="middle">cut manually</text>
 
   <rect class="box2" x="230" y="46" width="160" height="46" rx="10"/>
   <text class="lbl2" x="310" y="66" text-anchor="middle">Stable Release</text>
-  <text class="sub2" x="310" y="82" text-anchor="middle">v5.0.1 · permanent</text>
+  <text class="sub2" x="310" y="82" text-anchor="middle">v5.4.1 · permanent</text>
 
   <rect x="452" y="46" width="180" height="46" rx="10" fill="#12222c" stroke="url(#fs-accent2)" stroke-width="1.8"/>
   <text class="lbl2" x="542" y="66" text-anchor="middle">Main download buttons</text>

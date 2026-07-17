@@ -12,7 +12,7 @@ from app import database as app_database
 from app.models import Base, Holding, Portfolio, PortfolioSnapshot, RealizedTrade
 from app.routers import portfolio as portfolio_router
 from app.schemas import HoldingCreate, HoldingUpdate
-from app.services import stock_service
+from app.services import portfolio_lifecycle, portfolio_valuation, stock_service
 
 
 def make_db():
@@ -83,12 +83,12 @@ def test_open_holding_total_pct_uses_current_price(monkeypatch):
     db = make_db()
     add_holding(db, "OPEN", shares=10, avg_cost=100)
     monkeypatch.setattr(
-        portfolio_router,
+        portfolio_valuation,
         "get_portfolio_quotes",
         lambda _tickers: [quote("OPEN", 115)],
     )
 
-    rows, *_ = portfolio_router._compute_portfolio(1, db)
+    rows = portfolio_valuation.evaluate(db, 1).holdings
 
     assert row_by_ticker(rows, "OPEN")["total_return_pct"] == 15.0
 
@@ -97,18 +97,19 @@ def test_holding_daily_value_change_uses_share_count_times_quote_move(monkeypatc
     db = make_db()
     add_holding(db, "VOO", shares=8.5, avg_cost=400)
     monkeypatch.setattr(
-        portfolio_router,
+        portfolio_valuation,
         "get_portfolio_quotes",
         lambda _tickers: [quote("VOO", 456.70, day_change=-1.32, day_change_pct=-0.29)],
     )
 
-    rows, total_value, total_daily_change, _ = portfolio_router._compute_portfolio(1, db)
+    valuation = portfolio_valuation.evaluate(db, 1)
+    rows = valuation.holdings
     row = row_by_ticker(rows, "VOO")
 
-    assert total_value == 3881.95
+    assert valuation.total_value == 3881.95
     assert row["day_change"] == -1.32
     assert row["daily_value_change"] == -11.22
-    assert total_daily_change == -11.22
+    assert valuation.total_daily_change == -11.22
 
 
 def test_partial_sale_total_pct_combines_realized_and_unrealized(monkeypatch):
@@ -117,12 +118,12 @@ def test_partial_sale_total_pct_combines_realized_and_unrealized(monkeypatch):
     add_trade(db, "MIX", shares_sold=2, sale_price=130, avg_cost=100)
     add_trade(db, "MIX", shares_sold=3, sale_price=90, avg_cost=100)
     monkeypatch.setattr(
-        portfolio_router,
+        portfolio_valuation,
         "get_portfolio_quotes",
         lambda _tickers: [quote("MIX", 120)],
     )
 
-    rows, *_ = portfolio_router._compute_portfolio(1, db)
+    rows = portfolio_valuation.evaluate(db, 1).holdings
 
     # Realized: +30 over $500 sold basis. Unrealized: +100 over $500 remaining basis.
     assert row_by_ticker(rows, "MIX")["total_return_pct"] == 13.0
@@ -133,7 +134,7 @@ def test_realized_stats_weight_multiple_sells_by_quantity():
     add_trade(db, "SOLD", shares_sold=1, sale_price=150, avg_cost=100)
     add_trade(db, "SOLD", shares_sold=3, sale_price=110, avg_cost=100)
 
-    stats = portfolio_router._realized_stats_by_ticker(1, db)["SOLD"]
+    stats = portfolio_valuation.load_performance(db, 1).realized_by_ticker["SOLD"]
 
     assert stats["shares_sold"] == 4
     assert stats["avg_sell_price"] == 120
@@ -146,13 +147,13 @@ def test_missing_or_zero_basis_returns_none(monkeypatch):
     add_holding(db, "FREE", shares=10, avg_cost=0)
     add_trade(db, "ZERO", shares_sold=2, sale_price=50, avg_cost=0)
     monkeypatch.setattr(
-        portfolio_router,
+        portfolio_valuation,
         "get_portfolio_quotes",
         lambda _tickers: [quote("FREE", 20)],
     )
 
-    rows, *_ = portfolio_router._compute_portfolio(1, db)
-    stats = portfolio_router._realized_stats_by_ticker(1, db)["ZERO"]
+    rows = portfolio_valuation.evaluate(db, 1).holdings
+    stats = portfolio_valuation.load_performance(db, 1).realized_by_ticker["ZERO"]
 
     assert row_by_ticker(rows, "FREE")["total_return_pct"] is None
     assert stats["total_return_pct"] is None
@@ -160,9 +161,9 @@ def test_missing_or_zero_basis_returns_none(monkeypatch):
 
 def test_default_portfolio_is_created_on_first_use(monkeypatch):
     db = make_empty_db()
-    monkeypatch.setattr(portfolio_router.settings, "DEFAULT_HOLDINGS", ["VOO", "QQQ"])
+    monkeypatch.setattr(portfolio_lifecycle.settings, "DEFAULT_HOLDINGS", ["VOO", "QQQ"])
 
-    portfolio = portfolio_router._ensure_default_portfolio(db)
+    portfolio = portfolio_lifecycle.require_portfolio(db, 1)
 
     holdings = db.query(Holding).order_by(Holding.ticker).all()
     assert portfolio.id == 1
@@ -326,7 +327,7 @@ def test_delete_realized_trade_adjusts_realized_total_and_today_snapshot(monkeyp
     add_trade(db, "SOLD", shares_sold=1, sale_price=150, avg_cost=100)
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "SOLD").first()
     monkeypatch.setattr(
-        portfolio_router,
+        portfolio_valuation,
         "get_portfolio_quotes",
         lambda _tickers: [quote("SOLD", 110)],
     )
@@ -432,33 +433,30 @@ def _err_quote(_tickers):
 def test_valuation_degraded_when_all_quotes_error(monkeypatch):
     db = make_db()
     add_holding(db, "VOO", shares=10, avg_cost=400)
-    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", _err_quote)
-    rows, *_ = portfolio_router._compute_portfolio(1, db)
-    assert portfolio_router._valuation_degraded(1, rows, db) is True
+    monkeypatch.setattr(portfolio_valuation, "get_portfolio_quotes", _err_quote)
+    assert portfolio_valuation.evaluate(db, 1).degraded is True
 
 
 def test_valuation_not_degraded_when_priced(monkeypatch):
     db = make_db()
     add_holding(db, "VOO", shares=10, avg_cost=400)
     monkeypatch.setattr(
-        portfolio_router, "get_portfolio_quotes", lambda _t: [quote("VOO", 456)]
+        portfolio_valuation, "get_portfolio_quotes", lambda _t: [quote("VOO", 456)]
     )
-    rows, *_ = portfolio_router._compute_portfolio(1, db)
-    assert portfolio_router._valuation_degraded(1, rows, db) is False
+    assert portfolio_valuation.evaluate(db, 1).degraded is False
 
 
 def test_empty_portfolio_is_not_degraded(monkeypatch):
     # No priceable positions → a $0 total is genuine, not an outage.
     db = make_db()
-    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", lambda _t: [])
-    rows, *_ = portfolio_router._compute_portfolio(1, db)
-    assert portfolio_router._valuation_degraded(1, rows, db) is False
+    monkeypatch.setattr(portfolio_valuation, "get_portfolio_quotes", lambda _t: [])
+    assert portfolio_valuation.evaluate(db, 1).degraded is False
 
 
 def test_value_endpoint_degraded_flags_and_skips_snapshot(monkeypatch):
     db = make_db()
     add_holding(db, "VOO", shares=10, avg_cost=400)
-    monkeypatch.setattr(portfolio_router, "get_portfolio_quotes", _err_quote)
+    monkeypatch.setattr(portfolio_valuation, "get_portfolio_quotes", _err_quote)
     resp = portfolio_router.get_portfolio_value(portfolio_id=1, db=db)
     assert resp["degraded"] is True
     assert resp["total_value"] == 0
@@ -470,7 +468,7 @@ def test_value_endpoint_writes_snapshot_when_priced(monkeypatch):
     db = make_db()
     add_holding(db, "VOO", shares=10, avg_cost=400)
     monkeypatch.setattr(
-        portfolio_router, "get_portfolio_quotes", lambda _t: [quote("VOO", 456)]
+        portfolio_valuation, "get_portfolio_quotes", lambda _t: [quote("VOO", 456)]
     )
     resp = portfolio_router.get_portfolio_value(portfolio_id=1, db=db)
     assert resp["degraded"] is False

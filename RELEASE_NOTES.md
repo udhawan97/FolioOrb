@@ -63,7 +63,7 @@ panel can leak the wrong portfolio's data), the AI router and analytics snapshot
 take a `portfolio_id` throughout, and the portfolio-level AI cache is keyed
 `BOOK:<id>`. New create/rename/delete endpoints delete every child row
 explicitly (holdings, trades, snapshots, DCA plans + contributions, and the
-portfolio's AI cache). Installing over any 5.3.x keeps your existing holdings as
+portfolio's verdict history and AI cache). Installing over any 5.3.x keeps your existing holdings as
 the default portfolio. New tests for portfolio management and AI scoping; still
 no brokerage connection and still not financial advice.
 

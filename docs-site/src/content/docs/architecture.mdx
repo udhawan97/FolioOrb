@@ -22,11 +22,25 @@ import architecture from '../../assets/architecture.svg';
 
 ## Request flow
 
-The browser dashboard talks to the FastAPI app over HTTP/JSON. The app routes requests
-into a service layer split by domain — market data, portfolio analytics, AI, and news —
-each with its own caching behavior. Services read/write SQLite for persistence, call
-Yahoo Finance for market data, and optionally call Anthropic Claude when narration is
-requested and a key is configured.
+The browser dashboard talks to the FastAPI app over HTTP/JSON. Routers are thin HTTP
+adapters: they validate request shapes, call domain modules, and translate domain errors
+into responses. The modules read/write SQLite, call Yahoo Finance for market data, and
+optionally call Anthropic Claude when narration is requested and a key is configured.
+
+## Portfolio integrity modules
+
+Financial state is concentrated behind four interfaces so callers cannot accidentally use
+different rules for the same Portfolio:
+
+| Module | Owns | Important invariant |
+| --- | --- | --- |
+| `portfolio_lifecycle.py` | Default creation, list/create/rename/delete, owned-record cleanup | Deleting a Portfolio removes its holdings, trades, snapshots, verdict history, DCA ledger, and `BOOK:<id>` narratives together. |
+| `portfolio_valuation.py` | Live valuation, cost basis, realized + unrealized return, quote quality, daily history | Watchlist rows never enter totals; incomplete quotes are explicit; only complete valuations may update daily snapshots. |
+| `dca_ledger.py` | Plan persistence, catch-up, pending/applied/dismissed transitions, exact apply/undo | Catch-up is idempotent and no simulated buy mutates a holding until the user applies it. |
+| `narrative_cache.py` | Portfolio cache scopes, TTL/price freshness, JSON validation, writes | Every Portfolio narrative is isolated under `BOOK:<portfolio_id>`; stale or corrupt cache rows regenerate safely. |
+
+Pure DCA scheduling and cost math remains in `dca_service.py`, while routers and AI/analytics
+call these interfaces instead of reaching into each other's private helpers.
 
 ## Intelligence Engine
 
@@ -53,8 +67,8 @@ app/
 ├── database.py             SQLite engine/session and startup migrations
 ├── models.py               SQLAlchemy ORM models
 ├── schemas.py              Pydantic request/response contracts
-├── routers/                API route groups: stocks, portfolio, ai, news, system
-└── services/               Market data, analytics, signals, AI, news, exposure, regimes, updates
+├── routers/                Thin HTTP adapters: stocks, portfolio, DCA, AI, news, system
+└── services/               Lifecycle, valuation, DCA ledger, cache, analytics, signals, data, updates
 
 desktop/                    Desktop entry point (uvicorn + native window)
 packaging/                  PyInstaller spec, Inno Setup script, app icons

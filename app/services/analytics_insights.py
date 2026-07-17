@@ -670,8 +670,7 @@ def _signals_snapshot(
 
 def build_analytics_snapshot(db, portfolio_id: int = 1) -> dict[str, Any]:
     """Compact cross-tab snapshot for analytics insights."""
-    from app.models import PortfolioSnapshot
-    from app.routers.portfolio import _compute_portfolio, _cumulative_realized
+    from app.services import portfolio_valuation
     from app.services.portfolio_analytics import (
         compute_benchmark_comparison,
         compute_confidence_spectrum,
@@ -690,29 +689,19 @@ def build_analytics_snapshot(db, portfolio_id: int = 1) -> dict[str, Any]:
     from app.services.stock_service import get_all_quotes
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(
-        portfolio_id, db
-    )
+    valuation = portfolio_valuation.evaluate(db, portfolio_id)
+    holdings_rows = valuation.holdings
+    total_value = valuation.total_value
+    total_daily_change = valuation.total_daily_change
     non_watchlist = [h for h in holdings_rows if not h.get("is_watchlist")]
 
-    total_unrealized = sum(float(h.get("unrealized_gain") or 0) for h in non_watchlist)
-    realized = _cumulative_realized(portfolio_id, db)
-    total_return_dollar = round(total_unrealized + realized, 2)
-    total_return_pct = (
-        round(total_return_dollar / total_cost_basis * 100, 2) if total_cost_basis > 0 else 0.0
-    )
+    total_return_pct = valuation.total_return_pct
     prev_value = total_value - total_daily_change
     today_pnl_pct = (
         round(total_daily_change / prev_value * 100, 2) if abs(prev_value) > 0 else 0.0
     )
 
-    snapshots = (
-        db.query(PortfolioSnapshot)
-        .filter(PortfolioSnapshot.portfolio_id == portfolio_id)
-        .order_by(PortfolioSnapshot.snapshot_date.asc())
-        .all()
-    )
-    history = [{"date": s.snapshot_date, "total_value": s.total_value} for s in snapshots]
+    history = portfolio_valuation.snapshot_history(db, portfolio_id)
     drawdown = compute_drawdown(history)
     risk = compute_risk_metrics(holdings_rows, total_value)
     quotes = get_all_quotes([h["ticker"] for h in non_watchlist])
@@ -757,7 +746,7 @@ def build_analytics_snapshot(db, portfolio_id: int = 1) -> dict[str, Any]:
             "has_holdings": bool(non_watchlist) and total_value > 0,
             "total_return_pct": total_return_pct,
             "today_pnl_pct": today_pnl_pct,
-            "history_days": len(snapshots),
+            "history_days": len(history),
             "max_drawdown_pct": drawdown.get("max_drawdown_pct"),
         },
         "risk": {

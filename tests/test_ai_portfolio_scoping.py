@@ -26,8 +26,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.models import AISummary, Base, Holding, Portfolio
 from app.routers import ai as ai_router
-from app.routers import portfolio as portfolio_router
-from app.services import analytics_insights
+from app.services import analytics_insights, portfolio_valuation
 
 
 def make_multi_portfolio_db():
@@ -86,7 +85,7 @@ def test_book_cache_is_namespaced_per_portfolio(monkeypatch):
         "BBB": quote("BBB", 60, day_change=0.5, day_change_pct=0.8),
     }
     monkeypatch.setattr(
-        portfolio_router,
+        portfolio_valuation,
         "get_portfolio_quotes",
         lambda tickers: [quotes[t] for t in tickers if t in quotes],
     )

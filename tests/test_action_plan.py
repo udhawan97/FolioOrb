@@ -5,6 +5,7 @@ Mirrors the pattern established in tests/test_portfolio_briefing.py.
 """
 import asyncio
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -111,8 +112,8 @@ def _patch_core(monkeypatch):
 
 def _patch_compute_portfolio(monkeypatch):
     monkeypatch.setattr(
-        "app.routers.portfolio._compute_portfolio",
-        lambda pid, db: ([], 5000.0, 0.0, 2000.0),
+        "app.services.portfolio_valuation.evaluate",
+        lambda db, pid: SimpleNamespace(holdings=[], total_value=5000.0),
     )
 
 

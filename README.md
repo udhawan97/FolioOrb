@@ -222,7 +222,7 @@ python -m pylint $(git ls-files '*.py')
 flowchart LR
     browser["Browser dashboard<br>HTML, CSS, vanilla JS, Chart.js"]
     api["FastAPI app<br>routers, middleware, static serving"]
-    services["Service layer<br>signals, analytics, news, AI, market data"]
+    services["Domain modules<br>lifecycle, valuation, DCA, signals, AI cache"]
     db["SQLite<br>holdings, snapshots, AI cache, verdict history"]
     yahoo["Yahoo Finance<br>prices, history, headlines"]
     claude["Anthropic Claude<br>optional narration and plans"]
@@ -235,6 +235,8 @@ flowchart LR
 ```
 
 The browser view is identical whether you open `localhost:8000` yourself or launch the desktop app — the desktop build (PyInstaller + pywebview) runs the same FastAPI server in-process behind a native window.
+
+Portfolio lifecycle, valuation, recurring-investment state, and Portfolio-scoped AI narratives each have one service interface. That keeps deletion cascades, watchlist exclusions, realized/unrealized return math, quote-quality handling, DCA apply/undo, and `BOOK:<portfolio_id>` cache isolation consistent across every route. See the [architecture guide](https://udhawan97.github.io/FolioOrb/architecture/) for the module map and invariants.
 
 | Layer | Stack |
 | --- | --- |

@@ -4,6 +4,7 @@ No real network calls — Claude and portfolio compute are monkeypatched.
 """
 import asyncio
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -82,20 +83,19 @@ _BRIEFING_AI_RESPONSE = {
 
 
 def _patch_portfolio_compute(monkeypatch):
-    """Monkeypatch _compute_portfolio and _cumulative_realized used inside ai_router."""
-    def fake_compute(_portfolio_id, _db):
-        return _FAKE_HOLDINGS, 5000.0, 4.0, 2000.0
-
-    def fake_realized(_portfolio_id, _db):
-        return 200.0
-
+    """Monkeypatch the Portfolio valuation interface used inside ai_router."""
     monkeypatch.setattr(
-        "app.routers.portfolio._compute_portfolio",
-        fake_compute,
-    )
-    monkeypatch.setattr(
-        "app.routers.portfolio._cumulative_realized",
-        fake_realized,
+        "app.services.portfolio_valuation.evaluate",
+        lambda _db, _portfolio_id: SimpleNamespace(
+            holdings=_FAKE_HOLDINGS,
+            total_value=5000.0,
+            total_daily_change=4.0,
+            total_cost_basis=2000.0,
+            total_unrealized_gain=800.0,
+            realized_gain=200.0,
+            total_return=1000.0,
+            total_return_pct=50.0,
+        ),
     )
 
 

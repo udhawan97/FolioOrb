@@ -4,7 +4,7 @@ Regression tests for the daily portfolio-snapshot uniqueness guarantee.
 Two paths are covered:
   1. The startup migration collapses pre-existing duplicate snapshot rows to the
      most recent row per (portfolio_id, snapshot_date) and installs the UNIQUE index.
-  2. _upsert_daily_snapshot refreshes today's row in place instead of inserting a
+  2. Portfolio valuation refreshes today's snapshot in place instead of inserting a
      second row for the same day.
 """
 # pylint: disable=protected-access
@@ -13,8 +13,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import _ensure_performance_indexes
-from app.models import Base, Portfolio, PortfolioSnapshot
-from app.routers.portfolio import _upsert_daily_snapshot
+from app.models import Base, Holding, Portfolio, PortfolioSnapshot
+from app.services import portfolio_valuation
 
 
 def _make_engine():
@@ -67,11 +67,21 @@ def test_upsert_daily_snapshot_is_idempotent_within_a_day():
     Base.metadata.create_all(bind=engine)  # includes the unique index via __table_args__
     session = sessionmaker(bind=engine)()
     session.add(Portfolio(id=1, name="Test"))
+    session.add(Holding(portfolio_id=1, ticker="TEST", shares=10, avg_cost=80))
     session.commit()
 
-    totals = ([], 1000.0, 5.0, 800.0)  # (rows, total_value, daily, total_cost_basis)
-    _upsert_daily_snapshot(1, totals, session)
-    _upsert_daily_snapshot(1, ([], 1100.0, 6.0, 800.0), session)
+    def quote_at(price):
+        return lambda _tickers: [{
+            "ticker": "TEST", "current_price": price,
+            "day_change": 0.5, "day_change_pct": 0.5,
+        }]
+
+    portfolio_valuation.evaluate(
+        session, 1, quote_loader=quote_at(100), record_snapshot=True
+    )
+    portfolio_valuation.evaluate(
+        session, 1, quote_loader=quote_at(110), record_snapshot=True
+    )
 
     snaps = session.query(PortfolioSnapshot).filter_by(portfolio_id=1).all()
     assert len(snaps) == 1              # one row per day, not two

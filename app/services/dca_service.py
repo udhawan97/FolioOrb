@@ -5,7 +5,7 @@ and real historical closing prices, it computes the individual buys (a
 "simulated bucket") the user reviews and can then apply to a real holding.
 
 Every function here is pure so it unit-tests without a database or network.
-Database orchestration and price fetching live in ``app/routers/dca.py``.
+Database orchestration and price fetching live in ``app/services/dca_ledger.py``.
 """
 from __future__ import annotations
 

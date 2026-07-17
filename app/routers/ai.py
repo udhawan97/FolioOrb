@@ -3,7 +3,6 @@ app/routers/ai.py
 AI-powered summary endpoints using Claude, plus move-explanation endpoints.
 """
 # pylint: disable=too-many-lines
-import json
 import logging
 import os
 import re
@@ -86,6 +85,7 @@ from app.services.verdict_calibration import (
     log_verdict_snapshot,
 )
 from app.services.verdict_report import build_verdict_report
+from app.services import narrative_cache, portfolio_valuation
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -339,17 +339,12 @@ def _active_portfolio_tickers(db: Session, portfolio_id: int = 1) -> list[str]:
 
 
 def _cache_is_fresh(cached: AISummary, current_price: float | None = None) -> bool:
-    # getattr gives pyright concrete Python types instead of SQLAlchemy ColumnElement
-    generated_at: datetime = getattr(cached, "generated_at")
-    cached_price: float | None = getattr(cached, "price_when_generated")
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if now - generated_at > CACHE_TTL:
-        return False
-    if current_price is not None and cached_price is not None and cached_price > 0:
-        drift = abs(current_price - cached_price) / cached_price
-        if drift > PRICE_DRIFT_THRESHOLD:
-            return False
-    return True
+    return narrative_cache.is_fresh(
+        cached,
+        ttl=CACHE_TTL,
+        current_price=current_price,
+        price_drift_threshold=PRICE_DRIFT_THRESHOLD,
+    )
 
 
 @router.get("/cache/stats")
@@ -909,9 +904,6 @@ _VERDICT_DISCLAIMER = (
     "financial advice. Verify before you trade."
 )
 _AI_VERDICT_DISCLAIMER = _VERDICT_DISCLAIMER
-_PORTFOLIO_CACHE_TICKER = "BOOK"
-
-
 def _portfolio_cache_ticker(portfolio_id: int = 1) -> str:
     """
     AISummary.ticker sentinel for portfolio-LEVEL AI caches (briefing, action
@@ -923,7 +915,7 @@ def _portfolio_cache_ticker(portfolio_id: int = 1) -> str:
     Per-ticker summaries use real ticker strings and stay shared across
     portfolios, so they are left untouched.
     """
-    return f"{_PORTFOLIO_CACHE_TICKER}:{portfolio_id}"
+    return narrative_cache.portfolio_scope(portfolio_id)
 
 
 _ACTION_CACHE_CODE = {"add": "a", "hold": "h", "trim": "t", "needs-data": "n"}
@@ -1338,19 +1330,15 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
             }
 
     portfolio_state = _portfolio_state_signature(signals, alloc_map)
-    portfolio_cached = (
-        db.query(AISummary)
-        .filter(
-            AISummary.ticker == book_ticker,
-            AISummary.summary_type == portfolio_state["summary_type"],
-        )
-        .order_by(AISummary.generated_at.desc())
-        .first()
+    cache = narrative_cache.NarrativeCache(db, ttl=CACHE_TTL)
+    portfolio_cached = cache.get_text(
+        book_ticker,
+        portfolio_state["summary_type"],
     )
     portfolio_quip: str | None = None
     include_portfolio_quip = False
-    if portfolio_cached and _cache_is_fresh(portfolio_cached):
-        portfolio_quip = getattr(portfolio_cached, "summary_text", "")
+    if portfolio_cached is not None:
+        portfolio_quip = portfolio_cached
     else:
         include_portfolio_quip = True
 
@@ -1434,13 +1422,13 @@ async def get_all_investment_signals(  # pylint: disable=too-many-statements,too
                 portfolio_state["concentration_band"],
             )
             try:
-                db.add(AISummary(
-                    ticker=book_ticker,
-                    summary_type=portfolio_state["summary_type"],
-                    summary_text=encode_verdict_cache(portfolio_quip, None),
-                    price_when_generated=None,
-                    model_used=MODEL if book_bundle.get("quip") and claude_live else "fallback",
-                ))
+                cache.store_text(
+                    book_ticker,
+                    portfolio_state["summary_type"],
+                    encode_verdict_cache(portfolio_quip, None),
+                    MODEL if book_bundle.get("quip") and claude_live else "fallback",
+                    commit=False,
+                )
             except Exception as exc:  # pylint: disable=broad-except
                 logger.debug(
                     "Failed to cache portfolio quip; exception_type=%s",
@@ -1676,10 +1664,8 @@ def _period_portfolio_pl(
     semantics the hero P&L card uses (closest snapshot at/after the cutoff,
     else the earliest available).
     """
-    from app.routers.portfolio import _portfolio_snapshots  # lazy — no circular dep
-
     rows = [
-        r for r in _portfolio_snapshots(portfolio_id, db)
+        r for r in portfolio_valuation.snapshot_history(db, portfolio_id)
         if r.get("date") and r.get("total_value") is not None
     ]
     if not rows:
@@ -1702,23 +1688,17 @@ def _briefing_snapshot(db: Session, portfolio_id: int = 1) -> tuple[dict, list[d
     Build the compact portfolio snapshot fed to Haiku (and used for the local
     briefing lead line).  Returns (snapshot_dict, non_watchlist_holdings).
     """
-    from app.routers.portfolio import (  # lazy — no circular dep
-        _compute_portfolio,
-        _cumulative_realized,
-    )
-
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    holdings_rows, total_value, total_daily_change, total_cost_basis = _compute_portfolio(
-        portfolio_id, db
-    )
+    valuation = portfolio_valuation.evaluate(db, portfolio_id)
+    holdings_rows = valuation.holdings
+    total_value = valuation.total_value
+    total_daily_change = valuation.total_daily_change
     non_watchlist = [h for h in holdings_rows if not h.get("is_watchlist")]
 
-    total_unrealized = sum(float(h.get("unrealized_gain") or 0) for h in non_watchlist)
-    realized = _cumulative_realized(portfolio_id, db)
-    total_return_dollar = round(total_unrealized + realized, 2)
-    total_return_pct = (
-        round(total_return_dollar / total_cost_basis * 100, 2) if total_cost_basis > 0 else 0.0
-    )
+    total_unrealized = valuation.total_unrealized_gain
+    realized = valuation.realized_gain
+    total_return_dollar = valuation.total_return
+    total_return_pct = valuation.total_return_pct
     prev_value = total_value - total_daily_change
     today_pnl_pct = round(total_daily_change / prev_value * 100, 2) if abs(prev_value) > 0 else 0.0
 
@@ -2055,23 +2035,12 @@ async def get_portfolio_summary(
 
     # AI mode — check 24 h cache first (one entry per range)
     cache_type = _briefing_cache_type(range_key)
+    cache = narrative_cache.NarrativeCache(db, ttl=CACHE_TTL)
     if not force_refresh:
-        cached = (
-            db.query(AISummary)
-            .filter(
-                AISummary.ticker == book_ticker,
-                AISummary.summary_type == cache_type,
-            )
-            .order_by(AISummary.generated_at.desc())
-            .first()
-        )
-        if cached and _cache_is_fresh(cached):
-            try:
-                stored = json.loads(getattr(cached, "summary_text", None) or "{}")
-                stored["from_cache"] = True
-                return stored
-            except Exception:
-                pass  # cache corrupted — regenerate below
+        stored = cache.get_json(book_ticker, cache_type)
+        if stored is not None:
+            stored["from_cache"] = True
+            return stored
 
     # Build snapshot; surface 500 so the card can show a clear error
     try:
@@ -2095,14 +2064,7 @@ async def get_portfolio_summary(
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            db.add(AISummary(
-                ticker=book_ticker,
-                summary_type=cache_type,
-                summary_text=json.dumps(payload),
-                price_when_generated=None,
-                model_used=MODEL,
-            ))
-            db.commit()
+            cache.store_json(book_ticker, cache_type, payload, MODEL)
         except Exception as exc:
             logger.debug("Failed to cache briefing; exception_type=%s", type(exc).__name__)
         return payload
@@ -2154,14 +2116,12 @@ def _merge_ai_widget_insights(local_widgets: dict, ai_widgets: dict) -> dict:
 
 def _cache_analytics_insights(db: Session, payload: dict, portfolio_id: int = 1) -> None:
     try:
-        db.add(AISummary(
-            ticker=_portfolio_cache_ticker(portfolio_id),
-            summary_type=_ANALYTICS_INSIGHTS_CACHE_TYPE,
-            summary_text=json.dumps(payload),
-            price_when_generated=None,
-            model_used=MODEL,
-        ))
-        db.commit()
+        narrative_cache.NarrativeCache(db, ttl=CACHE_TTL).store_json(
+            _portfolio_cache_ticker(portfolio_id),
+            _ANALYTICS_INSIGHTS_CACHE_TYPE,
+            payload,
+            MODEL,
+        )
     except Exception as exc:
         logger.debug(
             "Failed to cache analytics insights; exception_type=%s",
@@ -2206,23 +2166,14 @@ async def get_analytics_insights(
             ) from exc
 
     if not force_refresh:
-        cached = (
-            db.query(AISummary)
-            .filter(
-                AISummary.ticker == _portfolio_cache_ticker(portfolio_id),
-                AISummary.summary_type == _ANALYTICS_INSIGHTS_CACHE_TYPE,
-            )
-            .order_by(AISummary.generated_at.desc())
-            .first()
+        stored = narrative_cache.NarrativeCache(db, ttl=CACHE_TTL).get_json(
+            _portfolio_cache_ticker(portfolio_id),
+            _ANALYTICS_INSIGHTS_CACHE_TYPE,
+            validator=lambda payload: not _analytics_cache_needs_regeneration(payload),
         )
-        if cached and _cache_is_fresh(cached):
-            try:
-                stored = json.loads(getattr(cached, "summary_text", None) or "{}")
-                if not _analytics_cache_needs_regeneration(stored):
-                    stored["from_cache"] = True
-                    return stored
-            except Exception:
-                pass
+        if stored is not None:
+            stored["from_cache"] = True
+            return stored
 
     try:
         snapshot = build_analytics_snapshot(db, portfolio_id)
@@ -2280,7 +2231,6 @@ def _action_plan_snapshot(
     Fuses per-ticker signal data, portfolio exposure, risk metrics, regime,
     and performance vs benchmark into a token-lean JSON.
     """
-    from app.routers.portfolio import _compute_portfolio  # lazy — avoids circular import
     from app.services.portfolio_analytics import (
         compute_portfolio_beta,
         compute_rolling_volatility,
@@ -2295,12 +2245,14 @@ def _action_plan_snapshot(
     regime = core["regime"]
     active_tickers = core["active_tickers"]
 
-    # Portfolio value + per-holding total_return_pct from the portfolio compute layer
+    # Portfolio value + per-holding total_return_pct from the valuation module.
     try:
-        holdings_rows, total_value, _, _ = _compute_portfolio(portfolio_id, db)
+        valuation = portfolio_valuation.evaluate(db, portfolio_id)
+        holdings_rows = valuation.holdings
+        total_value = valuation.total_value
     except Exception as exc:
         logger.warning(
-            "Action plan _compute_portfolio failed; exception_type=%s",
+            "Action plan Portfolio valuation failed; exception_type=%s",
             type(exc).__name__,
         )
         holdings_rows, total_value = [], 0.0
@@ -2542,24 +2494,13 @@ async def get_action_plan(
     }
     port_state = _portfolio_state_signature(clean_signals, alloc_map)
     cache_summary_type = f"{_ACTION_PLAN_CACHE_TYPE}:{port_state['summary_type']}"
+    cache = narrative_cache.NarrativeCache(db, ttl=CACHE_TTL)
 
     if not force_refresh:
-        cached = (
-            db.query(AISummary)
-            .filter(
-                AISummary.ticker == book_ticker,
-                AISummary.summary_type == cache_summary_type,
-            )
-            .order_by(AISummary.generated_at.desc())
-            .first()
-        )
-        if cached and _cache_is_fresh(cached):
-            try:
-                stored = json.loads(getattr(cached, "summary_text", None) or "{}")
-                stored["from_cache"] = True
-                return stored
-            except Exception:
-                pass  # cache corrupted — regenerate below
+        stored = cache.get_json(book_ticker, cache_summary_type)
+        if stored is not None:
+            stored["from_cache"] = True
+            return stored
 
     # Build compact snapshot for Claude
     try:
@@ -2582,14 +2523,12 @@ async def get_action_plan(
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            db.add(AISummary(
-                ticker=book_ticker,
-                summary_type=cache_summary_type,
-                summary_text=json.dumps(payload),
-                price_when_generated=None,
-                model_used=ACTION_PLAN_MODEL,
-            ))
-            db.commit()
+            cache.store_json(
+                book_ticker,
+                cache_summary_type,
+                payload,
+                ACTION_PLAN_MODEL,
+            )
         except Exception as exc:
             logger.debug(
                 "Failed to cache action plan; exception_type=%s",
