@@ -1,3 +1,53 @@
+# FolioOrb v5.4.2 Release Notes
+
+**Release date:** July 16, 2026
+
+## Headline
+
+Portfolio math, recurring-investment history, and AI narration now agree on one
+honest view of your holdings — even when a quote is missing or a position has
+already been sold.
+
+## What's New
+
+### 📐 Total return now counts every invested dollar
+
+Portfolio total-return percentage now uses both the cost basis still invested
+and the cost basis of shares already sold. Realized and unrealized gains were
+already combined; their denominator now matches, so partially sold positions no
+longer make the percentage look larger than it really is.
+
+### 🛡️ Missing prices stay missing
+
+Zero, non-finite, and malformed quotes are treated as unavailable instead of a
+real $0 price. An incomplete valuation cannot write a daily performance snapshot
+or ask Claude to narrate a portfolio briefing, analytics read, or action plan as
+though every position were priced. FolioOrb identifies the missing tickers and
+waits for complete market data.
+
+### 🔁 DCA history remains reversible
+
+A DCA plan with applied buys can no longer be deleted while its holding changes
+remain in place. Undo those buys first, then delete the plan, preserving the
+audit trail and keeping the ledger aligned with the holding.
+
+### ✨ A sharper public home
+
+The landing page and documentation now share a more deliberate type system and
+visual rhythm. The architecture page also documents the financial integrity
+modules that keep lifecycle, valuation, DCA, and narrative-cache rules coherent.
+
+## Under the hood
+
+Portfolio lifecycle, valuation, DCA persistence, and AI narrative caching now
+sit behind four focused service interfaces instead of being duplicated across
+routers. Portfolio deletion includes verdict history and scoped narratives;
+ticker and portfolio narratives share the same freshness and serialization
+rules. No schema migration is required, and installing over v5.4.1 preserves the
+existing SQLite database, holdings, trades, DCA history, settings, and API key.
+
+---
+
 # FolioOrb v5.4.1 Release Notes
 
 **Release date:** July 11, 2026

@@ -7,6 +7,21 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.4.2 — Honest Valuation, Safer Ledgers
+
+- **Return math now matches the full investment.** Portfolio total-return percentage includes
+  the cost basis of both open and already-sold shares, matching the realized + unrealized gain
+  shown beside it.
+- **Bad quotes never become a confident read.** Zero, non-finite, malformed, or missing prices
+  are labeled unavailable; incomplete valuations do not write daily snapshots or generate
+  portfolio-level Claude briefings, analytics narration, or action plans.
+- **Applied DCA buys stay traceable.** Undo applied buys before deleting their plan so the
+  contribution ledger and holding mutation cannot drift apart.
+- **Cleaner architecture and public docs.** Lifecycle, valuation, DCA, and narrative caching now
+  have focused service interfaces, while the landing page and docs share a sharper visual system.
+- Installing over v5.4.1 keeps the existing database, holdings, trades, DCA history, settings,
+  and API key. No schema migration is required.
+
 ## v5.4.1 — Per-Portfolio Verdict History
 
 - **Your track record follows the portfolio.** The Signals "how did my past calls age?" report
