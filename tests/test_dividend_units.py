@@ -9,7 +9,7 @@ expects a fraction, so a sub-1% yield was rendering 100x too high. `dividendRate
 """
 import math
 
-from app.services.stock_service import _normalized_dividend
+from app.services.stock_service import _ex_dividend_date, _normalized_dividend
 
 
 def test_yield_is_derived_from_rate_over_price_when_possible():
@@ -60,3 +60,20 @@ def test_missing_price_still_yields_from_the_percent_field():
     # No price to divide by; fall back to the percent field, converted.
     _rate, yld = _normalized_dividend({"dividendYield": 2.5}, 0)
     assert math.isclose(yld, 0.025, abs_tol=0.0005)
+
+
+# --- ex-dividend date normalization (unix seconds -> ISO date) ---
+
+
+def test_ex_dividend_date_from_unix_timestamp():
+    # 2026-05-11 in unix seconds.
+    assert _ex_dividend_date({"exDividendDate": 1778457600}) == "2026-05-11"
+
+
+def test_ex_dividend_date_absent():
+    assert _ex_dividend_date({}) is None
+    assert _ex_dividend_date({"exDividendDate": None}) is None
+
+
+def test_ex_dividend_date_garbage():
+    assert _ex_dividend_date({"exDividendDate": "soon"}) is None

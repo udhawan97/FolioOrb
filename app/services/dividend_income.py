@@ -49,6 +49,7 @@ def compute_portfolio_income(holdings_with_data: list[dict]) -> dict:
             continue
 
         income = round(shares * rate, 2)
+        ex_date = item.get("ex_dividend_date")
         payers.append({
             "ticker": ticker,
             "value": round(value, 2),
@@ -56,6 +57,7 @@ def compute_portfolio_income(holdings_with_data: list[dict]) -> dict:
             "dividend_rate": rate,
             "yield": round(rate / price, 5) if price else None,
             "annual_income": income,
+            "ex_dividend_date": ex_date if isinstance(ex_date, str) else None,
         })
 
     payers.sort(key=lambda p: p["annual_income"], reverse=True)

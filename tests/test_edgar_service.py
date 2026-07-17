@@ -207,3 +207,33 @@ def test_fetch_filing_document_fetches_sec_urls(monkeypatch):
     monkeypatch.setattr(edgar_service, "_get", lambda url: "<xml/>")
     url = "https://www.sec.gov/Archives/edgar/data/1/2/form4.xml"
     assert edgar_service.fetch_filing_document(url) == "<xml/>"
+
+
+# --- 8-K item codes decoded to plain English ---
+
+
+def test_decode_8k_items_names_the_common_ones():
+    labels = edgar_service.decode_8k_items("2.02,9.01")
+    assert "Results announced" in labels
+    assert any("financial statement" in s.lower() for s in labels)
+
+
+def test_decode_8k_names_an_officer_change():
+    assert any("officer" in s.lower() or "director" in s.lower()
+               for s in edgar_service.decode_8k_items("5.02"))
+
+
+def test_decode_8k_keeps_unknown_codes_as_the_bare_code():
+    assert edgar_service.decode_8k_items("9.99") == ["Item 9.99"]
+
+
+def test_decode_8k_handles_blank_and_whitespace():
+    assert not edgar_service.decode_8k_items("")
+    assert edgar_service.decode_8k_items("  2.02 , 9.01 ")[0] == "Results announced"
+
+
+def test_parse_filings_attaches_decoded_item_labels():
+    filings = _parse_filings(_SUBMISSIONS, cik="0000320193")
+    eightk = [f for f in filings if f["form"] == "8-K"][0]
+    assert isinstance(eightk["item_labels"], list)
+    assert "Results announced" in eightk["item_labels"]

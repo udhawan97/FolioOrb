@@ -3897,6 +3897,20 @@ function _yieldPct(fraction) {
     return `${(value * 100).toFixed(2)}%`;
 }
 
+// A heads-up chip for an upcoming ex-dividend date — the cutoff to own the
+// stock and still collect the next payment. Highlighted when it's within a
+// week or so; a past date is dropped rather than shown as stale.
+function _exDivChip(iso) {
+    if (!iso || typeof iso !== "string") return "";
+    const when = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(when.getTime())) return "";
+    const days = Math.round((when - new Date()) / 86400000);
+    if (days < 0 || days > 45) return "";  // only the near, still-relevant ones
+    const soon = days <= 7 ? " income-exdiv--soon" : "";
+    const label = days === 0 ? "ex-div today" : days === 1 ? "ex-div tomorrow" : `ex-div in ${days}d`;
+    return `<span class="income-exdiv${soon}" title="${escapeHtml(`Ex-dividend ${iso} — own it by then to get the next payment`)}">${escapeHtml(label)}</span>`;
+}
+
 function renderIncome(data) {
     const body = document.getElementById("income-body");
     if (!body) return;
@@ -3919,7 +3933,7 @@ function renderIncome(data) {
         const yld = _yieldPct(p.yield);
         const tip = yld ? `${p.ticker || ""} yields ${yld} on today's price` : "";
         return `<div class="income-row"${tip ? ` title="${escapeHtml(tip)}"` : ""}>
-            <span class="income-ticker">${escapeHtml(p.ticker || "")}</span>
+            <span class="income-ticker">${escapeHtml(p.ticker || "")}${_exDivChip(p.ex_dividend_date)}</span>
             <span class="income-yield">${escapeHtml(yld)}</span>
             <span class="income-annual">${escapeHtml(formatCurrency(p.annual_income))}<span class="income-per">/yr</span></span>
         </div>`;
@@ -13387,9 +13401,15 @@ function _newsRenderFilings(filingsData) {
         const rows = (h.filings || []).map(f => {
             const items = String(f.items || "").trim();
             const url   = _secUrl(f.url);
+            // Prefer plain-English item labels ("Results announced") over the raw
+            // codes ("2.02"); fall back to the codes only if decoding gave nothing.
+            const labels = Array.isArray(f.item_labels) ? f.item_labels : [];
+            const itemsHtml = labels.length
+                ? `<span class="filing-items">${escapeHtml(labels.join(" · "))}</span>`
+                : (items ? `<span class="filing-items">Items ${escapeHtml(items)}</span>` : "");
             const inner = `<span class="filing-date">${escapeHtml(f.filed_at || "")}</span>
                     <span class="filing-label">${escapeHtml(f.label || f.form || "")}</span>
-                    ${items ? `<span class="filing-items">Items ${escapeHtml(items)}</span>` : ""}`;
+                    ${itemsHtml}`;
             return `<li class="filing-row">
                 ${url
                     ? `<a class="filing-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">

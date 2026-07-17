@@ -18155,6 +18155,23 @@ body > .holding-expand-fab {
     padding-left: 0.1rem;
 }
 
+.income-exdiv {
+    margin-left: 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    color: var(--text-tertiary);
+    border: 1px solid var(--hairline);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.income-exdiv--soon {
+    color: var(--accent-yellow, var(--accent-green));
+    border-color: color-mix(in srgb, var(--accent-yellow, var(--accent-green)) 45%, transparent);
+}
+
 .fee-drag-headline {
     display: flex;
     align-items: baseline;

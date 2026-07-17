@@ -17,7 +17,7 @@ import math
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pytz
@@ -173,6 +173,17 @@ def _positive_number(value) -> float | None:
     return number
 
 
+def _ex_dividend_date(info: dict) -> str | None:
+    """Next ex-dividend date as an ISO string, from yfinance's unix seconds."""
+    raw = info.get("exDividendDate")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    try:
+        return datetime.fromtimestamp(float(raw), tz=timezone.utc).date().isoformat()
+    except (ValueError, OSError, OverflowError):
+        return None
+
+
 def _normalized_dividend(info: dict, price) -> tuple[float | None, float | None]:
     """Forward dividend as ($/share rate, yield-as-fraction), or (None, None).
 
@@ -293,6 +304,7 @@ def get_stock_data(ticker: str) -> dict:
             "profit_margin": info.get("profitMargins"),
             "dividend_yield": _round_or_none(dividend_yield, 5),
             "dividend_rate": _round_or_none(dividend_rate, 4),
+            "ex_dividend_date": _ex_dividend_date(info),
             "currency": info.get("currency") or "USD",
             "sector": info.get("sector") or info.get("categoryName") or "N/A",
             "quote_type": info.get("quoteType") or "EQUITY",
@@ -397,6 +409,7 @@ def get_fast_quote(ticker: str) -> dict:
             "profit_margin": None,
             "dividend_yield": None,
             "dividend_rate": None,
+            "ex_dividend_date": None,
             "currency": str(getattr(fi, "currency", None) or "USD"),
             "sector": "N/A",
             "quote_type": "ETF" if security_type == "ETF" else "EQUITY",

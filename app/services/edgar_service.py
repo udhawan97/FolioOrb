@@ -135,6 +135,36 @@ def _cik_from_map(raw_map: str, ticker: str) -> str | None:
     return None
 
 
+# The 8-K item codes worth naming in plain English. Unlisted codes fall back to
+# "Item X.YZ" — honest, if less friendly, rather than guessed.
+_ITEM_LABELS = {
+    "1.01": "Entered a material agreement",
+    "1.02": "Ended a material agreement",
+    "2.01": "Completed an acquisition or sale",
+    "2.02": "Results announced",
+    "2.03": "Took on a financial obligation",
+    "3.01": "Delisting notice",
+    "4.01": "Changed auditors",
+    "5.02": "Officer or director change",
+    "5.03": "Amended bylaws or charter",
+    "5.07": "Shareholder vote",
+    "7.01": "Regulation FD disclosure",
+    "8.01": "Other event",
+    "9.01": "Financial statements filed",
+}
+
+
+def decode_8k_items(items: str) -> list[str]:
+    """Turn an 8-K's comma-separated item codes into plain-English labels."""
+    labels = []
+    for code in str(items or "").split(","):
+        code = code.strip()
+        if not code:
+            continue
+        labels.append(_ITEM_LABELS.get(code, f"Item {code}"))
+    return labels
+
+
 def _filing_label(form: str) -> str:
     return _FORM_LABELS.get(form, form)
 
@@ -188,9 +218,14 @@ def _parse_filings(
                 "form": form,
                 "label": _filing_label(form),
                 "filed_at": str(series["filingDate"][i]).strip(),
-                "items": str(optional["items"][i]).strip()
-                if i < len(optional["items"])
-                else "",
+                "items": (
+                    str(optional["items"][i]).strip()
+                    if i < len(optional["items"])
+                    else ""
+                ),
+                "item_labels": decode_8k_items(
+                    optional["items"][i] if i < len(optional["items"]) else ""
+                ),
                 "url": _document_url(
                     cik,
                     accession,

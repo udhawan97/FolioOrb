@@ -64,3 +64,13 @@ def test_empty_state_when_nothing_pays():
 def test_render_escapes_untrusted_text():
     render = _render()
     assert "escapeHtml" in render
+
+
+def test_payer_rows_can_show_an_ex_dividend_chip():
+    js = _js()
+    # renderIncome hands each payer's ex-date to the chip helper...
+    assert "_exDivChip(p.ex_dividend_date)" in js
+    # ...which highlights a near cutoff (proximity computed, past dates dropped).
+    chip = js.split("function _exDivChip")[1][:700]
+    assert "income-exdiv" in chip
+    assert "income-exdiv--soon" in chip

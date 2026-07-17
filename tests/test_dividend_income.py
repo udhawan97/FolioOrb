@@ -98,3 +98,14 @@ def test_absurd_rate_is_rejected_as_bad_data():
     ])
     assert "BOGUS" in result["coverage"]["non_payers"]
     assert result["total_annual_income"] == 0.0
+
+
+def test_payer_carries_the_ex_dividend_date():
+    row = _payer("KO", 8156.0, 100, 2.12, 0.026, ex_dividend_date="2026-09-15")
+    result = compute_portfolio_income([row])
+    assert result["payers"][0]["ex_dividend_date"] == "2026-09-15"
+
+
+def test_payer_without_an_ex_date_is_fine():
+    result = compute_portfolio_income([_payer("KO", 8156.0, 100, 2.12, 0.026)])
+    assert result["payers"][0]["ex_dividend_date"] is None
