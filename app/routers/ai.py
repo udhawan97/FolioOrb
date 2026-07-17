@@ -51,7 +51,9 @@ from app.services.stock_service import (
     QUOTE_FETCH_ERROR,
     get_all_quotes,
     get_stock_data,
+    ticker_shape_is_safe,
 )
+from app.services.insider_activity import get_insider_activity
 from app.services.investment_signal import (
     build_investment_signal,
     signal_to_dict,
@@ -709,6 +711,21 @@ async def get_move_explanation(ticker: str):
     # that might explain the move. The /all loop below deliberately skips them.
     summary = explain_move(stock_data, include_filings=True)
     return _summary_to_dict(summary)
+
+
+@router.get("/insider-activity/{ticker}")
+async def get_insider_activity_endpoint(ticker: str):
+    """Recent open-market insider trades (SEC Form 4) for one holding.
+
+    Per-ticker and user-initiated, so it may spend the EDGAR round trips the
+    batch paths avoid. Stocks with no insider filings — and funds, which have
+    no insiders at all — return an honest empty-but-live result rather than an
+    error, so the caller can render "nothing to show" without special-casing.
+    """
+    symbol = (ticker or "").strip().upper()
+    if not ticker_shape_is_safe(symbol):
+        raise HTTPException(status_code=422, detail="Invalid ticker.")
+    return get_insider_activity(symbol)
 
 
 @router.get("/move-explanations/all")
