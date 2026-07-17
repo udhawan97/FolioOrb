@@ -731,6 +731,7 @@ let allocationFocusRefreshFrame = null;
 // Holding Intelligence state (covers "What It Covers" + "Why it moved")
 let cachedIntelligence = {};   // ticker → intelligence object (coverage data)
 let cachedExplanations = {};   // ticker → explanation object (move data)
+let cachedInsider = {};        // ticker → insider-activity object (SEC Form 4)
 let intelligenceLoaded = false;
 let intelligenceLoading = false;
 let _aiSummariesLoading = false;
@@ -5263,6 +5264,80 @@ function renderMoveExplainer(section, data, coverageData = null) {
     if (ctxCanvas && Array.isArray(timing.sparkline_30d)) _drawPctSparkline(ctxCanvas, timing.sparkline_30d);
 }
 
+// ── Insider Activity (SEC Form 4) ────────────────────────────────────────────
+//
+// The headline is open-market conviction — buys (P) and sells (S). Option
+// exercises, grants, and tax withholding (action "other") are shown for
+// completeness but never counted as conviction: the backend already excludes
+// them, and this render must not quietly recompute them back in. An empty list
+// on a live fetch is the normal case for funds and quiet stocks, not an error.
+function renderInsiderActivity(section, data) {
+    if (!section) return;
+
+    // Undefined = the lazy fetch hasn't landed yet. Stay blank rather than
+    // flash an empty state that a moment later fills in.
+    if (!data) { section.innerHTML = ""; return; }
+
+    if (data.data_quality === "unavailable") {
+        section.innerHTML = `<div class="intel-insider">
+            <div class="intel-label"><i class="bi bi-person-badge" aria-hidden="true"></i><span>Insider activity</span></div>
+            <p class="insider-note">Couldn't reach SEC EDGAR just now — insider filings unavailable.</p>
+        </div>`;
+        return;
+    }
+
+    const txs = Array.isArray(data.transactions) ? data.transactions : [];
+    const buys = Number(data.buys) || 0;
+    const sells = Number(data.sells) || 0;
+    const windowDays = Number(data.window_days) || 90;
+
+    // sec.gov or nothing — escapeHtml stops attribute breakout but would happily
+    // escape a javascript: URL into an href.
+    const secHref = (url) => {
+        const clean = String(url || "");
+        return clean.startsWith("https://www.sec.gov/") ? clean : "";
+    };
+
+    if (!txs.length) {
+        section.innerHTML = `<div class="intel-insider">
+            <div class="intel-label"><i class="bi bi-person-badge" aria-hidden="true"></i><span>Insider activity</span></div>
+            <p class="insider-note">No insider trades in the last ${escapeHtml(String(windowDays))} days. Funds and ETFs have no insiders to report.</p>
+        </div>`;
+        return;
+    }
+
+    const headline = [];
+    if (buys) headline.push(`<span class="insider-tally is-buy">${buys} bought${data.bought_value ? " · " + escapeHtml(formatCompactNumber(data.bought_value)) : ""}</span>`);
+    if (sells) headline.push(`<span class="insider-tally is-sell">${sells} sold${data.sold_value ? " · " + escapeHtml(formatCompactNumber(data.sold_value)) : ""}</span>`);
+    if (!headline.length) headline.push(`<span class="insider-tally is-neutral">No open-market buys or sells</span>`);
+
+    const rowsHtml = txs.map(tx => {
+        const action = String(tx.action || "other");
+        const tone = action === "buy" ? "is-buy" : action === "sell" ? "is-sell" : "is-neutral";
+        const verb = action === "buy" ? "Bought" : action === "sell" ? "Sold" : escapeHtml(tx.code_label || "Other");
+        const shares = isFiniteNumber(tx.shares) ? formatCompactNumber(tx.shares) : "";
+        // A price of 0 means "no sale price" (gifts, grants) — don't fake a $0.00.
+        const priceBit = (isFiniteNumber(tx.price) && Number(tx.price) > 0)
+            ? ` @ ${escapeHtml(formatCurrency(tx.price))}` : "";
+        const who = [tx.owner, tx.role].filter(Boolean).map(escapeHtml).join(" · ");
+        const href = secHref(tx.url);
+        const dateBadge = `<span class="insider-date">${escapeHtml(tx.date || "")}</span>`;
+        const inner = `${dateBadge}
+            <span class="insider-verb ${tone}">${verb}</span>
+            <span class="insider-shares">${escapeHtml(shares)}${priceBit}</span>
+            <span class="insider-who">${who}</span>`;
+        return `<li class="insider-row">${href
+            ? `<a class="insider-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${inner}<i class="bi bi-box-arrow-up-right insider-out" aria-hidden="true"></i></a>`
+            : `<span class="insider-link insider-link--plain">${inner}</span>`}</li>`;
+    }).join("");
+
+    section.innerHTML = `<div class="intel-insider">
+        <div class="intel-label"><i class="bi bi-person-badge" aria-hidden="true"></i><span>Insider activity · last ${escapeHtml(String(windowDays))}d</span></div>
+        <div class="insider-headline">${headline.join("")}</div>
+        <ul class="insider-list">${rowsHtml}</ul>
+    </div>`;
+}
+
 // ── Holding Coverage ("What It Covers") ──────────────────────────────────────
 
 const COVERAGE_TYPE_HINTS = {
@@ -6190,6 +6265,7 @@ function injectSummaryRows(tbody) {
             td.innerHTML = `<div class="summary-body"><div class="intel-grid">
                 <div class="intel-coverage-section"></div>
                 <div class="intel-move-section"></div>
+                <div class="intel-insider-section"></div>
                 <div class="intel-verdict-section"></div>
                 <div class="intel-slow-hint" hidden>
                     <i class="bi bi-hourglass-split"></i>
@@ -6238,6 +6314,11 @@ function injectSummaryRows(tbody) {
             renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
         }
 
+        // Insider section renders on every branch; absent data is shown as a
+        // quiet loading state until the lazy fetch lands.
+        const insiderSectionA = expandRow.querySelector(".intel-insider-section");
+        if (insiderSectionA) renderInsiderActivity(insiderSectionA, cachedInsider[ticker]);
+
         // Verdict section: render shimmer while intel is loading; render card when data arrives
         if (verdictSection) {
             if (intelligenceLoading && !cachedVerdicts[ticker]) {
@@ -6266,6 +6347,8 @@ function renderExpandedTicker(ticker) {
     const verdictSection = expandRow.querySelector(".intel-verdict-section");
     if (coverageSection) renderHoldingCoverage(coverageSection, cachedIntelligence[ticker]);
     if (moveSection) renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
+    const insiderSectionB = expandRow.querySelector(".intel-insider-section");
+    if (insiderSectionB) renderInsiderActivity(insiderSectionB, cachedInsider[ticker]);
     if (verdictSection) renderAiVerdict(verdictSection, cachedVerdicts[ticker], ticker);
     if (holdingIntelSettled(ticker)) {
         mainRow.classList.add("has-intel-ready");
@@ -10805,6 +10888,8 @@ function _renderAllExpandedIntelRows(tbody) {
         const verdictSection  = expandRow.querySelector(".intel-verdict-section");
         if (coverageSection) renderHoldingCoverage(coverageSection, cachedIntelligence[ticker]);
         if (moveSection)     renderMoveExplainer(moveSection, cachedExplanations[ticker], cachedIntelligence[ticker]);
+        const insiderSectionC = expandRow.querySelector(".intel-insider-section");
+        if (insiderSectionC) renderInsiderActivity(insiderSectionC, cachedInsider[ticker]);
         if (verdictSection)  renderAiVerdict(verdictSection, cachedVerdicts[ticker], ticker);
     });
 }
@@ -10835,9 +10920,11 @@ async function loadTargetedHoldingIntelligence(ticker) {
         const moveP = fetch("/api/ai/move-explanations/all");
         const verdictSuffix = isLocalIntelligenceMode() ? "?force_local=true" : "";
         const verdictP = fetch(`/api/ai/investment-signal/${encodeURIComponent(normalized)}${verdictSuffix}`);
+        // Insider filings are keyless/public — loaded in both engines, not gated on Claude.
+        const insiderP = fetch(`/api/ai/insider-activity/${encodeURIComponent(normalized)}`);
 
-        const [intelRes, moveRes, verdictRes] = await Promise.allSettled([
-            intelP, moveP, verdictP,
+        const [intelRes, moveRes, verdictRes, insiderRes] = await Promise.allSettled([
+            intelP, moveP, verdictP, insiderP,
         ]);
 
         if (intelRes.status === "fulfilled" && intelRes.value.ok) {
@@ -10859,6 +10946,10 @@ async function loadTargetedHoldingIntelligence(ticker) {
 
         if (verdictRes?.status === "fulfilled" && verdictRes.value.ok) {
             cachedVerdicts[normalized] = await verdictRes.value.json();
+        }
+
+        if (insiderRes?.status === "fulfilled" && insiderRes.value.ok) {
+            cachedInsider[normalized] = await insiderRes.value.json();
         }
     } catch (err) {
         console.warn(`Unable to refresh intelligence for ${normalized}:`, err);

@@ -6310,13 +6310,118 @@ tr[data-ticker]:hover .row-chevron { opacity: 0.55; transform: translateX(1px); 
 }
 
 .intel-coverage-section,
-.intel-move-section {
+.intel-move-section,
+.intel-insider-section {
     position: relative;
     min-width: 0;
     z-index: 2;
     display: flex;
     flex-direction: column;
 }
+
+/* ── Insider activity (SEC Form 4) ──────────────────────────────────────── */
+.intel-insider {
+    padding: var(--intel-pad);
+    position: relative;
+    z-index: 3;
+    font-size: var(--intel-body-size);
+    line-height: 1.48;
+}
+
+.insider-note {
+    margin: 0.4rem 0 0;
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+}
+
+.insider-headline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.45rem 0 0.55rem;
+}
+
+.insider-tally {
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+}
+
+.insider-tally.is-buy { color: var(--accent-green); border-color: color-mix(in srgb, var(--accent-green) 40%, transparent); }
+.insider-tally.is-sell { color: var(--accent-red); border-color: color-mix(in srgb, var(--accent-red) 40%, transparent); }
+.insider-tally.is-neutral { color: var(--text-tertiary); }
+
+.insider-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.insider-row + .insider-row {
+    border-top: 1px solid var(--hairline-soft);
+}
+
+.insider-link {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.4rem 0.35rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s var(--ease);
+    border-radius: 0.4rem;
+}
+
+a.insider-link:hover { background: var(--surface-hover); }
+.insider-link--plain { cursor: default; }
+
+.insider-date {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    flex: 0 0 auto;
+}
+
+.insider-verb {
+    font-size: 0.76rem;
+    font-weight: 600;
+    flex: 0 0 auto;
+}
+.insider-verb.is-buy { color: var(--accent-green); }
+.insider-verb.is-sell { color: var(--accent-red); }
+.insider-verb.is-neutral { color: var(--text-tertiary); }
+
+.insider-shares {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
+}
+
+.insider-who {
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.insider-out {
+    font-size: 0.66rem;
+    color: var(--text-tertiary);
+    opacity: 0;
+    transition: opacity 0.15s var(--ease);
+    flex: 0 0 auto;
+}
+a.insider-link:hover .insider-out,
+a.insider-link:focus-visible .insider-out { opacity: 1; }
 
 .intel-coverage-section > .intel-coverage,
 .intel-move-section > .intel-move {
