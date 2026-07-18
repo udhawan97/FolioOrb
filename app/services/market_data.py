@@ -15,6 +15,7 @@ Interface — nine accessors, keyed by ticker (or, for ``search``, by query):
     get_news                raw article payloads              list[dict]
     get_earnings_estimates  one row per quarter               list[dict]
     get_earnings_calendar   upcoming earnings dates           list[date]
+    get_dividend_dates      trailing ex-dividend dates        list[date]
     get_fund_holdings       a fund's largest positions        list[dict]
     search                  symbol lookup for autocomplete    list[dict]
 
@@ -198,6 +199,9 @@ class MarketDataAdapter(Protocol):
     def get_earnings_calendar(self, symbol: str) -> list[date]:
         ...
 
+    def get_dividend_dates(self, symbol: str) -> list[date]:
+        ...
+
     def get_fund_holdings(self, symbol: str) -> list[dict]:
         ...
 
@@ -349,6 +353,23 @@ class YFinanceAdapter:
             return []
         return _calendar_dates(calendar)
 
+    def get_dividend_dates(self, symbol: str) -> list[date]:
+        stock = self._ticker(symbol)
+        if stock is None:
+            return []
+        try:
+            series = stock.dividends
+        except Exception as exc:  # pylint: disable=broad-except
+            _log_unavailable("dividend_dates", symbol, exc)
+            return []
+        if series is None or getattr(series, "empty", True):
+            return []
+        try:
+            return sorted(stamp.date() for stamp in series.index)
+        except Exception as exc:  # pylint: disable=broad-except
+            _log_unavailable("dividend_dates", symbol, exc)
+            return []
+
     def get_fund_holdings(self, symbol: str) -> list[dict]:
         stock = self._ticker(symbol)
         if stock is None:
@@ -431,6 +452,7 @@ class FakeMarketData:
         news: Mapping[str, list[dict]] | None = None,
         earnings_estimates: Mapping[str, list[dict]] | None = None,
         earnings_calendar: Mapping[str, list[date]] | None = None,
+        dividend_dates: Mapping[str, list[date]] | None = None,
         fund_holdings: Mapping[str, list[dict]] | None = None,
         search: Mapping[str, list[dict]] | None = None,
     ) -> None:
@@ -442,6 +464,7 @@ class FakeMarketData:
             "get_news": _keyed_by_symbol(news),
             "get_earnings_estimates": _keyed_by_symbol(earnings_estimates),
             "get_earnings_calendar": _keyed_by_symbol(earnings_calendar),
+            "get_dividend_dates": _keyed_by_symbol(dividend_dates),
             "get_fund_holdings": _keyed_by_symbol(fund_holdings),
             # Queries are free text, so they match case- and space-insensitively.
             "search": _keyed_by_symbol(search),
@@ -485,6 +508,10 @@ class FakeMarketData:
 
     def get_earnings_calendar(self, symbol: str) -> list[date]:
         found = self._lookup("get_earnings_calendar", symbol)
+        return list(found or [])
+
+    def get_dividend_dates(self, symbol: str) -> list[date]:
+        found = self._lookup("get_dividend_dates", symbol)
         return list(found or [])
 
     def get_fund_holdings(self, symbol: str) -> list[dict]:
@@ -616,6 +643,15 @@ def get_earnings_estimates(
 def get_earnings_calendar(ticker: str) -> list[date]:
     """Upcoming earnings dates for a symbol, as plain dates."""
     return _ACTIVE_ADAPTER.get_earnings_calendar(_symbol(ticker))
+
+
+def get_dividend_dates(ticker: str) -> list[date]:
+    """Trailing ex-dividend dates for a symbol, oldest first, as plain dates.
+
+    The vendor hands back a pandas Series indexed by timestamp; that shape is
+    normalised away here so callers never import pandas to read a dividend.
+    """
+    return _ACTIVE_ADAPTER.get_dividend_dates(_symbol(ticker))
 
 
 def get_fund_holdings(ticker: str) -> list[dict]:

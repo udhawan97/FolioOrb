@@ -3,7 +3,7 @@ Dividend payment calendar — WHEN your holdings pay you, month by month.
 
 The income card answers "how much a year?"; this answers "which months?".
 Cadence and paying months are read from each payer's real trailing ex-dates
-(yfinance dividend history); the dollar amounts come from the same forward
+(via the market-data seam); the dollar amounts come from the same forward
 annual income the income card already shows. History times the payments, the
 forward rate sizes them — so a freshly raised dividend projects at the new
 rate, in the months the stock has actually been paying.
@@ -19,14 +19,11 @@ the network, mirroring timing_signal's day-keyed cache + bounded fan-out.
 """
 from __future__ import annotations
 
-import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Iterable
 
-import yfinance as yf
-
-logger = logging.getLogger(__name__)
+from app.services import market_data
 
 # ~13 months of history: catches an annual payer plus scheduling drift, without
 # reaching back to cadences the company may have abandoned.
@@ -121,20 +118,13 @@ def build_income_calendar(
 
 
 def _fetch_ex_dates(ticker: str) -> list[date]:
-    """Trailing ex-dates for one ticker; empty on any provider hiccup."""
-    try:
-        series = yf.Ticker(ticker).dividends
-        if series is None or getattr(series, "empty", True):
-            return []
-        cutoff_ordinal = date.today().toordinal() - _LOOKBACK_DAYS
-        return sorted(
-            d for d in (ts.date() for ts in series.index)
-            if d.toordinal() >= cutoff_ordinal
-        )
-    except Exception:  # pylint: disable=broad-except  # provider errors are routine
-        safe_ticker = ticker.replace("\r", "").replace("\n", "")
-        logger.warning("Dividend history fetch failed for %s", safe_ticker)
-        return []
+    """Trailing ex-dates for one ticker; empty on any provider hiccup.
+
+    The market-data seam already absorbs provider errors and the vendor's
+    pandas shape, so all that is left here is the lookback window.
+    """
+    cutoff_ordinal = date.today().toordinal() - _LOOKBACK_DAYS
+    return [d for d in market_data.get_dividend_dates(ticker) if d.toordinal() >= cutoff_ordinal]
 
 
 def fetch_dividend_ex_dates(tickers: Iterable[str]) -> dict[str, list[date]]:

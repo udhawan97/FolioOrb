@@ -49,6 +49,10 @@ class _StubTicker:
         return self._surface("calendar")
 
     @property
+    def dividends(self):
+        return self._surface("dividends")
+
+    @property
     def funds_data(self):
         return self._surface("funds_data")
 
@@ -122,6 +126,7 @@ _UNAVAILABLE = {
     "news": [],
     "earnings_estimates": [],
     "earnings_calendar": [],
+    "dividend_dates": [],
     "fund_holdings": [],
     "search": [],
 }
@@ -136,6 +141,7 @@ def _all_reads(reader, symbol="AAPL"):
         "news": reader.get_news(symbol),
         "earnings_estimates": reader.get_earnings_estimates(symbol),
         "earnings_calendar": reader.get_earnings_calendar(symbol),
+        "dividend_dates": reader.get_dividend_dates(symbol),
         "fund_holdings": reader.get_fund_holdings(symbol),
         "search": reader.search(symbol),
     }
@@ -220,6 +226,7 @@ def test_each_accessor_reads_its_preloaded_table():
         news={"AAPL": [{"id": "n1"}]},
         earnings_estimates={"AAPL": [{"date": date(2026, 7, 30), "eps_estimate": 1.89}]},
         earnings_calendar={"AAPL": [date(2026, 7, 30)]},
+        dividend_dates={"AAPL": [date(2026, 2, 9), date(2026, 5, 11)]},
         fund_holdings={"VOO": [{"symbol": "AAPL", "name": "Apple Inc", "weight": 7.2}]},
         search={"apple": [{"symbol": "AAPL"}]},
     ))
@@ -231,6 +238,7 @@ def test_each_accessor_reads_its_preloaded_table():
     assert market_data.get_news("AAPL") == [{"id": "n1"}]
     assert market_data.get_earnings_estimates("AAPL")[0]["eps_estimate"] == 1.89
     assert market_data.get_earnings_calendar("AAPL") == [date(2026, 7, 30)]
+    assert market_data.get_dividend_dates("AAPL") == [date(2026, 2, 9), date(2026, 5, 11)]
     assert market_data.get_fund_holdings("VOO")[0]["weight"] == 7.2
     assert market_data.search("apple") == [{"symbol": "AAPL"}]
 
@@ -472,6 +480,25 @@ def test_the_earnings_calendar_reads_the_current_dict_shape():
     dates = _adapter(_StubTicker(calendar=calendar)).get_earnings_calendar("AAPL")
 
     assert dates == [date(2026, 7, 30), date(2026, 7, 31)]
+
+
+def test_dividend_dates_normalise_the_vendor_series():
+    """The vendor hands back a pandas Series indexed by timestamp; callers get dates."""
+    series = pd.Series([0.24, 0.25], index=pd.to_datetime(["2026-02-09", "2026-05-11"]))
+
+    dates = _adapter(_StubTicker(dividends=series)).get_dividend_dates("AAPL")
+
+    assert dates == [date(2026, 2, 9), date(2026, 5, 11)]
+
+
+def test_dividend_dates_are_empty_for_a_non_payer():
+    assert _adapter(_StubTicker(dividends=pd.Series(dtype=float))).get_dividend_dates("X") == []
+
+
+def test_dividend_dates_survive_a_vendor_error():
+    stub = _StubTicker(dividends=RuntimeError("upstream is down"))
+
+    assert _adapter(stub).get_dividend_dates("AAPL") == []
 
 
 def test_the_earnings_calendar_reads_a_lone_timestamp():
