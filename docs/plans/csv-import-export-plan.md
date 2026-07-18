@@ -1,6 +1,6 @@
 # CSV Import & Export — Implementation Plan
 
-**Status:** approved, ready to implement
+**Status:** shipped (v4.5 — strict local template + Claude column remap; kept for design history)
 **Effort:** Medium (~1 day)
 **Confidence:** High — every moving part reuses an existing, tested pattern; the only new
 concept is the column remapper, and it's a copy of the established `ai_service` call shape.

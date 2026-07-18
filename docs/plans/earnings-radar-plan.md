@@ -1,6 +1,6 @@
 # Earnings Radar — Implementation Plan
 
-**Status:** approved, ready to implement
+**Status:** shipped (earnings badges + strip on holdings; consensus EPS added in v5.5 — kept for design history)
 **Effort:** Small (~half a day)
 **Confidence:** High — the hard part (earnings-date fetching/parsing) already exists in
 `app/services/event_calendar.py`; this feature surfaces it.
