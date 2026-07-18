@@ -452,6 +452,11 @@ def _update_env_file(key: str, value: str) -> None:
             break
 
     if not replaced:
+        # A hand-edited .env may not end in a newline. splitlines() can't tell us
+        # that, so without this the appended line is concatenated onto the last
+        # entry and both are destroyed.
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
         lines.append(new_line)
 
     env_path.write_text("".join(lines), encoding="utf-8")
