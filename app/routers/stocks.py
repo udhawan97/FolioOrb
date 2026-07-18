@@ -3,7 +3,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import pytz
-import yfinance as yf
 from fastapi import APIRouter, HTTPException, Query
 from app.services.stock_service import (
     DEFAULT_HOLDINGS,
@@ -12,21 +11,9 @@ from app.services.stock_service import (
     get_all_quotes,
     get_historical_prices,
 )
+from app.services.world_markets import WORLD_MARKETS, fetch_world_market
 
 logger = logging.getLogger(__name__)
-
-_WORLD_MARKETS = [
-    {"ticker": "^GSPC",  "name": "S&P 500",     "region": "US",      "flag": "🇺🇸"},
-    {"ticker": "^IXIC",  "name": "NASDAQ",       "region": "US",      "flag": "🇺🇸"},
-    {"ticker": "^DJI",   "name": "Dow Jones",    "region": "US",      "flag": "🇺🇸"},
-    {"ticker": "^FTSE",  "name": "FTSE 100",     "region": "Europe",  "flag": "🇬🇧"},
-    {"ticker": "^GDAXI", "name": "DAX",          "region": "Europe",  "flag": "🇩🇪"},
-    {"ticker": "^FCHI",  "name": "CAC 40",       "region": "Europe",  "flag": "🇫🇷"},
-    {"ticker": "^N225",  "name": "Nikkei 225",   "region": "Asia",    "flag": "🇯🇵"},
-    {"ticker": "^HSI",   "name": "Hang Seng",    "region": "Asia",    "flag": "🇭🇰"},
-    {"ticker": "^NSEI",  "name": "Nifty 50",     "region": "Asia",    "flag": "🇮🇳"},
-    {"ticker": "^AXJO",  "name": "ASX 200",      "region": "Pacific", "flag": "🇦🇺"},
-]
 
 # All routes in this file are grouped under the /api/stocks prefix
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
@@ -35,39 +22,14 @@ _WORLD_MARKETS_CACHE: tuple[float, list] | None = None
 _WORLD_MARKETS_TTL = 300  # seconds
 
 
-def _fetch_world_market(market: dict) -> dict:
-    """Fetch a single world-market index quote (runs in thread pool)."""
-    try:
-        fi = yf.Ticker(market["ticker"]).fast_info
-        price = float(getattr(fi, "last_price", None) or 0)
-        prev = float(getattr(fi, "previous_close", None) or 0)
-        if price > 0 and prev > 0:
-            chg = price - prev
-            chg_pct = chg / prev * 100
-        else:
-            chg = chg_pct = 0.0
-        return {
-            **market,
-            "price": round(price, 2),
-            "day_change": round(chg, 2),
-            "day_change_pct": round(chg_pct, 2),
-        }
-    except Exception as exc:
-        logger.warning(
-            "World market fetch failed; exception_type=%s",
-            type(exc).__name__,
-        )
-        return {**market, "price": 0, "day_change": 0, "day_change_pct": 0}
-
-
 def _get_world_markets_cached() -> list:
     global _WORLD_MARKETS_CACHE  # pylint: disable=global-statement
     now = time.monotonic()
     if _WORLD_MARKETS_CACHE and _WORLD_MARKETS_CACHE[0] > now:
         return _WORLD_MARKETS_CACHE[1]
 
-    with ThreadPoolExecutor(max_workers=min(10, len(_WORLD_MARKETS))) as pool:
-        results = list(pool.map(_fetch_world_market, _WORLD_MARKETS))
+    with ThreadPoolExecutor(max_workers=min(10, len(WORLD_MARKETS))) as pool:
+        results = list(pool.map(fetch_world_market, WORLD_MARKETS))
 
     _WORLD_MARKETS_CACHE = (now + _WORLD_MARKETS_TTL, results)
     return results

@@ -574,30 +574,10 @@ def build_analytics_fallback(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 def fetch_world_markets_sync() -> list[dict]:
-    """Sync world-index quotes (same sources as stocks router)."""
-    import yfinance as yf
-    from app.routers.stocks import _WORLD_MARKETS
+    """Sync world-index quotes (same list and payload as the stocks router)."""
+    from app.services.world_markets import WORLD_MARKETS, fetch_world_market
 
-    results: list[dict] = []
-    for market in _WORLD_MARKETS:
-        try:
-            fi = yf.Ticker(market["ticker"]).fast_info
-            price = float(getattr(fi, "last_price", None) or 0)
-            prev = float(getattr(fi, "previous_close", None) or 0)
-            if price > 0 and prev > 0:
-                chg = price - prev
-                chg_pct = chg / prev * 100
-            else:
-                chg = chg_pct = 0.0
-            results.append({
-                **market,
-                "price": round(price, 2),
-                "day_change": round(chg, 2),
-                "day_change_pct": round(chg_pct, 2),
-            })
-        except Exception:
-            results.append({**market, "price": 0, "day_change": 0, "day_change_pct": 0})
-    return results
+    return [fetch_world_market(market) for market in WORLD_MARKETS]
 
 
 def _cached_verdict_signals(db, non_watchlist: list[dict]) -> dict[str, dict | None]:
