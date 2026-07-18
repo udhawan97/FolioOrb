@@ -6586,6 +6586,121 @@ a.insider-link:focus-visible .insider-out { opacity: 1; }
     color: rgba(245, 250, 255, 0.68);
 }
 
+/* ── Thesis notes ("Your thesis") ────────────────────────────────────────── */
+.intel-notes-section {
+    position: relative;
+    min-width: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+}
+
+.thesis-notes {
+    padding: var(--intel-pad);
+    position: relative;
+    z-index: 3;
+    font-size: var(--intel-body-size);
+    line-height: 1.5;
+}
+
+.thesis-notes-text {
+    margin: 0.45rem 0 0;
+    color: rgba(245, 250, 255, 0.78);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.thesis-notes-empty {
+    margin: 0.45rem 0 0;
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.thesis-notes-edit {
+    margin-top: 0.5rem;
+    align-self: flex-start;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    background: none;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.thesis-notes-edit:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--text-primary) 35%, transparent);
+}
+
+.thesis-notes-count {
+    margin-left: auto;
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-tertiary);
+}
+
+.thesis-notes-input {
+    width: 100%;
+    margin-top: 0.45rem;
+    resize: vertical;
+    min-height: 4.4rem;
+    font: inherit;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 0.45rem 0.55rem;
+}
+
+.thesis-notes-input:focus {
+    outline: none;
+    border-color: rgba(111, 214, 240, 0.45);
+}
+
+.thesis-notes-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+}
+
+.thesis-notes-save,
+.thesis-notes-cancel {
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    cursor: pointer;
+    border: 1px solid var(--hairline);
+    background: none;
+    color: var(--text-tertiary);
+}
+
+.thesis-notes-save {
+    color: var(--accent-green);
+    border-color: color-mix(in srgb, var(--accent-green) 40%, transparent);
+}
+
+.thesis-notes-save:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.thesis-notes-cancel:hover {
+    color: var(--text-primary);
+}
+
+.thesis-notes-error {
+    font-size: 0.72rem;
+    color: var(--accent-red);
+}
+
 /* ── What It Covers: layman-friendly layout ─────────────────────────────── */
 .coverage-hero {
     margin-bottom: var(--intel-section-gap);

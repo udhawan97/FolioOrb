@@ -183,6 +183,7 @@ async def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
                 "avg_cost": h.avg_cost,
                 "is_watchlist": bool(h.is_watchlist),
                 "hold_class": h.hold_class or "auto",
+                "notes": h.notes,
             }
             for h in holdings
         ],

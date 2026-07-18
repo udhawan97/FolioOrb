@@ -231,6 +231,7 @@ def evaluate(
                 "allocation_pct": 0,
                 "is_watchlist": is_watchlist,
                 "hold_class": str(holding.hold_class or "auto"),
+                "notes": holding.notes,
             }
         )
 

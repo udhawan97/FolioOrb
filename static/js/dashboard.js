@@ -5434,6 +5434,117 @@ function renderInsiderActivity(section, data) {
     </div>`;
 }
 
+// ── Thesis notes ─────────────────────────────────────────────────────────────
+//
+// The "why do I own this?" box. Text lives on the holding itself
+// (Holding.notes), already round-trips through CSV import/export, and is yours
+// alone — no AI reads or writes it. Renders at every intel site but never
+// clobbers an open editor: refresh cycles re-run these renders mid-typing.
+function renderThesisNotes(section, ticker) {
+    if (!section) return;
+    if (section.classList.contains("is-editing")) return;
+
+    const holding = (latestHoldings || []).find(h => h.ticker === ticker);
+    // Holdings payload hasn't landed yet — stay blank rather than flash an
+    // empty state that a moment later fills in.
+    if (!holding || holding.id == null) { section.innerHTML = ""; return; }
+
+    const notes = String(holding.notes || "").trim();
+    const body = notes
+        ? `<p class="thesis-notes-text">${escapeHtml(notes).replace(/\n/g, "<br>")}</p>`
+        : `<p class="thesis-notes-empty">Why do you own this? Write it down now — future-you, mid-drawdown, will want the reason.</p>`;
+
+    section.innerHTML = `<div class="thesis-notes">
+        <div class="intel-label"><i class="bi bi-journal-text" aria-hidden="true"></i><span>Your thesis</span></div>
+        ${body}
+        <button type="button" class="thesis-notes-edit" aria-label="Edit your thesis for ${escapeHtml(ticker)}">
+            <i class="bi bi-pencil" aria-hidden="true"></i> ${notes ? "Edit" : "Write it"}
+        </button>
+    </div>`;
+
+    section.querySelector(".thesis-notes-edit").addEventListener("click", () => {
+        openThesisNotesEditor(section, ticker);
+    });
+}
+
+function openThesisNotesEditor(section, ticker) {
+    const holding = (latestHoldings || []).find(h => h.ticker === ticker);
+    if (!holding || holding.id == null) return;
+    section.classList.add("is-editing");
+
+    section.innerHTML = `<div class="thesis-notes is-editing">
+        <div class="intel-label"><i class="bi bi-journal-text" aria-hidden="true"></i><span>Your thesis</span>
+            <span class="thesis-notes-count"></span>
+        </div>
+        <textarea class="thesis-notes-input" maxlength="500" rows="4"
+            placeholder="Why you bought, what would make you sell — in your own words."></textarea>
+        <div class="thesis-notes-actions">
+            <button type="button" class="thesis-notes-save">Save</button>
+            <button type="button" class="thesis-notes-cancel">Cancel</button>
+            <span class="thesis-notes-error" role="alert" hidden></span>
+        </div>
+    </div>`;
+
+    // Assigned via .value, not markup — the text needs no escaping this way.
+    const input = section.querySelector(".thesis-notes-input");
+    input.value = String(holding.notes || "");
+    const count = section.querySelector(".thesis-notes-count");
+    const syncCount = () => { count.textContent = `${input.value.length}/500`; };
+    syncCount();
+    input.addEventListener("input", syncCount);
+    input.focus();
+    _syncThesisSectionHeight(section);
+
+    section.querySelector(".thesis-notes-cancel").addEventListener("click", () => {
+        section.classList.remove("is-editing");
+        renderThesisNotes(section, ticker);
+        _syncThesisSectionHeight(section);
+    });
+    section.querySelector(".thesis-notes-save").addEventListener("click", () => {
+        saveThesisNotes(section, ticker, input.value);
+    });
+}
+
+async function saveThesisNotes(section, ticker, text) {
+    const holding = (latestHoldings || []).find(h => h.ticker === ticker);
+    if (!holding || holding.id == null) return;
+    const saveBtn = section.querySelector(".thesis-notes-save");
+    const errorEl = section.querySelector(".thesis-notes-error");
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving…"; }
+    if (errorEl) errorEl.hidden = true;
+    const trimmed = String(text ?? "").slice(0, 500);
+    try {
+        const res = await fetch(`/api/portfolio/holdings/${holding.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notes: trimmed }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+        // Keep the editor open — never eat the user's words on a failed save.
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
+        if (errorEl) {
+            errorEl.textContent = "Couldn't save — your text is still here, try again.";
+            errorEl.hidden = false;
+        }
+        return;
+    }
+    holding.notes = trimmed;
+    section.classList.remove("is-editing");
+    renderThesisNotes(section, ticker);
+    _syncThesisSectionHeight(section);
+}
+
+// Entering/leaving the editor changes the section's height; an open summary
+// body animates via a fixed max-height, so re-measure or the box clips.
+function _syncThesisSectionHeight(section) {
+    const body = section.closest(".summary-body");
+    if (body && body.classList.contains("open")
+        && body.style.maxHeight && body.style.maxHeight !== "none") {
+        requestAnimationFrame(() => { body.style.maxHeight = body.scrollHeight + "px"; });
+    }
+}
+
 // ── Fundamentals over time (SEC XBRL) ────────────────────────────────────────
 //
 // Revenue, profit, and EPS from the numbers a company actually filed. Revenue
@@ -6412,6 +6523,7 @@ function injectSummaryRows(tbody) {
                 <div class="intel-move-section"></div>
                 <div class="intel-insider-section"></div>
                 <div class="intel-fundamentals-section"></div>
+                <div class="intel-notes-section"></div>
                 <div class="intel-verdict-section"></div>
                 <div class="intel-slow-hint" hidden>
                     <i class="bi bi-hourglass-split"></i>
@@ -6466,6 +6578,8 @@ function injectSummaryRows(tbody) {
         if (insiderSectionA) renderInsiderActivity(insiderSectionA, cachedInsider[ticker]);
         const fundamentalsSectionA = expandRow.querySelector(".intel-fundamentals-section");
         if (fundamentalsSectionA) renderFundamentals(fundamentalsSectionA, cachedFundamentals[ticker]);
+        const notesSectionA = expandRow.querySelector(".intel-notes-section");
+        if (notesSectionA) renderThesisNotes(notesSectionA, ticker);
 
         // Verdict section: render shimmer while intel is loading; render card when data arrives
         if (verdictSection) {
@@ -6499,6 +6613,8 @@ function renderExpandedTicker(ticker) {
     if (insiderSectionB) renderInsiderActivity(insiderSectionB, cachedInsider[ticker]);
     const fundamentalsSectionB = expandRow.querySelector(".intel-fundamentals-section");
     if (fundamentalsSectionB) renderFundamentals(fundamentalsSectionB, cachedFundamentals[ticker]);
+    const notesSectionB = expandRow.querySelector(".intel-notes-section");
+    if (notesSectionB) renderThesisNotes(notesSectionB, ticker);
     if (verdictSection) renderAiVerdict(verdictSection, cachedVerdicts[ticker], ticker);
     if (holdingIntelSettled(ticker)) {
         mainRow.classList.add("has-intel-ready");
@@ -11042,6 +11158,8 @@ function _renderAllExpandedIntelRows(tbody) {
         if (insiderSectionC) renderInsiderActivity(insiderSectionC, cachedInsider[ticker]);
         const fundamentalsSectionC = expandRow.querySelector(".intel-fundamentals-section");
         if (fundamentalsSectionC) renderFundamentals(fundamentalsSectionC, cachedFundamentals[ticker]);
+        const notesSectionC = expandRow.querySelector(".intel-notes-section");
+        if (notesSectionC) renderThesisNotes(notesSectionC, ticker);
         if (verdictSection)  renderAiVerdict(verdictSection, cachedVerdicts[ticker], ticker);
     });
 }
