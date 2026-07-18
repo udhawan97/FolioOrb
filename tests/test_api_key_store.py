@@ -92,17 +92,11 @@ def test_only_the_first_duplicate_line_is_rewritten(env_path):
     assert env_path.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=c\nANTHROPIC_API_KEY=b\n"
 
 
-def test_a_file_with_no_trailing_newline_glues_the_appended_line(env_path):
-    """KNOWN DEFECT, pinned so a fix is a deliberate edit rather than a surprise.
-
-    splitlines() drops the missing newline, so the appended line is concatenated
-    onto the last one and both entries are lost.  Correct behaviour would be
-    "LOG_LEVEL=INFO\\nANTHROPIC_API_KEY=abc\\n".  Predates this module; kept
-    unchanged because moving the code out of the router was a move, not a rewrite.
-    """
+def test_a_file_with_no_trailing_newline_still_appends_cleanly(env_path):
+    """A hand-edited .env often has no final newline; both entries must survive."""
     env_path.write_text("LOG_LEVEL=INFO", encoding="utf-8")
     store._update_env_file("ANTHROPIC_API_KEY", "abc")
-    assert env_path.read_text(encoding="utf-8") == "LOG_LEVEL=INFOANTHROPIC_API_KEY=abc\n"
+    assert env_path.read_text(encoding="utf-8") == "LOG_LEVEL=INFO\nANTHROPIC_API_KEY=abc\n"
 
 
 # ── save() ────────────────────────────────────────────────────────────────────

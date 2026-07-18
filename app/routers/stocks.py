@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import pytz
 from fastapi import APIRouter, HTTPException, Query
-from app.services import market_data
 from app.services.stock_service import (
     DEFAULT_HOLDINGS,
     QUOTE_FETCH_ERROR,
