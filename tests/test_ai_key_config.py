@@ -1,4 +1,4 @@
-"""Tests for the Anthropic API-key configure/remove endpoints.
+"""Tests for the Anthropic API-key configure/remove endpoints and the .env write.
 
 The endpoints are plain sync functions, so they're called directly with the
 disk write, client swap, and network heartbeat monkeypatched — no real key,
@@ -6,10 +6,12 @@ no network, no .env touched.
 
 Those three now live behind ``app.services.api_key_store``, so that is what the
 stubs replace; the endpoints themselves are still driven for real, which is what
-these tests are about.  The store's own behaviour is covered in
-tests/test_api_key_store.py.
+these tests are about.  The store's own behaviour — including the on-disk write,
+where the append and the in-place replace are only observable on disk, and where
+stubbing everything out once let a trailing-newline bug sit unnoticed — is
+covered for real against tmp_path in tests/test_api_key_store.py.
 """
-# pylint: disable=protected-access
+# pylint: disable=protected-access,redefined-outer-name
 import pytest
 from fastapi import HTTPException
 
