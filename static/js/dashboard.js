@@ -11013,6 +11013,9 @@ async function initDashboard() {
     // Paint last-known holdings immediately so the table isn't blank while the
     // live prices fetch; the network response below replaces this in place.
     hydratePortfolioFromCache();
+    // Same for the markets strip. Its own load is in the idle phase below, so
+    // without this its shimmer tiles outlast the whole critical-data fetch.
+    hydrateWorldMarketsFromCache();
 
     // Kick off critical data before heavier UI setup.
     const criticalData = Promise.all([
@@ -11078,15 +11081,39 @@ function _marketPrice(price) {
 const _REGION_ORDER = ["US", "Europe", "Asia", "Pacific"];
 let _cachedWorldMarketsForAnalytics = [];
 
-async function loadWorldMarkets() {
+// Stale-while-revalidate for the markets strip. It loads in the idle phase, so
+// without this the ten shimmer tiles are on screen for the whole critical-data
+// fetch and then some. Not keyed per portfolio — world indices are the same
+// book to book, which is also why one cached copy survives a switch.
+const WORLD_MARKETS_KEY = "folioorb-world-markets-v1";
+
+function persistWorldMarkets(markets) {
     try {
-        // apiGet throws (rather than silently returning) on a non-OK status, so it
-        // hits the catch below and replaces the shimmer skeletons with the
-        // "unavailable" fallback instead of spinning forever.
-        const { markets } = await apiGet("/api/stocks/world-markets");
-        _cachedWorldMarketsForAnalytics = markets || [];
-        const strip = document.getElementById("world-markets-strip");
-        if (!strip) return;
+        localStorage.setItem(WORLD_MARKETS_KEY, JSON.stringify(markets));
+    } catch (_) { /* quota or private mode — caching is best-effort */ }
+}
+
+function hydrateWorldMarketsFromCache() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(WORLD_MARKETS_KEY));
+        // Every tile reads .region, .name, .price and .day_change_pct; a row
+        // missing them would render "undefined" or throw on .toFixed.
+        if (!Array.isArray(cached) || !cached.length) return false;
+        const usable = cached.every(m =>
+            m && typeof m.region === "string" && typeof m.name === "string"
+            && Number.isFinite(m.day_change_pct));
+        if (!usable) return false;
+        renderWorldMarkets(cached);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function renderWorldMarkets(markets) {
+    _cachedWorldMarketsForAnalytics = markets || [];
+    const strip = document.getElementById("world-markets-strip");
+    if (strip) {
         strip.innerHTML = "";
 
         // Group by region, preserve defined order
@@ -11130,13 +11157,29 @@ async function loadWorldMarkets() {
                 strip.appendChild(tile);
             });
         });
-        window.AnalyticsCharts?.refreshMarketsTape?.(markets);
-    } catch (err) {
-        console.warn("World markets unavailable:", err);
-        const strip = document.getElementById("world-markets-strip");
-        if (strip) strip.innerHTML = `<span style="padding:1rem;color:var(--text-tertiary);font-size:.8rem">Market data unavailable</span>`;
     }
     window.AnalyticsCharts?.refreshMarketsTape?.(_cachedWorldMarketsForAnalytics);
+}
+
+async function loadWorldMarkets() {
+    try {
+        // apiGet throws (rather than silently returning) on a non-OK status, so it
+        // hits the catch below and replaces the shimmer skeletons with the
+        // "unavailable" fallback instead of spinning forever.
+        const { markets } = await apiGet("/api/stocks/world-markets");
+        renderWorldMarkets(markets || []);
+        persistWorldMarkets(markets || []);
+    } catch (err) {
+        console.warn("World markets unavailable:", err);
+        // Leave a populated strip alone: cached indices with a failed refresh
+        // still say more than an error line, and the hero cards use the same
+        // rule. Only an empty strip gets the fallback.
+        const strip = document.getElementById("world-markets-strip");
+        if (strip && !strip.querySelector(".market-tile")) {
+            strip.innerHTML = `<span style="padding:1rem;color:var(--text-tertiary);font-size:.8rem">Market data unavailable</span>`;
+        }
+        window.AnalyticsCharts?.refreshMarketsTape?.(_cachedWorldMarketsForAnalytics);
+    }
 }
 
 // ── Holding Intelligence ────────────────────────────────────────────────────

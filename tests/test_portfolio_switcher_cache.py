@@ -88,3 +88,46 @@ def test_the_dashboard_script_was_cache_busted():
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     assert "dashboard.js?v=99" not in html
     assert "dashboard.js?v=100" in html
+
+
+# ── World markets strip ───────────────────────────────────────────────────────
+#
+# Same stale-while-revalidate idea, different scope. The strip loads in the
+# dashboard's idle phase, so its ten shimmer tiles otherwise outlast the whole
+# critical-data fetch.
+
+def test_world_markets_cache_is_global_not_per_portfolio():
+    # World indices are the same book to book, which is also what lets one
+    # cached copy survive a portfolio switch.
+    js = _js()
+    assert 'WORLD_MARKETS_KEY = "folioorb-world-markets-v1"' in js
+    assert "${activePortfolioId}" not in js.split("WORLD_MARKETS_KEY")[1][:400]
+
+
+def test_render_is_separated_from_the_fetch():
+    # The cache and the network path must paint through one renderer, or the
+    # two drift.
+    js = _js()
+    assert "function renderWorldMarkets" in js
+    assert "renderWorldMarkets(markets || [])" in js
+    assert "renderWorldMarkets(cached)" in js
+
+
+def test_the_strip_hydrates_before_the_idle_phase_fetch():
+    init = _js().split("async function initDashboard")[1][:3000]
+    assert "hydrateWorldMarketsFromCache();" in init
+    hydrate = init.index("hydrateWorldMarketsFromCache();")
+    idle = init.index("scheduleWhenIdle(")
+    assert hydrate < idle, "hydrate before the idle-phase load, not after"
+
+
+def test_a_failed_refresh_leaves_cached_tiles_alone():
+    # Cached indices with a stale refresh still say more than an error line.
+    body = _js().split("async function loadWorldMarkets")[1][:1400]
+    assert 'strip.querySelector(".market-tile")' in body
+
+
+def test_a_malformed_market_row_is_not_rendered():
+    body = _js().split("function hydrateWorldMarketsFromCache")[1][:800]
+    assert "Array.isArray(cached)" in body
+    assert "Number.isFinite(m.day_change_pct)" in body
