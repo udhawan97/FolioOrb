@@ -205,13 +205,25 @@ def _ensure_performance_indexes(conn, tables: set) -> None:
 
     # Portfolio snapshots: one row per portfolio per day (upserted on refresh).
     if "portfolio_snapshots" in tables:
-        conn.execute(
+        # Collapsing duplicates is a one-time repair for databases predating the
+        # unique index below — once it exists, a duplicate cannot be inserted, so
+        # the scan can never find anything. Migrations run before the app serves
+        # its first request, so leaving it unconditional charged every startup a
+        # full scan plus GROUP BY to delete nothing.
+        already_unique = conn.execute(
             text(
-                "DELETE FROM portfolio_snapshots WHERE id NOT IN ("
-                "SELECT MAX(id) FROM portfolio_snapshots "
-                "GROUP BY portfolio_id, snapshot_date)"
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' "
+                "AND name = 'ux_portfolio_snapshots_pid_date'"
             )
-        )
+        ).first()
+        if not already_unique:
+            conn.execute(
+                text(
+                    "DELETE FROM portfolio_snapshots WHERE id NOT IN ("
+                    "SELECT MAX(id) FROM portfolio_snapshots "
+                    "GROUP BY portfolio_id, snapshot_date)"
+                )
+            )
         conn.execute(
             text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_portfolio_snapshots_pid_date "
