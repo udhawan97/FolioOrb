@@ -50,6 +50,13 @@ _TENOR_FIELDS = {
 _FLAT_MAX_BPS = 25.0
 _STEEP_MIN_BPS = 150.0
 
+# Per-attempt, and there are two attempts (this year, then last). The regime this
+# feeds is cached for the whole calendar day, so the cost lands on one request —
+# the first load after midnight, where it is a user waiting on a page. Treasury
+# either answers promptly or is having an outage; a long patient wait buys
+# nothing the day-cached fallback doesn't already cover.
+_FETCH_TIMEOUT = 4.0
+
 
 def _fetch_curve_xml() -> str | None:
     """Fetch the curve feed, falling back a year when January has no data yet."""
@@ -60,7 +67,7 @@ def _fetch_curve_xml() -> str | None:
         try:
             resp = requests.get(
                 _FEED_URL.format(year=candidate),
-                timeout=15,
+                timeout=_FETCH_TIMEOUT,
                 headers={"User-Agent": _USER_AGENT},
             )
             if resp.status_code != 200 or not resp.text:

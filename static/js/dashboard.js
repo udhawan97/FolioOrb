@@ -11005,6 +11005,164 @@ function maybeShowSenpaiWelcomeGuide() {
     guide.setAttribute("aria-hidden", "false");
 }
 
+// ── Boot splash ─────────────────────────────────────────────────────────────
+//
+// Shown only while there is genuinely nothing to look at. Once the caches above
+// are warm a switch repaints almost immediately, and an overlay covering
+// already-painted content is a regression — so a warm load gets a 300ms grace
+// period and usually never sees this at all.
+//
+// The progress is real: three stages tied to the promises initDashboard already
+// awaits. A bar that finishes before the data arrives is worse than no bar.
+
+// One fact per boot rather than a carousel — most sessions are over in a couple
+// of seconds, so rotating would just truncate the first one. The index persists,
+// making the set a sequence across days instead of a slot machine.
+const SPLASH_FACT_KEY = "folioorb-splash-fact-v1";
+const SPLASH_FACTS = [
+    { figure: "$8 million",
+      body: "Ronald Read pumped gas, then swept floors at JC Penney. He died in 2014 holding 95 stocks he had bought decades earlier, and left most of it to his town's library and hospital." },
+    { figure: "$180 → $7.2M",
+      body: "Grace Groner bought three shares of Abbott Laboratories in 1935, reinvested every dividend, and never sold. Seventy-five years later it paid for scholarships." },
+    { figure: "$5,000 → $22M",
+      body: "Anne Scheiber retired from the IRS having never earned more than $4,000 a year. She invested from a rent-controlled apartment for fifty years." },
+    { figure: "20% of every cheque",
+      body: "Theodore Johnson never earned more than $14,000 a year at UPS. He put a fifth of each cheque into company stock and died worth over $70 million." },
+    { figure: "100 guilders",
+      body: "A maid earning under fifty cents a day was among the last to subscribe to the world's first IPO. The Dutch East India Company's 1602 charter let any resident buy in." },
+    { figure: "Two sentences",
+      body: "On 17 May 1792, twenty-four brokers signed a two-sentence agreement outside 68 Wall Street, under the buttonwood tree they met beneath. It became the NYSE." },
+    { figure: "$11M, not $150M",
+      body: "Jack Bogle's first index fund opened in 1976 hoping to raise $150 million. It raised eleven, and critics called it Bogle's Folly. Indexing is now the default." },
+    { figure: "183 years, ended in a day",
+      body: "On 1 May 1975 the SEC abolished fixed brokerage commissions. Discount brokers became possible and the cost of trading collapsed." },
+    { figure: "A clause nobody noticed",
+      body: "Section 401(k) was a minor provision of the Revenue Act of 1978. The consultant who read it as a way to save pre-tax did not expect it to become how a country retires." },
+    { figure: "7.1% vs 2.1%",
+      body: "Buffett bet a million dollars that an index fund would beat a basket of hedge funds over a decade. Across 2008–2017 it compounded 7.1% a year against their 2.1%." },
+    { figure: "Most of it after 65",
+      body: "Buffett made his first investment at eleven, but the overwhelming majority of his fortune arrived after his sixty-fifth birthday. The skill is investing; the secret is time." },
+    { figure: "Miss 10 days, lose half",
+      body: "$10,000 left in the S&P 500 for twenty years grew to $64,844. Miss only the ten best days and roughly half that gain disappears — and seven of those ten fell in bear markets." },
+    { figure: "October 2019",
+      body: "Five major brokers dropped stock commissions to zero within days of each other, and fractional shares followed. Buying one share stopped being a rounding error against the fee." },
+];
+
+// Mode-agnostic on purpose: at boot we don't yet know whether Claude is
+// reachable, and Senpai's Claude-mode voice would be a lie if it isn't.
+const SPLASH_GREETINGS = [
+    "Senpai has the desk. Straightening the ledger before you look at it.",
+    "Senpai here. Pouring the market a coffee — it'll talk in a moment.",
+    "Senpai's on it. Composure first, then the numbers.",
+    "Senpai has your book. Waking it up gently.",
+];
+
+const BootSplash = (() => {
+    const STAGES = ["holdings", "prices", "market"];
+    let el = null;
+    let showTimer = null;
+    let hardTimer = null;
+    let shown = false;
+    let finished = false;
+    const done = new Set();
+
+    function pickFact() {
+        let index = 0;
+        try {
+            index = (parseInt(localStorage.getItem(SPLASH_FACT_KEY), 10) || 0) % SPLASH_FACTS.length;
+            localStorage.setItem(SPLASH_FACT_KEY, String((index + 1) % SPLASH_FACTS.length));
+        } catch (_) { /* private mode — always show the first */ }
+        return SPLASH_FACTS[index] || SPLASH_FACTS[0];
+    }
+
+    function paint() {
+        const fact = pickFact();
+        const figure = document.getElementById("boot-splash-figure");
+        const body = document.getElementById("boot-splash-body");
+        const greeting = document.getElementById("boot-splash-greeting");
+        if (figure) figure.textContent = fact.figure;
+        if (body) body.textContent = fact.body;
+        if (greeting) {
+            greeting.textContent =
+                SPLASH_GREETINGS[Math.floor(Math.random() * SPLASH_GREETINGS.length)];
+        }
+        const mark = document.getElementById("boot-splash-mark");
+        if (mark) {
+            // The pre-paint script has already settled the theme, so this can't
+            // flash the wrong mark.
+            const light = document.documentElement.dataset.bsTheme === "light";
+            mark.src = `/static/img/brand/folio-orbit-mark-${light ? "light" : "dark"}-animated.svg`;
+        }
+    }
+
+    function show() {
+        if (shown || finished) return;
+        el = document.getElementById("boot-splash");
+        if (!el) return;
+        paint();
+        el.hidden = false;
+        el.setAttribute("aria-hidden", "false");
+        document.body.classList.add("is-booting");
+        shown = true;
+        render();
+    }
+
+    function render() {
+        if (!shown) return;
+        const pct = (done.size / STAGES.length) * 100;
+        const fill = document.getElementById("boot-splash-curve-fill");
+        if (fill) fill.style.strokeDashoffset = String(100 - pct);
+        const track = document.getElementById("boot-splash-progress");
+        if (track) track.setAttribute("aria-valuenow", String(done.size));
+        STAGES.forEach(name => {
+            const step = document.querySelector(`[data-boot-stage="${name}"]`);
+            if (step) step.classList.toggle("is-done", done.has(name));
+        });
+    }
+
+    return {
+        /** Arm the splash. `warm` means the caches already painted something. */
+        begin(warm) {
+            if (warm) {
+                // Give the warm path a beat to finish on its own; most switches
+                // never reach this.
+                showTimer = setTimeout(show, 300);
+            } else {
+                show();
+            }
+            // A hung backend must not strand anyone behind an overlay.
+            hardTimer = setTimeout(() => this.finish(), 8000);
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") this.finish();
+            });
+            document.getElementById("boot-splash-skip")
+                ?.addEventListener("click", () => this.finish());
+            return this;
+        },
+        /** Mark one real stage complete. */
+        complete(stage) {
+            done.add(stage);
+            render();
+            return this;
+        },
+        finish() {
+            if (finished) return;
+            finished = true;
+            clearTimeout(showTimer);
+            clearTimeout(hardTimer);
+            document.body.classList.remove("is-booting");
+            if (!el) return;
+            el.classList.add("is-leaving");
+            const drop = () => {
+                el.hidden = true;
+                el.setAttribute("aria-hidden", "true");
+            };
+            if (prefersReducedMotion()) drop();
+            else setTimeout(drop, 260);
+        },
+    };
+})();
+
 async function initDashboard() {
     initThemeToggle();
     initTextSizeToggle();
@@ -11012,13 +11170,24 @@ async function initDashboard() {
 
     // Paint last-known holdings immediately so the table isn't blank while the
     // live prices fetch; the network response below replaces this in place.
-    hydratePortfolioFromCache();
+    const painted = hydratePortfolioFromCache();
+    // Same for the markets strip. Its own load is in the idle phase below, so
+    // without this its shimmer tiles outlast the whole critical-data fetch.
+    hydrateWorldMarketsFromCache();
 
-    // Kick off critical data before heavier UI setup.
+    // A warm load has already painted, so the splash waits 300ms and usually
+    // never appears; a cold one has nothing on screen and gets it immediately.
+    const splash = BootSplash.begin(painted);
+    if (painted) splash.complete("holdings");
+
+    // Kick off critical data before heavier UI setup. The splash advances off
+    // these same promises — `finally`, not `then`, so a failed fetch still
+    // releases the overlay and lets the dashboard show its own error state.
+    const priced = Promise.all([loadPortfolioValue(), loadPnl()])
+        .finally(() => splash.complete("prices"));
     const criticalData = Promise.all([
-        loadPortfolioValue(),
-        loadPnl(),
-        updateMarketStatus(),
+        priced,
+        updateMarketStatus().finally(() => splash.complete("market")),
     ]);
 
     initBrandIntro();
@@ -11041,6 +11210,9 @@ async function initDashboard() {
     window.addEventListener("resize", rafThrottle(syncHvtIndicator), { passive: true });
 
     await criticalData;
+    // Deliberately not gated on the idle phase below: a blank ANTHROPIC_API_KEY
+    // is a supported configuration, so that AI work may never complete.
+    splash.complete("holdings").finish();
 
     maybeShowSenpaiWelcomeGuide();
     startCountdown();
@@ -11078,15 +11250,39 @@ function _marketPrice(price) {
 const _REGION_ORDER = ["US", "Europe", "Asia", "Pacific"];
 let _cachedWorldMarketsForAnalytics = [];
 
-async function loadWorldMarkets() {
+// Stale-while-revalidate for the markets strip. It loads in the idle phase, so
+// without this the ten shimmer tiles are on screen for the whole critical-data
+// fetch and then some. Not keyed per portfolio — world indices are the same
+// book to book, which is also why one cached copy survives a switch.
+const WORLD_MARKETS_KEY = "folioorb-world-markets-v1";
+
+function persistWorldMarkets(markets) {
     try {
-        // apiGet throws (rather than silently returning) on a non-OK status, so it
-        // hits the catch below and replaces the shimmer skeletons with the
-        // "unavailable" fallback instead of spinning forever.
-        const { markets } = await apiGet("/api/stocks/world-markets");
-        _cachedWorldMarketsForAnalytics = markets || [];
-        const strip = document.getElementById("world-markets-strip");
-        if (!strip) return;
+        localStorage.setItem(WORLD_MARKETS_KEY, JSON.stringify(markets));
+    } catch (_) { /* quota or private mode — caching is best-effort */ }
+}
+
+function hydrateWorldMarketsFromCache() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(WORLD_MARKETS_KEY));
+        // Every tile reads .region, .name, .price and .day_change_pct; a row
+        // missing them would render "undefined" or throw on .toFixed.
+        if (!Array.isArray(cached) || !cached.length) return false;
+        const usable = cached.every(m =>
+            m && typeof m.region === "string" && typeof m.name === "string"
+            && Number.isFinite(m.day_change_pct));
+        if (!usable) return false;
+        renderWorldMarkets(cached);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function renderWorldMarkets(markets) {
+    _cachedWorldMarketsForAnalytics = markets || [];
+    const strip = document.getElementById("world-markets-strip");
+    if (strip) {
         strip.innerHTML = "";
 
         // Group by region, preserve defined order
@@ -11130,13 +11326,29 @@ async function loadWorldMarkets() {
                 strip.appendChild(tile);
             });
         });
-        window.AnalyticsCharts?.refreshMarketsTape?.(markets);
-    } catch (err) {
-        console.warn("World markets unavailable:", err);
-        const strip = document.getElementById("world-markets-strip");
-        if (strip) strip.innerHTML = `<span style="padding:1rem;color:var(--text-tertiary);font-size:.8rem">Market data unavailable</span>`;
     }
     window.AnalyticsCharts?.refreshMarketsTape?.(_cachedWorldMarketsForAnalytics);
+}
+
+async function loadWorldMarkets() {
+    try {
+        // apiGet throws (rather than silently returning) on a non-OK status, so it
+        // hits the catch below and replaces the shimmer skeletons with the
+        // "unavailable" fallback instead of spinning forever.
+        const { markets } = await apiGet("/api/stocks/world-markets");
+        renderWorldMarkets(markets || []);
+        persistWorldMarkets(markets || []);
+    } catch (err) {
+        console.warn("World markets unavailable:", err);
+        // Leave a populated strip alone: cached indices with a failed refresh
+        // still say more than an error line, and the hero cards use the same
+        // rule. Only an empty strip gets the fallback.
+        const strip = document.getElementById("world-markets-strip");
+        if (strip && !strip.querySelector(".market-tile")) {
+            strip.innerHTML = `<span style="padding:1rem;color:var(--text-tertiary);font-size:.8rem">Market data unavailable</span>`;
+        }
+        window.AnalyticsCharts?.refreshMarketsTape?.(_cachedWorldMarketsForAnalytics);
+    }
 }
 
 // ── Holding Intelligence ────────────────────────────────────────────────────
@@ -11514,10 +11726,55 @@ function closePortfolioManager() {
 // cache leaking the previous portfolio's data.
 let _portfolios = [];
 
+// Stale-while-revalidate for the switcher, mirroring the portfolio-value cache
+// above. Switching reloads the page, so without this the list is gone on every
+// switch and the trigger falls back to the word "Portfolio" until the fetch
+// lands — which is exactly the beat that makes switching feel broken.
+//
+// Not keyed per portfolio: this *is* the list of them.
+const PORTFOLIO_LIST_KEY = "folioorb-portfolios-v1";
+
+function persistPortfolioList(list) {
+    try {
+        localStorage.setItem(
+            PORTFOLIO_LIST_KEY,
+            JSON.stringify(list.map(p => ({ id: p.id, name: p.name })))
+        );
+    } catch (_) { /* quota or private mode — caching is best-effort */ }
+}
+
+function readPortfolioList() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(PORTFOLIO_LIST_KEY));
+        if (!Array.isArray(parsed)) return [];
+        // Shape-check every row: a half-written or older entry must not reach the
+        // renderer, which would paint "undefined" into the trigger.
+        return parsed.every(p => p && Number.isFinite(p.id) && typeof p.name === "string")
+            ? parsed
+            : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+// Paint the switcher from the last known list. Runs before the fetch, so the
+// correct name is on screen in the first frame after a reload; the fetch then
+// reconciles. A cached entry for a portfolio deleted elsewhere is safe: picking
+// it reloads, and the fetch below re-scopes to a live one.
+function hydratePortfolioSwitcherFromCache() {
+    const cached = readPortfolioList();
+    if (!cached.length) return false;
+    _portfolios = cached;
+    renderPortfolioSwitcher();
+    updateExportAnchor();
+    return true;
+}
+
 async function loadPortfolios() {
     try {
         _portfolios = await apiGet("/api/portfolio/");
     } catch (_) { return; }
+    persistPortfolioList(_portfolios);
     if (_portfolios.length && !_portfolios.some(p => p.id === activePortfolioId)) {
         // The saved portfolio no longer exists (deleted in another session). The
         // early data loads already fired against the dead id — fall back to the
@@ -11683,6 +11940,9 @@ async function createNewPortfolio() {
         });
         if (!res.ok) { showToast("Couldn't create portfolio", "danger"); return; }
         const data = await res.json();
+        // Seed the cache before the reload, or the new portfolio is the one name
+        // the switcher can't paint on the first frame.
+        persistPortfolioList([..._portfolios, { id: data.id, name: data.name }]);
         switchPortfolio(data.id);
     } catch (_) { showToast("Couldn't create portfolio", "danger"); }
 }
@@ -11754,6 +12014,7 @@ function initPortfolioSwitcher() {
         const wrap = document.getElementById("portfolio-switcher");
         if (!menu.hidden && wrap && !wrap.contains(e.target)) closeSwitcherMenu();
     });
+    hydratePortfolioSwitcherFromCache();
     loadPortfolios();
 }
 

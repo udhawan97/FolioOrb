@@ -164,10 +164,27 @@ def test_run_catchup_is_idempotent(client):
 
 
 def test_run_catchup_reports_missing_price_data(client, db, monkeypatch):
-    _create_weekly_plan(client)
+    # Stub before creating, so the plan is left with genuinely unbooked dates.
+    # Catch-up only reaches the price fetch when a buy is actually due; a plan
+    # that is already caught up needs no prices and must not claim they were
+    # missing.
     monkeypatch.setattr(dca_router, "get_daily_closes", lambda *a: {})
+    _create_weekly_plan(client)
     res = client.post("/api/dca/run")
     assert res.json()["plans"][0]["price_data"] is False
+
+
+def test_a_caught_up_plan_reports_priced_without_fetching(client, monkeypatch):
+    """Nothing due is not a pricing failure, so it must not be reported as one."""
+    _create_weekly_plan(client, days_back=21)
+
+    def _explode(*_args):
+        raise AssertionError("a caught-up plan must not fetch prices")
+
+    monkeypatch.setattr(dca_router, "get_daily_closes", _explode)
+    body = client.post("/api/dca/run").json()
+    assert body["buys_added"] == 0
+    assert body["plans"][0]["price_data"] is True
 
 
 def test_paused_plan_is_skipped_by_catchup(client, db):

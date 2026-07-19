@@ -53,8 +53,25 @@ Clock and threads:
   for the new entry's expiry, so a TTL window starts when the call starts —
   matching the caches this replaces. The lock guards the store only, never the
   fetch: holding it across a twenty-second network call would serialize the
-  concurrent fan-outs in news, earnings and timing. Two threads that miss the
-  same key therefore both fetch and the last one wins, exactly as before.
+  concurrent fan-outs in news, earnings and timing.
+
+  Concurrent misses on *one* key are deduplicated instead: the first caller
+  fetches and the rest wait for its answer. Startup warms these caches on a
+  background thread at the same moment the browser's first page load asks for
+  the same tickers, and before this every quote was pulled twice — in parallel,
+  with the duplicates competing for the GIL doing pandas work. Deduplication is
+  safe here because the fetchers are pure reads of an external API: it changes
+  how much load they generate, never what they return.
+
+  Three cases deliberately do not wait. Misses on *different* keys still run in
+  parallel, which is what the fan-outs need. A ``force_refresh`` call is asking
+  for a value newer than now, so inheriting a fetch that started earlier would
+  quietly defeat it. And a fetcher that re-enters its own key on the same thread
+  proceeds rather than waiting on itself, which would deadlock.
+
+  A fetch that raises stores nothing, so its waiters cannot be handed a value.
+  They wake and retry — one at a time, since the retry leads a new flight —
+  rather than inheriting the exception or stampeding the failing vendor.
 """
 from __future__ import annotations
 
@@ -80,6 +97,28 @@ def clear_all() -> None:
     """Empty every TTL cache in the process — a test seam, unused by the app."""
     for cached in list(_LIVE_CACHES):
         cached.cache_clear()
+
+
+# A waiter's ceiling, not a fetcher's. Every fetch here already carries its own
+# network timeout; this only stops a waiter hanging forever if a leader thread
+# dies without running its `finally`. On expiry the waiter re-reads the store and
+# leads a fresh fetch, so the cost of being wrong is one duplicate call.
+_FLIGHT_TIMEOUT = 30.0
+
+
+class _Flight:
+    """One in-progress fetch of one key, and the gate its waiters block on.
+
+    ``owner`` is the thread that started it, so a fetcher that re-enters its own
+    cache key can tell "someone else is fetching this" from "I am", and proceed
+    instead of waiting on itself.
+    """
+
+    __slots__ = ("event", "owner")
+
+    def __init__(self, owner: int) -> None:
+        self.event = threading.Event()
+        self.owner = owner
 
 
 def _default_key(*args: Any, **kwargs: Any) -> Hashable:
@@ -182,6 +221,7 @@ def ttl_cache(
             )
 
         store: dict[Hashable, tuple[float, T]] = {}
+        in_flight: dict[Hashable, _Flight] = {}
         lock = threading.Lock()
         derive_key = _default_key if key is None else key
 
@@ -199,26 +239,63 @@ def ttl_cache(
             entry_key = derive_key(*key_args, **key_kwargs)
             clock = now()
 
-            if not forced:
+            def fetch_and_store() -> T:
+                # Deliberately outside the lock: the fetch is the slow part, and
+                # every fan-out in this app depends on misses running in parallel.
+                result = func(*args, **kwargs)
+
+                if cache_when is not None and not cache_when(result):
+                    # Nothing else holds this value, so there is nothing to
+                    # protect it from — and a rejected value needn't even be
+                    # copyable.
+                    return result
+
+                expiry = clock + (ttl() if callable(ttl) else ttl)
+                with lock:
+                    store[entry_key] = (expiry, result)
+                    _drop_expired(store, clock)
+                return copy(result) if copy else result
+
+            # A forced call wants a value newer than now, so it neither waits on
+            # an in-flight fetch nor leads one for anybody else.
+            if forced:
+                return fetch_and_store()
+
+            me = threading.get_ident()
+            while True:
+                # The store read and the flight registration share one hold of
+                # the lock. Split apart, a caller could miss the store, have the
+                # leader store-and-finish in the gap, then find no flight to wait
+                # on — and refetch a value that was already sitting there.
                 with lock:
                     entry = store.get(entry_key)
-                if entry is not None and entry[0] > clock:
-                    return copy(entry[1]) if copy else entry[1]
+                    if entry is not None and entry[0] > clock:
+                        return copy(entry[1]) if copy else entry[1]
+                    running = in_flight.get(entry_key)
+                    if running is None:
+                        leading = _Flight(me)
+                        in_flight[entry_key] = leading
+                        break
+                    if running.owner == me:
+                        leading = None  # re-entrant: waiting would deadlock
+                        break
+                    waiting = running
+                # Outside the lock: let the leader finish, then look again. A
+                # leader that raised stored nothing, so the next pass makes this
+                # caller the new leader rather than a second simultaneous fetch.
+                waiting.event.wait(timeout=_FLIGHT_TIMEOUT)
+                clock = now()
 
-            # Deliberately outside the lock: the fetch is the slow part, and
-            # every fan-out in this app depends on misses running in parallel.
-            result = func(*args, **kwargs)
-
-            if cache_when is not None and not cache_when(result):
-                # Nothing else holds this value, so there is nothing to protect
-                # it from — and a rejected value needn't even be copyable.
-                return result
-
-            expiry = clock + (ttl() if callable(ttl) else ttl)
-            with lock:
-                store[entry_key] = (expiry, result)
-                _drop_expired(store, clock)
-            return copy(result) if copy else result
+            if leading is None:
+                return fetch_and_store()  # re-entrant call, shares nothing
+            try:
+                return fetch_and_store()
+            finally:
+                # Store first, then publish: a waiter woken here re-reads the
+                # store and finds the value the leader just wrote.
+                with lock:
+                    in_flight.pop(entry_key, None)
+                leading.event.set()
 
         def cache_clear() -> None:
             """Drop every entry this fetcher has remembered."""

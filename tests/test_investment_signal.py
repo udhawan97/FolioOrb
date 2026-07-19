@@ -4,7 +4,6 @@ No real network calls — AnalystRec objects are constructed directly.
 """
 # pylint: disable=protected-access
 import json
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -628,17 +627,17 @@ def test_verdict_quip_cache_uses_action_and_market_mood(monkeypatch):
 
     monkeypatch.setattr(verdict_pipeline, "generate_verdict_ai_bundles", fake_generate)
 
-    first = asyncio.run(ai_router.get_all_investment_signals(db))
+    first = ai_router.get_all_investment_signals(db)
     assert first["signals"]["NOW"]["market_mood"] == "warm"
     assert len(calls) == 1
 
     quote_state["quote"] = _stock_quote(price=101, low=50, high=120, day_change_pct=0.1)
-    second = asyncio.run(ai_router.get_all_investment_signals(db))
+    second = ai_router.get_all_investment_signals(db)
     assert second["signals"]["NOW"]["market_mood"] == "warm"
     assert len(calls) == 1, "same action + mood should reuse cached Claude quip"
 
     quote_state["quote"] = _stock_quote(price=54, low=50, high=120, day_change_pct=-1.1)
-    third = asyncio.run(ai_router.get_all_investment_signals(db))
+    third = ai_router.get_all_investment_signals(db)
     assert third["signals"]["NOW"]["market_mood"] == "cold"
     assert len(calls) == 2, "mood flip should request a fresh quip"
     assert set(calls[0][0]) == {"ticker", "action", "confidence", "market_mood", "reason", "mix"}
@@ -675,7 +674,7 @@ def test_all_signals_passes_batched_history_into_recommendation(monkeypatch):
     monkeypatch.setattr(verdict_pipeline, "get_analyst_recommendation", fake_rec)
     monkeypatch.setattr(verdict_pipeline, "generate_verdict_ai_bundles", lambda inputs: {})
 
-    result = asyncio.run(ai_router.get_all_investment_signals(db))
+    result = ai_router.get_all_investment_signals(db)
 
     assert received["VOO"] is closes
     assert result["signals"]["VOO"]["timing"]["cross"]["type"] == "golden"
@@ -710,7 +709,7 @@ def test_portfolio_quip_cache_and_fallback(monkeypatch):
 
     monkeypatch.setattr(verdict_pipeline, "generate_verdict_ai_bundles", fail_generate)
 
-    first = asyncio.run(ai_router.get_all_investment_signals(db))
+    first = ai_router.get_all_investment_signals(db)
     assert "portfolio_health" in first
     assert first["portfolio_health"]["quip"]
     assert first["portfolio_health"]["brand"]["kicker"] == (
@@ -719,14 +718,14 @@ def test_portfolio_quip_cache_and_fallback(monkeypatch):
     assert "FolioOrb" in first["signals"]["AAA"]["disclaimer"]
     assert len(calls) == 1
 
-    asyncio.run(ai_router.get_all_investment_signals(db))
+    ai_router.get_all_investment_signals(db)
     assert len(calls) == 1, (
         "portfolio quip should reuse cache when coarse state is unchanged"
     )
 
     recs["AAA"] = _stock_rec("sell", mean=4.5, upside=-15.0)
     recs["BBB"] = _stock_rec("sell", mean=4.5, upside=-15.0)
-    changed = asyncio.run(ai_router.get_all_investment_signals(db))
+    changed = ai_router.get_all_investment_signals(db)
     assert changed["portfolio_health"]["dominant_action"] == "trim"
     assert len(calls) == 2, "portfolio quip should refresh when state signature changes"
 

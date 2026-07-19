@@ -22544,3 +22544,188 @@ body > .fs-update-toast.is-in { opacity: 1; transform: translate(-50%, 0); }
     body > .fs-update-toast { transition: none; }
     .fs-update-panel { transform: none; }
 }
+
+/* ── Boot splash ──────────────────────────────────────────────────────────
+   Shown only on a cold load, so it is the first thing a new user sees and the
+   thing a returning user almost never does. Everything here leans on the
+   existing tokens; the one bold element is the curve, and the rest stays quiet
+   so it can carry the weight.
+   Radii are literal to match the house convention (14px callouts, 999px orbs) —
+   there are no radius tokens to reach for. */
+/* `body > .boot-splash`, not `.boot-splash`: an existing rule further up sets
+   `body > :not(.bg-orb) { position: relative; z-index: 1 }`, which at (0,1,1)
+   outranks a bare class and would drop this overlay into the page flow behind
+   the dashboard. Matching its shape wins on source order. */
+body > .boot-splash {
+    position: fixed;
+    inset: 0;
+    /* Above everything: this app's stack runs to 13000 (nav 11000, popovers
+       12000, action dialogs 13000). A splash that any of those punch through
+       is not a splash. */
+    z-index: 14000;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background: var(--bg-base);
+    opacity: 1;
+    transition: opacity .26s var(--ease);
+}
+.boot-splash[hidden] { display: none; }
+.boot-splash.is-leaving { opacity: 0; pointer-events: none; }
+
+/* The dashboard must not scroll behind the overlay. */
+body.is-booting { overflow: hidden; }
+
+.boot-splash-panel {
+    width: min(37rem, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.15rem;
+}
+
+.boot-splash-mark {
+    width: 62px;
+    height: 62px;
+    /* An empty src before paint would otherwise draw a broken-image glyph. */
+    min-height: 62px;
+}
+.boot-splash-mark:not([src]),
+.boot-splash-mark[src=""] { visibility: hidden; }
+
+.boot-splash-greeting {
+    margin: 0;
+    font-family: var(--font-text);
+    font-size: var(--ts-sm);
+    letter-spacing: .01em;
+    color: var(--text-tertiary);
+}
+
+/* The fact is an artifact, not narration: the number leads, the sentence
+   explains, and nothing frames it as trivia. */
+.boot-splash-fact {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+}
+.boot-splash-figure {
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 5.5vw, 2.9rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -.022em;
+    /* Accent, not brand: --brand-cyan is #6fd6f0 in *both* themes (it is chrome
+       for the orbit mark), which lands at ~1.6:1 on the light background.
+       --accent-cyan is theme-aware, so dark is unchanged and light gets a
+       readable teal. The house rule is semantic roles for meaning, brand for
+       chrome — this is meaning. */
+    background: linear-gradient(96deg, var(--accent-cyan), var(--accent-blue));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.boot-splash-body {
+    max-width: 34rem;
+    margin: 0 auto;
+    font-family: var(--font-text);
+    font-size: var(--ts-body);
+    line-height: 1.62;
+    color: var(--text-secondary);
+    text-wrap: pretty;
+}
+
+/* Compounding curve, not a bar: the wait is time passing, and time is the one
+   input every fact above depends on. pathLength=100 normalises the geometry so
+   the dash offset is just the percentage. */
+.boot-splash-progress {
+    width: min(20rem, 78%);
+    margin-top: .35rem;
+}
+.boot-splash-curve {
+    display: block;
+    width: 100%;
+    height: 54px;
+    overflow: visible;
+}
+.boot-splash-curve-track,
+.boot-splash-curve-fill {
+    fill: none;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+.boot-splash-curve-track { stroke: var(--hairline); }
+.boot-splash-curve-fill {
+    stroke: var(--accent-cyan);
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent-cyan) 55%, transparent));
+    transition: stroke-dashoffset .55s var(--ease);
+}
+
+.boot-splash-stages {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .45rem 1.4rem;
+    margin: 0;
+    padding: 0;
+}
+.boot-splash-stage {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    font-family: var(--font-text);
+    font-size: var(--ts-label);
+    letter-spacing: .035em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    transition: color .3s var(--ease);
+}
+.boot-splash-stage::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    transition: background .3s var(--ease), box-shadow .3s var(--ease);
+}
+.boot-splash-stage.is-done { color: var(--text-primary); }
+.boot-splash-stage.is-done::before {
+    background: var(--accent-cyan);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--accent-cyan) 65%, transparent);
+}
+
+.boot-splash-skip {
+    margin-top: .3rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: .3rem .95rem;
+    background: none;
+    font-family: var(--font-text);
+    font-size: var(--ts-label);
+    letter-spacing: .04em;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.boot-splash-skip:hover { color: var(--text-secondary); border-color: var(--hairline); }
+.boot-splash-skip:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+    color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* The curve appears rather than draws; the dots still change state, which
+       is the information. */
+    .boot-splash,
+    .boot-splash-curve-fill,
+    .boot-splash-stage,
+    .boot-splash-stage::before { transition: none; }
+    /* The animated mark is the only looping motion here; freeze it. */
+    .boot-splash-mark { animation: none; }
+}

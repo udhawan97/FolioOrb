@@ -133,9 +133,50 @@ class DcaLedger:
             "status": contribution.status,
         }
 
+    @staticmethod
+    def _has_unbooked_dates(
+        plan: DcaPlan,
+        start: date,
+        today: date,
+        existing: set[str],
+        floor: date,
+    ) -> bool:
+        """Could this plan owe a buy? Answered without touching market data.
+
+        Weekly and monthly cadences step by calendar date — ``scheduled_dates``
+        ignores the trading calendar for both — so the intended dates are known
+        from the plan alone, and comparing them against what is already booked
+        says whether pricing is worth doing.
+
+        A daily cadence *is* the trading calendar, so it can't be answered here;
+        those plans report True and pay for the fetch as before.
+
+        Deliberately one-sided: True only means a fetch is warranted, not that a
+        buy will be added. ``plan_contributions`` still drops intended dates with
+        no trading day yet, so the caller may price a window and add nothing.
+        """
+        if plan.frequency == "daily":
+            return True
+        intended = dca_service.scheduled_dates(plan.frequency, start, today, [])
+        return any(
+            day >= floor and day.isoformat() not in existing for day in intended
+        )
+
     def _catch_up(self, plan: DcaPlan, today: date) -> tuple[int, bool]:
         start = date.fromisoformat(plan.start_date)
         if start > today:
+            return 0, True
+        existing = {
+            row[0]
+            for row in self.db.query(DcaContribution.scheduled_date)
+            .filter(DcaContribution.plan_id == plan.id)
+            .all()
+        }
+        floor = date.fromisoformat(plan.catchup_floor) if plan.catchup_floor else start
+        if not self._has_unbooked_dates(plan, start, today, existing, floor):
+            # Nothing is due, which is the steady state on every page load. The
+            # window would be the plan's whole history, so not fetching it is
+            # the difference between a no-op and years of daily bars per plan.
             return 0, True
         closes = self._price_history_loader(
             plan.ticker, plan.start_date, today.isoformat()
@@ -149,13 +190,6 @@ class DcaLedger:
             today,
             sorted((date.fromisoformat(day), price) for day, price in closes.items()),
         )
-        existing = {
-            row[0]
-            for row in self.db.query(DcaContribution.scheduled_date)
-            .filter(DcaContribution.plan_id == plan.id)
-            .all()
-        }
-        floor = date.fromisoformat(plan.catchup_floor) if plan.catchup_floor else start
         added = 0
         for item in computed:
             scheduled = item["scheduled_date"].isoformat()

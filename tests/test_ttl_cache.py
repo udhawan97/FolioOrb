@@ -515,6 +515,151 @@ def test_concurrent_callers_leave_one_coherent_entry():
     assert list(fetch.cache) == [("AAPL",)]
 
 
+# ── Single flight ─────────────────────────────────────────────────────────────
+#
+# Startup warms the caches on a background thread while the browser's first page
+# load asks for the same tickers. Both missed, so both fetched: every quote was
+# pulled twice, in parallel, and the duplicates competed for the GIL doing pandas
+# work. One fetch per key per window is the point of these.
+
+def _blocking_fetcher(ttl=100.0, fail=False):
+    """A fetcher that parks inside the call until the test releases it."""
+    calls: list[str] = []
+    entered = threading.Event()
+    release = threading.Event()
+
+    @ttl_cache(ttl=ttl)
+    def fetch(ticker: str) -> str:
+        calls.append(ticker)
+        entered.set()
+        release.wait(timeout=5)
+        if fail:
+            raise RuntimeError("vendor down")
+        return f"quote:{ticker}"
+
+    return fetch, calls, entered, release
+
+
+def _gather(fetch, ticker, count):
+    """Run `fetch(ticker)` on `count` threads; return (threads, results, errors)."""
+    results: list[str] = []
+    errors: list[BaseException] = []
+    lock = threading.Lock()
+
+    def run() -> None:
+        try:
+            value = fetch(ticker)
+        except BaseException as exc:  # noqa: BLE001 — the test asserts on it
+            with lock:
+                errors.append(exc)
+        else:
+            with lock:
+                results.append(value)
+
+    threads = [threading.Thread(target=run) for _ in range(count)]
+    return threads, results, errors
+
+
+def test_concurrent_misses_on_one_key_fetch_once():
+    fetch, calls, entered, release = _blocking_fetcher()
+
+    leader, leader_results, _ = _gather(fetch, "AAPL", 1)
+    leader[0].start()
+    assert entered.wait(timeout=5), "leader never reached the fetch"
+
+    followers, follower_results, _ = _gather(fetch, "AAPL", 7)
+    for thread in followers:
+        thread.start()
+    release.set()
+    for thread in [*leader, *followers]:
+        thread.join(timeout=10)
+
+    assert calls == ["AAPL"], "the seven followers should have waited, not refetched"
+    assert leader_results + follower_results == ["quote:AAPL"] * 8
+
+
+def test_single_flight_is_per_key_so_fan_outs_still_run_in_parallel():
+    # The whole reason the lock was never held across the fetch. Two tickers must
+    # still be able to meet inside their fetches; a barrier proves they overlap.
+    barrier = threading.Barrier(2, timeout=5)
+    results: dict[str, str] = {}
+
+    @ttl_cache(ttl=100)
+    def fetch(ticker: str) -> str:
+        barrier.wait()
+        return f"quote:{ticker}"
+
+    threads = [
+        threading.Thread(target=lambda t=t: results.__setitem__(t, fetch(t)))
+        for t in ("AAPL", "MSFT")
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert results == {"AAPL": "quote:AAPL", "MSFT": "quote:MSFT"}
+
+
+def test_a_failing_leader_does_not_strand_its_followers():
+    # An exception is still never stored, so the followers cannot be handed one.
+    # They fetch for themselves rather than inheriting the failure or hanging.
+    fetch, calls, entered, release = _blocking_fetcher(fail=True)
+
+    leader, _, leader_errors = _gather(fetch, "AAPL", 1)
+    leader[0].start()
+    assert entered.wait(timeout=5)
+
+    followers, _, follower_errors = _gather(fetch, "AAPL", 3)
+    for thread in followers:
+        thread.start()
+    release.set()
+    for thread in [*leader, *followers]:
+        thread.join(timeout=10)
+
+    assert not any(thread.is_alive() for thread in [*leader, *followers])
+    assert len(leader_errors) == 1
+    assert len(follower_errors) == 3
+    assert calls  # they retried rather than hanging on a leader that never stored
+
+
+def test_a_fetcher_that_reenters_its_own_cache_does_not_deadlock():
+    # Recursion through the same key on one thread must not wait on itself.
+    depth = {"n": 0}
+
+    @ttl_cache(ttl=100)
+    def fetch(ticker: str) -> str:
+        depth["n"] += 1
+        if depth["n"] < 2:
+            return fetch(ticker)
+        return f"quote:{ticker}"
+
+    assert fetch("AAPL") == "quote:AAPL"
+    assert depth["n"] == 2
+
+
+def test_force_refresh_does_not_wait_on_another_threads_fetch():
+    # A forced call is asking for a value newer than now; inheriting an in-flight
+    # fetch that started earlier would quietly defeat that.
+    fetch, calls, entered, release = _blocking_fetcher()
+
+    leader, _, _ = _gather(fetch, "AAPL", 1)
+    leader[0].start()
+    assert entered.wait(timeout=5)
+
+    forced: list[str] = []
+    forcer = threading.Thread(
+        target=lambda: forced.append(fetch("AAPL", force_refresh=True))
+    )
+    forcer.start()
+    release.set()
+    for thread in [*leader, forcer]:
+        thread.join(timeout=10)
+
+    assert forced == ["quote:AAPL"]
+    assert calls == ["AAPL", "AAPL"], "the forced call must fetch on its own"
+
+
 # ── Identity ──────────────────────────────────────────────────────────────────
 
 def test_the_wrapper_keeps_the_fetchers_name_and_docstring():

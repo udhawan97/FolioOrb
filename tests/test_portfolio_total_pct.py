@@ -332,16 +332,16 @@ def test_delete_realized_trade_adjusts_realized_total_and_today_snapshot(monkeyp
         lambda _tickers: [quote("SOLD", 110)],
     )
 
-    before = asyncio.run(portfolio_router.get_pnl(db=db))
+    before = portfolio_router.get_pnl(db=db)
     result = asyncio.run(portfolio_router.remove_realized_trade(trade.id, db=db))
-    after = asyncio.run(portfolio_router.get_pnl(db=db))
+    after = portfolio_router.get_pnl(db=db)
 
     snap = db.query(PortfolioSnapshot).filter(PortfolioSnapshot.portfolio_id == 1).one()
     assert before["realized_gain"] == 50.0
     assert before["trades"][0]["id"] == trade.id
     assert result["ticker"] == "SOLD"
     assert after["realized_gain"] == 0.0
-    assert after["trades"] == []
+    assert not after["trades"]
     assert snap.realized_gain == 0.0
 
 

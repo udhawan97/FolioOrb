@@ -544,10 +544,14 @@ def warm_caches(tickers: Optional[list[str]] = None) -> None:
     if not targets:
         return
     try:
-        # get_all_quotes warms both the quote cache and the `.info` cache (via
-        # get_ticker_info), so analyst recs and holding intelligence benefit too.
-        get_all_quotes(targets)
+        # Fast quotes first: they are what the holdings table and hero cards
+        # need, so warming them first is what shortens time-to-first-paint. The
+        # phases are sequential, and `.info` is the slower of the two.
         get_portfolio_quotes(targets)
+        # get_all_quotes warms both the quote cache and the `.info` cache (via
+        # get_ticker_info), so analyst recs and holding intelligence benefit too
+        # — all of which load in the dashboard's idle phase, after first paint.
+        get_all_quotes(targets)
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning("Cache warmup failed; exception_type=%s", type(exc).__name__)
 
@@ -591,10 +595,17 @@ def get_historical_prices(ticker: str, period: str = "1mo") -> list[dict]:
     return results
 
 
+@ttl_cache(ttl=_HISTORY_TTL, key=lambda ticker, start, end: (ticker.upper(), start, end))
 def get_daily_closes(ticker: str, start: str, end: str) -> dict[str, float]:
     """
     Return ``{"YYYY-MM-DD": close}`` for trading days in ``[start, end]``
     (both inclusive). ``start``/``end`` are ISO date strings.
+
+    Cached on the exact window, like the other history fetchers. Daily DCA plans
+    re-ask for the same span on every page load — their cadence is the trading
+    calendar, so unlike weekly and monthly they can't tell whether a buy is due
+    without it — and the span runs from the plan's start date, so it grows for
+    the life of the plan.
 
     Used by the DCA engine to price historical buys on the exact days they would
     have executed. Missing or non-positive closes are dropped; returns ``{}``
