@@ -2256,6 +2256,14 @@ table tbody tr:hover {
     animation: spin 0.8s linear infinite;
 }
 
+/* Shared by the loading icons here and on .btn-claude-summaries. Bootstrap
+   ships spinner-border/spinner-grow for its own spinner markup, but no plain
+   rotate, so this one is ours. */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
 .holdings-intel-hub.is-claude-action.is-scanning .hub-icon--claude i {
     animation: hubClaudePulse 1.35s ease-in-out infinite;
 }
@@ -21571,7 +21579,9 @@ a.filing-link:focus-visible .filing-out {
 }
 
 .action-plan-skeleton .shimmer-line {
-    animation: shimmer 1.4s ease infinite;
+    /* Re-times the shared pulse; the shorthand resets animation-name, so the
+       keyframes have to be named again for the delays below to have an effect. */
+    animation: shimmerPulse 1.4s ease infinite;
 }
 
 .action-plan-skeleton .shimmer-line:nth-child(1) { animation-delay: 0ms; }
