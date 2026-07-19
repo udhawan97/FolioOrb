@@ -3,7 +3,6 @@ Tests for GET /api/ai/action-plan.
 No real network / API calls — Claude and signal pipeline are monkeypatched.
 Mirrors the pattern established in tests/test_portfolio_briefing.py.
 """
-import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -187,7 +186,7 @@ class TestActionPlanShape:
         _patch_compute_portfolio(monkeypatch)
         _patch_action_plan_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         for key in ("headline", "thesis", "buckets", "priority_moves", "best_return_note"):
             assert key in result, f"action plan missing key: {key}"
 
@@ -197,7 +196,7 @@ class TestActionPlanShape:
         _patch_compute_portfolio(monkeypatch)
         _patch_action_plan_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         buckets = result["buckets"]
         for key in ("hold", "add", "trim", "exit"):
             assert key in buckets, f"buckets missing key: {key}"
@@ -208,7 +207,7 @@ class TestActionPlanShape:
         _patch_compute_portfolio(monkeypatch)
         _patch_action_plan_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         for bucket_name, items in result["buckets"].items():
             for item in items:
                 assert "ticker" in item, f"{bucket_name} item missing 'ticker'"
@@ -220,7 +219,7 @@ class TestActionPlanShape:
         _patch_compute_portfolio(monkeypatch)
         _patch_action_plan_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         assert isinstance(result["priority_moves"], list)
         assert len(result["priority_moves"]) <= 3
 
@@ -230,7 +229,7 @@ class TestActionPlanShape:
         _patch_compute_portfolio(monkeypatch)
         _patch_action_plan_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         assert "disclaimer" in result
         assert "not" in result["disclaimer"].lower() or "financial" in result["disclaimer"].lower()
 
@@ -246,7 +245,7 @@ class TestActionPlanTickers:
         _patch_compute_portfolio(monkeypatch)
         _patch_action_plan_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         buckets = result["buckets"]
         all_tickers_in_response = [
             item["ticker"]
@@ -271,7 +270,7 @@ class TestActionPlanTickers:
             lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
         )
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         buckets = result.get("buckets") or {}
         all_tickers_in_response = [
             item["ticker"]
@@ -300,7 +299,7 @@ class TestActionPlanFallback:
             lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
         )
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         # Must return a valid plan, not raise
         assert result is not None
         assert "buckets" in result
@@ -316,7 +315,7 @@ class TestActionPlanFallback:
             lambda snapshot: (_ for _ in ()).throw(RuntimeError("Timeout")),
         )
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         assert result.get("source") == "local-fallback"
 
     def test_fallback_has_all_four_bucket_keys(self, monkeypatch):
@@ -330,7 +329,7 @@ class TestActionPlanFallback:
             lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
         )
 
-        result = asyncio.run(ai_router.get_action_plan(db=db))
+        result = ai_router.get_action_plan(db=db)
         for key in ("hold", "add", "trim", "exit"):
             assert key in result["buckets"], f"fallback buckets missing key: {key}"
 
@@ -347,7 +346,7 @@ class TestActionPlanFallback:
 
         # Should not raise even if snapshot building also partially fails
         try:
-            result = asyncio.run(ai_router.get_action_plan(db=db))
+            result = ai_router.get_action_plan(db=db)
             assert isinstance(result, dict)
         except Exception as exc:  # pylint: disable=broad-except
             pytest.fail(f"get_action_plan raised unexpectedly: {exc}")
@@ -364,7 +363,7 @@ class TestActionPlanFallback:
             lambda snapshot: claude_calls.append(snapshot) or dict(_AI_ACTION_PLAN_RESPONSE),
         )
 
-        result = asyncio.run(ai_router.get_action_plan(force_refresh=True, db=db))
+        result = ai_router.get_action_plan(force_refresh=True, db=db)
 
         assert not claude_calls
         assert result["source"] == "partial-data"
@@ -391,7 +390,7 @@ class TestActionPlanForceLocal:
             lambda snapshot: (claude_calls.append(snapshot), _AI_ACTION_PLAN_RESPONSE)[1],
         )
 
-        result = asyncio.run(ai_router.get_action_plan(force_local=True, db=db))
+        result = ai_router.get_action_plan(force_local=True, db=db)
         assert result.get("source") == "local-fallback", (
             "force_local=True must return a local-fallback plan"
         )
@@ -402,7 +401,7 @@ class TestActionPlanForceLocal:
         _patch_scan(monkeypatch)
         _patch_compute_portfolio(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(force_local=True, db=db))
+        result = ai_router.get_action_plan(force_local=True, db=db)
         for key in ("headline", "thesis", "buckets", "priority_moves", "best_return_note",
                     "regime", "disclaimer"):
             assert key in result, f"force_local plan missing key: {key}"
@@ -412,7 +411,7 @@ class TestActionPlanForceLocal:
         _patch_scan(monkeypatch)
         _patch_compute_portfolio(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(force_local=True, db=db))
+        result = ai_router.get_action_plan(force_local=True, db=db)
         for key in ("hold", "add", "trim", "exit"):
             assert key in result["buckets"], f"force_local buckets missing key: {key}"
 
@@ -421,7 +420,7 @@ class TestActionPlanForceLocal:
         _patch_scan(monkeypatch)
         _patch_compute_portfolio(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(force_local=True, db=db))
+        result = ai_router.get_action_plan(force_local=True, db=db)
         active = set(_ACTIVE_TICKERS)
         for bucket_name, items in result["buckets"].items():
             for item in items:
@@ -436,7 +435,7 @@ class TestActionPlanForceLocal:
         _patch_scan(monkeypatch)
         _patch_compute_portfolio(monkeypatch)
 
-        result = asyncio.run(ai_router.get_action_plan(force_local=True, db=db))
+        result = ai_router.get_action_plan(force_local=True, db=db)
         assert isinstance(result.get("regime"), dict), "regime must be a dict in local plan"
 
 
@@ -457,10 +456,10 @@ class TestActionPlanCache:
 
         monkeypatch.setattr(ai_router, "generate_action_plan", fake_generate)
 
-        asyncio.run(ai_router.get_action_plan(db=db))
+        ai_router.get_action_plan(db=db)
         assert len(call_count) == 1
 
-        result2 = asyncio.run(ai_router.get_action_plan(db=db))
+        result2 = ai_router.get_action_plan(db=db)
         assert len(call_count) == 1, "second call must reuse cache, not call Claude again"
         assert result2.get("from_cache") is True
 
@@ -477,8 +476,8 @@ class TestActionPlanCache:
 
         monkeypatch.setattr(ai_router, "generate_action_plan", fake_generate)
 
-        asyncio.run(ai_router.get_action_plan(db=db))
-        asyncio.run(ai_router.get_action_plan(force_refresh=True, db=db))
+        ai_router.get_action_plan(db=db)
+        ai_router.get_action_plan(force_refresh=True, db=db)
         assert len(call_count) == 2, "force_refresh=True must bypass cache"
 
 

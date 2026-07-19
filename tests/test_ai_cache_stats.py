@@ -1,7 +1,6 @@
 """
 Tests for AI cache accounting.
 """
-import asyncio
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -49,7 +48,7 @@ def test_ai_cache_stats_excludes_local_fallback_rows_from_token_cost(monkeypatch
     db.commit()
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "test-key")
 
-    stats = asyncio.run(get_ai_cache_stats(db))
+    stats = get_ai_cache_stats(db)
 
     assert stats["cached_summaries"] == 3
     assert stats["claude_cached_summaries"] == 1
@@ -65,7 +64,7 @@ def test_ai_cache_stats_marks_billing_paused_without_api_key(monkeypatch):
     db = _make_db()
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", "")
 
-    stats = asyncio.run(get_ai_cache_stats(db))
+    stats = get_ai_cache_stats(db)
 
     assert stats["claude_configured"] is False
     assert stats["billing_active"] is False

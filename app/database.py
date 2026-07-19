@@ -16,10 +16,25 @@ if _IS_SQLITE:
 
 # Create the database engine — this is the single connection to our SQLite file.
 # check_same_thread=False is required by SQLite when used with FastAPI's async workers.
+#
+# Pool sizing: get_db() holds its connection for the whole request, network time
+# included, because the heavy endpoints query holdings first and then spend
+# seconds in yfinance or Anthropic. SQLAlchemy's defaults (pool_size=5,
+# max_overflow=10) cap that at 15, and a page load fires more concurrent
+# requests than that — the sixteenth caller then blocks in QueuePool.get() for
+# up to pool_timeout seconds.
+#
+# The ceiling below is set above any concurrency the app can actually reach: the
+# anyio threadpool FastAPI runs sync endpoints in tops out at 40 workers, plus
+# roughly ten startup-warmup threads. A SQLite connection is a local file handle,
+# so headroom here costs microseconds and a few file descriptors — far cheaper
+# than the stall it removes.
 engine = create_engine(
     settings.DATABASE_URL,
     connect_args={"check_same_thread": False},
     echo=settings.DEBUG,  # Prints all SQL queries to the console when DEBUG=True
+    pool_size=10,
+    max_overflow=50,
 )
 
 

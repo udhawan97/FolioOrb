@@ -251,7 +251,7 @@ def _enrich_intelligence_dict(intel_dict: dict, stock_data: dict | None) -> dict
 
 
 @router.get("/cache/stats")
-async def get_ai_cache_stats(db: Session = Depends(get_db)):
+def get_ai_cache_stats(db: Session = Depends(get_db)):
     """
     Return cached AI summary counts with an estimated Anthropic token cost.
     Local fallback/deterministic cache rows are excluded because they do not
@@ -603,7 +603,7 @@ async def get_fundamentals_endpoint(ticker: str):
 
 
 @router.get("/move-explanations/all")
-async def get_all_move_explanations(
+def get_all_move_explanations(
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -710,7 +710,7 @@ _FALLBACK_INTEL_BASE = {
 
 
 @router.get("/intelligence/all/batch")
-async def get_all_intelligence(
+def get_all_intelligence(
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -796,7 +796,7 @@ async def get_investment_signal_single(
 
 
 @router.get("/investment-signals/all")
-async def get_all_investment_signals(
+def get_all_investment_signals(
     db: Session = Depends(get_db),
     force_local: bool = False,
     portfolio_id: int = 1,
@@ -914,7 +914,7 @@ async def get_analyst_recommendation_single(ticker: str):
 
 
 @router.get("/analyst-recommendations/all")
-async def get_all_analyst_recommendations(
+def get_all_analyst_recommendations(
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -959,7 +959,7 @@ async def get_all_analyst_recommendations(
 
 
 @router.get("/portfolio-summary")
-async def get_portfolio_summary(
+def get_portfolio_summary(
     mode: str = "ai",
     time_range: str = Query("day", alias="range"),
     force_refresh: bool = False,
@@ -1138,7 +1138,7 @@ async def get_analytics_insights(
 
 
 @router.get("/action-plan")
-async def get_action_plan(
+def get_action_plan(
     force_refresh: bool = False,
     force_local: bool = False,
     portfolio_id: int = 1,

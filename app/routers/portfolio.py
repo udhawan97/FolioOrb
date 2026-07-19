@@ -189,7 +189,7 @@ async def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/earnings")
-async def get_earnings_radar(
+def get_earnings_radar(
     portfolio_id: int = 1,
     window: int = Query(30, ge=1, le=60),
     db: Session = Depends(get_db),
@@ -615,7 +615,7 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/pnl")
-async def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """
     Profit/loss detail: cumulative totals, the realized-trade ledger, and the
     daily snapshot history (for the performance chart). Reads stored data only —
@@ -721,7 +721,7 @@ async def get_portfolio_range_performance(
 
 
 @router.get("/market-context")
-async def get_portfolio_market_context(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_market_context(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """World indices enriched with portfolio correlation and geographic alignment."""
     from app.routers.stocks import get_world_markets  # lazy — avoid circular import at load
 
@@ -774,26 +774,26 @@ async def get_sector_tilt(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/conviction-gaps")
-async def get_conviction_gaps(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_conviction_gaps(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Verdict vs position-size mismatches."""
     from app.routers.ai import get_all_investment_signals
 
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    sig_payload = await get_all_investment_signals(
+    sig_payload = get_all_investment_signals(
         portfolio_id=portfolio_id, db=db, force_local=True
     )
     return compute_conviction_gaps(result, sig_payload.get("signals") or {})
 
 
 @router.get("/confidence-spectrum")
-async def get_confidence_spectrum(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_confidence_spectrum(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Allocation-weighted confidence distribution."""
     from app.routers.ai import get_all_investment_signals
 
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    sig_payload = await get_all_investment_signals(
+    sig_payload = get_all_investment_signals(
         portfolio_id=portfolio_id, db=db, force_local=True
     )
     return compute_confidence_spectrum(result, sig_payload.get("signals") or {})
@@ -868,7 +868,7 @@ async def get_income_calendar(portfolio_id: int = 1, db: Session = Depends(get_d
 
 
 @router.get("/macro-alignment")
-async def get_macro_alignment(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_macro_alignment(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Index correlation vs geographic exposure scatter data."""
     from app.routers.stocks import get_world_markets  # noqa: PLC0415
 

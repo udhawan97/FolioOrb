@@ -81,7 +81,7 @@ async def delete_plan(plan_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/run")
-async def run_catchup(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def run_catchup(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Fill every active plan's missing scheduled buys idempotently."""
     return _call(_ledger(db).run_catchup, portfolio_id)
 

@@ -2,7 +2,6 @@
 Tests for GET /api/ai/portfolio-summary.
 No real network calls — Claude and portfolio compute are monkeypatched.
 """
-import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -181,7 +180,7 @@ class TestLocalBriefing:
         _patch_quotes(monkeypatch)
         _patch_explain_move(monkeypatch)
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="local", db=db))
+        result = ai_router.get_portfolio_summary(mode="local", db=db)
         assert result["mode"] == "local"
 
     def test_has_lead_and_movers(self, monkeypatch):
@@ -191,7 +190,7 @@ class TestLocalBriefing:
         _patch_quotes(monkeypatch)
         _patch_explain_move(monkeypatch)
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="local", db=db))
+        result = ai_router.get_portfolio_summary(mode="local", db=db)
         assert "lead" in result
         assert isinstance(result["lead"], str)
         assert len(result["lead"]) > 0
@@ -205,7 +204,7 @@ class TestLocalBriefing:
         _patch_quotes(monkeypatch)
         _patch_explain_move(monkeypatch)
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="local", db=db))
+        result = ai_router.get_portfolio_summary(mode="local", db=db)
         for mover in result["movers"]:
             for key in ("ticker", "day_change_pct", "day_change_dollar", "icon", "explanation"):
                 assert key in mover, f"movers missing key: {key}"
@@ -223,7 +222,7 @@ class TestLocalBriefing:
             "generate_portfolio_briefing",
             lambda snapshot: called.append(True) or {},
         )
-        asyncio.run(ai_router.get_portfolio_summary(mode="local", db=db))
+        ai_router.get_portfolio_summary(mode="local", db=db)
         assert not called, "local mode must never call Claude"
 
 
@@ -236,7 +235,7 @@ class TestAiBriefing:
         _patch_market_regime(monkeypatch)
         _patch_briefing_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        result = ai_router.get_portfolio_summary(mode="ai", db=db)
         for key in ("health", "drivers", "adjustments", "quote"):
             assert key in result, f"AI briefing missing key: {key}"
 
@@ -246,7 +245,7 @@ class TestAiBriefing:
         _patch_market_regime(monkeypatch)
         _patch_briefing_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        result = ai_router.get_portfolio_summary(mode="ai", db=db)
         assert result["mode"] == "ai"
 
     def test_drivers_is_list(self, monkeypatch):
@@ -255,7 +254,7 @@ class TestAiBriefing:
         _patch_market_regime(monkeypatch)
         _patch_briefing_ai(monkeypatch)
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        result = ai_router.get_portfolio_summary(mode="ai", db=db)
         assert isinstance(result["drivers"], list)
         assert isinstance(result["adjustments"], list)
 
@@ -272,10 +271,10 @@ class TestAiBriefing:
 
         monkeypatch.setattr(ai_router, "generate_portfolio_briefing", fake_generate)
 
-        asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        ai_router.get_portfolio_summary(mode="ai", db=db)
         assert len(call_count) == 1
 
-        result2 = asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        result2 = ai_router.get_portfolio_summary(mode="ai", db=db)
         assert len(call_count) == 1, "second call should reuse the cache, not call Claude again"
         assert result2.get("from_cache") is True
 
@@ -292,8 +291,8 @@ class TestAiBriefing:
 
         monkeypatch.setattr(ai_router, "generate_portfolio_briefing", fake_generate)
 
-        asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
-        asyncio.run(ai_router.get_portfolio_summary(mode="ai", force_refresh=True, db=db))
+        ai_router.get_portfolio_summary(mode="ai", db=db)
+        ai_router.get_portfolio_summary(mode="ai", force_refresh=True, db=db)
         assert len(call_count) == 2, "force_refresh=True should bypass cache"
 
     def test_claude_failure_returns_local_fallback(self, monkeypatch):
@@ -307,7 +306,7 @@ class TestAiBriefing:
             lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
         )
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        result = ai_router.get_portfolio_summary(mode="ai", db=db)
         assert result["mode"] == "ai"
         assert result["source"] == "local-fallback"
         for key in ("health", "drivers", "adjustments", "quote"):
@@ -325,7 +324,7 @@ class TestAiBriefing:
             lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
         )
 
-        result = asyncio.run(ai_router.get_portfolio_summary(mode="ai", db=db))
+        result = ai_router.get_portfolio_summary(mode="ai", db=db)
         assert isinstance(result["health"], str) and len(result["health"]) > 0
         assert isinstance(result["quote"], str) and len(result["quote"]) > 0
 
@@ -340,9 +339,7 @@ class TestAiBriefing:
             lambda snapshot: claude_calls.append(snapshot) or _BRIEFING_AI_RESPONSE.copy(),
         )
 
-        result = asyncio.run(
-            ai_router.get_portfolio_summary(mode="ai", force_refresh=True, db=db)
-        )
+        result = ai_router.get_portfolio_summary(mode="ai", force_refresh=True, db=db)
 
         assert not claude_calls
         assert result["source"] == "partial-data"
@@ -358,7 +355,7 @@ def test_unknown_mode_defaults_to_ai(monkeypatch):
     _patch_market_regime(monkeypatch)
     _patch_briefing_ai(monkeypatch)
 
-    result = asyncio.run(ai_router.get_portfolio_summary(mode="garbage", db=db))
+    result = ai_router.get_portfolio_summary(mode="garbage", db=db)
     assert result["mode"] == "ai"
 
 
@@ -382,9 +379,7 @@ class TestRangeBriefing:
         _patch_explain_move(monkeypatch)
         _patch_range_history(monkeypatch)
 
-        result = asyncio.run(
-            ai_router.get_portfolio_summary(mode="local", time_range="week", db=db)
-        )
+        result = ai_router.get_portfolio_summary(mode="local", time_range="week", db=db)
         assert result["mode"] == "local"
         assert result["period_label"] == "over the past week"
         assert "past week" in result["lead"]
@@ -407,13 +402,11 @@ class TestRangeBriefing:
 
         monkeypatch.setattr(ai_router, "generate_portfolio_briefing", fake_generate)
 
-        asyncio.run(ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db))
-        asyncio.run(ai_router.get_portfolio_summary(mode="ai", time_range="day", db=db))
+        ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db)
+        ai_router.get_portfolio_summary(mode="ai", time_range="day", db=db)
         assert len(call_count) == 2, "day and week must not share a cache entry"
 
-        result = asyncio.run(
-            ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db)
-        )
+        result = ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db)
         assert len(call_count) == 2, "second week call should hit the week cache"
         assert result.get("from_cache") is True
 
@@ -435,7 +428,7 @@ class TestRangeBriefing:
 
         monkeypatch.setattr(ai_router, "generate_portfolio_briefing", fake_generate)
 
-        asyncio.run(ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db))
+        ai_router.get_portfolio_summary(mode="ai", time_range="week", db=db)
         assert seen["period_label"] == "over the past week"
         assert "period_pl" in seen
         assert "best_period" in seen
@@ -449,9 +442,7 @@ class TestRangeBriefing:
         _patch_quotes(monkeypatch)
         _patch_explain_move(monkeypatch)
 
-        result = asyncio.run(
-            ai_router.get_portfolio_summary(mode="local", time_range="bogus", db=db)
-        )
+        result = ai_router.get_portfolio_summary(mode="local", time_range="bogus", db=db)
         assert "period_label" not in result, "unknown range must use the day payload"
 
     def test_fallback_uses_period_phrase(self, monkeypatch):
@@ -465,9 +456,7 @@ class TestRangeBriefing:
             lambda snapshot: (_ for _ in ()).throw(Exception("Claude down")),
         )
 
-        result = asyncio.run(
-            ai_router.get_portfolio_summary(mode="ai", time_range="month", db=db)
-        )
+        result = ai_router.get_portfolio_summary(mode="ai", time_range="month", db=db)
         assert result["source"] == "local-fallback"
         assert "over the past month" in result["health"]
 

@@ -12,12 +12,12 @@ Two concerns are covered:
 (b) Every portfolio-scoped endpoint accepts a ``portfolio_id`` query param that
     defaults to 1, while the global (non-portfolio) endpoints do not.
 
-The endpoints are plain ``async def`` functions, so they're called directly with
-``asyncio.run`` and an in-memory SQLite DB — the Anthropic/generate layer and the
-quote/regime layers are monkeypatched, so no network and no real key.
+The endpoints are plain ``def`` functions — they block, so they run in FastAPI's
+threadpool rather than on the event loop — and are called directly against an
+in-memory SQLite DB. The Anthropic/generate layer and the quote/regime layers are
+monkeypatched, so no network and no real key.
 """
 # pylint: disable=protected-access
-import asyncio
 import inspect
 
 from sqlalchemy import create_engine
@@ -111,9 +111,9 @@ def test_book_cache_is_namespaced_per_portfolio(monkeypatch):
     monkeypatch.setattr(ai_router, "generate_portfolio_briefing", stub_briefing)
 
     # Portfolio 1 → generates + caches under BOOK:1
-    r1 = asyncio.run(ai_router.get_portfolio_summary(portfolio_id=1, db=db))
+    r1 = ai_router.get_portfolio_summary(portfolio_id=1, db=db)
     # Portfolio 2 → must NOT read BOOK:1; generates its own + caches under BOOK:2
-    r2 = asyncio.run(ai_router.get_portfolio_summary(portfolio_id=2, db=db))
+    r2 = ai_router.get_portfolio_summary(portfolio_id=2, db=db)
 
     assert r1["seen_ticker"] == "AAA"
     assert r1["seen_total_value"] == 1100.0
@@ -130,7 +130,7 @@ def test_book_cache_is_namespaced_per_portfolio(monkeypatch):
 
     # Portfolio 1 re-read hits ITS OWN cache (proves the namespaced key is used on
     # read too, not just write) and does not re-generate.
-    r1_again = asyncio.run(ai_router.get_portfolio_summary(portfolio_id=1, db=db))
+    r1_again = ai_router.get_portfolio_summary(portfolio_id=1, db=db)
     assert r1_again.get("from_cache") is True
     assert r1_again["seen_ticker"] == "AAA"
     assert generate_calls == ["AAA", "BBB"]

@@ -7,7 +7,6 @@ history, analyst rating, market regime, Claude) is monkeypatched, so nothing
 here touches the network.
 """
 # pylint: disable=protected-access
-import asyncio
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -406,7 +405,7 @@ class TestRouterDelegates:
         db = _make_db(("AAA",))
         _stub_market(monkeypatch, quotes=[_quote("AAA")])
 
-        payload = asyncio.run(ai_router.get_all_investment_signals(db))
+        payload = ai_router.get_all_investment_signals(db)
 
         assert set(payload) == {
             "signals", "count", "portfolio_exposure", "portfolio_health",
