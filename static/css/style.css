@@ -21584,8 +21584,14 @@ a.filing-link:focus-visible .filing-out {
     animation: shimmerPulse 1.4s ease infinite;
 }
 
+/* Reading order, 40ms apart: header line, header badge, the two body lines,
+   the four buckets left to right, then the two closing lines. The bucket rules
+   below re-target the nth-child() counts that restart inside each wrapper. */
 .action-plan-skeleton .shimmer-line:nth-child(1) { animation-delay: 0ms; }
 .action-plan-skeleton .shimmer-line:nth-child(2) { animation-delay: 80ms; }
+.action-plan-skeleton .shimmer-line:nth-child(3) { animation-delay: 120ms; }
+.action-plan-skeleton .shimmer-line:nth-child(5) { animation-delay: 280ms; }
+.action-plan-skeleton .shimmer-line:nth-child(6) { animation-delay: 320ms; }
 .ap-sk-header .shimmer-line:last-child           { animation-delay: 40ms; }
 .ap-sk-buckets .shimmer-line:nth-child(1)        { animation-delay: 120ms; }
 .ap-sk-buckets .shimmer-line:nth-child(2)        { animation-delay: 160ms; }
