@@ -7,6 +7,27 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.9.0 — The Review Orbit
+
+- **One review workspace.** Inbox, Data Trust Center, monthly/quarterly Review Pack,
+  type-aware Watchlist Compare, thesis cadence, and the Local Backup Vault live behind the
+  new Review control.
+- **Attention without automation.** Price gaps, pending DCA buys, upcoming earnings,
+  calibration history, and thesis reviews are prioritised locally. Nothing places a trade
+  or changes a holding.
+- **Coverage before confidence.** Prices, quote metadata, fund fees, dividend
+  classification, top-holdings ETF overlap, theses, and stored history disclose their
+  coverage and sources. Missing stays missing.
+- **Verified recovery.** Manual vault snapshots contain the SQLite database only, excluding
+  API keys and `.env`. Restores are verified, applied only across a clean restart, and keep
+  a verified safety copy of the pre-restore database.
+- **Review packs tell the truth about returns.** Print-ready HTML and CSV include current
+  valuation, stored snapshots, realized trades, P&L contributors, and thesis attention;
+  raw value change names its stored opening snapshot and is labeled as cash-flow affected,
+  not time-weighted performance.
+- **Additive schema v5.** Optional thesis review timestamp/cadence fields do not affect
+  valuation or verdict math. Installing over v5.8.0 preserves all existing data and keys.
+
 ## v5.8.0 — The Workspace Remembers
 
 - **Theme and place persist.** Light/dark mode and the last dashboard zone restore across

@@ -11,6 +11,7 @@ starts before an installer is ever published.
 """
 
 import os
+import shutil
 import socket
 import sys
 import threading
@@ -89,6 +90,13 @@ def _run_server(port: int) -> None:
 
 def main() -> int:
     smoke = "--smoke" in sys.argv
+
+    # Apply an explicitly queued vault restore before the server thread imports
+    # app.main and opens SQLAlchemy connections to the live database.
+    from app.services import backup_service
+
+    backup_service.apply_pending_restore()
+
     port = _find_free_port(PREFERRED_PORT)
     base_url = f"http://{HOST}:{port}"
 
@@ -136,14 +144,16 @@ def _safe_download_name(name: str) -> str:
 
 
 def _write_text_file(path: str, content: str) -> str:
-    """Write ``content`` to ``path`` as UTF-8 with exactly one leading BOM.
+    """Write text as UTF-8, adding exactly one BOM for CSV files.
 
     Exported CSVs open cleanly in Excel only with a BOM. ``fetch().text()`` in
     the page strips the server's BOM, so content arriving here usually has none —
-    write it as ``utf-8-sig`` to add one. Content that already carries a BOM is
-    written as-is so it never doubles.
+    write CSV as ``utf-8-sig`` to add one. HTML remains plain UTF-8, and content
+    that already carries a BOM is written as-is so it never doubles.
     """
-    encoding = "utf-8" if content.startswith("﻿") else "utf-8-sig"
+    # CSV gets a BOM for Excel. HTML and other text exports stay plain UTF-8.
+    is_csv = str(path).lower().endswith(".csv")
+    encoding = "utf-8-sig" if is_csv and not content.startswith("﻿") else "utf-8"
     with open(path, "w", encoding=encoding, newline="") as handle:
         handle.write(content)
     return path
@@ -155,8 +165,9 @@ class _NativeBridge:  # pylint: disable=too-few-public-methods
     The WebView has no download chrome: an ``<a download>`` or a blob-URL click
     just navigates and renders the file inline, stranding the user on a text page
     with no back button. ``save_file`` gives the page a real "Save As…" dialog so
-    CSV export and template download write an actual file. Real browsers never
-    see this bridge and keep their own download path.
+    report exports and templates write actual files. The binary backup method
+    uses the same native dialog without decoding SQLite. Real browsers never see
+    this bridge and keep their own download path.
     """
 
     def save_file(self, filename: str, content: str) -> dict:
@@ -179,6 +190,30 @@ class _NativeBridge:  # pylint: disable=too-few-public-methods
             if not path:
                 return {"saved": False, "path": None}
             _write_text_file(path, content or "")
+            return {"saved": True, "path": path}
+        except Exception as exc:  # pylint: disable=broad-except
+            return {"saved": False, "path": None, "error": type(exc).__name__}
+
+    def export_backup(self, name: str) -> dict:
+        """Copy one verified database vault item through a native Save dialog."""
+        try:
+            import webview
+
+            from app.services import backup_service
+
+            source = backup_service.resolve_backup_name(name)
+            if not source.exists() or not backup_service.verify_vault_backup(source):
+                return {"saved": False, "path": None, "error": "unverified_backup"}
+            window = webview.active_window()
+            if window is None:
+                return {"saved": False, "path": None}
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG, save_filename=source.name
+            )
+            path = result[0] if isinstance(result, (list, tuple)) else result
+            if not path:
+                return {"saved": False, "path": None}
+            shutil.copyfile(source, path)
             return {"saved": True, "path": path}
         except Exception as exc:  # pylint: disable=broad-except
             return {"saved": False, "path": None, "error": type(exc).__name__}

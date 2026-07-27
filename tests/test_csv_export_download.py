@@ -56,6 +56,12 @@ def test_write_does_not_double_bom(tmp_path):
     assert not raw[3:].startswith(b"\xef\xbb\xbf")
 
 
+def test_write_keeps_html_plain_utf8(tmp_path):
+    dest = tmp_path / "review.html"
+    desktop_main._write_text_file(str(dest), "<!doctype html><title>Review</title>")
+    assert dest.read_bytes().startswith(b"<!doctype html>")
+
+
 # ── Desktop wiring: the native Save bridge is actually mounted on the window ─────
 
 
@@ -63,6 +69,7 @@ def test_desktop_exposes_save_bridge():
     src = (_ROOT / "desktop" / "main.py").read_text(encoding="utf-8")
     assert "class _NativeBridge" in src
     assert "def save_file(" in src
+    assert "def export_backup(" in src
     assert "SAVE_DIALOG" in src
     # The bridge is useless unless it's actually handed to the window.
     assert "js_api=_NativeBridge()" in src

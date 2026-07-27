@@ -10,6 +10,7 @@ from app.routers import stocks, portfolio, ai
 from app.routers import news
 from app.routers import system
 from app.routers import dca
+from app.routers import review
 from app.config import settings
 from app.database import engine
 from app.schema_meta import apply_migrations_safely
@@ -117,6 +118,7 @@ app.include_router(ai.router)
 app.include_router(news.router)
 app.include_router(system.router)
 app.include_router(dca.router)
+app.include_router(review.router)
 
 
 @app.get("/")

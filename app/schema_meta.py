@@ -35,7 +35,9 @@ logger = logging.getLogger(__name__)
 # v4 adds the additive verdict_snapshots.portfolio_id column (ALTER + backfill
 # to portfolio 1) for per-portfolio verdict history — additive, MIN_COMPATIBLE
 # unchanged.
-SCHEMA_VERSION = 4
+# v5 adds optional thesis review timestamps and cadence to holdings. Both are
+# additive and ignored by older binaries, so rollback compatibility is unchanged.
+SCHEMA_VERSION = 5
 
 # Oldest app version whose ORM models can still read this schema. Additive-only
 # migrations (new tables/columns/indexes) keep this unchanged, so a normal

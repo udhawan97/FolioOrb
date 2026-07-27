@@ -46,6 +46,11 @@ DEFAULTS: dict[str, Any] = {
     "rollback_point": None,
     # The version the user last actually ran, used to detect a fresh update.
     "last_seen_version": None,
+    # Manual database restore request, applied before SQLAlchemy opens the live
+    # database on the next launch. Stores a backup basename, never an arbitrary path.
+    "pending_db_restore": None,
+    # Last manual restore outcome for an honest post-restart status message.
+    "last_db_restore": None,
 }
 
 

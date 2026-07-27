@@ -94,6 +94,12 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 🗂️ Read the filings | What your companies actually told the SEC — 8-K, 10-Q, 10-K — pulled straight from EDGAR and linked to the source. Public record, no key, no middleman |
 | 📥 Import / export CSV | Move holdings in and out — a strict template locally, or let Claude map a messy brokerage export onto it |
 | 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply — or undo — one tap at a time |
+| 🧭 Open Review Orbit | One calm workspace gathers price gaps, pending DCA buys, upcoming earnings, verdict calibration, and thesis reviews — prioritised locally, with no automatic trades |
+| 🛡️ Check data trust | See price, quote, fund-fee, dividend, ETF-overlap, thesis, and stored-history coverage before treating a read as complete. Missing stays missing |
+| 💾 Back up locally | Create, verify, export, and restore SQLite snapshots from a local Backup Vault. Restores happen only across a clean restart and preserve the current database first |
+| 📝 Run a monthly review | Build a monthly or quarterly pack from current valuation, stored snapshots, realized trades, movers, and thesis attention; save it as print-ready HTML or CSV |
+| ⏱️ Put theses on a cadence | Mark a holding thesis reviewed and choose when it should return to the inbox — or keep it uncadenced |
+| ⚖️ Compare research ideas | Compare two or three research-mode stocks by stock fundamentals, or ETFs by fund-specific data and published-holdings overlap |
 | 🔐 Paste a Claude key | The dashboard validates it, verifies it reaches Anthropic, and connects live — no restart (disconnect any time) |
 
 > **Local Intelligence is not a downgraded mode.** It's the deterministic engine that runs the dashboard by default. Claude adds narration *on top* — it never gates the core experience, and everything it generates is cached in SQLite so refreshing doesn't mean paying again.
@@ -244,7 +250,12 @@ flowchart LR
 
 The browser view is identical whether you open `localhost:8000` yourself or launch the desktop app — the desktop build (PyInstaller + pywebview) runs the same FastAPI server in-process behind a native window.
 
-Portfolio lifecycle, valuation, recurring-investment state, and Portfolio-scoped AI narratives each have one service interface. That keeps deletion cascades, watchlist exclusions, realized/unrealized return math, quote-quality handling, DCA apply/undo, and `BOOK:<portfolio_id>` cache isolation consistent across every route. See the [architecture guide](https://udhawan97.github.io/FolioOrb/architecture/) for the module map and invariants.
+Portfolio lifecycle, valuation, recurring-investment state, Portfolio-scoped AI narratives,
+and the Review Orbit each have one service interface. That keeps deletion cascades,
+watchlist exclusions, realized/unrealized return math, quote-quality handling, DCA
+apply/undo, review provenance, and `BOOK:<portfolio_id>` cache isolation consistent across
+every route. See the [architecture guide](https://udhawan97.github.io/FolioOrb/architecture/)
+for the module map and invariants.
 
 | Layer | Stack |
 | --- | --- |

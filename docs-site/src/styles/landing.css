@@ -601,6 +601,27 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--page-gutter); }
 .dca-art-row--done { opacity: 0.7; }
 .dca-art-status { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-green); background: color-mix(in oklch, var(--color-green) 14%, transparent); padding: 0.16rem 0.5rem; border-radius: 999px; }
 
+/* Review Orbit product-structure artifact (Act 4, Moment G) */
+.review-art-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.9rem; }
+.review-art-head > div { display: grid; }
+.review-art-head small { color: var(--color-ink-2); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.review-art-head b { font-size: 1rem; }
+.review-art-orbit { position: relative; width: 34px; height: 34px; flex: none; border: 1px solid color-mix(in oklch, var(--color-accent) 45%, transparent); border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 5px color-mix(in oklch, var(--color-accent) 8%, transparent); }
+.review-art-orbit::after { content: ""; position: absolute; width: 5px; height: 5px; top: 1px; right: 5px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 10px var(--color-accent); }
+.review-art-orbit i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); }
+.review-art-count { margin-left: auto; color: var(--color-accent); font-family: var(--font-data); font-size: 0.7rem; }
+.review-art-tabs { display: flex; gap: 0.75rem; overflow: hidden; padding: 0.55rem 0; border-block: 1px solid var(--color-rule); color: var(--color-ink-2); font-size: 0.67rem; white-space: nowrap; }
+.review-art-tabs b { color: var(--color-ink); }
+.review-art-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.65rem; align-items: center; padding: 0.7rem 0; border-bottom: 1px solid var(--color-rule); }
+.review-art-row:last-child { border-bottom: 0; }
+.review-art-row > i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
+.review-art-row > i.urgent { background: var(--color-red); }
+.review-art-row > i.attention { background: var(--color-amber); }
+.review-art-row > span { display: grid; min-width: 0; }
+.review-art-row b { font-size: 0.77rem; }
+.review-art-row small { color: var(--color-ink-2); font-size: 0.66rem; }
+.review-art-row em { border: 1px solid var(--color-rule); border-radius: 999px; padding: 0.2rem 0.55rem; color: var(--color-ink-2); font-size: 0.65rem; font-style: normal; }
+
 /* ── DEMO PANEL (Act 5) ───────────────────────────────────────── */
 .demo-badge { display: inline-block; margin-top: 0.9rem; font-size: 0.78rem; color: var(--color-accent); background: color-mix(in oklch, var(--color-accent) 8%, transparent); border: 1px solid color-mix(in oklch, var(--color-accent) 25%, transparent); padding: 0.3rem 0.8rem; border-radius: 999px; }
 .demo-card { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; border-radius: var(--radius); padding: 1.8rem; }

@@ -66,6 +66,7 @@ export default defineConfig({
           label: 'Using The Dashboard',
           items: [
             { label: 'Overview & Holdings', slug: 'dashboard/overview-holdings' },
+            { label: 'Review Orbit', slug: 'dashboard/review-orbit' },
             { label: 'Analytics & Risk', slug: 'dashboard/analytics-risk' },
             { label: 'News & Market Context', slug: 'dashboard/news-market-context' },
             { label: 'Action Plan', slug: 'dashboard/action-plan' },

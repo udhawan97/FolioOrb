@@ -21,7 +21,7 @@ try {
 // simply ignore the extra query param.
 (function installPortfolioFetchScope() {
     const realFetch = window.fetch.bind(window);
-    const SCOPED = /^\/api\/(portfolio|ai|news|dca)\//;
+    const SCOPED = /^\/api\/(portfolio|ai|news|dca|review)\//;
     window.fetch = function scopedFetch(input, init) {
         // Only string URLs are rewritten — every fetch in the app passes a string,
         // and reconstructing a Request could consume a POST body. Request-object

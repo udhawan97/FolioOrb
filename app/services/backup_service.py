@@ -18,6 +18,7 @@ import logging
 import shutil
 import sqlite3
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app import paths
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 BACKUP_DIRNAME = "backups"
 DEFAULT_KEEP = 5
+MANUAL_KEEP = 12
 
 
 def backups_dir() -> Path:
@@ -76,6 +78,122 @@ def live_db_path() -> Path:
     if not url.startswith("sqlite") or ":memory:" in url:
         raise ValueError("Backups require a file-based SQLite database")
     return Path(url.replace("sqlite:///", "", 1))
+
+
+def resolve_backup_name(name: str) -> Path:
+    """Resolve one vault basename without allowing path traversal."""
+    raw = str(name or "").strip()
+    safe = Path(raw).name
+    if not raw or safe != raw or not safe.endswith(".db"):
+        raise ValueError("Invalid backup name")
+    path = (backups_dir() / safe).resolve()
+    if path.parent != backups_dir().resolve():
+        raise ValueError("Invalid backup name")
+    return path
+
+
+def backup_info(path: Path) -> dict:
+    """Public, secret-free metadata for one database backup."""
+    path = Path(path)
+    return {
+        "name": path.name,
+        "size_bytes": path.stat().st_size,
+        "created_at": datetime.fromtimestamp(
+            path.stat().st_mtime, tz=timezone.utc
+        ).isoformat(),
+        "verified": verify_vault_backup(path),
+        "holding_count": count_holdings(path),
+    }
+
+
+def list_backups() -> list[dict]:
+    """Newest-first inventory of the local database vault."""
+    backup_paths = sorted(
+        backups_dir().glob("*.db"),
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+    return [backup_info(path) for path in backup_paths]
+
+
+def create_manual_backup() -> dict:
+    """Create and verify a user-requested database-only vault snapshot."""
+    source = live_db_path()
+    expected = count_holdings(source)
+    backup = create_backup(source, label="manual")
+    if (
+        not verify_backup(backup, expected_min_holdings=expected)
+        or not verify_vault_backup(backup)
+    ):
+        _safe_remove(backup)
+        raise ValueError("Backup verification failed")
+    # A user-created snapshot must never evict an update or pre-restore rollback
+    # point. Apply its larger retention window only to other manual snapshots.
+    prune_backups(keep=MANUAL_KEEP, pattern="manual-*.db")
+    return backup_info(backup)
+
+
+def queue_restore(name: str) -> dict:
+    """Verify a vault item and queue it for the next clean process start."""
+    from app import app_settings
+
+    backup = resolve_backup_name(name)
+    if not verify_vault_backup(backup):
+        raise ValueError("Refusing to queue an unverified backup")
+    requested_at = datetime.now(timezone.utc).isoformat()
+    pending = {"name": backup.name, "requested_at": requested_at}
+    app_settings.save_settings({"pending_db_restore": pending})
+    return pending
+
+
+def apply_pending_restore() -> dict | None:
+    """Apply a queued restore before the database engine is imported.
+
+    The current database gets its own verified safety backup first. A failed
+    request is cleared so one bad vault item cannot trap the app in a startup
+    loop; the live file remains untouched on every pre-swap failure.
+    """
+    from app import app_settings
+
+    settings = app_settings.load_settings()
+    pending = settings.get("pending_db_restore")
+    if not isinstance(pending, dict) or not pending.get("name"):
+        return None
+
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        requested = resolve_backup_name(str(pending["name"]))
+        if not verify_vault_backup(requested):
+            raise ValueError("Queued backup failed verification")
+        live = live_db_path()
+        safety_name = None
+        if live.exists():
+            expected = count_holdings(live)
+            safety = create_backup(live, label="pre-manual-restore")
+            if not verify_backup(safety, expected_min_holdings=expected):
+                _safe_remove(safety)
+                raise ValueError("Safety backup failed verification")
+            safety_name = safety.name
+        restore_backup(requested, live)
+        result = {
+            "status": "restored",
+            "name": requested.name,
+            "safety_backup": safety_name,
+            "completed_at": now,
+        }
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Queued database restore failed: %s", type(exc).__name__)
+        result = {
+            "status": "failed",
+            "name": str(pending.get("name") or ""),
+            "error": type(exc).__name__,
+            "completed_at": now,
+        }
+    app_settings.save_settings({
+        "pending_db_restore": None,
+        "last_db_restore": result,
+    })
+    return result
 
 
 def _timestamp() -> str:
@@ -164,6 +282,24 @@ def verify_backup(backup_path: Path, expected_min_holdings: int | None = None) -
         conn.close()
 
 
+def verify_vault_backup(backup_path: Path) -> bool:
+    """Require both SQLite integrity and FolioOrb's holdings schema."""
+    backup_path = Path(backup_path)
+    if not verify_backup(backup_path):
+        return False
+    conn = sqlite3.connect(str(backup_path))
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='holdings'"
+        ).fetchone()
+        return row is not None
+    except sqlite3.DatabaseError:
+        return False
+    finally:
+        conn.close()
+
+
 def restore_backup(backup_path: Path, target_db: Path, ts: str | None = None) -> bool:
     """Restore ``backup_path`` over ``target_db`` without destroying the current file.
 
@@ -205,12 +341,23 @@ def _safe_remove(path: Path) -> None:
         logger.debug("Could not remove staging file %s: %s", path.name, type(exc).__name__)
 
 
-def prune_backups(dest_dir: Path | None = None, keep: int = DEFAULT_KEEP) -> list[Path]:
-    """Delete all but the ``keep`` most recent backups. Returns removed paths."""
+def prune_backups(
+    dest_dir: Path | None = None,
+    keep: int = DEFAULT_KEEP,
+    *,
+    pattern: str = "*.db",
+) -> list[Path]:
+    """Delete all but the ``keep`` newest matching backups.
+
+    The optional pattern keeps independently managed classes of rollback point
+    from evicting one another.
+    """
     dest_dir = Path(dest_dir) if dest_dir else backups_dir()
     if not dest_dir.exists():
         return []
-    backups = sorted(dest_dir.glob("*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
+    backups = sorted(
+        dest_dir.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     removed: list[Path] = []
     for old in backups[keep:]:
         try:

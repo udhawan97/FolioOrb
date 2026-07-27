@@ -51,6 +51,9 @@ class Holding(Base):
     # auto = FolioOrb decides core/tactical; anchor = long-horizon never-trim hold
     hold_class = Column(String(20), nullable=False, default="auto", server_default="auto")
     notes = Column(Text, nullable=True)
+    # Optional local workflow metadata. It never changes valuation or trading math.
+    thesis_reviewed_at = Column(DateTime, nullable=True)
+    thesis_review_interval_days = Column(Integer, nullable=True)
     added_at = Column(DateTime, default=func.now())
 
     portfolio = relationship("Portfolio", back_populates="holdings")

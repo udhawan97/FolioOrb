@@ -9,6 +9,8 @@ FolioOrb is local-first, not cloud-hosted.
 | --- | --- |
 | Holdings and portfolio snapshots | Stored in local SQLite under `database/` |
 | Config and API keys | Stored in local `.env`; `.env` is excluded from git |
+| Update and restore state | Stored in local `settings.json`, outside the portfolio database |
+| Manual Backup Vault snapshots | Stored as verified SQLite files under the local data directory; `.env` and API keys are excluded |
 | Browser cache | Uses `localStorage` for faster dashboard paint |
 | Market data | Requested from Yahoo Finance through `yfinance` |
 | Filings and the yield curve | Requested from SEC EDGAR and the US Treasury — public, keyless sources |
@@ -21,6 +23,8 @@ FolioOrb is local-first, not cloud-hosted.
 - CORS defaults to local origins
 - API key input is format-validated client-side and server-side before being saved
 - Claude is optional; the local engine remains available without an AI provider
+- A manual restore is applied only before the database opens on the next launch, after a
+  verified safety copy of the current database is created
 
 ## What actually leaves your machine
 
@@ -40,6 +44,10 @@ Every outbound call, and nothing else:
 What every one of these has in common: the request carries a ticker or a date, never your
 holdings, your share counts, or anything about your positions. There's no telemetry, no
 analytics beacon, and no third service in between.
+
+Creating, listing, exporting, or restoring a Backup Vault snapshot is local file work and
+does not make an outbound request. Exporting a backup places a copy only at the location you
+choose.
 
 ### The SEC contact address
 

@@ -113,6 +113,17 @@ def ensure_startup_migrations(target_engine=None):
                     "ADD COLUMN hold_class VARCHAR(20) NOT NULL DEFAULT 'auto'"
                 )
             )
+        if "thesis_reviewed_at" not in columns:
+            conn.execute(
+                text("ALTER TABLE holdings ADD COLUMN thesis_reviewed_at DATETIME")
+            )
+        if "thesis_review_interval_days" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE holdings "
+                    "ADD COLUMN thesis_review_interval_days INTEGER"
+                )
+            )
         tables = {
             row[0]
             for row in conn.execute(

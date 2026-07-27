@@ -1,3 +1,78 @@
+# FolioOrb v5.9.0 Release Notes
+
+**Release date:** July 27, 2026
+
+## Headline
+
+FolioOrb now has a review ritual, not just a dashboard. Review Orbit brings attention,
+coverage, reports, research comparison, thesis cadence, and verified local recovery into
+one workspace—without connecting a brokerage, inventing missing numbers, or moving a
+position on your behalf.
+
+## What's New
+
+### 🧭 One Review Orbit
+
+A new **Review** control opens a keyboard-accessible workspace with five connected views:
+Inbox, Trust, Review Pack, Compare, and Backups. It traps focus, closes with Escape, returns
+focus to its opener, fits narrow windows, and respects reduced motion.
+
+The Inbox prioritizes unusable prices, simulated DCA buys awaiting approval, upcoming
+earnings, verdicts still collecting calibration history, and thesis reviews. It is an
+attention list, not an automation queue: nothing places a trade or changes a holding.
+
+### 🛡️ Coverage before confidence
+
+The Data Trust Center reports coverage and sources for position prices, quote metadata,
+fund fees, dividend classification, top-holdings ETF overlap, local theses, and stored daily
+history. Missing or implausible provider fields stay missing, and top-10 overlap remains
+explicitly labeled as a floor rather than full-fund duplication.
+
+### 💾 A verified Local Backup Vault
+
+Create and verify SQLite snapshots while FolioOrb is running, inspect holding counts and
+timestamps, and export a backup through a real Save dialog in the desktop app. API keys and
+`.env` are excluded from manual vault snapshots.
+
+A restore never swaps the live database underneath an open app. FolioOrb verifies the chosen
+snapshot, queues it for the next clean start, takes and verifies a fresh safety copy of the
+current database, then stages and re-verifies the replacement before the swap. A failed
+restore leaves the live database untouched.
+
+### 📝 Monthly and quarterly review packs
+
+Build a local report from current valuation, stored snapshots, realized trades, the largest
+current P&L contributors, and theses needing attention. Save the result as print-ready HTML
+or CSV. Value change is deliberately labeled as cash-flow affected—not a time-weighted
+investment return—and names the exact stored opening snapshot used.
+
+### ⏱️ Thesis cadence
+
+Theses can now be marked reviewed and placed on a 30-, 60-, 90-, 180-, or 365-day cadence
+(or left uncadenced). Missing, due-soon, and overdue theses return to the Review Inbox. The
+review timestamp and cadence are local workflow metadata only; they never change valuation
+or verdict math, and Claude still never reads or writes the thesis.
+
+### ⚖️ Type-aware Watchlist Compare
+
+Select two or three research-mode stocks for a side-by-side fundamentals read, or two or
+three ETFs for fund-specific fields, concentration, and published top-holdings overlap.
+Owned positions cannot be smuggled into the research comparison, and mixed stock/ETF
+selections are rejected rather than flattened into misleading common metrics.
+
+## Under the hood
+
+`portfolio_review.py` composes the existing valuation, fee, income, overlap, calibration,
+and market-data interfaces rather than duplicating their financial math. `/api/review`
+provides Portfolio-scoped endpoints, while `review-orbit.js` owns the single UI workspace.
+
+Schema v5 adds two optional holding columns: `thesis_reviewed_at` and
+`thesis_review_interval_days`. The migration is additive and runs through FolioOrb's existing
+backup-first migration gate. Installing over v5.8.0 preserves holdings, trades, snapshots,
+DCA history, thesis text, settings, and API keys.
+
+---
+
 # FolioOrb v5.8.0 Release Notes
 
 **Release date:** July 21, 2026

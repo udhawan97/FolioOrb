@@ -1,5 +1,5 @@
 # pylint: disable=too-many-lines
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -247,6 +247,7 @@ async def add_holding(
         shares=data.shares or 0.0,
         avg_cost=data.avg_cost,
         notes=data.notes,
+        thesis_review_interval_days=data.thesis_review_interval_days,
         is_watchlist=data.is_watchlist or False,
         hold_class=data.hold_class or "auto",
     )
@@ -428,6 +429,7 @@ async def import_holdings(
             shares=create.shares or 0.0,
             avg_cost=create.avg_cost,
             notes=create.notes,
+            thesis_review_interval_days=create.thesis_review_interval_days,
             is_watchlist=create.is_watchlist or False,
             hold_class=create.hold_class or "auto",
         ))
@@ -481,6 +483,10 @@ async def update_holding(
         holding.avg_cost = data.avg_cost
     if data.notes is not None:
         holding.notes = data.notes
+    if "thesis_review_interval_days" in data.model_fields_set:
+        holding.thesis_review_interval_days = data.thesis_review_interval_days
+    if data.mark_thesis_reviewed:
+        holding.thesis_reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     if data.is_active is not None:
         holding.is_active = data.is_active
     if data.is_watchlist is not None:
@@ -493,6 +499,11 @@ async def update_holding(
     return {
         "ticker": holding.ticker,
         "hold_class": holding.hold_class or "auto",
+        "thesis_reviewed_at": (
+            holding.thesis_reviewed_at.isoformat()
+            if holding.thesis_reviewed_at else None
+        ),
+        "thesis_review_interval_days": holding.thesis_review_interval_days,
         "message": "Updated successfully",
     }
 

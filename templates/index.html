@@ -40,8 +40,9 @@
          filename, so these need no ?v= bump. -->
     <link href="/static/vendor/bootstrap-5.3.2.min.css" rel="stylesheet">
     <link href="/static/vendor/bootstrap-icons-1.11.1.css" rel="stylesheet">
-    <!-- v=108: persisted workspace state, modal focus, and narrow-screen containment. -->
+    <!-- Review Orbit styles are isolated below; the main sheet is unchanged. -->
     <link href="/static/css/style.css?v=109" rel="stylesheet">
+    <link href="/static/css/review-orbit.css?v=1" rel="stylesheet">
 </head>
 <body>
 
@@ -262,6 +263,14 @@
                         onclick="openPortfolioManager()">
                     <svg class="manage-lucide manage-lucide--nav" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
                     <span class="manage-nav-label">Manage</span>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary review-nav-trigger" id="review-orbit-trigger"
+                        type="button" aria-expanded="false" aria-controls="review-orbit"
+                        onclick="ReviewOrbit.open()">
+                    <i class="bi bi-compass" aria-hidden="true"></i>
+                    <span class="review-nav-label">Review</span>
+                    <span class="review-nav-badge" id="review-inbox-badge" hidden
+                          aria-label="Review items"></span>
                 </button>
 
                 <!-- ── Overflow menu — secondary controls ──────────────────── -->
@@ -2430,6 +2439,163 @@
         </div>
     </div>
 
+    <!-- ── Review Orbit ─────────────────────────────────────────────────── -->
+    <section class="review-orbit" id="review-orbit" role="dialog" aria-modal="true"
+             aria-labelledby="review-orbit-title" aria-hidden="true" hidden tabindex="-1">
+        <button class="review-orbit-backdrop" type="button" data-review-close
+                aria-label="Close Review Orbit"></button>
+        <div class="review-orbit-shell">
+            <header class="review-orbit-header">
+                <div class="review-orbit-identity">
+                    <span class="review-orbit-mark" id="review-orbit-mark" data-quality="partial"
+                          aria-hidden="true">
+                        <span class="review-orbit-mark-core"></span>
+                    </span>
+                    <div>
+                        <p class="review-orbit-kicker">Local review workspace</p>
+                        <h2 id="review-orbit-title">Review Orbit</h2>
+                        <p class="review-orbit-asof" id="review-orbit-asof">Loading local context…</p>
+                    </div>
+                </div>
+                <div class="review-orbit-header-actions">
+                    <span class="review-orbit-count" id="review-orbit-count">—</span>
+                    <button class="review-orbit-refresh" id="review-orbit-refresh" type="button"
+                            aria-label="Refresh Review Orbit" title="Refresh review data">
+                        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                    </button>
+                    <button class="review-orbit-close" type="button" data-review-close
+                            aria-label="Close Review Orbit">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </header>
+
+            <nav class="review-orbit-tabs" role="tablist" aria-label="Review workspace">
+                <button type="button" role="tab" id="review-tab-inbox" aria-controls="review-pane-inbox"
+                        aria-selected="true" data-review-tab="inbox">
+                    Inbox <span id="review-tab-count" aria-hidden="true"></span>
+                </button>
+                <button type="button" role="tab" id="review-tab-trust" aria-controls="review-pane-trust"
+                        aria-selected="false" tabindex="-1" data-review-tab="trust">Trust</button>
+                <button type="button" role="tab" id="review-tab-report" aria-controls="review-pane-report"
+                        aria-selected="false" tabindex="-1" data-review-tab="report">Review pack</button>
+                <button type="button" role="tab" id="review-tab-compare" aria-controls="review-pane-compare"
+                        aria-selected="false" tabindex="-1" data-review-tab="compare">Compare</button>
+                <button type="button" role="tab" id="review-tab-backups" aria-controls="review-pane-backups"
+                        aria-selected="false" tabindex="-1" data-review-tab="backups">Backups</button>
+            </nav>
+
+            <div class="review-orbit-body">
+                <section class="review-pane" id="review-pane-inbox" role="tabpanel"
+                         aria-labelledby="review-tab-inbox" data-review-pane="inbox">
+                    <div class="review-pane-heading">
+                        <div>
+                            <p class="review-eyebrow">What deserves attention</p>
+                            <h3>Review inbox</h3>
+                        </div>
+                        <p>Prioritised locally. Nothing here places a trade or changes a position.</p>
+                    </div>
+                    <div class="review-inbox-summary" id="review-inbox-summary"></div>
+                    <div class="review-list" id="review-inbox-list" aria-live="polite"></div>
+                    <form class="review-thesis-editor" id="review-thesis-editor" hidden>
+                        <div class="review-thesis-editor-head">
+                            <div>
+                                <p class="review-eyebrow">Review cadence</p>
+                                <h4 id="review-thesis-title">Holding thesis</h4>
+                            </div>
+                            <button type="button" id="review-thesis-cancel" aria-label="Close thesis editor">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <label for="review-thesis-notes">Reason to own or watch</label>
+                        <textarea id="review-thesis-notes" maxlength="500" rows="5"
+                                  placeholder="What would make this thesis stronger, weaker, or invalid?"></textarea>
+                        <div class="review-thesis-fields">
+                            <label for="review-thesis-cadence">Review again
+                                <select id="review-thesis-cadence">
+                                    <option value="">No cadence</option>
+                                    <option value="30">In 30 days</option>
+                                    <option value="60">In 60 days</option>
+                                    <option value="90">In 90 days</option>
+                                    <option value="180">In 180 days</option>
+                                    <option value="365">In one year</option>
+                                </select>
+                            </label>
+                            <button class="review-primary-btn" type="submit">Save &amp; mark reviewed</button>
+                        </div>
+                        <p class="review-inline-status" id="review-thesis-status" role="status"></p>
+                    </form>
+                </section>
+
+                <section class="review-pane" id="review-pane-trust" role="tabpanel"
+                         aria-labelledby="review-tab-trust" data-review-pane="trust" hidden>
+                    <div class="review-pane-heading">
+                        <div><p class="review-eyebrow">Coverage before confidence</p><h3>Data Trust Center</h3></div>
+                        <p>Every surface says what is known, missing, and locally stored.</p>
+                    </div>
+                    <div class="review-trust-principle" id="review-trust-principle"></div>
+                    <div class="review-trust-grid" id="review-trust-grid" aria-live="polite"></div>
+                </section>
+
+                <section class="review-pane" id="review-pane-report" role="tabpanel"
+                         aria-labelledby="review-tab-report" data-review-pane="report" hidden>
+                    <div class="review-pane-heading">
+                        <div><p class="review-eyebrow">A calm review ritual</p><h3>Monthly review pack</h3></div>
+                        <div class="review-segmented" aria-label="Review period">
+                            <button type="button" data-report-period="month" aria-pressed="true">Month</button>
+                            <button type="button" data-report-period="quarter" aria-pressed="false">Quarter</button>
+                        </div>
+                    </div>
+                    <div class="review-report-summary" id="review-report-summary" aria-live="polite"></div>
+                    <div class="review-report-actions">
+                        <button type="button" class="review-primary-btn" data-report-export="html">
+                            <i class="bi bi-file-earmark-text" aria-hidden="true"></i> Save print-ready HTML
+                        </button>
+                        <button type="button" class="review-secondary-btn" data-report-export="csv">
+                            <i class="bi bi-filetype-csv" aria-hidden="true"></i> Save CSV
+                        </button>
+                    </div>
+                    <p class="review-disclosure">Value change includes cash flows and is not presented as time-weighted performance.</p>
+                </section>
+
+                <section class="review-pane" id="review-pane-compare" role="tabpanel"
+                         aria-labelledby="review-tab-compare" data-review-pane="compare" hidden>
+                    <div class="review-pane-heading">
+                        <div><p class="review-eyebrow">Research mode only</p><h3>Watchlist compare</h3></div>
+                        <p>Choose two or three stocks together, or two or three ETFs together.</p>
+                    </div>
+                    <div class="review-watchlist-picks" id="review-watchlist-picks" aria-live="polite"></div>
+                    <button type="button" class="review-primary-btn" id="review-compare-run" disabled>Compare selected</button>
+                    <div class="review-compare-results" id="review-compare-results" aria-live="polite"></div>
+                </section>
+
+                <section class="review-pane" id="review-pane-backups" role="tabpanel"
+                         aria-labelledby="review-tab-backups" data-review-pane="backups" hidden>
+                    <div class="review-pane-heading">
+                        <div><p class="review-eyebrow">Your data, recoverable</p><h3>Local Backup Vault</h3></div>
+                        <button type="button" class="review-primary-btn" id="review-backup-create">
+                            <i class="bi bi-shield-plus" aria-hidden="true"></i> Create verified backup
+                        </button>
+                    </div>
+                    <p class="review-disclosure">Backups contain the SQLite portfolio database only. API keys and the local <code>.env</code> are excluded.</p>
+                    <div class="review-restore-status" id="review-restore-status" hidden></div>
+                    <div class="review-backup-list" id="review-backup-list" aria-live="polite"></div>
+                    <div class="review-restore-confirm" id="review-restore-confirm" hidden role="alert">
+                        <div>
+                            <strong id="review-restore-title">Restore this backup?</strong>
+                            <p>FolioOrb first saves the current database, then restores after a clean restart.</p>
+                        </div>
+                        <div>
+                            <button type="button" class="review-secondary-btn" id="review-restore-cancel">Cancel</button>
+                            <button type="button" class="review-danger-btn" id="review-restore-accept">Queue restore</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="review-orbit-live" id="review-orbit-live" role="status" aria-live="polite"></div>
+        </div>
+    </section>
+
     <!-- Bootstrap is used only declaratively here (data-bs-toggle/-target), and
          the bundle wires those on DOMContentLoaded, so deferring it costs
          nothing and stops it blocking the parser. Deferred scripts still run in
@@ -2440,8 +2606,9 @@
     <script defer src="/static/vendor/chartjs-chart-treemap-3.0.0.min.js"></script>
     <script defer src="/static/js/core.js?v=1"></script>
     <script defer src="/static/js/analytics-charts.js?v=15"></script>
-    <script defer src="/static/js/dashboard.js?v=102"></script>
+    <script defer src="/static/js/dashboard.js?v=103"></script>
     <script defer src="/static/js/updates.js?v=3"></script>
+    <script defer src="/static/js/review-orbit.js?v=3"></script>
 
     <!-- Tip Popover (singleton) -->
     <div id="tip-popover" role="tooltip" aria-hidden="true"></div>

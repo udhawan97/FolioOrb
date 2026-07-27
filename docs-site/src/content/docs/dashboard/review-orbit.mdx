@@ -1,0 +1,114 @@
+---
+title: Review Orbit
+description: Use the review inbox, data trust center, reports, research comparison, thesis cadence, and local backup vault.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Review Orbit turns the dashboard into a repeatable review workflow. Choose **Review** in the
+top bar to open one keyboard-accessible workspace; on a narrow screen it becomes a full-height
+sheet. Escape closes it, Tab stays inside while it is open, and focus returns to the control
+that opened it.
+
+<Aside type="note" title="Review, not execution">
+Review Orbit does not connect to a brokerage, place a trade, apply a DCA contribution, or
+change a position automatically. It points at work; you decide what to do.
+</Aside>
+
+## Inbox
+
+The Inbox combines attention that was previously scattered across the dashboard:
+
+- **Price gaps** that make current Portfolio totals partial or unavailable
+- **Pending DCA contributions** still waiting in the simulated ledger
+- **Missing, due-soon, or overdue theses**
+- **Upcoming earnings** within 30 days
+- **Verdict snapshots still collecting calibration history**
+
+Urgent data gaps come first, then items needing a decision, then quiet calendar/calibration
+context. Choose an item to open the relevant Review tab, holding, thesis editor, or DCA
+ledger. The Inbox itself makes no mutations.
+
+## Data Trust Center
+
+The Trust tab answers the question to ask before reading a confident number: *how much of
+this view is actually covered?*
+
+| Area | What complete means | Source or boundary |
+| --- | --- | --- |
+| Position prices | Every invested position has a positive usable quote | Yahoo Finance through the local market-data cache |
+| Quote metadata | The active rows returned provider metadata | Yahoo Finance through `yfinance` |
+| Fund fees | Every held ETF/fund has a plausible expense ratio | Provider expense-ratio fields; unknown never means free |
+| Dividend classification | The active rows returned a usable full quote | Provider forward-dividend fields; non-payers stay explicit |
+| ETF overlap | Published top holdings were available for each held ETF | Top holdings only; reported as a floor on real overlap |
+| Theses | Every active holding has local thesis text | Local SQLite only |
+| Stored history | At least one daily Portfolio snapshot exists | Local SQLite only |
+
+**Complete**, **partial**, **unavailable**, and **not applicable** are data states—not grades.
+The most limited relevant area sets the orbit's overall status.
+
+## Monthly or quarterly Review Pack
+
+Choose **Month** or **Quarter** to assemble:
+
+- Current value, cost basis, realized and unrealized P&L
+- The stored opening snapshot and snapshot coverage
+- Realized trades during the selected period
+- The largest current P&L contributors
+- Theses that need attention
+
+Save **print-ready HTML** to open or print to PDF, or **CSV** for a spreadsheet. The report
+calls raw start-to-end movement **value change** because deposits and withdrawals can move
+that number; it is not mislabeled as a time-weighted investment return. The exact stored
+opening-snapshot date appears beside the comparison, and history is marked partial when that
+snapshot is more than three days from the requested month or quarter boundary.
+
+## Thesis review cadence
+
+From a thesis item in the Inbox:
+
+<Steps>
+1. Write or update the reason to own or watch the holding.
+2. Choose no cadence, 30, 60, 90, 180, or 365 days.
+3. Select **Save & mark reviewed**.
+</Steps>
+
+The review timestamp and interval stay in local SQLite. They control only when the thesis
+returns to the Inbox; they do not change P&L, allocation, a verdict, or an action plan.
+Claude never reads or writes thesis text.
+
+## Watchlist Compare
+
+Compare is deliberately limited to active **Research mode** rows:
+
+- Choose two or three stocks to compare stock fundamentals such as valuation, revenue
+  growth, margins, free-cash-flow yield, and dividend yield.
+- Choose two or three ETFs to compare fund assets, expense ratio, holdings count,
+  concentration, and top holdings.
+- A two-ETF comparison also shows overlap across the published top holdings, with the
+  limitation stated beside it.
+
+Mixed stock/ETF selections and owned-position tickers are rejected instead of being forced
+into one misleading table. Missing provider fields render as unavailable.
+
+## Local Backup Vault
+
+The Backups tab creates transactionally consistent SQLite snapshots with SQLite's online
+backup API, then runs an integrity check and records the holding-row count.
+
+Manual vault snapshots contain the **portfolio database only**. They exclude `.env`, Claude
+API keys, update settings, and other config. Export uses a native Save dialog in the desktop
+app and a normal download in a browser.
+
+### Restore safely
+
+<Steps>
+1. Choose **Restore…** beside a verified snapshot and confirm the exact filename.
+2. FolioOrb queues the request instead of replacing an open database.
+3. Quit/restart (the packaged app quits after queuing; reopen it).
+4. Before restore, FolioOrb creates and verifies a fresh safety copy of the current database.
+5. The requested snapshot is staged and verified again, then swapped into place.
+</Steps>
+
+If staging or verification fails, the live database is left untouched. The next launch
+reports whether the restore succeeded and names the retained safety backup.

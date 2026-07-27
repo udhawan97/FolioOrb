@@ -41,6 +41,7 @@ class HoldingCreate(BaseModel):
         None, gt=0, allow_inf_nan=False, description="Average purchase price per share"
     )
     notes: Optional[str] = Field(None, max_length=500)
+    thesis_review_interval_days: Optional[int] = Field(None, ge=7, le=730)
     is_watchlist: Optional[bool] = False  # True = research-only, excluded from P&L
     hold_class: Optional[str] = Field(default="auto")
 
@@ -72,6 +73,8 @@ class HoldingUpdate(BaseModel):
     shares: Optional[float] = Field(None, gt=0)
     avg_cost: Optional[float] = Field(None, gt=0)
     notes: Optional[str] = Field(None, max_length=500)
+    thesis_review_interval_days: Optional[int] = Field(None, ge=7, le=730)
+    mark_thesis_reviewed: Optional[bool] = None
     is_active: Optional[bool] = None
     is_watchlist: Optional[bool] = None  # Toggle research mode without affecting P&L
     hold_class: Optional[str] = None
@@ -112,6 +115,8 @@ class HoldingResponse(BaseModel):
     is_active: bool
     hold_class: str
     notes: Optional[str]
+    thesis_reviewed_at: Optional[datetime]
+    thesis_review_interval_days: Optional[int]
     added_at: datetime
 
 

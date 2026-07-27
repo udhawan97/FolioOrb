@@ -47,7 +47,8 @@ lifetime is declared at the fetcher instead of hand-rolled beside it.
 
 ## Portfolio integrity modules
 
-Financial state is concentrated behind four interfaces so callers cannot accidentally use
+Financial state and review orchestration are concentrated behind focused interfaces so
+callers cannot accidentally use
 different rules for the same Portfolio:
 
 | Module | Owns | Important invariant |
@@ -56,6 +57,8 @@ different rules for the same Portfolio:
 | `portfolio_valuation.py` | Live valuation, cost basis, realized + unrealized return, quote quality, daily history | Watchlist rows never enter totals; zero, non-finite, and missing quotes make quality explicit; total-return percentage uses open plus sold cost basis; only complete valuations may update daily snapshots. |
 | `dca_ledger.py` | Plan persistence, catch-up, pending/applied/dismissed transitions, exact apply/undo | Catch-up is idempotent; no simulated buy mutates a holding until the user applies it; a plan with applied buys cannot be deleted until those buys are undone. |
 | `narrative_cache.py` | Portfolio and ticker cache reads/writes, TTL/price freshness, verdict encoding, JSON validation | Portfolio narratives are isolated under `BOOK:<portfolio_id>`; stale or corrupt rows regenerate safely; incomplete valuations never produce confident Portfolio-level Claude narration. |
+| `portfolio_review.py` | Review Inbox, trust coverage, period reports, type-aware research comparison, thesis cadence state | Reuses valuation/fee/income/overlap contracts; value change is not called investment return; Compare accepts only research-mode tickers of one security type. |
+| `backup_service.py` | WAL-safe snapshots, integrity verification, vault inventory, queued restore and safety copy | Manual restore happens before SQLAlchemy opens the database; an unverified or failed staged copy never replaces the live file. |
 
 Pure DCA scheduling and cost math remains in `dca_service.py`, while routers and AI/analytics
 call these interfaces instead of reaching into each other's private helpers.
@@ -102,8 +105,8 @@ app/
 ├── database.py             SQLite engine/session and startup migrations
 ├── models.py               SQLAlchemy ORM models
 ├── schemas.py              Pydantic request/response contracts
-├── routers/                Thin HTTP adapters: stocks, portfolio, DCA, AI, news, system
-└── services/               Lifecycle, valuation, DCA ledger, cache, analytics, signals, data, updates
+├── routers/                Thin HTTP adapters: stocks, portfolio, DCA, AI, news, review, system
+└── services/               Lifecycle, valuation, review, backup, DCA, cache, analytics, signals, updates
 
 desktop/                    Desktop entry point (uvicorn + native window)
 packaging/                  PyInstaller spec, Inno Setup script, app icons
@@ -115,6 +118,7 @@ static/
 ├── css/style.css           Dashboard design system
 ├── js/core.js              Escaping, fetch + endpoint cache, holding-panel registry
 ├── js/dashboard.js         Main dashboard behavior
+├── js/review-orbit.js      Review workspace, reports, compare, thesis, and vault UI
 ├── js/analytics-charts.js  Chart.js analytics widgets
 └── js/updates.js           In-app update check and download
 ```

@@ -229,6 +229,11 @@ def evaluate(
                 "is_watchlist": is_watchlist,
                 "hold_class": str(holding.hold_class or "auto"),
                 "notes": holding.notes,
+                "thesis_reviewed_at": (
+                    holding.thesis_reviewed_at.isoformat()
+                    if holding.thesis_reviewed_at else None
+                ),
+                "thesis_review_interval_days": holding.thesis_review_interval_days,
             }
         )
 

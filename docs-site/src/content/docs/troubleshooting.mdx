@@ -17,6 +17,8 @@ import SenpaiTip from '../../components/SenpaiTip.astro';
 | Claude request fails | Confirm the key starts with `sk-ant-`, has account credit/access, and restart if you edited `.env` manually |
 | Pylint command fails on Windows | Use Git Bash, WSL, or run `pylint app tests run.py` |
 | Senpai stopped talking | It's probably hidden — check the overflow menu's Intelligence section and toggle it back on |
+| A Backup Vault restore says it is queued | Restart FolioOrb. The database is intentionally restored only before SQLite opens; the next launch reports success or a safe pre-swap failure |
+| A backup fails verification | Do not restore it. Create a new verified backup; the failed file never replaces the live database |
 
 ## Installing the desktop app
 
@@ -50,3 +52,7 @@ without one. A key unlocks narration, action plan thesis text, and news themes o
 Locally, in SQLite under `database/`, and in a local `.env` file. Neither leaves your
 machine except for the explicit Yahoo Finance and (optional) Anthropic calls described in
 [Privacy & Data Handling](../privacy/).
+
+**Does a Backup Vault file contain my Claude API key?**
+No. Manual vault snapshots contain only the SQLite portfolio database. `.env`, API keys,
+and update settings stay outside the file.

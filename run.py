@@ -13,6 +13,11 @@ def _open_browser():
 
 
 if __name__ == "__main__":
+    # Manual restores are swapped in before app.main imports SQLAlchemy and
+    # opens the live SQLite file. The browser is opened only after that boundary.
+    from app.services import backup_service
+
+    backup_service.apply_pending_restore()
     threading.Thread(target=_open_browser, daemon=True).start()
     uvicorn.run(
         "app.main:app",

@@ -57,6 +57,17 @@ def test_verify_rejects_corrupt_file(tmp_path):
     assert backup_service.verify_backup(junk) is False
 
 
+def test_vault_verification_rejects_an_unrelated_healthy_database(tmp_path):
+    unrelated = tmp_path / "unrelated.db"
+    conn = sqlite3.connect(str(unrelated))
+    conn.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)")
+    conn.commit()
+    conn.close()
+
+    assert backup_service.verify_backup(unrelated) is True
+    assert backup_service.verify_vault_backup(unrelated) is False
+
+
 def test_verify_min_holdings_when_table_absent(tmp_path):
     empty_db = tmp_path / "fresh.db"
     conn = sqlite3.connect(str(empty_db))
@@ -186,3 +197,56 @@ def test_prune_keeps_newest_n(tmp_path):
     assert len(removed) == 4
     # The three newest (highest index) survive.
     assert {p.name for p in remaining} == {created[i].name for i in (4, 5, 6)}
+
+
+def test_manual_pruning_does_not_remove_other_rollback_points(tmp_path):
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    protected = backups / "pre-update-5.9.0.db"
+    protected.touch()
+    for i in range(3):
+        (backups / f"manual-{i}.db").touch()
+
+    removed = backup_service.prune_backups(
+        backups, keep=1, pattern="manual-*.db"
+    )
+
+    assert protected.exists()
+    assert len(removed) == 2
+    assert len(list(backups.glob("manual-*.db"))) == 1
+
+
+def test_resolve_backup_name_rejects_traversal(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    with pytest.raises(ValueError):
+        backup_service.resolve_backup_name("../portfolio.db")
+    with pytest.raises(ValueError):
+        backup_service.resolve_backup_name("notes.txt")
+
+
+def test_queued_restore_applies_before_start_and_keeps_safety_copy(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    live = tmp_path / "portfolio.db"
+    _make_db(live, ["CURRENT"])
+    wanted = backup_service.create_backup(
+        live, label="manual", dest_dir=tmp_path / "backups", ts="wanted"
+    )
+
+    conn = sqlite3.connect(str(live))
+    conn.execute("DELETE FROM holdings")
+    conn.execute("INSERT INTO holdings (ticker) VALUES ('CHANGED')")
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr(backup_service, "live_db_path", lambda: live)
+    backup_service.queue_restore(wanted.name)
+    result = backup_service.apply_pending_restore()
+
+    assert result["status"] == "restored"
+    assert _holdings(live) == ["CURRENT"]
+    assert result["safety_backup"].startswith("pre-manual-restore-")
+    assert backup_service.resolve_backup_name(result["safety_backup"]).exists()
