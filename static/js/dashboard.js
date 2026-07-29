@@ -9410,6 +9410,28 @@ function initDashboardSenpai() {
         return DASHBOARD_SENPAI_QUOTES;
     }
 
+    // Declared here rather than beside the click handler below: setVisible() runs
+    // during init and reaches revealBubbleForDwell(), so a later `const` would be
+    // in its temporal dead zone.
+    const isMobileSenpai = () =>
+        window.matchMedia?.("(max-width: 575.98px)").matches ?? false;
+
+    // Desktop keeps the bubble open only long enough to read it, then lets it
+    // settle back to the orb so it stops covering the panel underneath. Mobile
+    // already collapses on its own, so it opts out here.
+    const SENPAI_BUBBLE_DWELL_MS = 9000;
+    let _dashboardSenpaiDwellTimer = null;
+
+    function revealBubbleForDwell() {
+        if (isMobileSenpai()) return;
+        senpai.classList.add("is-expanded");
+        window.clearTimeout(_dashboardSenpaiDwellTimer);
+        _dashboardSenpaiDwellTimer = window.setTimeout(() => {
+            senpai.classList.remove("is-expanded");
+            _dashboardSenpaiDwellTimer = null;
+        }, SENPAI_BUBBLE_DWELL_MS);
+    }
+
     function showQuote(nextIndex = null, { withEmoticon = false } = {}) {
         const quotes = currentSenpaiQuotes();
         if (nextIndex === null) {
@@ -9426,6 +9448,7 @@ function initDashboardSenpai() {
             : quotes[_dashboardSenpaiQuoteIndex];
         const message = withEmoticon ? `${baseMessage} ${randomTapEmoticon()}` : baseMessage;
         quote.textContent = message;
+        revealBubbleForDwell();
         animateSenpaiForLine(message);
         if (!prefersReducedMotion() && !bubble.classList.contains("is-talking")) {
             bubble.classList.add("is-talking");
@@ -9440,6 +9463,7 @@ function initDashboardSenpai() {
     function speak(message, { reveal = true, persist = false } = {}) {
         if (reveal && !isVisible()) setVisible(true, persist);
         quote.textContent = message;
+        revealBubbleForDwell();
         animateSenpaiForLine(message);
         if (!prefersReducedMotion() && !bubble.classList.contains("is-talking")) {
             bubble.classList.add("is-talking");
@@ -9478,9 +9502,6 @@ function initDashboardSenpai() {
     try { savedVisible = localStorage.getItem(DASHBOARD_SENPAI_KEY) !== "0"; } catch (_) {}
     setVisible(savedVisible, false);
 
-    const isMobileSenpai = () =>
-        window.matchMedia?.("(max-width: 575.98px)").matches ?? false;
-
     toggle.addEventListener("click", () => {
         if (senpai.classList.contains("is-hidden")) {
             setVisible(true);
@@ -9492,6 +9513,17 @@ function initDashboardSenpai() {
             senpai.classList.toggle("is-expanded");
             return;
         }
+        // On desktop the bubble settles away after its dwell. Clicking the orb
+        // then brings the last line back rather than hiding Senpai outright —
+        // otherwise the only way to re-read a settled quip would be to hide and
+        // re-show the whole thing. A second click still hides, as before.
+        if (!senpai.classList.contains("is-expanded") && !senpai.classList.contains("is-texting")) {
+            revealBubbleForDwell();
+            return;
+        }
+        window.clearTimeout(_dashboardSenpaiDwellTimer);
+        _dashboardSenpaiDwellTimer = null;
+        senpai.classList.remove("is-expanded");
         setVisible(false);
     });
     navToggle.addEventListener("click", () => {
@@ -10995,6 +11027,54 @@ function renderSenpaiWelcomeHoldModes() {
     }).join("");
 }
 
+// The guide paints a full-viewport pointer-blocking layer, so it has to be a real
+// modal for the keyboard too: without this the first screen a new user meets is
+// reachable only after tabbing through the whole dashboard behind it. Mirrors the
+// portfolio manager's trap so both overlays behave identically.
+let _senpaiWelcomePreviousFocus = null;
+const _senpaiWelcomeBackgroundState = new Map();
+
+function senpaiWelcomeFocusableElements() {
+    const guide = document.getElementById("senpai-welcome-guide");
+    if (!guide) return [];
+    return Array.from(guide.querySelectorAll(
+        "a[href], button:not([disabled]), input:not([disabled]), " +
+        "select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    )).filter(element => element.getClientRects().length > 0);
+}
+
+function handleSenpaiWelcomeKeydown(event) {
+    const guide = document.getElementById("senpai-welcome-guide");
+    if (!guide?.classList.contains("is-visible")) return;
+
+    if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closeSenpaiWelcomeGuide();
+        return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = senpaiWelcomeFocusableElements();
+    if (!focusable.length) {
+        event.preventDefault();
+        guide.focus();
+        return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    } else if (!guide.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
 // Module-level so the global Escape handler can dismiss the welcome guide too.
 // Returns true if it actually closed a visible guide.
 function closeSenpaiWelcomeGuide() {
@@ -11002,7 +11082,16 @@ function closeSenpaiWelcomeGuide() {
     if (!guide || !guide.classList.contains("is-visible")) return false;
     guide.classList.remove("is-visible");
     guide.setAttribute("aria-hidden", "true");
+    guide.setAttribute("aria-modal", "false");
+    document.removeEventListener("keydown", handleSenpaiWelcomeKeydown, true);
+    _senpaiWelcomeBackgroundState.forEach((wasInert, element) => {
+        element.inert = wasInert;
+    });
+    _senpaiWelcomeBackgroundState.clear();
     try { localStorage.setItem(SENPAI_WELCOME_SEEN_KEY, "1"); } catch (_) {}
+    const previousFocus = _senpaiWelcomePreviousFocus;
+    _senpaiWelcomePreviousFocus = null;
+    if (previousFocus?.focus) requestAnimationFrame(() => previousFocus.focus());
     return true;
 }
 
@@ -11038,6 +11127,18 @@ function maybeShowSenpaiWelcomeGuide() {
     if (seen || latestHoldings.length > 0) return;
     guide.classList.add("is-visible");
     guide.setAttribute("aria-hidden", "false");
+    guide.setAttribute("aria-modal", "true");
+    _senpaiWelcomePreviousFocus = document.activeElement;
+    document.querySelectorAll("body > *").forEach(element => {
+        if (element === guide || element.tagName === "SCRIPT") return;
+        _senpaiWelcomeBackgroundState.set(element, element.inert);
+        element.inert = true;
+    });
+    document.addEventListener("keydown", handleSenpaiWelcomeKeydown, true);
+    requestAnimationFrame(() => {
+        (document.getElementById("senpai-welcome-add-holding")
+            || senpaiWelcomeFocusableElements()[0])?.focus();
+    });
 }
 
 // ── Boot splash ─────────────────────────────────────────────────────────────

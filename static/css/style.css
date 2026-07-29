@@ -9111,6 +9111,29 @@ body > .dashboard-senpai {
     transform: translateY(18px) scale(0.88);
 }
 
+/* ── Desktop: the bubble settles after it has been read ──────────────────────
+   It is fixed bottom-right over live content, so leaving it pinned open buries
+   whatever occupies that corner — at 1440x900 that is the per-holding dollar
+   column of "Today's impact". Senpai still speaks on every new quip
+   (`is-texting`) and reopens on click (`is-expanded`); it just stops standing
+   on the numbers once the message has been delivered. Mirrors the behaviour
+   mobile already had. */
+@media (min-width: 576px) {
+    body > .dashboard-senpai:not(.is-expanded):not(.is-texting) .dashboard-senpai-bubble {
+        opacity: 0;
+        /* `visibility` rather than opacity alone: a transparent box still answers
+           hit-testing, so the values underneath would stay unclickable. Delayed so
+           the fade still plays before the box leaves the layer. */
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(6px) scale(0.96);
+        transition:
+            opacity 0.24s var(--ease),
+            transform 0.28s var(--spring),
+            visibility 0s linear 0.24s;
+    }
+}
+
 /* ── Mobile: Senpai collapses to a corner orb; bubble expands on tap or message ─
    Selectors are prefixed with `body > .dashboard-senpai` so they outrank the base
    .dashboard-senpai-bubble rule that follows them in source order. */

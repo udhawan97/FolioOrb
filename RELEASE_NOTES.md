@@ -1,3 +1,57 @@
+# FolioOrb v5.9.1 Release Notes
+
+**Release date:** July 29, 2026
+
+## Headline
+
+A userflow audit of the first-run, add-holding, dashboard, and Review Orbit journeys —
+run against a real browser rather than the source — turned up four fixable gaps. This
+release closes them. No feature changes; nothing moves a position.
+
+## Fixes
+
+### ⌨️ The welcome guide is now a real modal
+
+The first-run guide painted a full-viewport layer that blocked the mouse but left the
+whole dashboard behind it in the tab order — its own buttons were the 93rd tab stop, and
+focus never entered the dialog. It now does what Review Orbit and the portfolio manager
+already did: marks the background `inert`, sets `aria-modal="true"`, moves focus to
+**Add your first holding** on open, traps Tab in both directions, and returns focus to
+where it came from on close. Escape and the one-time dismissal are unchanged.
+
+### 💬 Senpai stops standing on the numbers
+
+On desktop the quip bubble was pinned open bottom-right, permanently covering whatever
+occupied that corner — at 1440×900 that was the per-holding dollar column of Today's
+impact and part of the world-markets strip. The bubble now settles back to the orb about
+nine seconds after it speaks, the way it already did on mobile. New quips still open it,
+and clicking the orb brings the last line back; a second click hides Senpai as before.
+
+### 🔤 Ticker validation works again
+
+`pattern="[A-Za-z0-9.^-]{1,10}"` on the ticker field is not a valid regular expression
+under the `v` flag browsers now use, so every page load logged a console error and the
+attribute was dropped wholesale — taking the client-side character check with it. The
+dash is now escaped. Tickers with dashes and carets (`BRK-B`, `^GSPC`) still validate;
+junk no longer does. The JS and Python checks were always in place, so no bad data could
+reach the database either way.
+
+### 🔊 Add-holding errors are announced
+
+The add-holding message is now a polite live region and is wired to the ticker field with
+`aria-describedby`, so screen-reader users hear the specific error instead of only seeing
+focus move.
+
+## Known gap
+
+A cold load still fetches three endpoints twice — `benchmark-comparison`,
+`analytics-insights`, and the multi-ticker `history/batch`. It is real and measured
+(29 requests, 26 distinct) but tracing the two initialisation paths safely did not fit
+this release, and a rushed change to the data-loading path was not worth the risk. It is
+queued for the next one.
+
+---
+
 # FolioOrb v5.9.0 Release Notes
 
 **Release date:** July 27, 2026

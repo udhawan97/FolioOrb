@@ -7,6 +7,29 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.9.1 — Userflow fixes
+
+- **The welcome guide is a real modal.** The first-run guide blocked the mouse but left the
+  dashboard behind it reachable by Tab, and never moved focus into itself. It now marks the
+  background inert, moves focus to **Add your first holding**, traps Tab in both directions,
+  and returns focus to its opener — matching Review Orbit and the portfolio manager.
+- **Senpai settles instead of covering the numbers.** On desktop the quip bubble stayed
+  pinned open over the bottom-right of the dashboard, hiding Today's impact contributions
+  and part of the world-markets strip. It now fades back to the orb a few seconds after it
+  speaks, as it already did on mobile. Clicking the orb brings the last line back.
+- **Ticker validation works again.** The ticker field's `pattern` was not a valid regular
+  expression under the stricter parser current browsers use, so it was dropped entirely and
+  logged a console error on every load. Dashes and carets (`BRK-B`, `^GSPC`) validate as
+  intended; invalid input no longer slips past the field check.
+- **Add-holding errors are announced.** The inline error is now a live region tied to the
+  ticker field, so screen-reader users hear what went wrong.
+
+### Known issues
+
+- A cold load still requests three endpoints twice (`benchmark-comparison`,
+  `analytics-insights`, and the batched price history), which lengthens first paint. Queued
+  for the next release.
+
 ## v5.9.0 — The Review Orbit
 
 - **One review workspace.** Inbox, Data Trust Center, monthly/quarterly Review Pack,
