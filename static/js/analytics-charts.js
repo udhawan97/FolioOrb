@@ -36,6 +36,7 @@ const AnalyticsCharts = (() => {
 
     let _moduleInsightsCache = { ai: null, local: null };
     let _moduleInsightsLoading = false;
+    let _aiModuleInsightsLoading = false;
     let _portfolioExposureCache = null;
 
     // Sector tilt live-selection state
@@ -52,6 +53,9 @@ const AnalyticsCharts = (() => {
             ? PORTFOLIO_EXPOSURE_URL
             : "/api/ai/portfolio-exposure";
     }
+
+    const BENCHMARK_COMPARISON_URL = "/api/portfolio/benchmark-comparison";
+    const ANALYTICS_INSIGHTS_LOCAL_URL = "/api/ai/analytics-insights?mode=local";
 
     // Three panes here want this payload and so does the dashboard snapshot.
     // apiGetCached is the shared layer: concurrent callers await one in-flight
@@ -354,7 +358,13 @@ const AnalyticsCharts = (() => {
 
         _moduleInsightsLoading = true;
         try {
-            _moduleInsightsCache.local = await apiGet("/api/ai/analytics-insights?mode=local");
+            // The in-flight guard above only covers concurrent non-forced calls.
+            // A forced call during init (the intelligence-mode handler fires while
+            // the zone-enter fetch is still open) slipped past it and produced a
+            // second identical request, so the shared endpoint cache backs it up.
+            // Forcing still refetches — it drops the entry first.
+            if (forceRefresh) apiGetCached.invalidate(ANALYTICS_INSIGHTS_LOCAL_URL);
+            _moduleInsightsCache.local = await apiGetCached(ANALYTICS_INSIGHTS_LOCAL_URL);
             applyWidgetInsights();
             if (widgetInsightMode() === "ai") {
                 void loadAiWidgetInsights(false);
@@ -372,6 +382,13 @@ const AnalyticsCharts = (() => {
             applyWidgetInsights();
             return;
         }
+        // The local sibling has always had this guard; this one did not, and it
+        // has two callers that can fire together on a switch into AI mode
+        // (loadWidgetInsights chains into it, and onIntelligenceModeChanged also
+        // calls it directly). Without the guard that was two billed Claude calls
+        // for one payload.
+        if (_aiModuleInsightsLoading && !forceRefresh) return;
+        _aiModuleInsightsLoading = true;
         applyWidgetInsights();
         try {
             const params = new URLSearchParams({ mode: "ai" });
@@ -387,6 +404,8 @@ const AnalyticsCharts = (() => {
             console.warn("Claude analytics tips fetch failed:", err);
             _moduleInsightsCache.ai = null;
             applyWidgetInsights();
+        } finally {
+            _aiModuleInsightsLoading = false;
         }
     }
 
@@ -1457,8 +1476,10 @@ const AnalyticsCharts = (() => {
         showLoading("benchmark-loading", true);
         showEmpty("benchmark-empty", false);
         try {
-            const res = await fetch("/api/portfolio/benchmark-comparison");
-            const data = await res.json();
+            // Both the pane loader and the post-render pass ask for this on a
+            // cold load. Sharing the in-flight promise makes that one request;
+            // onRefresh() invalidates so a refresh still refetches.
+            const data = await apiGetCached(BENCHMARK_COMPARISON_URL);
             if (!data.has_data) {
                 showEmpty("benchmark-empty", true);
                 benchmarkChart?.destroy();
@@ -3055,8 +3076,19 @@ const AnalyticsCharts = (() => {
         }
     }
 
+    // The dashboard calls this from three places, and two of them fire on a cold
+    // load without the mode having moved: once when the persisted mode is applied
+    // at startup, then again ~6s later when the Claude heartbeat resolves and
+    // re-applies the same status. Each pass cleared caches and refetched, so the
+    // local insights payload was requested twice per load. A handler named
+    // "...Changed" should do nothing when nothing changed.
+    let _lastAppliedInsightMode = null;
+
     function onIntelligenceModeChanged() {
-        if (widgetInsightMode() === "ai") {
+        const mode = widgetInsightMode();
+        if (mode === _lastAppliedInsightMode) return;
+        _lastAppliedInsightMode = mode;
+        if (mode === "ai") {
             _moduleInsightsCache.ai = null;
             applyWidgetInsights();
             void loadWidgetInsights(false);
@@ -3065,6 +3097,8 @@ const AnalyticsCharts = (() => {
         }
         _moduleInsightsCache.ai = null;
         applyWidgetInsights();
+        // Reaching here now means a genuine switch into local mode, so a forced
+        // refetch is what we want.
         void loadWidgetInsights(true);
     }
 
@@ -3074,6 +3108,9 @@ const AnalyticsCharts = (() => {
         // endpoint cache and "refresh" would quietly stop refetching.
         _portfolioExposureCache = null;
         apiGetCached.invalidate(exposureUrl());
+        // Same reason as the exposure line above: these are shared entries now,
+        // so a refresh has to drop them or the panes redraw yesterday's payload.
+        apiGetCached.invalidate(BENCHMARK_COMPARISON_URL);
         loadWidgetInsights(true);
         if (activePane === "performance" && rendered.has("performance")) loadPerformancePane();
         if (activePane === "risk" && rendered.has("risk")) loadRiskPane();

@@ -7,6 +7,20 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.9.2 — No duplicate requests on load
+
+- **A cold load no longer fetches the same endpoint twice.** It was 29 requests
+  across 26 endpoints; it is now 26 across 26. Sparkline history and the benchmark
+  comparison share one request between the cached-paint and live-fetch passes, and
+  the intelligence-mode handler no longer redoes its work when the Claude heartbeat
+  re-applies a mode that has not changed. Refreshing still refetches everything.
+- **One Claude call per payload.** The AI insights loader had two callers that could
+  fire together on a switch into Claude mode and no in-flight guard, so a single
+  payload could cost two billed calls. It now has the same guard its local
+  counterpart always had.
+- This closes the known issue listed under v5.9.1 below. No feature or schema
+  changes.
+
 ## v5.9.1 — Userflow fixes
 
 - **The welcome guide is a real modal.** The first-run guide blocked the mouse but left the

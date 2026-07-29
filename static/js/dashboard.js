@@ -853,6 +853,9 @@ let portfolioSnapshotExposurePromise = null;
 // sharing one request rests on them spelling it the same way — hence one const
 // rather than two literals.
 const PORTFOLIO_EXPOSURE_URL = "/api/ai/portfolio-exposure";
+// Prefix, not a full URL: the ticker list varies, so invalidation matches the
+// whole family rather than one exact query string.
+const TREND_HISTORY_URL_PREFIX = "/api/stocks/history/batch";
 const cachedDeepIntel = {};      // ticker → deep read payload
 const deepIntelLoadingTickers = new Set();
 let aiCheckInterval = null;
@@ -4519,6 +4522,11 @@ function renderProjectionChart(data) {
 }
 
 
+// renderPortfolioValueData runs twice on a warm load — once off the cached
+// payload for the instant paint, once when the live fetch lands — and each pass
+// asks for sparkline history. Sharing the in-flight promise makes that one
+// request instead of two; refreshDashboardData() drops the entry first so a
+// refresh still gets fresh bars.
 async function loadTrendData(tickers) {
     if (!tickers.length) return {};
 
@@ -4527,7 +4535,7 @@ async function loadTrendData(tickers) {
             tickers: tickers.join(","),
             period: "1mo",
         });
-        const data = await apiGet(`/api/stocks/history/batch?${params}`);
+        const data = await apiGetCached(`${TREND_HISTORY_URL_PREFIX}?${params}`);
         return data.data || {};
     } catch (err) {
         console.warn("Unable to load trend data:", err);
@@ -9862,6 +9870,11 @@ function refreshDashboardData({
     animateButton = false,
     forcePortfolioValue = false,
 } = {}) {
+    // Sparkline history is shared through the endpoint cache to collapse the
+    // double render on load. A refresh is exactly when that entry should stop
+    // being reused, so drop the family before the jobs below re-request it.
+    apiGetCached.invalidate(TREND_HISTORY_URL_PREFIX);
+
     const refreshButton = document.querySelector(".btn-refresh-data");
     if (animateButton) refreshButton?.classList.remove("is-refreshing");
     if (animateButton && refreshButton && !prefersReducedMotion()) {

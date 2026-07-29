@@ -1,3 +1,47 @@
+# FolioOrb v5.9.2 Release Notes
+
+**Release date:** July 29, 2026
+
+## Headline
+
+Closes the known gap left open by 5.9.1: a cold load fetched three endpoints
+twice. It now issues **26 requests across 26 endpoints — no duplicates.**
+
+## Fixes
+
+### 🔁 No duplicate requests on a cold load
+
+A browser trace of a warm start measured 29 requests across 26 endpoints. Three
+different causes, so three different fixes:
+
+- **Sparkline history** — `renderPortfolioValueData` runs twice by design, once
+  off the cached payload for the instant paint and again when the live fetch
+  lands. Each pass requested trend history. It now goes through the shared
+  endpoint cache, so the two renders share one request; a refresh drops the
+  entry first, so the bars still update.
+- **Benchmark comparison** — the pane loader and the post-render pass both asked
+  for it. Moved off a raw `fetch` onto the same shared cache, with the refresh
+  path invalidating it.
+- **Analytics insights** — the dashboard re-applies the intelligence mode when
+  the Claude heartbeat resolves, about six seconds after startup already applied
+  the same mode. Too far apart to share a request, so the guard is on the
+  handler: `onIntelligenceModeChanged` now returns early when the mode has not
+  actually changed. A genuine switch still clears caches and refetches.
+
+### 💸 One Claude call per payload, not two
+
+While verifying the above, the AI insights loader turned out to have two callers
+that can fire together on a switch into Claude mode, and — unlike its local
+sibling — no in-flight guard. That meant one payload could cost two billed Claude
+calls. It now has the same guard.
+
+## Notes
+
+No feature changes, no schema changes, nothing moves a position. Installing over
+5.9.1 preserves all existing data and keys.
+
+---
+
 # FolioOrb v5.9.1 Release Notes
 
 **Release date:** July 29, 2026
