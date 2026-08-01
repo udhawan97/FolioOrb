@@ -1,7 +1,6 @@
 """
 Tests for analytics insights service and GET /api/ai/analytics-insights.
 """
-import asyncio
 import json
 from unittest.mock import MagicMock, patch
 
@@ -132,7 +131,7 @@ def test_analytics_insights_local_endpoint():
         "app.services.analytics_insights.build_analytics_snapshot",
         return_value=_FAKE_SNAPSHOT,
     ):
-        result = asyncio.run(get_analytics_insights(mode="local", force_refresh=False, db=db))
+        result = get_analytics_insights(mode="local", force_refresh=False, db=db)
     assert result["mode"] == "local"
     assert result["digest"]["risk"] == MODULE_DIGEST["risk"]
     assert "insights" in result
@@ -151,7 +150,7 @@ def test_analytics_insights_ai_endpoint_uses_claude():
         "app.routers.ai.generate_analytics_insights",
         return_value={"insights": _AI_INSIGHTS, "widget_insights": _AI_WIDGET_INSIGHTS},
     ):
-        result = asyncio.run(get_analytics_insights(mode="ai", force_refresh=True, db=db))
+        result = get_analytics_insights(mode="ai", force_refresh=True, db=db)
 
     assert result["mode"] == "ai"
     assert result["source"] == "claude"
@@ -187,9 +186,7 @@ def test_analytics_insights_partial_valuation_skips_claude():
         "app.services.analytics_insights.build_analytics_snapshot",
         return_value=partial_snapshot,
     ), patch("app.routers.ai.generate_analytics_insights") as gen_mock:
-        result = asyncio.run(
-            get_analytics_insights(mode="ai", force_refresh=True, db=db)
-        )
+        result = get_analytics_insights(mode="ai", force_refresh=True, db=db)
 
     gen_mock.assert_not_called()
     assert result["source"] == "local-fallback"
@@ -225,7 +222,7 @@ def test_analytics_insights_ai_serves_cache():
     with patch("app.services.analytics_insights.build_analytics_snapshot") as snap_mock, patch(
         "app.routers.ai.generate_analytics_insights"
     ) as gen_mock:
-        result = asyncio.run(get_analytics_insights(mode="ai", force_refresh=False, db=db))
+        result = get_analytics_insights(mode="ai", force_refresh=False, db=db)
 
     assert result["from_cache"] is True
     assert result["insights"]["risk"] == _AI_INSIGHTS["risk"]

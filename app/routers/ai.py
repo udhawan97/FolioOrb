@@ -387,7 +387,7 @@ def remove_api_key():
 
 
 @router.get("/summary/{ticker}")
-async def get_stock_summary(
+def get_stock_summary(
     ticker: str,
     force_refresh: bool = False,
     db: Session = Depends(get_db),
@@ -442,7 +442,7 @@ async def get_stock_summary(
 
 
 @router.get("/summaries/all")
-async def get_all_summaries(
+def get_all_summaries(
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -557,7 +557,7 @@ _UNCLEAR_RESULT = {
 # ── Move explanation endpoints ─────────────────────────────────────────────
 
 @router.get("/move-explanation/{ticker}")
-async def get_move_explanation(ticker: str):
+def get_move_explanation(ticker: str):
     """
     Explain why a ticker moved today.
     Returns market context, attribution type, and likely drivers.
@@ -575,7 +575,7 @@ async def get_move_explanation(ticker: str):
 
 
 @router.get("/insider-activity/{ticker}")
-async def get_insider_activity_endpoint(ticker: str):
+def get_insider_activity_endpoint(ticker: str):
     """Recent open-market insider trades (SEC Form 4) for one holding.
 
     Per-ticker and user-initiated, so it may spend the EDGAR round trips the
@@ -590,7 +590,7 @@ async def get_insider_activity_endpoint(ticker: str):
 
 
 @router.get("/fundamentals/{ticker}")
-async def get_fundamentals_endpoint(ticker: str):
+def get_fundamentals_endpoint(ticker: str):
     """Annual revenue, net income, and diluted EPS from SEC XBRL filings.
 
     Per-ticker and user-initiated. Funds and non-filers have no financials and
@@ -643,7 +643,7 @@ def get_all_move_explanations(
 # ── Holding Intelligence endpoints ────────────────────────────────────────────
 
 @router.get("/intelligence/{ticker}")
-async def get_holding_intelligence_single(ticker: str, ai_holdings_fallback: bool = False):
+def get_holding_intelligence_single(ticker: str, ai_holdings_fallback: bool = False):
     """
     Return structured intelligence for a single holding:
     what it covers (sectors, countries, top holdings, strategy, benchmarks).
@@ -784,7 +784,7 @@ def _portfolio_cache_ticker(portfolio_id: int = 1) -> str:
 
 
 @router.get("/investment-signal/{ticker}")
-async def get_investment_signal_single(
+def get_investment_signal_single(
     ticker: str,
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
@@ -820,7 +820,7 @@ def get_all_investment_signals(
 
 
 @router.get("/portfolio-exposure")
-async def get_portfolio_exposure(
+def get_portfolio_exposure(
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -829,13 +829,13 @@ async def get_portfolio_exposure(
 
 
 @router.get("/verdict-calibration")
-async def get_verdict_calibration(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_verdict_calibration(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Lightweight calibration buckets from this portfolio's verdict snapshots."""
     return calibration_summary(db, portfolio_id)
 
 
 @router.get("/verdict-report")
-async def get_verdict_report(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_verdict_report(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Scorecard of how this portfolio's past verdicts have aged vs. current price.
 
     Reads the most recent logged verdict snapshots for the portfolio and grades
@@ -852,7 +852,7 @@ async def get_verdict_report(portfolio_id: int = 1, db: Session = Depends(get_db
 
 
 @router.get("/intelligence/{ticker}/deep")
-async def get_holding_intelligence_deep(ticker: str):
+def get_holding_intelligence_deep(ticker: str):
     """
     Tier-2 intelligence fetch — richer data for expanded holding panel.
     Does not block initial verdict render; called async on expand.
@@ -903,7 +903,7 @@ async def get_holding_intelligence_deep(ticker: str):
 
 
 @router.get("/analyst-recommendation/{ticker}")
-async def get_analyst_recommendation_single(ticker: str):
+def get_analyst_recommendation_single(ticker: str):
     """
     Return analyst consensus for a single ticker.
     ETFs return ETF quality instead of a stock analyst rating.
@@ -1067,7 +1067,7 @@ def _merge_ai_widget_insights(local_widgets: dict, ai_widgets: dict) -> dict:
 
 
 @router.get("/analytics-insights")
-async def get_analytics_insights(
+def get_analytics_insights(
     mode: str = "ai",
     force_refresh: bool = False,
     portfolio_id: int = 1,

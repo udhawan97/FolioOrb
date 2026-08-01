@@ -6,7 +6,6 @@ worth duplicating — these tests pin the contract: it passes the ticker through
 returns the service payload, and never raises for a ticker with no insiders.
 """
 # pylint: disable=protected-access
-import asyncio
 
 from app.routers import ai as ai_router
 
@@ -20,7 +19,7 @@ def test_endpoint_returns_the_service_payload(monkeypatch):
                 "data_quality": "live"}
 
     monkeypatch.setattr(ai_router, "get_insider_activity", _fake)
-    result = asyncio.run(ai_router.get_insider_activity_endpoint("aapl"))
+    result = ai_router.get_insider_activity_endpoint("aapl")
     assert captured["ticker"] == "AAPL"  # normalized before the service sees it
     assert result["buys"] == 2
     assert result["data_quality"] == "live"
@@ -33,7 +32,7 @@ def test_endpoint_is_calm_about_a_ticker_with_no_insiders(monkeypatch):
         lambda t, **_kw: {"ticker": t, "buys": 0, "sells": 0,
                           "transactions": [], "data_quality": "live"},
     )
-    result = asyncio.run(ai_router.get_insider_activity_endpoint("VOO"))
+    result = ai_router.get_insider_activity_endpoint("VOO")
     assert result["transactions"] == []
     assert result["data_quality"] == "live"
 
@@ -48,7 +47,7 @@ def test_endpoint_rejects_a_malformed_ticker(monkeypatch):
     from fastapi import HTTPException  # local: only this test needs it
 
     try:
-        asyncio.run(ai_router.get_insider_activity_endpoint("../etc/passwd"))
+        ai_router.get_insider_activity_endpoint("../etc/passwd")
         raised = False
     except HTTPException as exc:
         raised = exc.status_code == 422
@@ -68,7 +67,7 @@ def test_fundamentals_endpoint_returns_the_service_payload(monkeypatch):
                 "data_quality": "live"}
 
     monkeypatch.setattr(ai_router, "get_fundamentals", _fake)
-    result = asyncio.run(ai_router.get_fundamentals_endpoint("aapl"))
+    result = ai_router.get_fundamentals_endpoint("aapl")
     assert captured["ticker"] == "AAPL"
     assert result["periods"][0]["year"] == 2025
 
@@ -81,7 +80,7 @@ def test_fundamentals_endpoint_rejects_a_malformed_ticker(monkeypatch):
     from fastapi import HTTPException
 
     try:
-        asyncio.run(ai_router.get_fundamentals_endpoint("../x"))
+        ai_router.get_fundamentals_endpoint("../x")
         raised = False
     except HTTPException as exc:
         raised = exc.status_code == 422

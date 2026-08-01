@@ -9,40 +9,28 @@ request queues behind it, however trivial.
 
 That is not hypothetical here. ``GET /api/portfolio/`` is two indexed SELECTs
 against local SQLite, and it is what the portfolio switcher's dropdown waits on.
-When the endpoints below were ``async def``, that dropdown inherited the latency
-of whichever one happened to hold the loop — up to the 15s earnings timeout, or a
+When these endpoints were ``async def``, that dropdown inherited the latency of
+whichever one happened to hold the loop — up to the 15s earnings timeout, or a
 full Claude round-trip.
 
-Each entry below blocks for a reason worth naming, so a future edit can tell
-whether the constraint still applies. Adding ``async`` back to any of them is the
-regression this guards.
+This guard used to name the blocking endpoints one by one. That list could only
+ever catch a regression on a name somebody remembered to add to it, and fifty-six
+endpoints were written as ``async def`` without ever appearing in it. So the
+default is inverted: **every** registered endpoint must be ``def``, and the few
+that genuinely await say so in ``AWAITS`` below. A new blocking endpoint is now
+caught the moment it is registered, without anyone maintaining a list.
 """
 import inspect
 
-from app.routers import ai, dca, portfolio
+from app.routers import ai, dca, news, portfolio, review, stocks, system
 
-# endpoint function name -> what blocks inside it
-BLOCKING_ENDPOINTS = {
-    ai: {
-        "get_ai_cache_stats": "loads every AISummary row, then estimates tokens in Python",
-        "get_all_move_explanations": "serial explain_move with lazy per-holding fetches",
-        "get_all_intelligence": "serial get_holding_intelligence plus an ETF fan-out",
-        "get_all_investment_signals": "full scan_portfolio: quotes, history, regime",
-        "get_all_analyst_recommendations": "serial per-ticker .info scrape",
-        "get_portfolio_summary": "snapshot build plus a synchronous Anthropic call",
-        "get_action_plan": "scan_portfolio plus a synchronous Anthropic call",
-    },
-    portfolio: {
-        "get_earnings_radar": "8-thread yfinance fan-out behind a 15s timeout",
-        "get_pnl": "scans the realized-trade and snapshot tables",
-        "get_portfolio_market_context": "calls the sync get_world_markets() inline",
-        "get_macro_alignment": "calls the sync get_world_markets() inline",
-        "get_conviction_gaps": "delegates to get_all_investment_signals",
-        "get_confidence_spectrum": "delegates to get_all_investment_signals",
-    },
-    dca: {
-        "run_catchup": "fetches daily closes per plan, serially",
-    },
+ROUTERS = (ai, dca, news, portfolio, review, stocks, system)
+
+# The only endpoints allowed to be `async def`, and the await that earns it.
+# Anything here must genuinely suspend — an `async def` that never awaits is the
+# bug this module exists to prevent, not an exemption from it.
+AWAITS = {
+    "import_holdings": "awaits UploadFile.read() on the uploaded CSV",
 }
 
 
@@ -60,35 +48,54 @@ def _registered_endpoints(module):
     }
 
 
-def test_blocking_endpoints_are_sync():
-    """None of the blocking endpoints may be a coroutine function."""
+def test_every_endpoint_is_sync_unless_it_awaits():
+    """No endpoint may be a coroutine function unless ``AWAITS`` justifies it."""
     offenders = []
-    for module, endpoints in BLOCKING_ENDPOINTS.items():
-        registered = _registered_endpoints(module)
-        for name, reason in endpoints.items():
-            endpoint = registered.get(name)
-            assert endpoint is not None, f"{module.__name__}.{name} is not registered"
-            if inspect.iscoroutinefunction(endpoint):
-                offenders.append(f"{module.__name__}.{name} — {reason}")
+    for module in ROUTERS:
+        for name, endpoint in _registered_endpoints(module).items():
+            if inspect.iscoroutinefunction(endpoint) and name not in AWAITS:
+                offenders.append(f"{module.__name__}.{name}")
     assert not offenders, (
-        "These endpoints block, so they must be `def` (threadpool) rather than "
-        "`async def` (event loop):\n  " + "\n  ".join(offenders)
+        "These endpoints run on the event loop and block it. Make them `def` so "
+        "FastAPI runs them in the threadpool, or add them to AWAITS with the "
+        "await that justifies it:\n  " + "\n  ".join(sorted(offenders))
     )
 
 
-def test_guard_covers_every_router_it_names():
-    """Every name in the table above must still exist, so the guard can't rot."""
-    for module, endpoints in BLOCKING_ENDPOINTS.items():
-        registered = _registered_endpoints(module)
-        missing = sorted(set(endpoints) - set(registered))
-        assert not missing, f"{module.__name__} no longer registers: {missing}"
+def test_awaiting_endpoints_still_await():
+    """Every name in ``AWAITS`` must exist and still be a coroutine function.
+
+    Converting one of these to ``def`` would block the loop on a real ``await``,
+    which is a different bug from the one above — so pin it from both sides.
+    """
+    registered = {}
+    for module in ROUTERS:
+        registered.update(_registered_endpoints(module))
+    for name, reason in AWAITS.items():
+        endpoint = registered.get(name)
+        assert endpoint is not None, f"AWAITS names {name}, which is not registered"
+        assert inspect.iscoroutinefunction(endpoint), f"{name} no longer awaits: {reason}"
+
+
+def test_guard_sees_every_router():
+    """A router missing from ``ROUTERS`` would be silently unguarded."""
+    from app.main import app  # noqa: PLC0415 — importing the built app is the point
+
+    guarded = {name for module in ROUTERS for name in _registered_endpoints(module)}
+    live = {
+        route.endpoint.__name__
+        for route in app.routes
+        if getattr(route, "endpoint", None) is not None
+        and str(getattr(route, "path", "")).startswith("/api/")
+    }
+    assert not live - guarded, f"unguarded API endpoints: {sorted(live - guarded)}"
 
 
 def test_connection_pool_exceeds_request_concurrency():
     """The pool must not be the next thing that serializes those endpoints.
 
-    Making the endpoints above sync moves them off the event loop and lets them
-    run genuinely in parallel — which raises peak concurrent DB connections.
+    Making the endpoints sync moves them off the event loop and lets them run
+    genuinely in parallel — which raises peak concurrent DB connections.
     ``get_db`` holds its connection for the whole request, network time included,
     so a pool smaller than peak concurrency just relocates the stall from the
     loop into ``QueuePool.get()``.
@@ -101,13 +108,3 @@ def test_connection_pool_exceeds_request_concurrency():
     pool = engine.pool
     ceiling = pool.size() + pool._max_overflow  # pylint: disable=protected-access
     assert ceiling >= 50, f"pool ceiling {ceiling} is below peak request concurrency"
-
-
-def test_csv_import_stays_async():
-    """The one endpoint that genuinely awaits must keep its `async def`.
-
-    ``import_holdings`` awaits ``UploadFile.read()``. Converting it would be a
-    different bug from the one above, so pin it explicitly.
-    """
-    endpoint = _registered_endpoints(portfolio)["import_holdings"]
-    assert inspect.iscoroutinefunction(endpoint)

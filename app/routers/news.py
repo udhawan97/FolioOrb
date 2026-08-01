@@ -94,7 +94,7 @@ def _headlines_signature(news_by_ticker: dict[str, list[dict]]) -> str:
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.get("/feed")
-async def get_news_feed(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_news_feed(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """
     Grouped news feed for all active holdings + watchlist.
     Always available — no AI required, no heartbeat gate.
@@ -132,7 +132,7 @@ async def get_news_feed(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/themes")
-async def get_news_themes(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_news_themes(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """
     Claude-mode news themes: portfolio briefing + cross-holding clusters.
     Heartbeat-gated — returns 503 when Claude is unreachable.
@@ -182,7 +182,7 @@ async def get_news_themes(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/filings")
-async def get_portfolio_filings(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_filings(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """
     Recent SEC filings for every active holding — always available, no AI.
 

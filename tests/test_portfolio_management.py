@@ -4,7 +4,6 @@ Endpoints are plain async funcs, so they're called directly with an in-memory
 SQLite DB (fixture style from tests/test_portfolio_total_pct.py).
 """
 # pylint: disable=protected-access
-import asyncio
 
 import pytest
 from fastapi import HTTPException
@@ -35,22 +34,22 @@ def _db():
 
 def test_create_and_list_portfolios():
     db = _db()
-    res = asyncio.run(pr.create_portfolio(PortfolioCreate(name="IRA"), db))
+    res = pr.create_portfolio(PortfolioCreate(name="IRA"), db)
     assert res["name"] == "IRA"
-    listing = asyncio.run(pr.get_portfolios(db))
+    listing = pr.get_portfolios(db)
     assert {p["name"] for p in listing} == {"My Portfolio", "IRA"}
 
 
 def test_rename_portfolio():
     db = _db()
-    new = asyncio.run(pr.create_portfolio(PortfolioCreate(name="Old"), db))
-    asyncio.run(pr.rename_portfolio(new["id"], PortfolioCreate(name="Taxable"), db))
+    new = pr.create_portfolio(PortfolioCreate(name="Old"), db)
+    pr.rename_portfolio(new["id"], PortfolioCreate(name="Taxable"), db)
     assert db.query(Portfolio).filter(Portfolio.id == new["id"]).one().name == "Taxable"
 
 
 def test_delete_portfolio_cascades_all_scoped_rows():
     db = _db()
-    pid = asyncio.run(pr.create_portfolio(PortfolioCreate(name="Scratch"), db))["id"]
+    pid = pr.create_portfolio(PortfolioCreate(name="Scratch"), db)["id"]
     # Populate every portfolio-scoped table for this portfolio.
     db.add(Holding(portfolio_id=pid, ticker="AAPL", shares=5, avg_cost=100))
     db.add(RealizedTrade(portfolio_id=pid, ticker="AAPL", shares_sold=1,
@@ -68,7 +67,7 @@ def test_delete_portfolio_cascades_all_scoped_rows():
                           exec_date="2026-06-01", price=100, shares=0.5, amount=50))
     db.commit()
 
-    asyncio.run(pr.delete_portfolio(pid, db))
+    pr.delete_portfolio(pid, db)
 
     assert db.query(Portfolio).filter(Portfolio.id == pid).first() is None
     assert db.query(Holding).filter(Holding.portfolio_id == pid).count() == 0
@@ -81,26 +80,26 @@ def test_delete_portfolio_cascades_all_scoped_rows():
 
 def test_cannot_delete_default_portfolio():
     db = _db()
-    asyncio.run(pr.create_portfolio(PortfolioCreate(name="Other"), db))
+    pr.create_portfolio(PortfolioCreate(name="Other"), db)
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(pr.delete_portfolio(1, db))
+        pr.delete_portfolio(1, db)
     assert exc.value.status_code == 400
 
 
 def test_cannot_delete_only_portfolio():
     db = _db()
-    pid = asyncio.run(pr.create_portfolio(PortfolioCreate(name="Solo"), db))["id"]
+    pid = pr.create_portfolio(PortfolioCreate(name="Solo"), db)["id"]
     # Remove the default so only this one remains, then it must refuse deletion.
     db.query(Portfolio).filter(Portfolio.id == 1).delete()
     db.commit()
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(pr.delete_portfolio(pid, db))
+        pr.delete_portfolio(pid, db)
     assert exc.value.status_code == 400
 
 
 def test_delete_missing_portfolio_404():
     db = _db()
-    asyncio.run(pr.create_portfolio(PortfolioCreate(name="A"), db))
+    pr.create_portfolio(PortfolioCreate(name="A"), db)
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(pr.delete_portfolio(999, db))
+        pr.delete_portfolio(999, db)
     assert exc.value.status_code == 404

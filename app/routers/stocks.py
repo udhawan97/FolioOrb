@@ -109,7 +109,7 @@ def get_price_history(
     return {"ticker": ticker.upper(), "period": period, "data": history}
 
 @router.get("/market-status")
-async def get_market_status():
+def get_market_status():
     """Check if US markets are currently open."""
     eastern = pytz.timezone("America/New_York")
     now = datetime.now(eastern)
