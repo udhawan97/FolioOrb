@@ -26,6 +26,27 @@ in the repository. Highlights of the current release below.
 - **One market-hours answer and one concentration scale**, instead of two of each
   that could disagree on the same page.
 - No schema changes and no migration.
+- Also ships the user-flow resilience work below, which was prepared as v5.9.3
+  and never cut as its own tag.
+
+## v5.9.3 — User-flow resilience (shipped in v5.10.0)
+
+- **Review Orbit owns the viewport.** It stays fixed above the sticky navbar on
+  compact screens and hides fixed dashboard utilities while open.
+- **Holding details work from the keyboard.** Native disclosure controls expose
+  their expanded state, collapsed detail content leaves the accessibility tree,
+  and ticker lookups stay scoped to the holdings table.
+- **News failures are retryable.** A failed feed offers an announced in-place
+  retry and does not require a page reload to recover.
+- **Focus returns somewhere visible.** Closing Manage after entering from the
+  first-run guide falls back to the named Manage control instead of focusing the
+  hidden guide.
+- **Help buttons have names.** Icon-only tooltip triggers—including dynamically
+  rendered ones—derive an accessible name from their help heading.
+- **The Action Plan fits 320 px.** Its header stacks cleanly with no page-wide
+  horizontal overflow.
+- No portfolio math, trade behavior, or schema changed; existing data and keys
+  are preserved.
 
 ## v5.9.2 — No duplicate requests on load
 

@@ -87,7 +87,7 @@ def test_the_dashboard_script_was_cache_busted():
     # Editing dashboard.js without bumping its ?v= serves users the stale file.
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     assert "dashboard.js?v=99" not in html
-    assert "dashboard.js?v=105" in html
+    assert "dashboard.js?v=106" in html
 
 
 # ── World markets strip ───────────────────────────────────────────────────────

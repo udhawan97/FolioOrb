@@ -74,11 +74,74 @@ banding, shared by both.
 - Two response schemas that nothing had ever used are gone.
 - `tests/conftest.py` gained shared `db` and `api_client` fixtures, replacing
   the in-memory-database block that had been copy-pasted across thirty files.
-- 1385 tests pass (up from 1338); pylint stays at 10.00/10.
+- 1393 tests pass (up from 1338); pylint stays at 10.00/10.
 
 ## Notes
 
 No schema changes and no migration. Nothing to do on upgrade.
+
+This release also carries the user-flow resilience work prepared as v5.9.3,
+which was never cut as its own tag; its notes follow below.
+
+---
+
+# FolioOrb v5.9.3 Release Notes (shipped in v5.10.0)
+
+**Prepared:** August 1, 2026 — folded into v5.10.0 rather than cut
+as its own tag.
+
+The Review Orbit, holdings, News, Manage, tooltips, and Analytics flows now hold
+up under keyboard use, narrow windows, and transient failures—not just a
+pointer on a desktop-sized dashboard.
+
+## Fixes
+
+### 🧭 Review Orbit stays above the whole dashboard
+
+The global body-child stacking rule and sticky navbar could pull the full-screen
+workspace behind app chrome, leaving its header obscured and fixed dashboard
+utilities visible through it. Review Orbit now keeps its fixed viewport layer,
+covers the navbar at phone widths, and suppresses the holding FAB and Senpai
+while open. Escape still returns focus to the named Review trigger.
+
+### ⌨️ Holding details are real disclosure controls
+
+Ticker rows now expose native keyboard buttons with `aria-expanded` and
+`aria-controls`. Enter and Space both open and close the matching detail row;
+collapsed content becomes hidden from assistive technology and focus remains on
+the trigger. Holding-intelligence lookups are scoped to the holdings table so
+allocation rows with the same ticker cannot receive duplicate detail content.
+
+### 🔁 News failures can recover in place
+
+A transient feed failure no longer marks News as permanently loaded. The empty
+state offers **Retry news**, announces progress, and refetches without reloading
+the page. A successful retry restores the feed and moves focus to the first
+article (or the News tab when there are no links).
+
+### 🎯 Manage returns focus somewhere visible
+
+Opening Manage from the one-time welcome guide used to return focus into that
+now-hidden guide on Escape. FolioOrb now validates the opener and falls back to
+the always-visible, explicitly named **Manage portfolios** control.
+
+### 🔊 Icon-only help controls have useful names
+
+Shared tooltip setup now names icon-only buttons from their tooltip headings,
+including controls added after initial render. Decorative glyphs stay hidden
+from assistive technology instead of becoming the button name.
+
+### 📱 Analytics reads as a card, not a word rail
+
+At 320 px the Portfolio Action Plan header now stacks its headline and metadata
+instead of squeezing them into a narrow vertical strip. The compact layout has
+no page-wide horizontal overflow.
+
+## Notes
+
+No portfolio math, trade behavior, schema, or migration changed. Installing over
+5.9.2 preserves holdings, trades, snapshots, DCA history, theses, settings, and
+API keys.
 
 ---
 
