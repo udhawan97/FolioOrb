@@ -33,6 +33,18 @@ AWAITS = {
     "import_holdings": "awaits UploadFile.read() on the uploaded CSV",
 }
 
+# Coroutine endpoints that are not ours to convert, or that hold the loop for a
+# bounded constant time rather than for I/O. Kept apart from AWAITS so the rule
+# there stays exactly "it suspends"; these are simply out of scope.
+NOT_BLOCKING = {
+    "openapi": "FastAPI's own schema route",
+    "swagger_ui_html": "FastAPI's own docs route",
+    "swagger_ui_redirect": "FastAPI's own docs route",
+    "redoc_html": "FastAPI's own docs route",
+    "dashboard": "returns the template string read once at import — no I/O",
+    "health_check": "returns a literal dict — no I/O",
+}
+
 
 def _registered_endpoints(module):
     """Map endpoint name -> the callable actually registered on the router.
@@ -77,18 +89,63 @@ def test_awaiting_endpoints_still_await():
         assert inspect.iscoroutinefunction(endpoint), f"{name} no longer awaits: {reason}"
 
 
+def _walk_endpoints(router):
+    """Every endpoint reachable from ``router``, however deeply nested.
+
+    FastAPI does not keep included routers flat on ``app.routes``. Each one
+    arrives wrapped in a ``_IncludedRouter`` that holds the real ``APIRouter``
+    under ``original_router`` — and whose own ``routes`` attribute is a *string*,
+    so a naive recursion iterates it character by character, finds no endpoints,
+    and terminates. Walking only the top level, or walking it naively, yields the
+    four docs routes and nothing else: a guard built on either compares against
+    an effectively empty set and passes whatever is registered. The size floor in
+    the test below exists because that failure is otherwise silent.
+    """
+    nested = getattr(router, "original_router", None)
+    if nested is not None:
+        yield from _walk_endpoints(nested)
+        return
+    routes = getattr(router, "routes", None)
+    if not isinstance(routes, (list, tuple)):
+        return
+    for route in routes:
+        endpoint = getattr(route, "endpoint", None)
+        if endpoint is not None:
+            yield endpoint
+        else:
+            yield from _walk_endpoints(route)
+
+
 def test_guard_sees_every_router():
     """A router missing from ``ROUTERS`` would be silently unguarded."""
     from app.main import app  # noqa: PLC0415 — importing the built app is the point
 
     guarded = {name for module in ROUTERS for name in _registered_endpoints(module)}
-    live = {
-        route.endpoint.__name__
-        for route in app.routes
-        if getattr(route, "endpoint", None) is not None
-        and str(getattr(route, "path", "")).startswith("/api/")
-    }
-    assert not live - guarded, f"unguarded API endpoints: {sorted(live - guarded)}"
+    live = {endpoint.__name__ for endpoint in _walk_endpoints(app)}
+    # Sanity floor: the walk must actually find the API, or this proves nothing.
+    assert len(live) > 90, f"route walk found only {len(live)} endpoints"
+    stale = sorted(guarded - live)
+    assert not stale, f"guard names endpoints the app never registers: {stale}"
+
+    unguarded = live - guarded - set(NOT_BLOCKING)
+    assert not unguarded, f"unguarded endpoints: {sorted(unguarded)}"
+
+
+def test_every_reachable_endpoint_is_sync_unless_it_awaits():
+    """The same rule, applied to the built app rather than the router modules.
+
+    ``test_every_endpoint_is_sync_unless_it_awaits`` trusts ``ROUTERS`` to be
+    complete. This one trusts nothing and walks what the app actually serves.
+    """
+    from app.main import app  # noqa: PLC0415 — importing the built app is the point
+
+    allowed = set(AWAITS) | set(NOT_BLOCKING)
+    offenders = sorted(
+        endpoint.__name__
+        for endpoint in _walk_endpoints(app)
+        if inspect.iscoroutinefunction(endpoint) and endpoint.__name__ not in allowed
+    )
+    assert not offenders, f"these endpoints block the event loop: {offenders}"
 
 
 def test_connection_pool_exceeds_request_concurrency():

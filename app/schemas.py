@@ -103,6 +103,32 @@ class HoldingUpdate(BaseModel):
         return parsed.isoformat()
 
 
+class RealizedTradeUpdate(BaseModel):
+    """Corrections to an already-recorded sale. All fields are optional.
+
+    ``realized_gain`` is deliberately absent: it is derived from the other three
+    and is recomputed on every edit, so there is no way to store a gain that
+    disagrees with the numbers it is supposed to come from.
+    """
+    shares_sold: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
+    sale_price: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
+    avg_cost: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
+    sale_date: Optional[str] = None
+
+    @field_validator("sale_date")
+    @classmethod
+    def valid_sale_date(cls, v):
+        if v is None:
+            return None
+        try:
+            parsed = date.fromisoformat(str(v).strip())
+        except (TypeError, ValueError) as exc:
+            raise ValueError("sale_date must be an ISO date, e.g. 2026-01-15") from exc
+        if parsed > date.today():
+            raise ValueError("sale_date cannot be in the future")
+        return parsed.isoformat()
+
+
 class HoldingResponse(BaseModel):
     """Shape of a holding returned in API responses."""
     model_config = ConfigDict(from_attributes=True)

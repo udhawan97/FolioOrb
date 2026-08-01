@@ -5,7 +5,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Holding, RealizedTrade
-from app.schemas import HoldingCreate, HoldingUpdate, PortfolioCreate
+from app.schemas import (
+    HoldingCreate,
+    HoldingUpdate,
+    PortfolioCreate,
+    RealizedTradeUpdate,
+)
 from app.config import settings
 from app.services.stock_service import (
     get_all_quotes,
@@ -528,6 +533,57 @@ def remove_holding(holding_id: int, db: Session = Depends(get_db)):
         "ticker": holding.ticker,
         "message": "Holding removed from portfolio",
         "was_watchlist": bool(holding.is_watchlist),
+    }
+
+
+@router.patch("/trades/{trade_id}")
+def update_realized_trade(
+    trade_id: int,
+    data: RealizedTradeUpdate,
+    db: Session = Depends(get_db),
+):
+    """Correct one recorded sale in place, re-deriving its realized gain.
+
+    Deleting the trade and redoing the share reduction was the only way to fix a
+    mistyped price, and it re-reads the cost basis from the holding as it stands
+    now rather than as it stood at the sale — so the correction could move more
+    than the typo did. Editing the row touches only what the caller named.
+
+    ``realized_gain`` is never accepted from the caller. It is recomputed from
+    whichever of the three inputs survive the edit, so the ledger cannot hold a
+    gain that contradicts its own numbers.
+    """
+    trade = db.query(RealizedTrade).filter(RealizedTrade.id == trade_id).first()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Realized trade not found")
+
+    if data.shares_sold is not None:
+        trade.shares_sold = data.shares_sold
+    if data.sale_price is not None:
+        trade.sale_price = round(data.sale_price, 2)
+    if data.avg_cost is not None:
+        trade.avg_cost = round(data.avg_cost, 2)
+    if data.sale_date is not None:
+        # Noon, matching _record_reduction, so a timezone shift on display can't
+        # walk the stamp across midnight and into the wrong tax year.
+        parsed = date.fromisoformat(data.sale_date)
+        trade.created_at = datetime(parsed.year, parsed.month, parsed.day, 12, 0)
+
+    trade.realized_gain = round(
+        (float(trade.sale_price) - float(trade.avg_cost)) * float(trade.shares_sold), 2
+    )
+    portfolio_id = trade.portfolio_id
+    ticker = trade.ticker
+    realized_gain = trade.realized_gain
+    db.commit()
+
+    # Same correction the delete path makes: past snapshots stay as history, and
+    # today's is only rewritten when quotes are actually available.
+    portfolio_valuation.evaluate(db, portfolio_id, record_snapshot=True)
+    return {
+        "ticker": ticker,
+        "realized_gain": realized_gain,
+        "message": f"Updated realized sale for {ticker}",
     }
 
 
