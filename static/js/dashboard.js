@@ -1476,10 +1476,22 @@ async function loadPortfolioValue() {
         // Update the HUD popover sync display immediately (before rendering).
         const popUpdatedEl = document.getElementById("hud-pop-updated");
         if (popUpdatedEl) popUpdatedEl.textContent = _lastDashboardSyncText;
+        // A holding quoted in another currency is left out of the dollar total
+        // rather than added to it at face value. Say so where the sync status is
+        // explained, so the number on screen is never quietly short.
+        const foreign = data.foreign_currency_tickers || [];
         const syncSubEl = document.getElementById("hud-pop-sync-sub");
-        if (syncSubEl) syncSubEl.textContent = "Prices, P&L and holdings pulled from market data";
+        if (syncSubEl) {
+            syncSubEl.textContent = foreign.length
+                ? `Total excludes ${foreign.join(", ")} — priced in another currency`
+                : "Prices, P&L and holdings pulled from market data";
+        }
         const syncIconEl = document.getElementById("hud-sync-icon");
-        if (syncIconEl) syncIconEl.innerHTML = `<i class="bi bi-check-circle-fill"></i>`;
+        if (syncIconEl) {
+            syncIconEl.innerHTML = foreign.length
+                ? `<i class="bi bi-exclamation-circle" style="color:var(--bs-warning)"></i>`
+                : `<i class="bi bi-check-circle-fill"></i>`;
+        }
         const pill = document.getElementById("hud-status-pill");
         if (pill) {
             pill.classList.remove("is-refreshed");
@@ -4629,9 +4641,16 @@ function trendSignature(history = []) {
 }
 
 function holdingBadgeHtml(h) {
-    return h.is_watchlist
-        ? html`<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask me-1"></i>Research</span>`
-        : "";
+    if (h.is_watchlist) {
+        return html`<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask me-1"></i>Research</span>`;
+    }
+    // Yahoo prices a foreign listing in its home market's currency — London in
+    // pence, not even pounds — so this row's figures are not dollars and the
+    // portfolio total leaves it out. Name the currency rather than imply a rate.
+    if (h.currency && h.currency.toUpperCase() !== "USD") {
+        return html`<span class="badge watchlist-badge ms-1" title="Priced in ${h.currency} — excluded from your dollar total"><i class="bi bi-globe2 me-1"></i>${h.currency}</span>`;
+    }
+    return "";
 }
 
 function moveBadgeHtml(ticker) {

@@ -585,6 +585,7 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
         "degraded": valuation.degraded,
         "data_quality": valuation.data_quality,
         "missing_tickers": list(valuation.missing_tickers),
+        "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "priced_position_count": valuation.priced_position_count,
         "expected_position_count": valuation.expected_position_count,
         "total_value": valuation.total_value,

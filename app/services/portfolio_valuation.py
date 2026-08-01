@@ -22,6 +22,11 @@ from app.services.stock_service import get_portfolio_quotes
 
 QuoteLoader = Callable[[list[str]], list[dict]]
 
+# Every total this module produces is denominated in dollars. Yahoo prices a
+# foreign listing in its home currency — and London quotes in *pence*, not
+# pounds — so a quote that says anything else is not addable here.
+REPORTING_CURRENCY = "USD"
+
 
 @dataclass
 class PortfolioValuation:  # pylint: disable=too-many-instance-attributes
@@ -39,6 +44,7 @@ class PortfolioValuation:  # pylint: disable=too-many-instance-attributes
     total_return_pct: float
     data_quality: str
     missing_tickers: tuple[str, ...]
+    foreign_currency_tickers: tuple[str, ...]
     expected_position_count: int
     priced_position_count: int
     snapshot_recorded: bool
@@ -113,6 +119,29 @@ def _current_price(quote: dict) -> float | None:
     return price if isfinite(price) and price > 0 else None
 
 
+def _quote_currency(quote: dict) -> str:
+    """The currency a quote is priced in, in the vendor's own spelling.
+
+    A quote that omits the field is treated as dollars, which is what every
+    domestic quote has always been assumed to be — so only an *explicitly*
+    foreign currency changes anything.
+
+    The casing is preserved rather than folded because it carries meaning:
+    Yahoo writes London's pence "GBp" and pounds "GBP", a hundred-fold
+    difference that a row displaying its own currency must not erase.
+    """
+    return str(quote.get("currency") or REPORTING_CURRENCY).strip() or REPORTING_CURRENCY
+
+
+def _is_reporting_currency(currency: str) -> bool:
+    """True when a currency is the dollar the totals are denominated in.
+
+    Only here is case folded — for deciding addability, "usd" is "USD", while
+    "GBp" and "GBP" are both simply not it.
+    """
+    return currency.upper() == REPORTING_CURRENCY
+
+
 def _upsert_snapshot(db: Session, valuation: PortfolioValuation) -> bool:
     today = date.today().isoformat()
 
@@ -154,8 +183,10 @@ def _upsert_snapshot(db: Session, valuation: PortfolioValuation) -> bool:
 
 
 # This orchestration intentionally keeps quote quality, financial totals, and
-# snapshot eligibility in one auditable calculation path.
-# pylint: disable=too-many-statements
+# snapshot eligibility in one auditable calculation path. Which currency a row is
+# priced in belongs to that same path — it decides whether the row is addable at
+# all — so it is counted here rather than split into a pass that could disagree.
+# pylint: disable=too-many-statements,too-many-branches
 def evaluate(
     db: Session,
     portfolio_id: int,
@@ -174,6 +205,7 @@ def evaluate(
     total_daily_change = 0.0
     total_cost_basis = 0.0
     priced_tickers: set[str] = set()
+    foreign_tickers: set[str] = set()
 
     for quote in quotes:
         if quote.get("error"):
@@ -188,6 +220,12 @@ def evaluate(
         shares = float(holding.shares or 0.0)
         avg_cost = float(holding.avg_cost or 0.0)
         is_watchlist = bool(holding.is_watchlist)
+        currency = _quote_currency(quote)
+        # A price in another currency is not a dollar figure, so it cannot join
+        # a dollar sum. The row is still built — the user owns the position and
+        # should see it, priced as its own market prices it — but it stays out
+        # of every total, exactly as an unpriceable quote does.
+        addable = _is_reporting_currency(currency)
         current_value = shares * current_price
         daily_value_change = shares * float(quote.get("day_change") or 0.0)
         cost_basis = shares * avg_cost
@@ -200,12 +238,14 @@ def evaluate(
             combined_gain / combined_cost_basis * 100 if combined_cost_basis > 0 else None
         )
 
-        if not is_watchlist:
+        if not is_watchlist and addable:
             total_value += current_value
             total_daily_change += daily_value_change
             total_cost_basis += cost_basis
             if shares > 0:
                 priced_tickers.add(ticker)
+        elif not is_watchlist and shares > 0:
+            foreign_tickers.add(ticker)
 
         rows.append(
             {
@@ -226,6 +266,7 @@ def evaluate(
                 "day_change_pct": float(quote.get("day_change_pct") or 0.0),
                 "daily_value_change": round(daily_value_change, 2),
                 "allocation_pct": 0,
+                "currency": currency,
                 "is_watchlist": is_watchlist,
                 "hold_class": str(holding.hold_class or "auto"),
                 "notes": holding.notes,
@@ -237,8 +278,12 @@ def evaluate(
             }
         )
 
+    def counts_toward_totals(row: dict) -> bool:
+        """A row is part of the dollar totals only if it is priced in dollars."""
+        return not row["is_watchlist"] and _is_reporting_currency(row["currency"])
+
     for row in rows:
-        if total_value > 0 and not row["is_watchlist"]:
+        if total_value > 0 and counts_toward_totals(row):
             row["allocation_pct"] = round(row["current_value"] / total_value * 100, 1)
 
     expected_tickers = {
@@ -246,8 +291,12 @@ def evaluate(
         for holding in holdings
         if not holding.is_watchlist and float(holding.shares or 0.0) > 0
     }
-    missing_tickers = tuple(sorted(expected_tickers - priced_tickers))
-    if not expected_tickers or not missing_tickers:
+    foreign_currency_tickers = tuple(sorted(foreign_tickers & expected_tickers))
+    # Both reasons leave a position out of the totals, so both bear on quality;
+    # they are reported apart only so the UI can say which one applies.
+    unpriced_tickers = expected_tickers - priced_tickers
+    missing_tickers = tuple(sorted(unpriced_tickers - foreign_tickers))
+    if not expected_tickers or not unpriced_tickers:
         data_quality = "complete"
     elif priced_tickers:
         data_quality = "partial"
@@ -255,7 +304,7 @@ def evaluate(
         data_quality = "unavailable"
 
     total_unrealized_gain = round(
-        sum(row["unrealized_gain"] for row in rows if not row["is_watchlist"]),
+        sum(row["unrealized_gain"] for row in rows if counts_toward_totals(row)),
         2,
     )
     realized_gain = _realized_gain(db, portfolio_id)
@@ -283,6 +332,7 @@ def evaluate(
         ),
         data_quality=data_quality,
         missing_tickers=missing_tickers,
+        foreign_currency_tickers=foreign_currency_tickers,
         expected_position_count=len(expected_tickers),
         priced_position_count=len(priced_tickers),
         snapshot_recorded=False,
