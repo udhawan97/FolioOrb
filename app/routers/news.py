@@ -45,6 +45,20 @@ router = APIRouter(prefix="/api/news", tags=["news"])
 _THEMES_CACHE: dict[str, tuple[float, dict]] = {}
 _THEMES_TTL = 30 * 60  # 30 min
 
+
+def _remember_themes(sig: str, result: dict) -> None:
+    """Store one themes payload, sweeping entries that can never be read again.
+
+    The key is a hash of the *headline set*, so it turns over whenever the news
+    does — not once per holding. Left unpruned, every feed this portfolio has
+    ever shown keeps its briefing and theme list alive for the life of the
+    process.
+    """
+    now = time.monotonic()
+    for stale in [key for key, (expiry, _) in _THEMES_CACHE.items() if expiry <= now]:
+        del _THEMES_CACHE[stale]
+    _THEMES_CACHE[sig] = (now + _THEMES_TTL, result)
+
 # ── Filings timeline ──────────────────────────────────────────────────────────
 _FILINGS_PER_HOLDING = 5
 _FILINGS_WORKERS = 8
@@ -177,7 +191,7 @@ def get_news_themes(portfolio_id: int = 1, db: Session = Depends(get_db)):
         "themes":       themes_data["themes"],
         "generated_at": datetime.now(tz=timezone.utc).isoformat(),
     }
-    _THEMES_CACHE[sig] = (now + _THEMES_TTL, result)
+    _remember_themes(sig, result)
     return result
 
 

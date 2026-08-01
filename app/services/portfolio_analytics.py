@@ -36,7 +36,14 @@ def _cache_get(key: str) -> Any | None:
 
 
 def _cache_set(key: str, payload: Any) -> Any:
-    _cache[key] = {"payload": payload, "expires_at": time.time() + _CACHE_TTL_SEC}
+    now = time.time()
+    # Keys here are a hash of the sorted ticker set, so the key space grows with
+    # every edit to a portfolio rather than being bounded by its size. Without
+    # this sweep a long-running desktop process keeps one dead payload — matrices
+    # and return series included — per shape the portfolio has ever had.
+    for stale in [k for k, entry in _cache.items() if entry["expires_at"] < now]:
+        del _cache[stale]
+    _cache[key] = {"payload": payload, "expires_at": now + _CACHE_TTL_SEC}
     return payload
 
 
