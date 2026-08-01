@@ -1,6 +1,5 @@
 # pylint: disable=protected-access
 
-
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy import text
@@ -177,10 +176,10 @@ def test_hold_class_persists_via_update_endpoint():
     holding = db.query(Holding).filter(Holding.ticker == "VOO").first()
 
     result = portfolio_router.update_holding(
-            holding.id,
-            HoldingUpdate(hold_class="anchor"),
-            db,
-        )
+        holding.id,
+        HoldingUpdate(hold_class="anchor"),
+        db,
+    )
 
     db.refresh(holding)
     assert result["hold_class"] == "anchor"

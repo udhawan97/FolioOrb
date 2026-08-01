@@ -6,7 +6,6 @@ worth duplicating — these tests pin the contract: it passes the ticker through
 returns the service payload, and never raises for a ticker with no insiders.
 """
 # pylint: disable=protected-access
-
 from app.routers import ai as ai_router
 
 

@@ -15,10 +15,12 @@ from typing import Any
 
 import numpy as np
 
-from app.services.portfolio_projection import (
-    BENCHMARK_TICKER,
+from app.services.portfolio_projection import BENCHMARK_TICKER
+from app.services.returns_math import (
     TRADING_DAYS,
-    _portfolio_daily_returns,
+    annualized,
+    log_returns as _log_returns,
+    weighted_daily_returns as _portfolio_daily_returns,
 )
 from app.services.portfolio_exposure import build_portfolio_exposure
 from app.services.stock_service import get_all_quotes, get_historical_prices
@@ -52,24 +54,16 @@ def _tickers_key(tickers: list[str], suffix: str = "") -> str:
     return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
 
-def _log_returns(closes: list[float]) -> np.ndarray:
-    if len(closes) < 2:
-        return np.array([], dtype=float)
-    prices = np.asarray(closes, dtype=float)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        returns = np.diff(np.log(prices))
-    # A non-positive close (bad data — a delisted/halted ticker, a data glitch)
-    # makes log() emit -inf/nan, which would silently contaminate every
-    # downstream stat (annualized return/vol, correlation) with NaN. Treat that
-    # day as a flat 0% return instead of letting it propagate.
-    return np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
-
-
 def _annualize_stats(daily_log_returns: np.ndarray) -> tuple[float, float]:
-    if daily_log_returns.size < 5:
+    """Annualised (return, volatility) as rounded percentages.
+
+    Reports zeros on too little history: analytics shows measured figures, and
+    a made-up drift would read as a real number on the risk cards.
+    """
+    stats = annualized(daily_log_returns)
+    if stats is None:
         return 0.0, 0.0
-    mu = float(np.mean(daily_log_returns)) * TRADING_DAYS
-    sigma = float(np.std(daily_log_returns, ddof=1)) * math.sqrt(TRADING_DAYS)
+    mu, sigma = stats
     return round(mu * 100, 2), round(sigma * 100, 2)
 
 

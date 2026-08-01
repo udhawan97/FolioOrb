@@ -4,7 +4,6 @@ Endpoints are plain async funcs, so they're called directly with an in-memory
 SQLite DB (fixture style from tests/test_portfolio_total_pct.py).
 """
 # pylint: disable=protected-access
-
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine

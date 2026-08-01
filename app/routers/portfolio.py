@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Holding, RealizedTrade
+from app.routers.deps import require_portfolio
 from app.schemas import (
     HoldingCreate,
     HoldingUpdate,
@@ -29,6 +30,7 @@ from app.services.etf_overlap import compute_etf_overlap
 from app.services.fund_costs import compute_fee_drag
 from app.services.realized_recap import build_realized_recap
 from app.services.portfolio_projection import get_cached_projection
+from app.services.world_markets import get_world_markets_cached
 from app.services.portfolio_analytics import (
     compute_risk_metrics,
     compute_correlation_matrix,
@@ -52,13 +54,8 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 # ── Shared helpers ─────────────────────────────────────────────────────
 
-
-def _require_portfolio(portfolio_id, db):
-    """Translate the Portfolio lifecycle seam to an HTTP 404."""
-    try:
-        return portfolio_lifecycle.require_portfolio(db, portfolio_id)
-    except portfolio_lifecycle.PortfolioNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+# Shared with the review router, which used to keep its own divergent copy.
+_require_portfolio = require_portfolio
 
 
 def _holdings_with_quote_data(holdings: list[dict]) -> list[dict]:
@@ -464,10 +461,13 @@ async def import_holdings(
 
 @router.put("/holdings/{holding_id}")
 def update_holding(
-    holding_id: int, data: HoldingUpdate, db: Session = Depends(get_db)
+    holding_id: int,
+    data: HoldingUpdate,
+    db: Session = Depends(get_db),
+    portfolio_id: int = 1,
 ):
     """Update shares, average cost, notes, or active status of an existing holding."""
-    holding = db.query(Holding).filter(Holding.id == holding_id).first()
+    holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
 
@@ -514,12 +514,14 @@ def update_holding(
 
 
 @router.delete("/holdings/{holding_id}")
-def remove_holding(holding_id: int, db: Session = Depends(get_db)):
+def remove_holding(
+    holding_id: int, db: Session = Depends(get_db), portfolio_id: int = 1
+):
     """
     Soft-delete a holding by setting is_active=False.
     The row is kept in the database for historical reference.
     """
-    holding = db.query(Holding).filter(Holding.id == holding_id).first()
+    holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
 
@@ -541,6 +543,7 @@ def update_realized_trade(
     trade_id: int,
     data: RealizedTradeUpdate,
     db: Session = Depends(get_db),
+    portfolio_id: int = 1,
 ):
     """Correct one recorded sale in place, re-deriving its realized gain.
 
@@ -552,8 +555,19 @@ def update_realized_trade(
     ``realized_gain`` is never accepted from the caller. It is recomputed from
     whichever of the three inputs survive the edit, so the ledger cannot hold a
     gain that contradicts its own numbers.
+
+    Scoped by ``portfolio_id`` for the same reason the delete path is: resolving
+    a row by primary key alone lets a request scoped to one portfolio rewrite
+    another portfolio's trade.
     """
-    trade = db.query(RealizedTrade).filter(RealizedTrade.id == trade_id).first()
+    trade = (
+        db.query(RealizedTrade)
+        .filter(
+            RealizedTrade.id == trade_id,
+            RealizedTrade.portfolio_id == portfolio_id,
+        )
+        .first()
+    )
     if not trade:
         raise HTTPException(status_code=404, detail="Realized trade not found")
 
@@ -572,7 +586,6 @@ def update_realized_trade(
     trade.realized_gain = round(
         (float(trade.sale_price) - float(trade.avg_cost)) * float(trade.shares_sold), 2
     )
-    portfolio_id = trade.portfolio_id
     ticker = trade.ticker
     realized_gain = trade.realized_gain
     db.commit()
@@ -588,13 +601,21 @@ def update_realized_trade(
 
 
 @router.delete("/trades/{trade_id}")
-def remove_realized_trade(trade_id: int, db: Session = Depends(get_db)):
+def remove_realized_trade(
+    trade_id: int, db: Session = Depends(get_db), portfolio_id: int = 1
+):
     """Delete one realized sale and refresh today's snapshot."""
-    trade = db.query(RealizedTrade).filter(RealizedTrade.id == trade_id).first()
+    trade = (
+        db.query(RealizedTrade)
+        .filter(
+            RealizedTrade.id == trade_id,
+            RealizedTrade.portfolio_id == portfolio_id,
+        )
+        .first()
+    )
     if not trade:
         raise HTTPException(status_code=404, detail="Realized trade not found")
 
-    portfolio_id = trade.portfolio_id
     ticker = trade.ticker
     db.delete(trade)
     db.commit()
@@ -791,12 +812,9 @@ def get_portfolio_range_performance(
 @router.get("/market-context")
 def get_portfolio_market_context(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """World indices enriched with portfolio correlation and geographic alignment."""
-    from app.routers.stocks import get_world_markets  # lazy — avoid circular import at load
-
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    world_payload = get_world_markets()
-    return compute_market_context(result, world_payload.get("markets", []))
+    return compute_market_context(result, get_world_markets_cached())
 
 
 @router.get("/benchmark-comparison")
@@ -938,9 +956,6 @@ def get_income_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
 @router.get("/macro-alignment")
 def get_macro_alignment(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Index correlation vs geographic exposure scatter data."""
-    from app.routers.stocks import get_world_markets  # noqa: PLC0415
-
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    world_payload = get_world_markets()
-    return compute_macro_alignment(result, world_payload.get("markets", []))
+    return compute_macro_alignment(result, get_world_markets_cached())

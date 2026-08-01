@@ -38,3 +38,17 @@ def test_review_orbit_covers_all_six_feature_contracts():
     assert "/api/review/report" in script
     assert "/api/review/compare" in script
     assert "/api/review/thesis/" in script
+
+
+def test_review_orbit_root_wins_the_global_body_child_stacking_rule():
+    styles = (ROOT / "static" / "css" / "review-orbit.css").read_text(encoding="utf-8")
+
+    root_rule = styles.split("body > .review-orbit", 1)[1].split("}", 1)[0]
+    assert "position: fixed" in root_rule
+    assert "z-index: 11500" in root_rule
+
+    # Fixed dashboard utilities must not leak above the modal workspace even if
+    # their own stacking values change later.
+    assert "body.review-orbit-open > .holding-expand-fab" in styles
+    assert "body.review-orbit-open > .dashboard-senpai" in styles
+    assert "visibility: hidden" in styles

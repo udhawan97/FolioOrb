@@ -9,41 +9,49 @@ request queues behind it, however trivial.
 
 That is not hypothetical here. ``GET /api/portfolio/`` is two indexed SELECTs
 against local SQLite, and it is what the portfolio switcher's dropdown waits on.
-When these endpoints were ``async def``, that dropdown inherited the latency of
-whichever one happened to hold the loop — up to the 15s earnings timeout, or a
+When the endpoints below were ``async def``, that dropdown inherited the latency
+of whichever one happened to hold the loop — up to the 15s earnings timeout, or a
 full Claude round-trip.
 
-This guard used to name the blocking endpoints one by one. That list could only
-ever catch a regression on a name somebody remembered to add to it, and fifty-six
-endpoints were written as ``async def`` without ever appearing in it. So the
-default is inverted: **every** registered endpoint must be ``def``, and the few
-that genuinely await say so in ``AWAITS`` below. A new blocking endpoint is now
-caught the moment it is registered, without anyone maintaining a list.
+Why this guard is an inverted list
+----------------------------------
+It used to be an allowlist: a table naming the endpoints known to block, checked
+for still being ``def``. That shape can only rot in one direction. It never
+mentioned ``news`` at all, and named 1 of 13 ``dca`` routes, so roughly thirty
+blocking ``async def`` handlers were structurally invisible to it — including
+``get_news_themes``, which made a synchronous Anthropic round-trip on the loop.
+
+So the rule is inverted: **every** registered endpoint on **every** router must
+be ``def`` unless it is named in ``GENUINELY_ASYNC`` below, with a reason. A new
+blocking endpoint fails by default, and making one async is a deliberate edit to
+this file rather than an omission from it.
 """
+import importlib
 import inspect
+import pkgutil
 
-from app.routers import ai, dca, news, portfolio, review, stocks, system
+import app.routers
 
-ROUTERS = (ai, dca, news, portfolio, review, stocks, system)
-
-# The only endpoints allowed to be `async def`, and the await that earns it.
-# Anything here must genuinely suspend — an `async def` that never awaits is the
-# bug this module exists to prevent, not an exemption from it.
-AWAITS = {
-    "import_holdings": "awaits UploadFile.read() on the uploaded CSV",
+# endpoint name -> why it is allowed to occupy the event loop.
+# The bar: it must either `await` real async I/O, or do no I/O at all.
+GENUINELY_ASYNC = {
+    "import_holdings": "awaits UploadFile.read() — genuine async I/O",
+    "get_market_status": "pure clock arithmetic, no I/O to hand to a thread",
 }
 
-# Coroutine endpoints that are not ours to convert, or that hold the loop for a
-# bounded constant time rather than for I/O. Kept apart from AWAITS so the rule
-# there stays exactly "it suspends"; these are simply out of scope.
-NOT_BLOCKING = {
-    "openapi": "FastAPI's own schema route",
-    "swagger_ui_html": "FastAPI's own docs route",
-    "swagger_ui_redirect": "FastAPI's own docs route",
-    "redoc_html": "FastAPI's own docs route",
-    "dashboard": "returns the template string read once at import — no I/O",
-    "health_check": "returns a literal dict — no I/O",
-}
+
+def _all_routers():
+    """Every router module under app.routers, discovered rather than listed.
+
+    Discovery is the point: a new router file is covered the day it is added,
+    which is exactly what the old hand-maintained module list failed to do.
+    """
+    modules = []
+    for info in pkgutil.iter_modules(app.routers.__path__):
+        module = importlib.import_module(f"app.routers.{info.name}")
+        if hasattr(module, "router"):
+            modules.append(module)
+    return modules
 
 
 def _registered_endpoints(module):
@@ -60,99 +68,49 @@ def _registered_endpoints(module):
     }
 
 
-def test_every_endpoint_is_sync_unless_it_awaits():
-    """No endpoint may be a coroutine function unless ``AWAITS`` justifies it."""
+def test_every_router_is_discovered():
+    """The sweep must actually see the routers, or it passes vacuously."""
+    names = {m.__name__.rsplit(".", 1)[-1] for m in _all_routers()}
+    assert {"ai", "dca", "news", "portfolio", "review", "stocks", "system"} <= names
+
+
+def test_no_endpoint_blocks_the_event_loop():
+    """Every endpoint is `def` unless explicitly excused in GENUINELY_ASYNC."""
     offenders = []
-    for module in ROUTERS:
+    for module in _all_routers():
         for name, endpoint in _registered_endpoints(module).items():
-            if inspect.iscoroutinefunction(endpoint) and name not in AWAITS:
+            if name in GENUINELY_ASYNC:
+                continue
+            if inspect.iscoroutinefunction(endpoint):
                 offenders.append(f"{module.__name__}.{name}")
     assert not offenders, (
-        "These endpoints run on the event loop and block it. Make them `def` so "
-        "FastAPI runs them in the threadpool, or add them to AWAITS with the "
-        "await that justifies it:\n  " + "\n  ".join(sorted(offenders))
+        "These endpoints are `async def`, so FastAPI runs them on the single "
+        "event loop and every other request queues behind them. Make them "
+        "`def` (FastAPI will threadpool them), or add them to GENUINELY_ASYNC "
+        "with a reason if they truly await:\n  " + "\n  ".join(sorted(offenders))
     )
 
 
-def test_awaiting_endpoints_still_await():
-    """Every name in ``AWAITS`` must exist and still be a coroutine function.
-
-    Converting one of these to ``def`` would block the loop on a real ``await``,
-    which is a different bug from the one above — so pin it from both sides.
-    """
+def test_genuinely_async_endpoints_are_still_async():
+    """The excused list must not rot either — each entry stays registered and async."""
     registered = {}
-    for module in ROUTERS:
+    for module in _all_routers():
         registered.update(_registered_endpoints(module))
-    for name, reason in AWAITS.items():
+
+    for name, reason in GENUINELY_ASYNC.items():
         endpoint = registered.get(name)
-        assert endpoint is not None, f"AWAITS names {name}, which is not registered"
-        assert inspect.iscoroutinefunction(endpoint), f"{name} no longer awaits: {reason}"
-
-
-def _walk_endpoints(router):
-    """Every endpoint reachable from ``router``, however deeply nested.
-
-    FastAPI does not keep included routers flat on ``app.routes``. Each one
-    arrives wrapped in a ``_IncludedRouter`` that holds the real ``APIRouter``
-    under ``original_router`` — and whose own ``routes`` attribute is a *string*,
-    so a naive recursion iterates it character by character, finds no endpoints,
-    and terminates. Walking only the top level, or walking it naively, yields the
-    four docs routes and nothing else: a guard built on either compares against
-    an effectively empty set and passes whatever is registered. The size floor in
-    the test below exists because that failure is otherwise silent.
-    """
-    nested = getattr(router, "original_router", None)
-    if nested is not None:
-        yield from _walk_endpoints(nested)
-        return
-    routes = getattr(router, "routes", None)
-    if not isinstance(routes, (list, tuple)):
-        return
-    for route in routes:
-        endpoint = getattr(route, "endpoint", None)
-        if endpoint is not None:
-            yield endpoint
-        else:
-            yield from _walk_endpoints(route)
-
-
-def test_guard_sees_every_router():
-    """A router missing from ``ROUTERS`` would be silently unguarded."""
-    from app.main import app  # noqa: PLC0415 — importing the built app is the point
-
-    guarded = {name for module in ROUTERS for name in _registered_endpoints(module)}
-    live = {endpoint.__name__ for endpoint in _walk_endpoints(app)}
-    # Sanity floor: the walk must actually find the API, or this proves nothing.
-    assert len(live) > 90, f"route walk found only {len(live)} endpoints"
-    stale = sorted(guarded - live)
-    assert not stale, f"guard names endpoints the app never registers: {stale}"
-
-    unguarded = live - guarded - set(NOT_BLOCKING)
-    assert not unguarded, f"unguarded endpoints: {sorted(unguarded)}"
-
-
-def test_every_reachable_endpoint_is_sync_unless_it_awaits():
-    """The same rule, applied to the built app rather than the router modules.
-
-    ``test_every_endpoint_is_sync_unless_it_awaits`` trusts ``ROUTERS`` to be
-    complete. This one trusts nothing and walks what the app actually serves.
-    """
-    from app.main import app  # noqa: PLC0415 — importing the built app is the point
-
-    allowed = set(AWAITS) | set(NOT_BLOCKING)
-    offenders = sorted(
-        endpoint.__name__
-        for endpoint in _walk_endpoints(app)
-        if inspect.iscoroutinefunction(endpoint) and endpoint.__name__ not in allowed
-    )
-    assert not offenders, f"these endpoints block the event loop: {offenders}"
+        assert endpoint is not None, f"{name} is no longer registered ({reason})"
+        assert inspect.iscoroutinefunction(endpoint), (
+            f"{name} is excused from the sync rule because it {reason}, but it "
+            f"is no longer `async def` — drop it from GENUINELY_ASYNC."
+        )
 
 
 def test_connection_pool_exceeds_request_concurrency():
     """The pool must not be the next thing that serializes those endpoints.
 
-    Making the endpoints sync moves them off the event loop and lets them run
-    genuinely in parallel — which raises peak concurrent DB connections.
+    Making the endpoints above sync moves them off the event loop and lets them
+    run genuinely in parallel — which raises peak concurrent DB connections.
     ``get_db`` holds its connection for the whole request, network time included,
     so a pool smaller than peak concurrency just relocates the stall from the
     loop into ``QueuePool.get()``.

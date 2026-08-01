@@ -29,6 +29,31 @@ _TEMPLATE_FILE = _RESOURCE_DIR / "templates" / "index.html"
 logger = logging.getLogger(__name__)
 
 
+def _warmup_tickers() -> list[str]:
+    """Every active ticker the user holds, across all portfolios.
+
+    Deliberately not portfolio-scoped: the browser decides which portfolio to
+    open from localStorage, so at boot we don't yet know which one that is.
+    Warming the union means whichever they pick is already hot. Falls back to
+    DEFAULT_HOLDINGS for a brand-new database with nothing in it.
+    """
+    from app.database import SessionLocal
+    from app.models import Holding
+    from app.services.stock_service import DEFAULT_HOLDINGS, normalize_ticker
+
+    with SessionLocal() as db:
+        rows = db.query(Holding.ticker).filter(Holding.is_active.is_(True)).all()
+
+    seen: set[str] = set()
+    tickers: list[str] = []
+    for row in rows:
+        symbol = normalize_ticker(row[0])
+        if symbol and symbol not in seen:
+            seen.add(symbol)
+            tickers.append(symbol)
+    return tickers or list(DEFAULT_HOLDINGS)
+
+
 def _run_startup_warmup() -> None:
     """
     Pre-fetch quotes, history, and world markets for the active holdings so the
@@ -36,23 +61,14 @@ def _run_startup_warmup() -> None:
     requests. Runs in a background thread; any failure is logged and ignored.
     """
     try:
-        from app.database import SessionLocal
-        from app.models import Holding
-        from app.services.stock_service import DEFAULT_HOLDINGS, warm_caches
+        from app.services.stock_service import warm_caches
         from app.services.timing_signal import get_batched_history_closes
-        from app.routers.stocks import _get_world_markets_cached
+        from app.services.world_markets import get_world_markets_cached
 
-        with SessionLocal() as db:
-            tickers = [
-                str(row[0]).upper()
-                for row in db.query(Holding.ticker)
-                .filter(Holding.is_active.is_(True))
-                .all()
-            ] or list(DEFAULT_HOLDINGS)
-
+        tickers = _warmup_tickers()
         warm_caches(tickers)
         get_batched_history_closes(tickers)
-        _get_world_markets_cached()
+        get_world_markets_cached()
         logger.info("Startup cache warmup complete for %d tickers", len(tickers))
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning("Startup cache warmup failed; exception_type=%s", type(exc).__name__)

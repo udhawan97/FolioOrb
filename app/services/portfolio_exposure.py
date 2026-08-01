@@ -154,6 +154,38 @@ def _concentration_hhi(sector_exposure: list[dict]) -> float:
     return round(sum(s * s for s in shares), 3)
 
 
+# ── Concentration bands ────────────────────────────────────────────────────────
+# One scale, read as "effective number of sectors" (1/HHI): 0.10 is ~10 sectors,
+# 0.25 is ~4, 0.50 is ~2.  This used to be three tables in three modules that
+# disagreed — the action plan called 0.30 "high" while the analytics narration
+# called the same book "moderately concentrated" in the same dashboard load.
+_HHI_BANDS: tuple[tuple[float, str, str], ...] = (
+    (0.10, "low", "well spread"),
+    (0.25, "medium", "moderately concentrated"),
+    (0.50, "high", "concentrated"),
+)
+_HHI_TOP_BAND = ("very high", "very concentrated")
+
+# At or above this the book is worth flagging as under-diversified.
+CONCENTRATION_FLAG_HHI = 0.25
+
+
+def concentration_band(hhi: float) -> str:
+    """Machine-readable band: low | medium | high | very high."""
+    for cutoff, band, _ in _HHI_BANDS:
+        if hhi < cutoff:
+            return band
+    return _HHI_TOP_BAND[0]
+
+
+def concentration_word(hhi: float) -> str:
+    """The same band as prose, for narration."""
+    for cutoff, _, word in _HHI_BANDS:
+        if hhi < cutoff:
+            return word
+    return _HHI_TOP_BAND[1]
+
+
 def build_portfolio_exposure(
     holdings: list[dict],
     *,
@@ -189,7 +221,7 @@ def build_portfolio_exposure(
     hhi = _concentration_hhi(sector_exposure)
 
     flags: list[str] = []
-    if hhi >= 0.25:
+    if hhi >= CONCENTRATION_FLAG_HHI:
         flags.append("Sector concentration is elevated — book is not very diversified")
     if len(duplicate_flags) >= 2:
         flags.append("Hidden duplication detected across holdings")

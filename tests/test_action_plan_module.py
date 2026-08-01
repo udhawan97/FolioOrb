@@ -47,13 +47,12 @@ def _scan(signals=None, allocation=None, positions=None, exposure=None):
         signals=signals,
         allocation_pct=allocation,
         positions=positions,
-        # NOTE: the snapshot reads "sectors"/"countries"; build_portfolio_exposure
-        # emits "sector_exposure"/"country_exposure". That pre-existing mismatch
-        # is why the real exposure block reaches Claude empty — see
-        # tests/test_verdict_pipeline.py::TestBookExposure for the real key names.
+        # Keys here must match build_portfolio_exposure()'s real output — see
+        # tests/test_verdict_pipeline.py::TestBookExposure. A fake that invents
+        # its own shape is what let the empty-exposure bug ship green.
         exposure=exposure if exposure is not None else {
-            "sectors": [{"sector": "Technology", "weight_pct": 80.0}],
-            "countries": [{"country": "US", "weight_pct": 100.0}],
+            "sector_exposure": [{"name": "Technology", "weight_pct": 80.0}],
+            "country_exposure": [{"name": "US", "weight_pct": 100.0}],
             "concentration_hhi": 0.50,
         },
         regime={"label": "Risk-on", "mood": "warm"},
@@ -90,7 +89,7 @@ def _quiet_analytics(monkeypatch):
     )
     monkeypatch.setattr(
         "app.services.portfolio_analytics.compute_sector_tilt",
-        lambda holdings: {"tilt": [{"sector": "Technology", "overweight_pct": 12.34}]},
+        lambda holdings: {"sectors": [{"name": "Technology", "tilt_pct": 12.34}]},
     )
     monkeypatch.setattr(
         "app.services.portfolio_analytics.compute_conviction_gaps",
@@ -126,7 +125,8 @@ class TestBuildSnapshot:
         assert snapshot["total_value"] == 5000
         assert snapshot["regime"] == {"label": "Risk-on", "mood": "warm"}
         assert snapshot["concentration_hhi"] == 0.5
-        assert snapshot["hhi_band"] == "high"
+        # 0.50 HHI ≈ two effective sectors — the top band on the shared scale.
+        assert snapshot["hhi_band"] == "very high"
         assert [h["t"] for h in snapshot["holdings"]] == ["AAPL", "MSFT"]
         assert snapshot["holdings"][0]["ret_pct"] == 80.0
         assert snapshot["holdings"][1]["ret_pct"] == 0

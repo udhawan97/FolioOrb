@@ -25,11 +25,16 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import pytz
-
 from app.config import settings
-from app.services import market_data
+from app.services import market_data, market_hours
 from app.services.security_type import classify_security
+# Re-exported: what a *symbol* is lives in `ticker`, what a *quote* means lives
+# here. Callers that already import these two from this module keep working.
+from app.services.ticker import (  # noqa: F401  pylint: disable=unused-import
+    TICKER_PATTERN,
+    normalize_ticker,
+    ticker_shape_is_safe,
+)
 from app.services.ttl_cache import ttl_cache
 
 logger = logging.getLogger(__name__)
@@ -37,9 +42,6 @@ logger = logging.getLogger(__name__)
 # ── Module-level constants ─────────────────────────────────────────────────────
 
 QUOTE_FETCH_ERROR = "Quote data is temporarily unavailable."
-
-# Ticker symbols: letters, digits, '.', '-', '^'; max 10 chars.
-TICKER_PATTERN = re.compile(r"^[A-Z0-9.^-]{1,10}$")
 
 # Suggestion queries: allow company-name chars, strip injection-prone punctuation.
 SUGGESTION_QUERY_PATTERN = re.compile(r"[^A-Za-z0-9 .^\-&]")
@@ -61,8 +63,6 @@ _QUOTE_TTL = 60             # 1 min while open
 _QUOTE_TTL_CLOSED = 900     # 15 min while closed
 _HISTORY_TTL = 300
 
-_EASTERN = pytz.timezone("America/New_York")
-
 
 class InfoUnavailable(RuntimeError):
     """The `.info` read itself failed — not the same as Yahoo having nothing to say.
@@ -78,16 +78,6 @@ class InfoUnavailable(RuntimeError):
 
 # ── Pure helpers ───────────────────────────────────────────────────────────────
 
-def normalize_ticker(ticker: str) -> str:
-    """Strip whitespace and upper-case a user-supplied ticker symbol."""
-    return (ticker or "").strip().upper()
-
-
-def ticker_shape_is_safe(ticker: str) -> bool:
-    """Return True if the symbol is narrow enough to be safe in logs, URLs, and storage."""
-    return bool(TICKER_PATTERN.fullmatch(normalize_ticker(ticker)))
-
-
 def _clean_suggestion_query(query: str) -> str:
     """Allow company-name searches while stripping punctuation used in injections."""
     return SUGGESTION_QUERY_PATTERN.sub("", (query or "").strip())[:80]
@@ -98,6 +88,23 @@ def quote_resolves(quote: dict) -> bool:
     if not quote or quote.get("error"):
         return False
     return (quote.get("current_price") or 0.0) > 0
+
+
+def usable_price(quote: dict) -> float | None:
+    """The quote's price if it can be used in arithmetic, else None.
+
+    "Usable" means present, numeric, finite, and positive.  The finite check is
+    the one that is easy to lose: Yahoo occasionally returns NaN, and NaN is
+    *truthy*, so the common `quote.get("current_price") or 0` idiom passes it
+    straight through — after which one bad ticker turns a portfolio total, and
+    every weight derived from it, into NaN without tripping any `<= 0` guard.
+    Every caller that multiplies a price by a share count wants this.
+    """
+    try:
+        price = float(quote.get("current_price") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    return price if math.isfinite(price) and price > 0 else None
 
 
 def _fast_float(value, default: float = 0.0) -> float:
@@ -115,23 +122,15 @@ def _round_or_none(val, decimals: int):
 
 
 # ── Market-hours detection ─────────────────────────────────────────────────────
-
-def _market_is_open() -> bool:
-    """Best-effort US market-hours check (no holiday calendar)."""
-    now = datetime.now(_EASTERN)
-    if now.weekday() >= 5:  # Saturday / Sunday
-        return False
-    open_t = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    close_t = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    return open_t <= now <= close_t
-
+# The schedule itself lives in `market_hours`; this module only says how long an
+# answer is worth keeping on each side of the bell.
 
 def _quote_ttl() -> float:
-    return _QUOTE_TTL if _market_is_open() else _QUOTE_TTL_CLOSED
+    return _QUOTE_TTL if market_hours.is_open() else _QUOTE_TTL_CLOSED
 
 
 def _info_ttl() -> float:
-    return _INFO_TTL if _market_is_open() else _INFO_TTL_CLOSED
+    return _INFO_TTL if market_hours.is_open() else _INFO_TTL_CLOSED
 
 
 # ── Core fetch functions ───────────────────────────────────────────────────────

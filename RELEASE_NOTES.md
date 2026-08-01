@@ -1,3 +1,150 @@
+# FolioOrb v5.10.0 Release Notes
+
+**Release date:** August 1, 2026
+
+## Headline
+
+An architecture pass. **52 endpoints came off the event loop**, so a slow
+Claude call or Yahoo fetch no longer freezes the whole dashboard, and a
+portfolio-scoping bug that let one portfolio edit another's holdings is closed.
+
+## Fixes
+
+### 🔒 Holdings can only be edited through the portfolio that owns them
+
+`PUT` and `DELETE /api/portfolio/holdings/{id}`, and
+`DELETE /api/portfolio/trades/{id}`, looked their row up by id alone. The
+browser scopes every request with a `portfolio_id`, but the handlers ignored
+it — so with more than one portfolio open, an edit or a delete could land on a
+holding belonging to a different book, and the realized-sale it recorded went
+into the wrong ledger. All three now resolve through the holdings repository,
+which owns the ownership rule, and answer 404 when the holding isn't yours.
+
+### ⚡ A slow endpoint no longer freezes the dashboard
+
+The app runs one server worker, so one event loop. Fifty-two endpoints were
+declared `async` while doing blocking work — yfinance fetches, SEC EDGAR calls,
+synchronous Claude round-trips, unbounded table scans — and each one held that
+loop for its whole duration while every other request queued behind it. The
+portfolio switcher's dropdown, which is two indexed local queries, could inherit
+a 30-second Claude wait. Those endpoints now run in the worker threadpool.
+
+The guard that was supposed to catch this only listed endpoints by hand and had
+never been told about the news router at all; it now sweeps every router and
+fails any blocking endpoint by default.
+
+### 📉 A single bad price can no longer blank every weight
+
+If Yahoo returned `NaN` for one holding, the verdict pipeline's position-weight
+calculation propagated it: `NaN` is truthy, so it slipped past the guard meant
+to catch missing prices, and every holding in the book came back with a `NaN`
+weight — into the concentration score and into what Claude was told. Prices now
+go through one shared check that rejects `NaN`, infinities, and negatives.
+
+### 🧭 The action plan sees your sectors again
+
+The action-plan snapshot read three keys nobody produced — sector exposure,
+country exposure and sector tilt were spelled differently by the code that
+built them — so Claude received an empty exposure block on every request and
+wrote around the gap. The keys now match, and the tests no longer fake a shape
+the real code never emits.
+
+### 🕐 Market hours are answered once
+
+The status badge and the cache-expiry logic each computed "is the market open?"
+separately, so they could disagree. One module now answers it.
+
+### 📊 One concentration scale
+
+An HHI of 0.30 was "high" on the action plan and "moderately concentrated" in
+the analytics narration — same book, same page, two verdicts. There is now one
+banding, shared by both.
+
+## Under the hood
+
+- New seams, each replacing a rule that was written out two or three times:
+  `market_hours` (the trading calendar), `ticker` (symbol shape and
+  normalisation, dependency-free so the request schemas can share it),
+  `returns_math` (log-returns and annualisation, previously duplicated between
+  analytics and projection), and `routers/deps` (portfolio resolution).
+- The world-markets fan-out and its cache moved out of the stocks router into
+  `world_markets`, so startup warmup no longer imports a private function out of
+  an HTTP router. It gains request coalescing, and a briefly unreachable Yahoo
+  is retried rather than cached as an all-zero strip for five minutes.
+- Two response schemas that nothing had ever used are gone.
+- `tests/conftest.py` gained shared `db` and `api_client` fixtures, replacing
+  the in-memory-database block that had been copy-pasted across thirty files.
+- 1393 tests pass (up from 1338); pylint stays at 10.00/10.
+
+## Notes
+
+No schema changes and no migration. Nothing to do on upgrade.
+
+This release also carries the user-flow resilience work prepared as v5.9.3,
+which was never cut as its own tag; its notes follow below.
+
+---
+
+# FolioOrb v5.9.3 Release Notes (shipped in v5.10.0)
+
+**Prepared:** August 1, 2026 — folded into v5.10.0 rather than cut
+as its own tag.
+
+The Review Orbit, holdings, News, Manage, tooltips, and Analytics flows now hold
+up under keyboard use, narrow windows, and transient failures—not just a
+pointer on a desktop-sized dashboard.
+
+## Fixes
+
+### 🧭 Review Orbit stays above the whole dashboard
+
+The global body-child stacking rule and sticky navbar could pull the full-screen
+workspace behind app chrome, leaving its header obscured and fixed dashboard
+utilities visible through it. Review Orbit now keeps its fixed viewport layer,
+covers the navbar at phone widths, and suppresses the holding FAB and Senpai
+while open. Escape still returns focus to the named Review trigger.
+
+### ⌨️ Holding details are real disclosure controls
+
+Ticker rows now expose native keyboard buttons with `aria-expanded` and
+`aria-controls`. Enter and Space both open and close the matching detail row;
+collapsed content becomes hidden from assistive technology and focus remains on
+the trigger. Holding-intelligence lookups are scoped to the holdings table so
+allocation rows with the same ticker cannot receive duplicate detail content.
+
+### 🔁 News failures can recover in place
+
+A transient feed failure no longer marks News as permanently loaded. The empty
+state offers **Retry news**, announces progress, and refetches without reloading
+the page. A successful retry restores the feed and moves focus to the first
+article (or the News tab when there are no links).
+
+### 🎯 Manage returns focus somewhere visible
+
+Opening Manage from the one-time welcome guide used to return focus into that
+now-hidden guide on Escape. FolioOrb now validates the opener and falls back to
+the always-visible, explicitly named **Manage portfolios** control.
+
+### 🔊 Icon-only help controls have useful names
+
+Shared tooltip setup now names icon-only buttons from their tooltip headings,
+including controls added after initial render. Decorative glyphs stay hidden
+from assistive technology instead of becoming the button name.
+
+### 📱 Analytics reads as a card, not a word rail
+
+At 320 px the Portfolio Action Plan header now stacks its headline and metadata
+instead of squeezing them into a narrow vertical strip. The compact layout has
+no page-wide horizontal overflow.
+
+## Notes
+
+No portfolio math, trade behavior, schema, or migration changed. Installing over
+5.9.2 preserves holdings, trades, snapshots, DCA history, theses, settings, and
+API keys.
+
+---
+
 # FolioOrb v5.9.2 Release Notes
 
 **Release date:** July 29, 2026

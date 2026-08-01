@@ -16,13 +16,25 @@ from typing import Any
 
 import numpy as np
 
+from app.services.returns_math import (
+    annualized,
+    log_returns as _log_returns,
+    weighted_daily_returns as _portfolio_daily_returns,
+)
 from app.services.stock_service import get_historical_prices
 
 logger = logging.getLogger(__name__)
 
 BENCHMARK_TICKER = "SPY"
 LOOKBACK_PERIOD = "3y"
-TRADING_DAYS = 252
+
+# Fallbacks for a history too short to measure: a long-run equity-like drift and
+# volatility, so a new or thinly-priced book still projects a plausible cone
+# instead of a flat line. The floor keeps `best`/`worst` from collapsing onto
+# `avg`, since the scenario spread is one sigma either side of the drift.
+_DEFAULT_MU = 0.08
+_DEFAULT_SIGMA = 0.15
+_MIN_SIGMA = 0.05
 
 HORIZONS: dict[str, dict[str, Any]] = {
     "30d": {"label": "30D", "days": 30, "step_days": 1},
@@ -41,67 +53,13 @@ def _fetch_closes(ticker: str) -> list[tuple[str, float]]:
     return [(r["date"], float(r["close"])) for r in rows if r.get("close", 0) > 0]
 
 
-def _log_returns(closes: list[float]) -> np.ndarray:
-    if len(closes) < 2:
-        return np.array([], dtype=float)
-    prices = np.asarray(closes, dtype=float)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        returns = np.diff(np.log(prices))
-    # _fetch_closes already filters non-positive prices, but guard here too so a
-    # bad close (0/negative) can never turn a projection into NaN — mirrors the
-    # same defense in portfolio_analytics._log_returns. Treat a bad day as flat.
-    return np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
-
-
 def _annualize_stats(daily_log_returns: np.ndarray) -> tuple[float, float]:
-    if daily_log_returns.size < 5:
-        return 0.08, 0.15
-    mu = float(np.mean(daily_log_returns)) * TRADING_DAYS
-    sigma = float(np.std(daily_log_returns, ddof=1)) * math.sqrt(TRADING_DAYS)
-    return mu, max(sigma, 0.05)
-
-
-def _portfolio_daily_returns(
-    holdings: list[tuple[str, float, list[tuple[str, float]]]],
-) -> np.ndarray:
-    """
-    holdings: [(ticker, weight, [(date, close), ...]), ...]
-    Returns aligned weighted daily log-returns.
-    """
-    active = [(t, w, s) for t, w, s in holdings if w > 0 and len(s) >= 2]
-    if not active:
-        return np.array([], dtype=float)
-
-    all_dates: set[str] = set()
-    for _t, _w, series in active:
-        for d, _c in series:
-            all_dates.add(d)
-    dates = sorted(all_dates)
-    if len(dates) < 2:
-        return np.array([], dtype=float)
-
-    date_idx = {d: i for i, d in enumerate(dates)}
-    n = len(dates)
-    port_rets = np.zeros(n - 1, dtype=float)
-    total_weight = sum(w for _t, w, _s in active)
-
-    for _ticker, weight, series in active:
-        closes = np.full(n, np.nan)
-        for d, c in series:
-            if d in date_idx:
-                closes[date_idx[d]] = c
-        for i in range(1, n):
-            if np.isnan(closes[i]):
-                closes[i] = closes[i - 1]
-        if np.isnan(closes[0]):
-            valid = np.where(~np.isnan(closes))[0]
-            if valid.size:
-                closes[: valid[0]] = closes[valid[0]]
-        if np.any(np.isnan(closes)) or np.any(closes <= 0):
-            continue
-        port_rets += (weight / total_weight) * np.diff(np.log(closes))
-
-    return port_rets
+    """Annualised (drift, volatility) as decimals, with projection defaults."""
+    stats = annualized(daily_log_returns)
+    if stats is None:
+        return _DEFAULT_MU, _DEFAULT_SIGMA
+    mu, sigma = stats
+    return mu, max(sigma, _MIN_SIGMA)
 
 
 def _growth_path(  # pylint: disable=too-many-positional-arguments

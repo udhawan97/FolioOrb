@@ -31,13 +31,28 @@ body.review-orbit-open { overflow: hidden; }
     font-weight: 750;
 }
 
-.review-orbit {
+/* Match the specificity of style.css's global `body > *:not(.bg-orb)` rule.
+   Without the body-child selector that rule changes this modal root back to
+   position: relative / z-index: 1, so the navbar and dashboard utilities paint
+   above Review Orbit on compact screens. */
+.review-orbit,
+body > .review-orbit {
     position: fixed;
     inset: 0;
-    z-index: 10060;
+    /* The sticky app navbar is 11000; the modal must cover it as one
+       uninterrupted workspace, including at phone widths. */
+    z-index: 11500;
     display: grid;
     place-items: center;
     padding: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+/* Inert blocks interaction with the dashboard while Review Orbit is open;
+   visibility also guarantees fixed utilities never bleed through visually. */
+body.review-orbit-open > .holding-expand-fab,
+body.review-orbit-open > .dashboard-senpai {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .review-orbit-backdrop {

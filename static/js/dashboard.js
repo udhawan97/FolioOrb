@@ -4696,6 +4696,17 @@ function createHoldingRow(h) {
     return row;
 }
 
+function holdingDetailsId(ticker) {
+    const safeTicker = String(ticker || "holding").replace(/[^A-Za-z0-9_-]+/g, "-");
+    return `holding-details-${safeTicker}`;
+}
+
+function holdingTableRow(ticker) {
+    const tbody = document.getElementById("holdings-table");
+    if (!tbody) return null;
+    return tbody.querySelector(`tr[data-ticker="${CSS.escape(String(ticker || ""))}"]`);
+}
+
 function updateHoldingRow(row, h, index, trendData = {}) {
     row.dataset.ticker = h.ticker;
     row.style.setProperty("--row-index", index);
@@ -4703,11 +4714,15 @@ function updateHoldingRow(row, h, index, trendData = {}) {
 
     const rec = cachedRecommendations[h.ticker];
     const tickerHtml = html`
-        <span class="holding-ticker-wrap">
+        <button type="button" class="holding-disclosure-btn"
+                aria-expanded="false" aria-controls="${holdingDetailsId(h.ticker)}"
+                aria-label="Show details for ${h.ticker}">
+          <span class="holding-ticker-wrap">
             <span class="ticker-dot" style="background:${chartColor(index)}"></span>
             <span class="holding-ticker-symbol">${h.ticker}</span>${holdingBadgeHtml(h)}${earningsBadgeHtml(h)}
-            <i class="bi bi-chevron-right row-chevron"></i>
-        </span>
+            <i class="bi bi-chevron-right row-chevron" aria-hidden="true"></i>
+          </span>
+        </button>
     `;
 
     setCellHtml(row.querySelector('[data-field="ticker"]'), tickerHtml);
@@ -4883,6 +4898,43 @@ function animateSummaryBody(body, opening) {
     }
 }
 
+function syncHoldingSummarySemantics(mainRow, expandRow, expanded) {
+    const ticker = mainRow?.dataset?.ticker || "holding";
+    const disclosure = mainRow?.querySelector(".holding-disclosure-btn");
+    const detailsId = holdingDetailsId(ticker);
+    if (expandRow) {
+        expandRow.id = detailsId;
+        expandRow.setAttribute("aria-hidden", String(!expanded));
+    }
+    if (disclosure) {
+        disclosure.setAttribute("aria-controls", detailsId);
+        disclosure.setAttribute("aria-expanded", String(expanded));
+        disclosure.setAttribute("aria-label", `${expanded ? "Hide" : "Show"} details for ${ticker}`);
+    }
+}
+
+function setHoldingSummaryExpanded(mainRow, expandRow, expanded) {
+    const body = expandRow?.querySelector(".summary-body");
+    if (!body) return;
+
+    // Make the controlled row measurable before the opening animation. On
+    // collapse, aria-hidden takes effect immediately and `hidden` follows the
+    // visual transition so the accessibility and visual states both settle.
+    if (expanded) expandRow.hidden = false;
+    syncHoldingSummarySemantics(mainRow, expandRow, expanded);
+    animateSummaryBody(body, expanded);
+    mainRow.classList.toggle("summary-open", expanded);
+
+    const transitionToken = String((Number(expandRow.dataset.collapseToken) || 0) + 1);
+    expandRow.dataset.collapseToken = transitionToken;
+    if (!expanded) {
+        window.setTimeout(() => {
+            if (expandRow.dataset.collapseToken !== transitionToken) return;
+            if (!mainRow.classList.contains("summary-open")) expandRow.hidden = true;
+        }, 280);
+    }
+}
+
 const HOLDING_SENPAI_QUOTES = {
     up: {
         low: [
@@ -5006,8 +5058,7 @@ function toggleSummaryRow(mainRow) {
     if (!expandRow || !expandRow.classList.contains("summary-expand-row")) return;
     const body = expandRow.querySelector(".summary-body");
     const isOpen = body.classList.contains("open");
-    animateSummaryBody(body, !isOpen);
-    mainRow.classList.toggle("summary-open", !isOpen);
+    setHoldingSummaryExpanded(mainRow, expandRow, !isOpen);
     syncHoldingExpandFab();
     if (!isOpen) {
         mainRow.classList.remove("has-intel-ready");
@@ -6727,6 +6778,8 @@ function injectSummaryRows(tbody) {
         if (!expandRow) {
             expandRow = document.createElement("tr");
             expandRow.className = "summary-expand-row";
+            expandRow.hidden = true;
+            expandRow.setAttribute("aria-hidden", "true");
             const td = document.createElement("td");
             td.colSpan = 9;
             td.innerHTML = `<div class="summary-body"><div class="intel-grid">
@@ -6750,6 +6803,12 @@ function injectSummaryRows(tbody) {
             </div></div>`;
             expandRow.appendChild(td);
             mainRow.after(expandRow);
+        }
+
+        const expanded = mainRow.classList.contains("summary-open");
+        syncHoldingSummarySemantics(mainRow, expandRow, expanded);
+        if (!expanded && !expandRow.querySelector(".summary-body.open")) {
+            expandRow.hidden = true;
         }
 
         const intelGrid = expandRow.querySelector(".intel-grid");
@@ -6776,7 +6835,7 @@ function injectSummaryRows(tbody) {
 }
 
 function renderExpandedTicker(ticker) {
-    const mainRow = document.querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
+    const mainRow = holdingTableRow(ticker);
     if (!mainRow) return;
     const tbody = mainRow.closest("tbody");
     if (tbody) injectSummaryRows(tbody);
@@ -6985,7 +7044,7 @@ async function loadAnalystRecommendations() {
             const targetCell = document.getElementById(`target-cell-${ticker}`);
             if (targetCell) targetCell.innerHTML = renderTargetCell(rec);
             if (intelligenceLoaded && cachedIntelligence[ticker]) {
-                const row = document.querySelector(`tr[data-ticker="${ticker}"]`);
+                const row = holdingTableRow(ticker);
                 const expandRow = row?.nextElementSibling;
                 const coverageSection = expandRow?.querySelector(".intel-coverage-section");
                 if (coverageSection) renderHoldingCoverage(coverageSection, cachedIntelligence[ticker]);
@@ -7749,7 +7808,7 @@ function _renderHoldModeStrip(verdict, ticker) {
 }
 
 function _syncHoldModeStrip(ticker, holdClass) {
-    const mainRow = document.querySelector(`tr[data-ticker="${CSS.escape(ticker)}"]`);
+    const mainRow = holdingTableRow(ticker);
     const strip = mainRow?.nextElementSibling?.querySelector(".hold-mode-strip");
     if (!strip) return;
     strip.querySelectorAll(".hold-mode-seg").forEach(btn => {
@@ -11749,7 +11808,7 @@ async function loadTargetedHoldingIntelligence(ticker) {
         renderExpandedTicker(normalized);
         scheduleAllocationFocusPanelRefresh();
         const holding = latestHoldings.find(h => h.ticker === normalized);
-        const row = document.querySelector(`tr[data-ticker="${CSS.escape(normalized)}"]`);
+        const row = holdingTableRow(normalized);
         if (holding && row) setCellHtml(row.querySelector('[data-field="day"]'), dayChangeHtml(holding));
     }
 }
@@ -11771,9 +11830,11 @@ async function loadHoldingIntelligence(options = {}) {
         // Toggle expand rows open/closed on repeated click
         const allBodies = tbody.querySelectorAll(".summary-body");
         const anyOpen = Array.from(allBodies).some(b => b.classList.contains("open"));
-        allBodies.forEach(b => animateSummaryBody(b, !anyOpen));
         tbody.querySelectorAll("tr[data-ticker]").forEach(r => {
-            r.classList.toggle("summary-open", !anyOpen);
+            const expandRow = r.nextElementSibling;
+            if (expandRow?.classList.contains("summary-expand-row")) {
+                setHoldingSummaryExpanded(r, expandRow, !anyOpen);
+            }
             if (!anyOpen) r.classList.remove("has-intel-ready");
         });
         syncHoldingExpandFab();
@@ -11874,6 +11935,18 @@ function portfolioManagerFocusableElements() {
     )).filter(element => element.getClientRects().length > 0);
 }
 
+function isRestorableFocusTarget(element) {
+    if (!(element instanceof HTMLElement) || !element.isConnected || element.disabled) return false;
+    if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
+    return element.getClientRects().length > 0;
+}
+
+function portfolioManagerFallbackFocus() {
+    const navTrigger = document.getElementById("portfolio-manager-trigger");
+    if (isRestorableFocusTarget(navTrigger)) return navTrigger;
+    return portfolioManagerTriggers().find(isRestorableFocusTarget) || null;
+}
+
 function handlePortfolioManagerKeydown(event) {
     const popover = document.getElementById("portfolioModal");
     if (!popover?.classList.contains("is-visible")) return;
@@ -11946,7 +12019,13 @@ function closePortfolioManager() {
     setPortfolioManagerTriggerState(false);
     const previousFocus = _portfolioManagerPreviousFocus;
     _portfolioManagerPreviousFocus = null;
-    if (previousFocus?.focus) requestAnimationFrame(() => previousFocus.focus());
+    requestAnimationFrame(() => {
+        const fallbackFocus = portfolioManagerFallbackFocus();
+        const focusTarget = isRestorableFocusTarget(previousFocus)
+            ? previousFocus
+            : fallbackFocus;
+        focusTarget?.focus();
+    });
     return true;
 }
 
@@ -13781,6 +13860,35 @@ function initTips() {
     if (document.documentElement.dataset.tipsDelegated === "true") return;
     document.documentElement.dataset.tipsDelegated = "true";
 
+    function applyTipTriggerA11y(root) {
+        const triggers = [];
+        if (root instanceof Element) {
+            const owner = root.closest(".tip-trigger");
+            if (owner) triggers.push(owner);
+            for (const trigger of root.querySelectorAll(".tip-trigger")) triggers.push(trigger);
+        }
+        for (const trigger of new Set(triggers)) {
+            const title = String(trigger.dataset.tipTitle || "").trim();
+            const hasName = trigger.hasAttribute("aria-label")
+                || trigger.hasAttribute("aria-labelledby")
+                || String(trigger.textContent || "").trim().length > 0;
+            if (trigger.matches("button") && title && !hasName) {
+                trigger.setAttribute("aria-label", `About ${title}`);
+            }
+            for (const icon of trigger.querySelectorAll("i")) {
+                icon.setAttribute("aria-hidden", "true");
+            }
+        }
+    }
+
+    applyTipTriggerA11y(document.body);
+    const tipA11yObserver = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) applyTipTriggerA11y(node);
+        }
+    });
+    tipA11yObserver.observe(document.body, { childList: true, subtree: true });
+
     let hideTimeout = null;
     let activeTrigger = null;
 
@@ -14116,8 +14224,12 @@ function _newsShowFeed(show) {
 function _newsShowEmpty(show, isError = false) {
     const el = document.getElementById("news-empty");
     if (!el) return;
+    const retry = document.getElementById("news-retry-btn");
     el.hidden = !show;
-    if (!show) return;
+    if (!show) {
+        if (retry) retry.hidden = true;
+        return;
+    }
     const title = el.querySelector(".news-empty-title");
     const body = el.querySelector(".news-empty-body");
     if (title) title.textContent = isError
@@ -14126,6 +14238,7 @@ function _newsShowEmpty(show, isError = false) {
     if (body) body.textContent = isError
         ? "Check your connection and refresh — news refreshes every 15 minutes."
         : "Add holdings or check back later — news refreshes every 15 minutes.";
+    if (retry) retry.hidden = !isError;
 }
 
 /** Clear the AI briefing/themes section text (used when switching to local). */
@@ -14375,6 +14488,7 @@ async function _newsLoadThemes() {
  * fetch and render AI themes.  Lazy — only runs once per session unless forced.
  */
 async function loadNewsZone() {
+    let feedLoaded = false;
     _newsShowLoading(true);
     _newsShowFeed(false);
     _newsShowEmpty(false);
@@ -14382,6 +14496,7 @@ async function loadNewsZone() {
     try {
         _newsFeedData = await apiGet("/api/news/feed");
         _newsRenderFeed(_newsFeedData);
+        feedLoaded = true;
     } catch (err) {
         console.warn("News feed fetch failed:", err);
         _newsShowFeed(false);
@@ -14398,12 +14513,39 @@ async function loadNewsZone() {
         await _newsLoadThemes();
     }
 
-    _newsLoaded = true;
-    _newsLoadPromise = null;
+    _newsLoaded = feedLoaded;
+    return feedLoaded;
 }
 
 /** Lazy entry-point: starts a load if not already done. */
-function ensureNewsLoaded() {
-    if (_newsLoaded) return;
-    if (!_newsLoadPromise) _newsLoadPromise = loadNewsZone();
+function ensureNewsLoaded({ force = false } = {}) {
+    if (force) _newsLoaded = false;
+    if (_newsLoaded) return Promise.resolve(true);
+    if (!_newsLoadPromise) {
+        _newsLoadPromise = loadNewsZone().finally(() => { _newsLoadPromise = null; });
+    }
+    return _newsLoadPromise;
+}
+
+async function retryNewsZone() {
+    const retry = document.getElementById("news-retry-btn");
+    const status = document.getElementById("news-retry-status");
+    if (retry) retry.disabled = true;
+    if (status) status.textContent = "Retrying news.";
+
+    const loaded = await ensureNewsLoaded({ force: true });
+    if (retry) retry.disabled = false;
+    if (status) status.textContent = loaded
+        ? "News loaded."
+        : "News is still unavailable. Try again when your connection returns.";
+
+    requestAnimationFrame(() => {
+        if (loaded) {
+            const firstArticle = document.querySelector("#news-feed-wrap a[href]");
+            const newsTab = document.querySelector("#dashboard-zone-tabs [data-zone='news']");
+            (firstArticle || newsTab)?.focus();
+        } else {
+            retry?.focus();
+        }
+    });
 }

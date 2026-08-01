@@ -144,6 +144,23 @@ def test_editing_a_missing_trade_is_a_404():
     assert exc.value.status_code == 404
 
 
+def test_a_trade_in_another_portfolio_cannot_be_edited():
+    """Resolving by primary key alone would let one portfolio rewrite another's."""
+    db = make_db()
+    db.add(Portfolio(id=2, name="Other"))
+    db.commit()
+    theirs = add_trade(db, portfolio_id=2, ticker="TSLA")
+
+    with pytest.raises(HTTPException) as exc:
+        portfolio_router.update_realized_trade(
+            theirs.id, RealizedTradeUpdate(sale_price=999.0), db=db, portfolio_id=1
+        )
+
+    assert exc.value.status_code == 404
+    db.refresh(theirs)
+    assert theirs.sale_price == 150.0  # untouched
+
+
 def test_a_non_positive_price_is_rejected_before_it_reaches_the_ledger():
     for bad in (0, -5):
         with pytest.raises(ValueError):

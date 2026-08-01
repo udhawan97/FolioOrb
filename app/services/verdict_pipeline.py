@@ -47,7 +47,12 @@ from app.services.portfolio_exposure import (
     exposure_context_for_ticker,
 )
 from app.services.portfolio_state import _ACTION_CACHE_CODE, portfolio_state_signature
-from app.services.stock_service import DEFAULT_HOLDINGS, get_all_quotes, get_stock_data
+from app.services.stock_service import (
+    DEFAULT_HOLDINGS,
+    get_all_quotes,
+    get_stock_data,
+    usable_price,
+)
 from app.services.timing_signal import (
     build_timing_signal,
     get_batched_history_closes,
@@ -146,22 +151,26 @@ class ScanResult:  # pylint: disable=too-many-instance-attributes
 
 
 def _allocation_pcts(positions: dict, quotes: dict) -> dict[str, float]:
-    """Compute allocation_pct for every non-watchlist holding."""
-    total_value = sum(
-        meta["shares"] * (quotes.get(ticker, {}).get("current_price") or 0)
+    """Compute allocation_pct for every non-watchlist holding.
+
+    Prices go through `usable_price` so this agrees with the valuation seam on
+    what counts as priced — notably rejecting NaN, which the older
+    ``current_price or 0`` read let through and which then turned every weight
+    in the book into NaN.  An unpriced holding contributes nothing and lands at
+    0.0 rather than disappearing, so the exposure rows keep their ticker.
+    """
+    values = {
+        ticker: meta["shares"] * (usable_price(quotes.get(ticker, {})) or 0.0)
         for ticker, meta in positions.items()
         if not meta["is_watchlist"]
-    )
+    }
+    total_value = sum(values.values())
     if total_value <= 0:
         return {}
-    result: dict[str, float] = {}
-    for ticker, meta in positions.items():
-        if meta["is_watchlist"]:
-            continue
-        price = (quotes.get(ticker, {}).get("current_price") or 0)
-        value = meta["shares"] * price
-        result[ticker] = round(value / total_value * 100, 1)
-    return result
+    return {
+        ticker: round(value / total_value * 100, 1)
+        for ticker, value in values.items()
+    }
 
 
 def _exposure_rows(positions: dict, alloc_map: dict) -> list[dict]:

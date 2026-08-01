@@ -7,6 +7,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from app.services import portfolio_exposure
+
 
 # Widgets that render the full AI tip card (headline + personalized insight).
 # All other widgets keep the plain-string one-liner format.
@@ -77,13 +79,8 @@ WIDGET_KEYS: tuple[str, ...] = (
 
 
 def _concentration_word(hhi: float) -> str:
-    if hhi < 0.25:
-        return "well spread"
-    if hhi < 0.5:
-        return "moderately concentrated"
-    if hhi < 0.75:
-        return "concentrated"
-    return "very concentrated"
+    """Prose for an HHI. The scale lives in `portfolio_exposure`, which owns it."""
+    return portfolio_exposure.concentration_word(hhi)
 
 
 def _performance_insight(perf: dict, valuation: dict) -> str:

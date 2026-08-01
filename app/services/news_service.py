@@ -13,10 +13,9 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from app.services import market_data
+from app.services import market_data, market_hours
 from app.services.log_safety import sanitize_for_log
 from app.services.stock_service import (
-    _market_is_open,
     normalize_ticker,
     ticker_shape_is_safe,
 )
@@ -33,7 +32,7 @@ _FETCH_TIMEOUT = 20.0  # seconds for the concurrent fan-out
 
 
 def _news_ttl() -> float:
-    return _NEWS_TTL_OPEN if _market_is_open() else _NEWS_TTL_CLOSED
+    return _NEWS_TTL_OPEN if market_hours.is_open() else _NEWS_TTL_CLOSED
 
 
 # ── Normalization ─────────────────────────────────────────────────────────────

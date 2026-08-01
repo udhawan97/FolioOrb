@@ -1,6 +1,6 @@
 """Fixtures every test in this suite gets, whether it asks for them or not.
 
-Two properties belong to the *suite*, not to any one test, and were being
+Three properties belong to the *suite*, not to any one test, and were being
 arranged (or forgotten) file by file across ninety-odd of them:
 
   * **Nothing reaches Yahoo.** Tests used to pin the vendor wherever the module
@@ -13,11 +13,23 @@ arranged (or forgotten) file by file across ninety-odd of them:
     remembered by the next one. That is how a suite acquires order-dependent
     tests, and it is why several files grew their own ``cache_clear()``
     boilerplate.
+  * **A test gets a clean database, and gives it back.** Thirty files carried a
+    byte-identical ``_make_db()`` — in-memory SQLite, ``StaticPool``,
+    ``create_all``, seed portfolio 1 — under five different names, and most of
+    them never closed the session or disposed the engine. ``db`` and
+    ``api_client`` below are that block, once, with teardown attached.
 """
 from __future__ import annotations
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+from app.database import get_db
+from app.models import Base, Portfolio
 from app.services import market_data
 from app.services.market_data import FakeMarketData
 from app.services.ttl_cache import clear_all
@@ -74,3 +86,61 @@ def _empty_ttl_caches():
     clear_all()
     yield
     clear_all()
+
+
+# ── Database ──────────────────────────────────────────────────────────────────
+
+def make_session(*, seed_portfolio: bool = True):
+    """Build a throwaway in-memory database and return (session, engine).
+
+    ``StaticPool`` plus ``check_same_thread=False`` is what keeps a
+    ``:memory:`` database alive across connections and usable from the
+    threadpool a sync endpoint runs in — drop either and the schema vanishes
+    between statements. Prefer the ``db`` fixture; this exists for the handful
+    of tests that need two databases at once, or one that outlives a fixture.
+    """
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(bind=engine)()
+    if seed_portfolio:
+        session.add(Portfolio(id=1, name="Test Portfolio"))
+        session.commit()
+    return session, engine
+
+
+@pytest.fixture(name="db")
+def _db():
+    """A session on a fresh database seeded with portfolio 1, closed afterwards.
+
+    Portfolio 1 is seeded because it is the default every portfolio-scoped
+    endpoint falls back to, so almost every test wants it to exist. A test that
+    needs a genuinely empty database calls ``make_session(seed_portfolio=False)``.
+    """
+    session, engine = make_session()
+    yield session
+    session.close()
+    engine.dispose()
+
+
+@pytest.fixture(name="api_client")
+def _api_client(db):  # pylint: disable=redefined-outer-name
+    """Mount routers on a bare app wired to the `db` fixture::
+
+        client = api_client(portfolio_router.router)
+        assert client.get("/api/portfolio/holdings").status_code == 200
+
+    A bare ``FastAPI()`` rather than the real app keeps the test off the
+    lifespan — no migrations, no update scheduler, no startup warmup thread.
+    """
+    def mount(*routers) -> TestClient:
+        app = FastAPI()
+        for router in routers:
+            app.include_router(router)
+        app.dependency_overrides[get_db] = lambda: db
+        return TestClient(app)
+
+    return mount
