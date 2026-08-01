@@ -7,6 +7,25 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.9.3 — User-flow resilience
+
+- **Review Orbit owns the viewport.** It stays fixed above the sticky navbar on
+  compact screens and hides fixed dashboard utilities while open.
+- **Holding details work from the keyboard.** Native disclosure controls expose
+  their expanded state, collapsed detail content leaves the accessibility tree,
+  and ticker lookups stay scoped to the holdings table.
+- **News failures are retryable.** A failed feed offers an announced in-place
+  retry and does not require a page reload to recover.
+- **Focus returns somewhere visible.** Closing Manage after entering from the
+  first-run guide falls back to the named Manage control instead of focusing the
+  hidden guide.
+- **Help buttons have names.** Icon-only tooltip triggers—including dynamically
+  rendered ones—derive an accessible name from their help heading.
+- **The Action Plan fits 320 px.** Its header stacks cleanly with no page-wide
+  horizontal overflow.
+- No portfolio math, trade behavior, or schema changed; existing data and keys
+  are preserved.
+
 ## v5.9.2 — No duplicate requests on load
 
 - **A cold load no longer fetches the same endpoint twice.** It was 29 requests

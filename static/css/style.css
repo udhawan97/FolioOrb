@@ -5339,6 +5339,24 @@ body > .portfolio-action-dialog-overlay[hidden] { display: none; }
 /* ── Inline AI summary expand rows ─────────────────────────────────────── */
 .summary-expand-row { cursor: default !important; }
 .summary-expand-row:hover { background-color: transparent !important; }
+.holding-disclosure-btn {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    margin: -0.25rem -0.35rem;
+    padding: 0.25rem 0.35rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    text-align: left;
+}
+.holding-disclosure-btn:focus-visible {
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 2px;
+}
 .summary-expand-row td {
     padding: 0 !important;
     border-top: 0 !important;
@@ -21321,6 +21339,11 @@ a.filing-link:focus-visible .filing-out {
     margin: 0;
 }
 
+.news-retry-btn {
+    margin-top: 0.45rem;
+    min-height: 2.25rem;
+}
+
 /* ── Skeleton shimmer ── */
 @keyframes news-shimmer {
     from { background-position: -200% center; }
@@ -22086,6 +22109,20 @@ a.filing-link:focus-visible .filing-out {
 
 /* ── Responsive: 2-col buckets on narrow viewports ────────── */
 @media (max-width: 520px) {
+    .ap-header {
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .ap-meta-stack {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        padding-top: 0;
+    }
+
     .ap-buckets {
         grid-template-columns: repeat(2, 1fr);
     }
