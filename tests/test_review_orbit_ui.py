@@ -12,8 +12,8 @@ def test_review_orbit_is_wired_as_one_accessible_workspace():
     assert 'id="review-orbit"' in markup
     assert 'aria-modal="true"' in markup
     assert 'role="tablist"' in markup
-    assert "/static/js/review-orbit.js?v=3" in markup
-    assert "/static/css/review-orbit.css?v=1" in markup
+    assert "/static/js/review-orbit.js?v=" in markup
+    assert "/static/css/review-orbit.css?v=" in markup
     assert "setBackgroundInert(true)" in script
     assert 'event.key === "Escape"' in script
     assert "prefers-reduced-motion: reduce" in styles

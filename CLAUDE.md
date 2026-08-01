@@ -46,7 +46,7 @@ docs-site/          separate Astro 7 + Starlight site (npm), deploys to GitHub P
 
 ## Gotchas
 
-**Frontend cache-busting.** `templates/index.html` loads local JS with hand-bumped query strings (`dashboard.js?v=99`). Edit a JS file → bump its `?v=` or users get the stale file.
+**Frontend cache-busting is automatic.** `templates/index.html` writes every local asset as `?v=0`; `_stamp_static_assets()` in `app/main.py` rewrites that to a SHA-1 of the file's bytes when the template is read at import. Edit a JS or CSS file and the URL changes by itself — nothing to bump. Keep the `?v=0` placeholder on new asset tags (a tag with no `?v=` is never stamped).
 
 **Frontend edits break Python tests.** Several tests (`test_csv_import_ui.py`, `test_dividend_calendar_ui.py`, …) assert on literal strings inside `dashboard.js` / `index.html`. Run pytest after touching the UI.
 

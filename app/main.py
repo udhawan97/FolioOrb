@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import re
 import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -108,8 +110,41 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # Files at static/css/style.css → URL: /static/css/style.css
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
+def _stamp_static_assets(html: str) -> str:
+    """Rewrite every ``/static/...?v=`` token to a hash of that file's bytes.
+
+    The template's own numbers were maintained by hand, which made a stale asset
+    a silent failure: whoever edited the file had a cold cache and saw the change
+    immediately, while every existing user kept the previous version until
+    somebody noticed and bumped a number in a different file.
+
+    Hashing the contents makes the URL exactly as fresh as the file. Identical
+    bytes keep their URL — a reinstall or a rebuild that changed nothing does not
+    evict anyone's cache — and any edit changes it. Contents rather than mtime
+    for that reason: mtime moves on every checkout and every unpack of the frozen
+    bundle, none of which mean the file is different.
+
+    An asset that cannot be read keeps whatever token it had. A missing file is a
+    broken page either way, and stripping the token would take working
+    cache-busting away from a path that merely has a typo.
+    """
+
+    def replace(match: re.Match) -> str:
+        relative_path = match.group("path")
+        asset = _STATIC_DIR / relative_path
+        try:
+            digest = hashlib.sha1(
+                asset.read_bytes(), usedforsecurity=False
+            ).hexdigest()[:10]
+        except OSError:
+            return match.group(0)
+        return f"/static/{relative_path}?v={digest}"
+
+    return re.sub(r"/static/(?P<path>[\w./-]+)\?v=\w+", replace, html)
+
+
 with open(_TEMPLATE_FILE, encoding="utf-8") as _f:
-    _dashboard_html = _f.read()
+    _dashboard_html = _stamp_static_assets(_f.read())
 
 # Register the route groups defined in our router files
 app.include_router(stocks.router)

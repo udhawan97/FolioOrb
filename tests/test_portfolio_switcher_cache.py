@@ -83,11 +83,11 @@ def test_the_deleted_portfolio_fallback_still_runs():
     assert "location.reload()" in body
 
 
-def test_the_dashboard_script_was_cache_busted():
-    # Editing dashboard.js without bumping its ?v= serves users the stale file.
+def test_the_dashboard_script_is_cache_busted():
+    # The token itself is now hashed from the file at startup — see
+    # test_asset_stamping. This only pins that the script still asks for one.
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    assert "dashboard.js?v=99" not in html
-    assert "dashboard.js?v=106" in html
+    assert "dashboard.js?v=" in html
 
 
 # ── World markets strip ───────────────────────────────────────────────────────

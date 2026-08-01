@@ -149,6 +149,8 @@ def test_both_insight_loaders_declare_their_flags():
 # ── Cache-busting ────────────────────────────────────────────────────────────
 
 
-def test_the_analytics_bundle_was_cache_busted():
+def test_the_analytics_bundle_is_cache_busted():
+    # Which token it carries is derived from the file and covered by
+    # test_asset_stamping; all this needs is that the bundle opts in at all.
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    assert "analytics-charts.js?v=19" in html
+    assert "analytics-charts.js?v=" in html
