@@ -13,7 +13,6 @@ from app.models import (
     Holding,
     Portfolio,
     PortfolioSnapshot,
-    PriceSnapshot,
     RealizedTrade,
     VerdictSnapshot,
 )
@@ -34,7 +33,6 @@ def _seed_owned_records(db, portfolio_id: int, ticker: str) -> None:
     holding = Holding(portfolio_id=portfolio_id, ticker=ticker, shares=1, avg_cost=100)
     db.add(holding)
     db.flush()
-    db.add(PriceSnapshot(holding_id=holding.id, price=110, day_change_pct=1.5))
     db.add(
         RealizedTrade(
             portfolio_id=portfolio_id,
@@ -100,7 +98,6 @@ def test_delete_portfolio_removes_all_owned_records_and_preserves_other_portfoli
     assert deleted_name == "IRA"
     assert [p.id for p in portfolio_lifecycle.list_portfolios(db)] == [1]
     assert db.query(Holding).filter_by(portfolio_id=2).count() == 0
-    assert db.query(PriceSnapshot).filter_by(holding_id=2).count() == 0
     assert db.query(RealizedTrade).filter_by(portfolio_id=2).count() == 0
     assert db.query(PortfolioSnapshot).filter_by(portfolio_id=2).count() == 0
     assert db.query(VerdictSnapshot).filter_by(portfolio_id=2).count() == 0
@@ -108,7 +105,6 @@ def test_delete_portfolio_removes_all_owned_records_and_preserves_other_portfoli
     assert db.query(DcaContribution).count() == 1
     assert db.query(AISummary).filter_by(ticker="BOOK:2").count() == 0
     assert db.query(Holding).filter_by(portfolio_id=1).count() == 1
-    assert db.query(PriceSnapshot).filter_by(holding_id=1).count() == 1
     assert db.query(VerdictSnapshot).filter_by(portfolio_id=1).count() == 1
     assert db.query(AISummary).filter_by(ticker="BOOK:1").count() == 1
 

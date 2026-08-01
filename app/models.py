@@ -57,26 +57,6 @@ class Holding(Base):
     added_at = Column(DateTime, default=func.now())
 
     portfolio = relationship("Portfolio", back_populates="holdings")
-    # A holding can have many price snapshots recorded over time
-    price_history = relationship(
-        "PriceSnapshot", back_populates="holding", cascade="all, delete-orphan"
-    )
-
-
-class PriceSnapshot(Base):
-    """
-    A point-in-time price record for a holding.
-    Used to track how the stock price changes over time.
-    """
-    __tablename__ = "price_snapshots"
-
-    id = Column(Integer, primary_key=True, index=True)
-    holding_id = Column(Integer, ForeignKey("holdings.id"), nullable=False)
-    price = Column(Float, nullable=False)
-    day_change_pct = Column(Float, nullable=True)   # Percentage change from previous close
-    recorded_at = Column(DateTime, default=func.now())
-
-    holding = relationship("Holding", back_populates="price_history")
 
 
 class AISummary(Base):

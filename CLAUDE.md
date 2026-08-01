@@ -34,7 +34,7 @@ app/paths.py        resource_dir()/data_dir() — the source-vs-frozen split. Re
 app/config.py       Settings singleton, loads .env from data_dir()
 app/database.py     engine, SessionLocal, get_db(), SQLite PRAGMAs, ensure_startup_migrations()
 app/schema_meta.py  schema_version + backup-first migration wrapper
-app/models.py       9 tables (portfolios, holdings, price_snapshots, verdict_snapshots, dca_*, ...)
+app/models.py       8 tables (portfolios, holdings, realized_trades, verdict_snapshots, dca_*, ...)
 app/routers/        6 routers, all /api/*: ai, portfolio, news, stocks, dca, system
 app/services/       51 modules — market data, portfolio math, signals/AI, EDGAR, updater, backups
 static/js/          dashboard.js (~14k lines), analytics-charts.js, updates.js — plain JS, no build
@@ -56,9 +56,9 @@ docs-site/          separate Astro 7 + Starlight site (npm), deploys to GitHub P
 
 **Caching is in-process dicts with market-hours-aware TTLs** — no Redis. Pattern: module-level `dict[ticker] = (expiry_monotonic, payload)`. See `stock_service.py:55` (info 300s open / 3600s closed). AI narratives cache 24h. Restarting the server clears everything.
 
-**yfinance is not funneled through `stock_service.py`.** Routers call it directly in places, bypassing that module's TTL cache and `TICKER_PATTERN` validation. New market-data code should go through `stock_service.py`.
+**`app/services/market_data.py` is the only place yfinance is named.** Nothing else imports the vendor — not routers, not other services. Its accessors never raise: a vendor exception, a missing package, or an empty frame all read as absent data. New market-data code goes through `market_data.py` (or `stock_service.py`, which layers the TTL cache and `TICKER_PATTERN` validation on top of it), never straight to yfinance.
 
-**`peewee` is pinned in requirements.txt but unused.** SQLAlchemy is the ORM.
+**Portfolio totals are dollars only.** `TICKER_PATTERN` accepts foreign listings (`VOD.L`, `SHOP.TO`), and Yahoo prices them in their home currency — London in *pence*. `portfolio_valuation.evaluate()` keeps any row whose quote currency isn't USD out of every total, names it in `foreign_currency_tickers`, and suppresses that day's snapshot. There is no FX conversion; don't add one without deciding what a total means when the rate is stale.
 
 ## Testing
 
