@@ -135,7 +135,7 @@ jobs:
             exit 1
           fi
           echo "Built $DMG"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
           path: dist/out/*.dmg
@@ -188,7 +188,7 @@ jobs:
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           & $iscc "/DMyAppVersion=$env:APP_VERSION" "/DMyOutputName=$outputName" packaging\windows\installer.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: dist/installer/*.exe
