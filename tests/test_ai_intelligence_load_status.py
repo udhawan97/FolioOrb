@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import patch
 
 from app.routers.ai import _market_pulse_status
@@ -97,12 +96,8 @@ def test_single_intelligence_uses_claude_holdings_fallback_only_when_requested()
         patch("app.routers.ai.generate_etf_profile_seed", return_value=ai_profile) as mock_seed,
         patch("app.routers.ai.compute_contribution_breakdown", return_value=[]),
     ):
-        without_fallback = asyncio.run(
-            get_holding_intelligence_single("MYST", ai_holdings_fallback=False)
-        )
-        with_fallback = asyncio.run(
-            get_holding_intelligence_single("MYST", ai_holdings_fallback=True)
-        )
+        without_fallback = get_holding_intelligence_single("MYST", ai_holdings_fallback=False)
+        with_fallback = get_holding_intelligence_single("MYST", ai_holdings_fallback=True)
 
     assert without_fallback["top_holdings"] == []
     assert without_fallback["aum"] is None

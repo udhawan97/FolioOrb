@@ -1,7 +1,5 @@
 # pylint: disable=protected-access
 
-import asyncio
-
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy import text
@@ -177,12 +175,10 @@ def test_hold_class_persists_via_update_endpoint():
     add_holding(db, "VOO", shares=1, avg_cost=400)
     holding = db.query(Holding).filter(Holding.ticker == "VOO").first()
 
-    result = asyncio.run(
-        portfolio_router.update_holding(
-            holding.id,
-            HoldingUpdate(hold_class="anchor"),
-            db,
-        )
+    result = portfolio_router.update_holding(
+        holding.id,
+        HoldingUpdate(hold_class="anchor"),
+        db,
     )
 
     db.refresh(holding)
@@ -243,12 +239,10 @@ def test_research_holding_can_be_added_without_shares(monkeypatch):
         },
     )
 
-    result = asyncio.run(
-        portfolio_router.add_holding(
+    result = portfolio_router.add_holding(
             HoldingCreate(ticker="idea", is_watchlist=True),
             db=db,
         )
-    )
 
     holding = db.query(Holding).filter(Holding.ticker == "IDEA").first()
     assert result["ticker"] == "IDEA"
@@ -270,12 +264,10 @@ def test_add_holding_rejects_unresolved_ticker(monkeypatch):
     )
 
     try:
-        asyncio.run(
-            portfolio_router.add_holding(
+        portfolio_router.add_holding(
                 HoldingCreate(ticker="NOPE", shares=1),
                 db=db,
             )
-        )
     except HTTPException as exc:
         assert exc.status_code == 400
         assert "Couldn't find ticker NOPE" in exc.detail["message"]
@@ -333,7 +325,7 @@ def test_delete_realized_trade_adjusts_realized_total_and_today_snapshot(monkeyp
     )
 
     before = portfolio_router.get_pnl(db=db)
-    result = asyncio.run(portfolio_router.remove_realized_trade(trade.id, db=db))
+    result = portfolio_router.remove_realized_trade(trade.id, db=db)
     after = portfolio_router.get_pnl(db=db)
 
     snap = db.query(PortfolioSnapshot).filter(PortfolioSnapshot.portfolio_id == 1).one()
@@ -367,7 +359,7 @@ def test_range_performance_excludes_watchlist_and_inactive(monkeypatch):
         fake_history,
     )
 
-    result = asyncio.run(portfolio_router.get_portfolio_range_performance(db=db))
+    result = portfolio_router.get_portfolio_range_performance(db=db)
 
     assert seen_tickers == ["AAPL"], "inactive and watchlist holdings must not be fetched"
     assert "AAPL" in result["ranges"]["week"]["holdings"]
@@ -377,7 +369,7 @@ def test_range_performance_excludes_watchlist_and_inactive(monkeypatch):
 def test_range_performance_404_for_unknown_portfolio():
     db = make_empty_db()
     try:
-        asyncio.run(portfolio_router.get_portfolio_range_performance(portfolio_id=999, db=db))
+        portfolio_router.get_portfolio_range_performance(portfolio_id=999, db=db)
         assert False, "expected HTTPException for unknown portfolio"
     except HTTPException as exc:
         assert exc.status_code == 404
@@ -396,9 +388,7 @@ def test_watchlist_share_reduction_does_not_record_realized_trade():
     db.commit()
     holding = db.query(Holding).filter(Holding.ticker == "WATCH").first()
 
-    asyncio.run(
-        portfolio_router.update_holding(holding.id, HoldingUpdate(shares=4), db)
-    )
+    portfolio_router.update_holding(holding.id, HoldingUpdate(shares=4), db)
 
     assert db.query(RealizedTrade).filter(RealizedTrade.ticker == "WATCH").count() == 0
     db.refresh(holding)
@@ -415,9 +405,7 @@ def test_non_watchlist_share_reduction_still_records_realized_trade(monkeypatch)
         portfolio_router, "get_stock_data", lambda _ticker: quote("REAL", 120)
     )
 
-    asyncio.run(
-        portfolio_router.update_holding(holding.id, HoldingUpdate(shares=4), db)
-    )
+    portfolio_router.update_holding(holding.id, HoldingUpdate(shares=4), db)
 
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "REAL").first()
     assert trade is not None
@@ -483,8 +471,8 @@ def test_reduction_uses_explicit_sale_price(monkeypatch):
     holding = db.query(Holding).filter(Holding.ticker == "NVDA").first()
     # Live price would be 200; the user says they actually sold at 120.
     monkeypatch.setattr(portfolio_router, "get_stock_data", lambda _t: quote("NVDA", 200))
-    asyncio.run(portfolio_router.update_holding(
-        holding.id, HoldingUpdate(shares=6, sale_price=120), db))
+    portfolio_router.update_holding(
+        holding.id, HoldingUpdate(shares=6, sale_price=120), db)
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "NVDA").first()
     assert trade.sale_price == 120.0            # explicit price wins over live
     assert trade.realized_gain == (120 - 100) * 4
@@ -495,7 +483,7 @@ def test_reduction_falls_back_to_live_price_without_sale_price(monkeypatch):
     add_holding(db, "NVDA", shares=10, avg_cost=100)
     holding = db.query(Holding).filter(Holding.ticker == "NVDA").first()
     monkeypatch.setattr(portfolio_router, "get_stock_data", lambda _t: quote("NVDA", 200))
-    asyncio.run(portfolio_router.update_holding(holding.id, HoldingUpdate(shares=6), db))
+    portfolio_router.update_holding(holding.id, HoldingUpdate(shares=6), db)
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "NVDA").first()
     assert trade.sale_price == 200.0            # unchanged legacy behavior
 
@@ -505,8 +493,8 @@ def test_reduction_stamps_explicit_sale_date(monkeypatch):
     add_holding(db, "NVDA", shares=10, avg_cost=100)
     holding = db.query(Holding).filter(Holding.ticker == "NVDA").first()
     monkeypatch.setattr(portfolio_router, "get_stock_data", lambda _t: quote("NVDA", 200))
-    asyncio.run(portfolio_router.update_holding(
-        holding.id, HoldingUpdate(shares=6, sale_price=120, sale_date="2025-12-15"), db))
+    portfolio_router.update_holding(
+        holding.id, HoldingUpdate(shares=6, sale_price=120, sale_date="2025-12-15"), db)
     trade = db.query(RealizedTrade).filter(RealizedTrade.ticker == "NVDA").first()
     assert trade.created_at.year == 2025 and trade.created_at.month == 12
     assert trade.created_at.day == 15

@@ -10,8 +10,13 @@ from sqlalchemy.orm import Session
 
 from app import app_settings, paths
 from app.database import get_db
-from app.models import Holding
-from app.services import backup_service, portfolio_lifecycle, portfolio_review, update_installer
+from app.routers.deps import require_portfolio as _require_portfolio
+from app.services import (
+    backup_service,
+    holdings_repository,
+    portfolio_review,
+    update_installer,
+)
 
 router = APIRouter(prefix="/api/review", tags=["review"])
 
@@ -23,13 +28,6 @@ class ThesisReviewIn(BaseModel):
 
 class RestoreIn(BaseModel):
     name: str
-
-
-def _require_portfolio(portfolio_id: int, db: Session) -> None:
-    try:
-        portfolio_lifecycle.require_portfolio(db, portfolio_id)
-    except portfolio_lifecycle.PortfolioNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _domain_call(operation, *args, **kwargs):
@@ -115,14 +113,8 @@ def review_thesis(
     db: Session = Depends(get_db),
 ):
     _require_portfolio(portfolio_id, db)
-    holding = (
-        db.query(Holding)
-        .filter(
-            Holding.id == holding_id,
-            Holding.portfolio_id == portfolio_id,
-            Holding.is_active.is_(True),
-        )
-        .first()
+    holding = holdings_repository.in_portfolio(
+        db, portfolio_id, holding_id, active_only=True
     )
     if holding is None:
         raise HTTPException(status_code=404, detail="Holding not found")

@@ -36,7 +36,7 @@ def _call(operation: Callable, *args, **kwargs):
 
 
 @router.post("/plans")
-async def create_plan(
+def create_plan(
     data: DcaPlanCreate,
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
@@ -53,13 +53,13 @@ async def create_plan(
 
 
 @router.get("/plans")
-async def list_plans(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def list_plans(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """List all DCA plans and rolled-up bucket totals for a Portfolio."""
     return {"plans": _call(_ledger(db).list_plans, portfolio_id)}
 
 
 @router.patch("/plans/{plan_id}")
-async def update_plan(
+def update_plan(
     plan_id: int,
     data: DcaPlanUpdate,
     db: Session = Depends(get_db),
@@ -75,7 +75,7 @@ async def update_plan(
 
 
 @router.delete("/plans/{plan_id}")
-async def delete_plan(plan_id: int, db: Session = Depends(get_db)):
+def delete_plan(plan_id: int, db: Session = Depends(get_db)):
     """Delete a plan only when its bucket has no applied buys."""
     return {"message": _call(_ledger(db).delete_plan, plan_id)}
 
@@ -87,7 +87,7 @@ def run_catchup(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/contributions")
-async def list_contributions(
+def list_contributions(
     portfolio_id: int = 1,
     status: str = Query("pending"),
     db: Session = Depends(get_db),
@@ -103,7 +103,7 @@ async def list_contributions(
 
 
 @router.post("/contributions/{contribution_id}/apply")
-async def apply_contribution(
+def apply_contribution(
     contribution_id: int,
     db: Session = Depends(get_db),
 ):
@@ -112,13 +112,13 @@ async def apply_contribution(
 
 
 @router.post("/plans/{plan_id}/apply-pending")
-async def apply_all_pending(plan_id: int, db: Session = Depends(get_db)):
+def apply_all_pending(plan_id: int, db: Session = Depends(get_db)):
     """Apply every pending buy in a plan."""
     return _call(_ledger(db).apply_all_pending, plan_id)
 
 
 @router.post("/contributions/{contribution_id}/skip")
-async def skip_contribution(
+def skip_contribution(
     contribution_id: int,
     db: Session = Depends(get_db),
 ):
@@ -127,13 +127,13 @@ async def skip_contribution(
 
 
 @router.post("/plans/{plan_id}/skip-pending")
-async def skip_all_pending(plan_id: int, db: Session = Depends(get_db)):
+def skip_all_pending(plan_id: int, db: Session = Depends(get_db)):
     """Dismiss every pending buy in a plan."""
     return _call(_ledger(db).skip_all_pending, plan_id)
 
 
 @router.post("/contributions/{contribution_id}/restore")
-async def restore_contribution(
+def restore_contribution(
     contribution_id: int,
     db: Session = Depends(get_db),
 ):
@@ -142,7 +142,7 @@ async def restore_contribution(
 
 
 @router.post("/contributions/{contribution_id}/undo")
-async def undo_contribution(
+def undo_contribution(
     contribution_id: int,
     db: Session = Depends(get_db),
 ):
@@ -151,6 +151,6 @@ async def undo_contribution(
 
 
 @router.post("/plans/{plan_id}/undo-applied")
-async def undo_all_applied(plan_id: int, db: Session = Depends(get_db)):
+def undo_all_applied(plan_id: int, db: Session = Depends(get_db)):
     """Reverse every applied buy in a plan."""
     return _call(_ledger(db).undo_all_applied, plan_id)

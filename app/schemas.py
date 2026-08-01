@@ -1,15 +1,18 @@
-import re
 from typing import Optional
-from datetime import datetime, date
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from datetime import date
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.services.ticker import validated_ticker_shape
 
 
-# Pydantic schemas define the shape of data coming IN (requests) and going OUT (responses).
+# Pydantic schemas define the shape of data coming IN (requests).
 # They are separate from the SQLAlchemy models in models.py.
 #
 # - "Create" schemas = data the client sends to us (request body)
 # - "Update" schemas = data the client sends to modify an existing record
-# - "Response" schemas = data we send back to the client
+#
+# Responses are shaped by the routers as plain dicts; this module deliberately
+# holds no response models, having previously carried two that nothing used.
 #
 # Pydantic validates data automatically — e.g. it rejects negative share counts
 # before the request even reaches our route function.
@@ -17,7 +20,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 # ── Holding Schemas ────────────────────────────────────────────────────
 
-_TICKER_PATTERN = re.compile(r"^[A-Z0-9.^-]{1,10}$")
 _HOLD_CLASS_VALUES = {"auto", "anchor", "trade", "core"}
 
 
@@ -49,12 +51,7 @@ class HoldingCreate(BaseModel):
     @classmethod
     def uppercase_ticker(cls, v):
         # Normalize the ticker so "voo", "VOO", and " Voo " all become "VOO"
-        ticker = v.upper().strip()
-        if not _TICKER_PATTERN.fullmatch(ticker):
-            raise ValueError(
-                "Ticker may contain only letters, numbers, '.', '-', or '^'"
-            )
-        return ticker
+        return validated_ticker_shape(v)
 
     @field_validator("hold_class")
     @classmethod
@@ -103,40 +100,12 @@ class HoldingUpdate(BaseModel):
         return parsed.isoformat()
 
 
-class HoldingResponse(BaseModel):
-    """Shape of a holding returned in API responses."""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    ticker: str
-    company_name: Optional[str]
-    shares: float
-    avg_cost: Optional[float]
-    is_active: bool
-    hold_class: str
-    notes: Optional[str]
-    thesis_reviewed_at: Optional[datetime]
-    thesis_review_interval_days: Optional[int]
-    added_at: datetime
-
-
 # ── Portfolio Schemas ──────────────────────────────────────────────────
 
 class PortfolioCreate(BaseModel):
     """Data required to create a new portfolio."""
     name: str = Field(default="My Portfolio", max_length=100)
     description: Optional[str] = None
-
-
-class PortfolioResponse(BaseModel):
-    """Shape of a portfolio returned in API responses, including its list of holdings."""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str
-    description: Optional[str]
-    created_at: datetime
-    holdings: list[HoldingResponse] = []
 
 
 # ── DCA (dollar-cost-averaging) Schemas ─────────────────────────────────
@@ -156,12 +125,7 @@ class DcaPlanCreate(BaseModel):
     @field_validator("ticker")
     @classmethod
     def uppercase_ticker(cls, v):
-        ticker = v.upper().strip()
-        if not _TICKER_PATTERN.fullmatch(ticker):
-            raise ValueError(
-                "Ticker may contain only letters, numbers, '.', '-', or '^'"
-            )
-        return ticker
+        return validated_ticker_shape(v)
 
     @field_validator("frequency")
     @classmethod

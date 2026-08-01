@@ -17,7 +17,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import DcaContribution, DcaPlan, Holding
-from app.services import portfolio_valuation
+from app.services import holdings_repository, portfolio_valuation
 from app.services.dividend_income import compute_portfolio_income
 from app.services.earnings_radar import get_earnings_events
 from app.services.etf_overlap import compute_etf_overlap, overlap_between
@@ -84,11 +84,15 @@ def thesis_state(holding: Holding, *, today: date | None = None) -> dict:
 
 
 def _active_holdings(db: Session, portfolio_id: int) -> list[Holding]:
-    return (
-        db.query(Holding)
-        .filter(Holding.portfolio_id == portfolio_id, Holding.is_active.is_(True))
-        .order_by(Holding.ticker.asc())
-        .all()
+    """The portfolio's active holdings, alphabetical for display.
+
+    Which rows count as active is `holdings_repository`'s to decide; only the
+    presentation order is this module's. Re-deriving the filter here just to
+    change the ORDER BY is what put a fourth copy of the rule in the codebase.
+    """
+    return sorted(
+        holdings_repository.active(db, portfolio_id),
+        key=lambda holding: str(holding.ticker),
     )
 
 
@@ -581,16 +585,15 @@ def compare_watchlist(
     selected = [str(value).strip().upper() for value in tickers]
     if len(selected) not in {2, 3} or len(set(selected)) != len(selected):
         raise ValueError("Choose two or three different research tickers")
-    rows = (
-        db.query(Holding)
-        .filter(
-            Holding.portfolio_id == portfolio_id,
-            Holding.is_active.is_(True),
-            Holding.is_watchlist.is_(True),
-            Holding.ticker.in_(selected),
-        )
-        .all()
-    )
+    # Narrow the repository's active rows in Python rather than re-deriving the
+    # active filter with two extra clauses bolted on — a personal portfolio is
+    # tens of rows, and this keeps one definition of "active".
+    wanted = set(selected)
+    rows = [
+        holding
+        for holding in holdings_repository.active(db, portfolio_id)
+        if holding.is_watchlist and str(holding.ticker) in wanted
+    ]
     by_ticker = {str(row.ticker): row for row in rows}
     missing = [ticker for ticker in selected if ticker not in by_ticker]
     if missing:

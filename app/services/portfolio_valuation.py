@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from math import isfinite
 from typing import Callable
 
 from sqlalchemy import func
@@ -18,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models import PortfolioSnapshot, RealizedTrade
 from app.services import holdings_repository
-from app.services.stock_service import get_portfolio_quotes
+from app.services.stock_service import get_portfolio_quotes, usable_price
 
 QuoteLoader = Callable[[list[str]], list[dict]]
 
@@ -105,12 +104,11 @@ def _realized_gain(db: Session, portfolio_id: int) -> float:
 
 
 def _current_price(quote: dict) -> float | None:
-    """Coerce a usable positive quote price without leaking bad market data."""
-    try:
-        price = float(quote.get("current_price") or 0.0)
-    except (TypeError, ValueError):
-        return None
-    return price if isfinite(price) and price > 0 else None
+    """Coerce a usable positive quote price without leaking bad market data.
+
+    What "usable" means belongs to `stock_service`, which owns quote semantics.
+    """
+    return usable_price(quote)
 
 
 def _upsert_snapshot(db: Session, valuation: PortfolioValuation) -> bool:

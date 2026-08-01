@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.services import portfolio_exposure as exposure_service
 from app.services import portfolio_valuation
 from app.services.timing_signal import timing_bucket
 from app.services.verdict_pipeline import VERDICT_DISCLAIMER, ScanResult
@@ -158,9 +159,11 @@ def build_snapshot(
             type(exc).__name__,
         )
 
-    # Exposure summary — top 4 sectors + top 3 countries
-    sectors = (portfolio_exposure.get("sectors") or [])[:4]
-    countries = (portfolio_exposure.get("countries") or [])[:3]
+    # Exposure summary — top 4 sectors + top 3 countries.
+    # Keys must match build_portfolio_exposure()'s output exactly; reading
+    # "sectors"/"countries" here silently shipped Claude an empty exposure block.
+    sectors = (portfolio_exposure.get("sector_exposure") or [])[:4]
+    countries = (portfolio_exposure.get("country_exposure") or [])[:3]
     hhi = float(portfolio_exposure.get("concentration_hhi") or 0)
 
     # Conviction gaps summary
@@ -175,21 +178,19 @@ def build_snapshot(
             "mood": regime.get("mood", ""),
         },
         "concentration_hhi": round(hhi, 3),
-        "hhi_band": (
-            "high" if hhi >= 0.25 else "medium" if hhi >= 0.10 else "low"
-        ),
+        "hhi_band": exposure_service.concentration_band(hhi),
         "holdings": holdings_data,
         "exposure": {
             "top_sectors": [
                 {
-                    "s": s.get("sector") or s.get("name", ""),
+                    "s": s.get("name", ""),
                     "w": round(float(s.get("weight_pct") or 0), 1),
                 }
                 for s in sectors
             ],
             "top_countries": [
                 {
-                    "c": c.get("country") or c.get("name", ""),
+                    "c": c.get("name", ""),
                     "w": round(float(c.get("weight_pct") or 0), 1),
                 }
                 for c in countries
@@ -200,9 +201,11 @@ def build_snapshot(
             "beta_label": beta_data.get("label"),
             "vol_pct": vol_data.get("current_vol_pct"),
         },
+        # compute_sector_tilt returns {"sectors": [{name, tilt_pct, ...}]}; the
+        # old read of {"tilt": [{sector, overweight_pct}]} matched nothing.
         "tilt": [
-            {"s": t.get("sector", ""), "vs_spy": round(float(t.get("overweight_pct") or 0), 1)}
-            for t in (sector_tilt_data.get("tilt") or [])[:3]
+            {"s": t.get("name", ""), "vs_spy": round(float(t.get("tilt_pct") or 0), 1)}
+            for t in (sector_tilt_data.get("sectors") or [])[:3]
         ],
         "conviction_gaps": [
             {

@@ -1,21 +1,14 @@
 """HTTP-level tests for GET /api/portfolio/fee-drag.
 
-Mounts only the portfolio router on a bare FastAPI app with an in-memory SQLite
-DB (the pattern in tests/test_earnings_radar_router.py), so the full app
-lifespan never runs. Both quote seams are monkeypatched — the fee math itself is
-covered by tests/test_fund_costs.py; this file is about the router: the
-quote-metadata merge, query-param validation, and 404s.
+Mounts only the portfolio router via the shared `api_client` fixture, so the
+full app lifespan never runs. Both quote seams are monkeypatched — the fee math
+itself is covered by tests/test_fund_costs.py; this file is about the router:
+the quote-metadata merge, query-param validation, and 404s.
 """
 # pylint: disable=redefined-outer-name,unused-argument
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import get_db
-from app.models import Base, Holding, Portfolio
+from app.models import Holding
 from app.routers import portfolio as portfolio_router
 from app.services import portfolio_valuation
 
@@ -23,24 +16,6 @@ _FULL_QUOTES = {
     "VOO": {"quote_type": "ETF", "expense_ratio": 0.003},
     "AAPL": {"quote_type": "EQUITY", "exchange": "NMS"},
 }
-
-
-def _make_db():
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(bind=engine)  # pylint: disable=invalid-name
-    db = Session()
-    db.add(Portfolio(id=1, name="Test"))
-    db.add(Holding(portfolio_id=1, ticker="VOO", shares=100, avg_cost=50,
-                   is_active=True, is_watchlist=False))
-    db.add(Holding(portfolio_id=1, ticker="AAPL", shares=50, avg_cost=50,
-                   is_active=True, is_watchlist=False))
-    db.commit()
-    return db
 
 
 def _fast_quotes(tickers):
@@ -53,18 +28,19 @@ def _fast_quotes(tickers):
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, db, api_client):
     monkeypatch.setattr(portfolio_valuation, "get_portfolio_quotes", _fast_quotes)
     monkeypatch.setattr(
         portfolio_router,
         "get_all_quotes",
         lambda tickers: [{"ticker": t, **_FULL_QUOTES.get(t, {})} for t in tickers],
     )
-    db = _make_db()
-    app = FastAPI()
-    app.include_router(portfolio_router.router)
-    app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app)
+    db.add(Holding(portfolio_id=1, ticker="VOO", shares=100, avg_cost=50,
+                   is_active=True, is_watchlist=False))
+    db.add(Holding(portfolio_id=1, ticker="AAPL", shares=50, avg_cost=50,
+                   is_active=True, is_watchlist=False))
+    db.commit()
+    return api_client(portfolio_router.router)
 
 
 def test_fee_drag_prices_funds_from_the_merged_quote_metadata(client):

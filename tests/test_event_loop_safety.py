@@ -13,37 +13,45 @@ When the endpoints below were ``async def``, that dropdown inherited the latency
 of whichever one happened to hold the loop — up to the 15s earnings timeout, or a
 full Claude round-trip.
 
-Each entry below blocks for a reason worth naming, so a future edit can tell
-whether the constraint still applies. Adding ``async`` back to any of them is the
-regression this guards.
+Why this guard is an inverted list
+----------------------------------
+It used to be an allowlist: a table naming the endpoints known to block, checked
+for still being ``def``. That shape can only rot in one direction. It never
+mentioned ``news`` at all, and named 1 of 13 ``dca`` routes, so roughly thirty
+blocking ``async def`` handlers were structurally invisible to it — including
+``get_news_themes``, which made a synchronous Anthropic round-trip on the loop.
+
+So the rule is inverted: **every** registered endpoint on **every** router must
+be ``def`` unless it is named in ``GENUINELY_ASYNC`` below, with a reason. A new
+blocking endpoint fails by default, and making one async is a deliberate edit to
+this file rather than an omission from it.
 """
+import importlib
 import inspect
+import pkgutil
 
-from app.routers import ai, dca, portfolio
+import app.routers
 
-# endpoint function name -> what blocks inside it
-BLOCKING_ENDPOINTS = {
-    ai: {
-        "get_ai_cache_stats": "loads every AISummary row, then estimates tokens in Python",
-        "get_all_move_explanations": "serial explain_move with lazy per-holding fetches",
-        "get_all_intelligence": "serial get_holding_intelligence plus an ETF fan-out",
-        "get_all_investment_signals": "full scan_portfolio: quotes, history, regime",
-        "get_all_analyst_recommendations": "serial per-ticker .info scrape",
-        "get_portfolio_summary": "snapshot build plus a synchronous Anthropic call",
-        "get_action_plan": "scan_portfolio plus a synchronous Anthropic call",
-    },
-    portfolio: {
-        "get_earnings_radar": "8-thread yfinance fan-out behind a 15s timeout",
-        "get_pnl": "scans the realized-trade and snapshot tables",
-        "get_portfolio_market_context": "calls the sync get_world_markets() inline",
-        "get_macro_alignment": "calls the sync get_world_markets() inline",
-        "get_conviction_gaps": "delegates to get_all_investment_signals",
-        "get_confidence_spectrum": "delegates to get_all_investment_signals",
-    },
-    dca: {
-        "run_catchup": "fetches daily closes per plan, serially",
-    },
+# endpoint name -> why it is allowed to occupy the event loop.
+# The bar: it must either `await` real async I/O, or do no I/O at all.
+GENUINELY_ASYNC = {
+    "import_holdings": "awaits UploadFile.read() — genuine async I/O",
+    "get_market_status": "pure clock arithmetic, no I/O to hand to a thread",
 }
+
+
+def _all_routers():
+    """Every router module under app.routers, discovered rather than listed.
+
+    Discovery is the point: a new router file is covered the day it is added,
+    which is exactly what the old hand-maintained module list failed to do.
+    """
+    modules = []
+    for info in pkgutil.iter_modules(app.routers.__path__):
+        module = importlib.import_module(f"app.routers.{info.name}")
+        if hasattr(module, "router"):
+            modules.append(module)
+    return modules
 
 
 def _registered_endpoints(module):
@@ -60,28 +68,42 @@ def _registered_endpoints(module):
     }
 
 
-def test_blocking_endpoints_are_sync():
-    """None of the blocking endpoints may be a coroutine function."""
+def test_every_router_is_discovered():
+    """The sweep must actually see the routers, or it passes vacuously."""
+    names = {m.__name__.rsplit(".", 1)[-1] for m in _all_routers()}
+    assert {"ai", "dca", "news", "portfolio", "review", "stocks", "system"} <= names
+
+
+def test_no_endpoint_blocks_the_event_loop():
+    """Every endpoint is `def` unless explicitly excused in GENUINELY_ASYNC."""
     offenders = []
-    for module, endpoints in BLOCKING_ENDPOINTS.items():
-        registered = _registered_endpoints(module)
-        for name, reason in endpoints.items():
-            endpoint = registered.get(name)
-            assert endpoint is not None, f"{module.__name__}.{name} is not registered"
+    for module in _all_routers():
+        for name, endpoint in _registered_endpoints(module).items():
+            if name in GENUINELY_ASYNC:
+                continue
             if inspect.iscoroutinefunction(endpoint):
-                offenders.append(f"{module.__name__}.{name} — {reason}")
+                offenders.append(f"{module.__name__}.{name}")
     assert not offenders, (
-        "These endpoints block, so they must be `def` (threadpool) rather than "
-        "`async def` (event loop):\n  " + "\n  ".join(offenders)
+        "These endpoints are `async def`, so FastAPI runs them on the single "
+        "event loop and every other request queues behind them. Make them "
+        "`def` (FastAPI will threadpool them), or add them to GENUINELY_ASYNC "
+        "with a reason if they truly await:\n  " + "\n  ".join(sorted(offenders))
     )
 
 
-def test_guard_covers_every_router_it_names():
-    """Every name in the table above must still exist, so the guard can't rot."""
-    for module, endpoints in BLOCKING_ENDPOINTS.items():
-        registered = _registered_endpoints(module)
-        missing = sorted(set(endpoints) - set(registered))
-        assert not missing, f"{module.__name__} no longer registers: {missing}"
+def test_genuinely_async_endpoints_are_still_async():
+    """The excused list must not rot either — each entry stays registered and async."""
+    registered = {}
+    for module in _all_routers():
+        registered.update(_registered_endpoints(module))
+
+    for name, reason in GENUINELY_ASYNC.items():
+        endpoint = registered.get(name)
+        assert endpoint is not None, f"{name} is no longer registered ({reason})"
+        assert inspect.iscoroutinefunction(endpoint), (
+            f"{name} is excused from the sync rule because it {reason}, but it "
+            f"is no longer `async def` — drop it from GENUINELY_ASYNC."
+        )
 
 
 def test_connection_pool_exceeds_request_concurrency():
@@ -101,13 +123,3 @@ def test_connection_pool_exceeds_request_concurrency():
     pool = engine.pool
     ceiling = pool.size() + pool._max_overflow  # pylint: disable=protected-access
     assert ceiling >= 50, f"pool ceiling {ceiling} is below peak request concurrency"
-
-
-def test_csv_import_stays_async():
-    """The one endpoint that genuinely awaits must keep its `async def`.
-
-    ``import_holdings`` awaits ``UploadFile.read()``. Converting it would be a
-    different bug from the one above, so pin it explicitly.
-    """
-    endpoint = _registered_endpoints(portfolio)["import_holdings"]
-    assert inspect.iscoroutinefunction(endpoint)

@@ -1,52 +1,28 @@
 """HTTP-level tests for GET /api/portfolio/earnings.
 
-Mounts only the portfolio router on a bare FastAPI app (the pattern in
-tests/test_system_router.py) with an in-memory SQLite DB (the pattern in
-tests/test_action_plan.py), so the full app lifespan never runs. Earnings
-resolution itself is monkeypatched — the service is covered by
-tests/test_earnings_radar.py; this file is about the router: query-param
-validation, the is_watchlist merge, active-holding scoping, and 404s.
+Mounts only the portfolio router via the shared `api_client` fixture, so the
+full app lifespan never runs. Earnings resolution itself is monkeypatched — the
+service is covered by tests/test_earnings_radar.py; this file is about the
+router: query-param validation, the is_watchlist merge, active-holding scoping,
+and 404s.
 """
 # pylint: disable=protected-access,redefined-outer-name,unused-argument,unnecessary-lambda
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import get_db
-from app.models import Base, Holding, Portfolio
+from app.models import Holding
 from app.routers import portfolio as portfolio_router
 
 
-def _make_db():
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(bind=engine)  # pylint: disable=invalid-name
-    db = Session()
-    db.add(Portfolio(id=1, name="Test"))
-    db.add(Holding(portfolio_id=1, ticker="MSFT", shares=10, avg_cost=100,
-                    is_active=True, is_watchlist=False))
-    db.add(Holding(portfolio_id=1, ticker="NVDA", shares=5, avg_cost=50,
-                    is_active=True, is_watchlist=True))
-    db.add(Holding(portfolio_id=1, ticker="OLD", shares=1, avg_cost=1,
-                    is_active=False, is_watchlist=False))  # soft-deleted
-    db.commit()
-    return db
-
-
 @pytest.fixture
-def client():
-    db = _make_db()
-    app = FastAPI()
-    app.include_router(portfolio_router.router)
-    app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app)
+def client(db, api_client):
+    db.add(Holding(portfolio_id=1, ticker="MSFT", shares=10, avg_cost=100,
+                   is_active=True, is_watchlist=False))
+    db.add(Holding(portfolio_id=1, ticker="NVDA", shares=5, avg_cost=50,
+                   is_active=True, is_watchlist=True))
+    db.add(Holding(portfolio_id=1, ticker="OLD", shares=1, avg_cost=1,
+                   is_active=False, is_watchlist=False))  # soft-deleted
+    db.commit()
+    return api_client(portfolio_router.router)
 
 
 def test_window_out_of_bounds_rejected(client):

@@ -7,6 +7,26 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.10.0 — Architecture pass
+
+- **Holdings can only be edited through the portfolio that owns them.** The edit,
+  delete and delete-trade endpoints resolved a row by id alone and ignored the
+  portfolio the request was scoped to, so with more than one portfolio a change
+  could land on the wrong book — and record its realized sale in the wrong ledger.
+  All three now check ownership and answer 404 when the holding isn't yours.
+- **A slow endpoint no longer freezes the dashboard.** Fifty-two endpoints were
+  declared async while doing blocking work (Yahoo, SEC EDGAR, Claude, large
+  scans), each holding the single event loop while every other request queued
+  behind it. They now run in the worker threadpool, and the guard that missed
+  them sweeps every router instead of a hand-written list.
+- **A single `NaN` price can no longer blank every position weight**, and with it
+  the concentration score and what Claude is told about your book.
+- **The action plan sees your sector and country exposure again** — it had been
+  reading keys nothing produced, and sending Claude an empty block.
+- **One market-hours answer and one concentration scale**, instead of two of each
+  that could disagree on the same page.
+- No schema changes and no migration.
+
 ## v5.9.2 — No duplicate requests on load
 
 - **A cold load no longer fetches the same endpoint twice.** It was 29 requests

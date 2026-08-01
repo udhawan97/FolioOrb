@@ -7,6 +7,7 @@ callers ask for the shape they need instead of re-deriving the filter:
 
     active()                    → ORM rows
     active_by_ticker()          → one ORM row, or None
+    in_portfolio()              → one ORM row by id, active or not
     active_tickers()            → normalised ticker strings
     active_tickers_or_default() → the same, falling back to DEFAULT_HOLDINGS
     meta_map()                  → ticker → position context
@@ -67,6 +68,33 @@ def active_by_ticker(db: Session, portfolio_id: int, ticker: str) -> Holding | N
         .order_by(Holding.id.asc())
         .first()
     )
+
+
+def in_portfolio(
+    db: Session,
+    portfolio_id: int,
+    holding_id: int,
+    *,
+    active_only: bool = False,
+) -> Holding | None:
+    """Return the holding with `holding_id` **if it belongs to this portfolio**.
+
+    This owns the ownership half of the rule — the part the mutating endpoints
+    were missing entirely when they looked a holding up by primary key alone,
+    which let a request scoped to one portfolio edit another portfolio's row.
+
+    `active_only` is the policy the two mutating callers genuinely disagree on,
+    so it is named rather than assumed. The edit endpoint leaves it False
+    because it can flip a soft-deleted row back to active and therefore has to
+    be able to find one; thesis review passes True because reviewing a holding
+    the user has already removed is meaningless.
+    """
+    query = db.query(Holding).filter(
+        Holding.id == holding_id, Holding.portfolio_id == portfolio_id
+    )
+    if active_only:
+        query = query.filter(Holding.is_active.is_(True))
+    return query.first()
 
 
 def active_tickers(db: Session, portfolio_id: int) -> list[str]:

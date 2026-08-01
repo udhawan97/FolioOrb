@@ -35,9 +35,11 @@ app/config.py       Settings singleton, loads .env from data_dir()
 app/database.py     engine, SessionLocal, get_db(), SQLite PRAGMAs, ensure_startup_migrations()
 app/schema_meta.py  schema_version + backup-first migration wrapper
 app/models.py       9 tables (portfolios, holdings, price_snapshots, verdict_snapshots, dca_*, ...)
-app/routers/        6 routers, all /api/*: ai, portfolio, news, stocks, dca, system
-app/services/       51 modules — market data, portfolio math, signals/AI, EDGAR, updater, backups
-static/js/          dashboard.js (~14k lines), analytics-charts.js, updates.js — plain JS, no build
+app/routers/        7 routers, all /api/*: ai, portfolio, news, stocks, dca, system, review
+app/routers/deps.py shared router helpers (require_portfolio → 404)
+app/services/       64 modules — market data, portfolio math, signals/AI, EDGAR, updater, backups
+static/js/          dashboard.js (~14k lines), analytics-charts.js, core.js, review-orbit.js,
+                    updates.js — plain JS, no build
 templates/index.html  served as a pre-read string; no Jinja
 docs-site/          separate Astro 7 + Starlight site (npm), deploys to GitHub Pages
 ```
@@ -54,15 +56,19 @@ docs-site/          separate Astro 7 + Starlight site (npm), deploys to GitHub P
 
 **`app/version.py` is the release gate.** One line, `__version__`. `release.yml` hard-fails if a `v*` tag doesn't match it. Bumping a release also means hand-syncing hard-coded version strings in `RELEASE_NOTES.md` and several `docs-site/src/content/docs/*` pages.
 
-**Caching is in-process dicts with market-hours-aware TTLs** — no Redis. Pattern: module-level `dict[ticker] = (expiry_monotonic, payload)`. See `stock_service.py:55` (info 300s open / 3600s closed). AI narratives cache 24h. Restarting the server clears everything.
+**Caching is in-process, market-hours-aware, no Redis.** Use the `@ttl_cache` decorator in `app/services/ttl_cache.py` — it owns expiry, eviction, the `force_refresh` bypass, and single-flight coalescing so concurrent misses on one key fetch once. TTL may be a callable read at store time (that is how `stock_service` gets 60s open / 900s closed). Don't hand-roll a module-level `dict[key] = (expiry, payload)`; a handful of those survive (`portfolio_analytics`, `portfolio_projection`, `dividend_calendar`, `update_service`, `news.py`) and are the exception, not the pattern. Restarting the server clears everything.
 
-**yfinance is not funneled through `stock_service.py`.** Routers call it directly in places, bypassing that module's TTL cache and `TICKER_PATTERN` validation. New market-data code should go through `stock_service.py`.
+**Blocking endpoints must be `def`, not `async def`.** One uvicorn worker means one event loop; an `async def` handler that calls yfinance, EDGAR, the sync Anthropic client, or an unbounded query holds it and every other request queues behind it. FastAPI threadpools plain `def` handlers. `tests/test_event_loop_safety.py` enforces this by sweeping every router and failing any `async def` not listed in its `GENUINELY_ASYNC` table.
+
+**Market data goes through `market_data.py`; symbols through `ticker.py`.** `app/services/market_data.py` is the only module that imports yfinance — no router touches the vendor. `stock_service.py` decides what a *quote* means (which price field to believe, TTLs, `usable_price`); `app/services/ticker.py` decides what a *symbol* is (`TICKER_PATTERN`, `normalize_ticker`, `ticker_shape_is_safe`) and is dependency-free so `app/schemas.py` can share it. Nine services call `market_data` directly and own their own caching — check before adding a tenth.
+
+**Portfolio-scoped mutations must filter on `portfolio_id`.** Look holdings up via `holdings_repository` (`active`, `active_by_ticker`, `in_portfolio`), never by primary key alone — id-only lookups let a request scoped to one portfolio mutate another's row. `holdings_repository` is the single owner of `portfolio_id == X AND is_active IS TRUE`.
 
 **`peewee` is pinned in requirements.txt but unused.** SQLAlchemy is the ORM.
 
 ## Testing
 
-pytest only, flat `tests/` (~95 files), **no `conftest.py` and no pytest config file** — defaults apply. Fixtures are file-local; external I/O is stubbed with `monkeypatch` (`monkeypatch.setattr("requests.get", ...)`). The suite is fully offline — never add a test that hits the network. Routes are tested via `fastapi.testclient.TestClient`.
+pytest only, flat `tests/` (~120 files), **no pytest config file** — defaults apply. `tests/conftest.py` is suite-wide only: it forces market data offline (`FakeMarketData`), clears TTL caches around every test, and provides `db` (in-memory SQLite seeded with portfolio 1) and `api_client` (mounts routers on a bare app wired to `db`). Most files still carry their own `_make_db()` copy — prefer the fixtures in new tests. External I/O is stubbed with `monkeypatch`. The suite is fully offline — never add a test that hits the network. Routes are tested via `fastapi.testclient.TestClient`.
 
 ## Environment
 

@@ -4,7 +4,6 @@ feed-route integration.  No real network calls: articles come from the
 market-data seam's fake adapter.
 """
 # pylint: disable=protected-access
-import asyncio
 import time
 
 from sqlalchemy import create_engine
@@ -347,7 +346,7 @@ class TestNewsFeedEndpoint:
             news_router, "_holding_info_brief",
             lambda _: {"company_name": "Apple Inc.", "sector": "Technology"},
         )
-        result = asyncio.run(news_router.get_news_feed(portfolio_id=1, db=db))
+        result = news_router.get_news_feed(portfolio_id=1, db=db)
         assert "holdings" in result
         assert isinstance(result["holdings"], list)
 
@@ -360,7 +359,7 @@ class TestNewsFeedEndpoint:
             news_router, "_holding_info_brief",
             lambda _: {"company_name": "Apple Inc.", "sector": "Technology"},
         )
-        result = asyncio.run(news_router.get_news_feed(portfolio_id=1, db=db))
+        result = news_router.get_news_feed(portfolio_id=1, db=db)
         h = result["holdings"][0]
         for key in ("ticker", "company_name", "sector", "is_watchlist", "items"):
             assert key in h, f"holding missing key: {key}"
@@ -371,14 +370,14 @@ class TestNewsFeedEndpoint:
         monkeypatch.setattr(
             news_router, "_holding_info_brief", lambda _: {"company_name": "", "sector": ""}
         )
-        result = asyncio.run(news_router.get_news_feed(portfolio_id=1, db=db))
+        result = news_router.get_news_feed(portfolio_id=1, db=db)
         assert "generated_at" in result
 
     def test_empty_portfolio_returns_empty_holdings(self, monkeypatch):
         db = _make_db(())  # no holdings
         monkeypatch.setattr(news_router, "fetch_portfolio_news", lambda _: {})
-        result = asyncio.run(news_router.get_news_feed(portfolio_id=1, db=db))
-        assert result["holdings"] == []
+        result = news_router.get_news_feed(portfolio_id=1, db=db)
+        assert not result["holdings"]
 
     def test_holdings_sorted_by_sector_then_ticker(self, monkeypatch):
         db = _make_db(("MSFT", "AAPL", "VOO"))
@@ -392,7 +391,7 @@ class TestNewsFeedEndpoint:
             return {"company_name": t, "sector": sectors.get(t, "")}
 
         monkeypatch.setattr(news_router, "_holding_info_brief", fake_brief)
-        result = asyncio.run(news_router.get_news_feed(portfolio_id=1, db=db))
+        result = news_router.get_news_feed(portfolio_id=1, db=db)
 
         tickers = [h["ticker"] for h in result["holdings"]]
         # ETF sorts before Technology (E < T), and within Technology AAPL < MSFT
@@ -420,7 +419,7 @@ class TestNewsFeedEndpoint:
             news_router, "_holding_info_brief",
             lambda _: {"company_name": "Apple Inc.", "sector": "Technology"},
         )
-        result = asyncio.run(news_router.get_news_feed(portfolio_id=1, db=db))
+        result = news_router.get_news_feed(portfolio_id=1, db=db)
         aapl = next(h for h in result["holdings"] if h["ticker"] == "AAPL")
         assert len(aapl["items"]) == 1
         assert aapl["items"][0]["title"] == "Big Apple day"

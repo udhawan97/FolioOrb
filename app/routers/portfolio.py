@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Holding, RealizedTrade
+from app.routers.deps import require_portfolio
 from app.schemas import HoldingCreate, HoldingUpdate, PortfolioCreate
 from app.config import settings
 from app.services.stock_service import (
@@ -24,6 +25,7 @@ from app.services.etf_overlap import compute_etf_overlap
 from app.services.fund_costs import compute_fee_drag
 from app.services.realized_recap import build_realized_recap
 from app.services.portfolio_projection import get_cached_projection
+from app.services.world_markets import get_world_markets_cached
 from app.services.portfolio_analytics import (
     compute_risk_metrics,
     compute_correlation_matrix,
@@ -47,13 +49,8 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 # ── Shared helpers ─────────────────────────────────────────────────────
 
-
-def _require_portfolio(portfolio_id, db):
-    """Translate the Portfolio lifecycle seam to an HTTP 404."""
-    try:
-        return portfolio_lifecycle.require_portfolio(db, portfolio_id)
-    except portfolio_lifecycle.PortfolioNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+# Shared with the review router, which used to keep its own divergent copy.
+_require_portfolio = require_portfolio
 
 
 def _holdings_with_quote_data(holdings: list[dict]) -> list[dict]:
@@ -114,7 +111,7 @@ def _record_reduction(holding, old_shares, new_shares, db, *, sale_price=None, s
 
 
 @router.post("/create")
-async def create_portfolio(
+def create_portfolio(
     data: PortfolioCreate,
     db: Session = Depends(get_db),  # FastAPI injects a DB session automatically
 ):
@@ -124,7 +121,7 @@ async def create_portfolio(
 
 
 @router.get("/", response_model=list[dict])
-async def get_portfolios(db: Session = Depends(get_db)):
+def get_portfolios(db: Session = Depends(get_db)):
     """Return a list of all portfolios (id and name only)."""
     portfolio_lifecycle.require_portfolio(db, 1)
     portfolios = portfolio_lifecycle.list_portfolios(db)
@@ -132,7 +129,7 @@ async def get_portfolios(db: Session = Depends(get_db)):
 
 
 @router.patch("/{portfolio_id}")
-async def rename_portfolio(
+def rename_portfolio(
     portfolio_id: int, data: PortfolioCreate, db: Session = Depends(get_db)
 ):
     """Rename a portfolio (and optionally update its description)."""
@@ -146,7 +143,7 @@ async def rename_portfolio(
 
 
 @router.delete("/{portfolio_id}")
-async def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
+def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
     """Delete a portfolio and everything scoped to it.
 
     Guards: the default portfolio (id 1, auto-recreated) and the last remaining
@@ -166,7 +163,7 @@ async def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/holdings")
-async def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Return all active holdings for a portfolio (defaults to portfolio 1)."""
     _require_portfolio(portfolio_id, db)
     holdings = holdings_repository.active(db, portfolio_id)
@@ -217,7 +214,7 @@ def get_earnings_radar(
 
 
 @router.post("/holdings")
-async def add_holding(
+def add_holding(
     data: HoldingCreate, portfolio_id: int = 1, db: Session = Depends(get_db)
 ):
     """Add a new stock holding to the portfolio."""
@@ -272,7 +269,7 @@ _CSV_CONTENT_TYPES_WITH_EXT = {"application/octet-stream", "text/plain", ""}
 
 
 @router.get("/holdings/export")
-async def export_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def export_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Stream the portfolio's active holdings as a clean CSV.
 
     The output is exactly the strict-import template, so export → import round-trips.
@@ -458,11 +455,14 @@ async def import_holdings(
 
 
 @router.put("/holdings/{holding_id}")
-async def update_holding(
-    holding_id: int, data: HoldingUpdate, db: Session = Depends(get_db)
+def update_holding(
+    holding_id: int,
+    data: HoldingUpdate,
+    db: Session = Depends(get_db),
+    portfolio_id: int = 1,
 ):
     """Update shares, average cost, notes, or active status of an existing holding."""
-    holding = db.query(Holding).filter(Holding.id == holding_id).first()
+    holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
 
@@ -509,12 +509,14 @@ async def update_holding(
 
 
 @router.delete("/holdings/{holding_id}")
-async def remove_holding(holding_id: int, db: Session = Depends(get_db)):
+def remove_holding(
+    holding_id: int, db: Session = Depends(get_db), portfolio_id: int = 1
+):
     """
     Soft-delete a holding by setting is_active=False.
     The row is kept in the database for historical reference.
     """
-    holding = db.query(Holding).filter(Holding.id == holding_id).first()
+    holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
 
@@ -532,13 +534,21 @@ async def remove_holding(holding_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/trades/{trade_id}")
-async def remove_realized_trade(trade_id: int, db: Session = Depends(get_db)):
+def remove_realized_trade(
+    trade_id: int, db: Session = Depends(get_db), portfolio_id: int = 1
+):
     """Delete one realized sale and refresh today's snapshot."""
-    trade = db.query(RealizedTrade).filter(RealizedTrade.id == trade_id).first()
+    trade = (
+        db.query(RealizedTrade)
+        .filter(
+            RealizedTrade.id == trade_id,
+            RealizedTrade.portfolio_id == portfolio_id,
+        )
+        .first()
+    )
     if not trade:
         raise HTTPException(status_code=404, detail="Realized trade not found")
 
-    portfolio_id = trade.portfolio_id
     ticker = trade.ticker
     db.delete(trade)
     db.commit()
@@ -553,7 +563,7 @@ async def remove_realized_trade(trade_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/seed")
-async def seed_portfolio(db: Session = Depends(get_db)):
+def seed_portfolio(db: Session = Depends(get_db)):
     """
     Backward-compatible setup helper.
     The default portfolio is now created automatically on first use.
@@ -642,7 +652,7 @@ def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/realized-summary")
-async def get_realized_summary(
+def get_realized_summary(
     portfolio_id: int = 1,
     year: int | None = Query(None),
     db: Session = Depends(get_db),
@@ -668,7 +678,7 @@ async def get_realized_summary(
 
 
 @router.get("/projection")
-async def get_portfolio_projection(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_projection(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """
     Growth scenarios (avg / best / worst) for 30D–10Y horizons, benchmarked
     against S&P 500. Uses 3-year historical volatility; cached for 5 minutes.
@@ -679,7 +689,7 @@ async def get_portfolio_projection(portfolio_id: int = 1, db: Session = Depends(
 
 
 @router.get("/risk-metrics")
-async def get_portfolio_risk_metrics(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_risk_metrics(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Annualized return/volatility per holding plus portfolio and S&P 500 points."""
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id)
@@ -687,7 +697,7 @@ async def get_portfolio_risk_metrics(portfolio_id: int = 1, db: Session = Depend
 
 
 @router.get("/correlation")
-async def get_portfolio_correlation(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_correlation(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Daily-return correlation matrix for current holdings."""
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id)
@@ -695,14 +705,14 @@ async def get_portfolio_correlation(portfolio_id: int = 1, db: Session = Depends
 
 
 @router.get("/drawdown")
-async def get_portfolio_drawdown(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_drawdown(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Underwater chart series (% below running peak) from snapshot history."""
     _require_portfolio(portfolio_id, db)
     return compute_drawdown(portfolio_valuation.snapshot_history(db, portfolio_id))
 
 
 @router.get("/contribution")
-async def get_portfolio_contribution(
+def get_portfolio_contribution(
     period: str = "day",
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
@@ -714,7 +724,7 @@ async def get_portfolio_contribution(
 
 
 @router.get("/range-performance")
-async def get_portfolio_range_performance(
+def get_portfolio_range_performance(
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -734,16 +744,13 @@ async def get_portfolio_range_performance(
 @router.get("/market-context")
 def get_portfolio_market_context(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """World indices enriched with portfolio correlation and geographic alignment."""
-    from app.routers.stocks import get_world_markets  # lazy — avoid circular import at load
-
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    world_payload = get_world_markets()
-    return compute_market_context(result, world_payload.get("markets", []))
+    return compute_market_context(result, get_world_markets_cached())
 
 
 @router.get("/benchmark-comparison")
-async def get_benchmark_comparison(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_benchmark_comparison(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Portfolio vs S&P 500 cumulative return and alpha by range."""
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
@@ -754,14 +761,14 @@ async def get_benchmark_comparison(portfolio_id: int = 1, db: Session = Depends(
 
 
 @router.get("/return-calendar")
-async def get_return_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_return_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Monthly return heatmap from portfolio snapshot history."""
     _require_portfolio(portfolio_id, db)
     return compute_return_calendar(portfolio_valuation.snapshot_history(db, portfolio_id))
 
 
 @router.get("/beta")
-async def get_portfolio_beta(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_beta(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Portfolio beta vs S&P 500."""
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
@@ -769,7 +776,7 @@ async def get_portfolio_beta(portfolio_id: int = 1, db: Session = Depends(get_db
 
 
 @router.get("/rolling-volatility")
-async def get_rolling_volatility(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_rolling_volatility(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Trailing 30-day annualized volatility series."""
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
@@ -777,7 +784,7 @@ async def get_rolling_volatility(portfolio_id: int = 1, db: Session = Depends(ge
 
 
 @router.get("/sector-tilt")
-async def get_sector_tilt(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_sector_tilt(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Sector overweight / underweight vs S&P 500."""
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
@@ -811,7 +818,7 @@ def get_confidence_spectrum(portfolio_id: int = 1, db: Session = Depends(get_db)
 
 
 @router.get("/fee-drag")
-async def get_portfolio_fee_drag(
+def get_portfolio_fee_drag(
     portfolio_id: int = 1,
     horizon_years: int = Query(10, ge=0, le=40),
     db: Session = Depends(get_db),
@@ -832,7 +839,7 @@ async def get_portfolio_fee_drag(
 
 
 @router.get("/etf-overlap")
-async def get_portfolio_etf_overlap(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_etf_overlap(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Pairwise overlap between held ETFs, from each fund's top-10 holdings.
 
     Top-10 only — the payload's `basis`/`caveat` say so. Funds without holdings
@@ -844,7 +851,7 @@ async def get_portfolio_etf_overlap(portfolio_id: int = 1, db: Session = Depends
 
 
 @router.get("/income")
-async def get_portfolio_income(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_portfolio_income(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Annual dividend income the portfolio pays you, and its blended yield.
 
     Non-paying holdings are named, never counted as $0 income. A per-share
@@ -856,7 +863,7 @@ async def get_portfolio_income(portfolio_id: int = 1, db: Session = Depends(get_
 
 
 @router.get("/income-calendar")
-async def get_income_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def get_income_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Which months pay you — the income card's payers projected over the next
     twelve months from each one's real ex-date history.
 
@@ -881,9 +888,6 @@ async def get_income_calendar(portfolio_id: int = 1, db: Session = Depends(get_d
 @router.get("/macro-alignment")
 def get_macro_alignment(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Index correlation vs geographic exposure scatter data."""
-    from app.routers.stocks import get_world_markets  # noqa: PLC0415
-
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    world_payload = get_world_markets()
-    return compute_macro_alignment(result, world_payload.get("markets", []))
+    return compute_macro_alignment(result, get_world_markets_cached())

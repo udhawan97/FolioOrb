@@ -1,9 +1,7 @@
 import logging
-import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
-import pytz
 from fastapi import APIRouter, HTTPException, Query
+from app.services import market_hours
 from app.services.stock_service import (
     DEFAULT_HOLDINGS,
     QUOTE_FETCH_ERROR,
@@ -11,28 +9,12 @@ from app.services.stock_service import (
     get_all_quotes,
     get_historical_prices,
 )
-from app.services.world_markets import WORLD_MARKETS, fetch_world_market
+from app.services.world_markets import get_world_markets_cached
 
 logger = logging.getLogger(__name__)
 
 # All routes in this file are grouped under the /api/stocks prefix
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
-
-_WORLD_MARKETS_CACHE: tuple[float, list] | None = None
-_WORLD_MARKETS_TTL = 300  # seconds
-
-
-def _get_world_markets_cached() -> list:
-    global _WORLD_MARKETS_CACHE  # pylint: disable=global-statement
-    now = time.monotonic()
-    if _WORLD_MARKETS_CACHE and _WORLD_MARKETS_CACHE[0] > now:
-        return _WORLD_MARKETS_CACHE[1]
-
-    with ThreadPoolExecutor(max_workers=min(10, len(WORLD_MARKETS))) as pool:
-        results = list(pool.map(fetch_world_market, WORLD_MARKETS))
-
-    _WORLD_MARKETS_CACHE = (now + _WORLD_MARKETS_TTL, results)
-    return results
 
 
 def _fetch_ticker_history(ticker: str, period: str) -> tuple[str, list]:
@@ -110,32 +92,11 @@ def get_price_history(
 
 @router.get("/market-status")
 async def get_market_status():
-    """Check if US markets are currently open."""
-    eastern = pytz.timezone("America/New_York")
-    now = datetime.now(eastern)
+    """Check if US markets are currently open.
 
-    is_weekday = now.weekday() < 5  # Monday=0, Friday=4
-    market_open  = now.replace(hour=9,  minute=30, second=0, microsecond=0)
-    market_close = now.replace(hour=16, minute=0,  second=0, microsecond=0)
-
-    is_open = is_weekday and market_open <= now <= market_close
-
-    # Describe the next opening only while the market is closed.
-    if is_open:
-        next_open = None
-    elif is_weekday and now < market_open:
-        next_open = "9:30 AM ET today"      # weekday, before the bell
-    elif now.weekday() >= 4:
-        next_open = "Mon 9:30 AM ET"        # Fri after close, or the weekend
-    else:
-        next_open = "9:30 AM ET tomorrow"   # Mon–Thu after close
-
-    return {
-        "is_open": is_open,
-        "status": "OPEN" if is_open else "CLOSED",
-        "eastern_time": now.strftime("%I:%M %p ET"),
-        "next_open": next_open,
-    }
+    Pure clock arithmetic — no I/O, so this one genuinely belongs on the loop.
+    """
+    return market_hours.session_status()
 
 
 @router.get("/world-markets")
@@ -145,4 +106,4 @@ def get_world_markets():
     Uses fast_info for speed (single lightweight request per ticker).
     Results are cached for 5 minutes and fetched in parallel.
     """
-    return {"markets": _get_world_markets_cached()}
+    return {"markets": get_world_markets_cached()}
