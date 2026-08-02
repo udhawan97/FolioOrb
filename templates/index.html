@@ -2989,6 +2989,29 @@
                 </div>
             </div>
         </div>
+        <div class="dca-action-dialog-overlay" id="dca-action-dialog"
+             role="dialog" aria-modal="true" aria-labelledby="dca-action-title"
+             aria-describedby="dca-action-copy" aria-hidden="true" hidden>
+            <form class="portfolio-action-dialog" id="dca-action-form" novalidate>
+                <h2 class="portfolio-action-dialog-title" id="dca-action-title">Review DCA action</h2>
+                <p class="portfolio-action-dialog-copy" id="dca-action-copy"></p>
+                <p class="portfolio-action-dialog-warning" id="dca-action-warning" hidden></p>
+                <label class="portfolio-action-dialog-field" id="dca-action-field"
+                       for="dca-action-input" hidden>
+                    <span>Dollar amount per interval</span>
+                    <input id="dca-action-input" type="number" min="0.01" step="0.01"
+                           inputmode="decimal" autocomplete="off">
+                </label>
+                <p class="portfolio-action-dialog-error" id="dca-action-error"
+                   role="alert" hidden>Enter a positive dollar amount.</p>
+                <div class="portfolio-action-dialog-actions">
+                    <button class="btn btn-sm portfolio-action-dialog-cancel"
+                            id="dca-action-cancel" type="button">Cancel</button>
+                    <button class="btn btn-sm btn-primary portfolio-action-dialog-submit"
+                            id="dca-action-submit" type="submit">Continue</button>
+                </div>
+            </form>
+        </div>
     </div>
 </body>
 </html>

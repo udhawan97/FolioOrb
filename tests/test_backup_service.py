@@ -6,6 +6,7 @@ online backup API, integrity checking, the non-destructive restore path (current
 file preserved as ``*.failed-*``), and retention pruning.
 """
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -42,6 +43,45 @@ def test_create_and_verify_preserves_rows(tmp_path):
     assert backup.exists()
     assert backup_service.verify_backup(backup, expected_min_holdings=3)
     assert _holdings(backup) == ["VOO", "AAPL", "MSFT"]
+    assert sorted(path.name for path in backup.parent.iterdir()) == [backup.name]
+
+
+def test_listing_absent_vault_does_not_create_it(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    vault = tmp_path / "backups"
+
+    assert backup_service.list_backups() == []
+    assert not vault.exists()
+
+
+def test_listing_and_verification_do_not_create_sqlite_sidecars(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    vault = tmp_path / "backups"
+    vault.mkdir()
+    backup = vault / "manual-closed.db"
+    _make_db(backup, ["VOO", "AAPL"])
+    before = {path.name: path.stat().st_size for path in vault.iterdir()}
+
+    assert backup_service.verify_vault_backup(backup) is True
+    assert backup_service.list_backups()[0]["holding_count"] == 2
+
+    after = {path.name: path.stat().st_size for path in vault.iterdir()}
+    assert after == before
+    assert not Path(f"{backup}-wal").exists()
+    assert not Path(f"{backup}-shm").exists()
+
+
+def test_vault_verification_refuses_nonempty_wal_sidecar(tmp_path):
+    backup = tmp_path / "manual-incomplete.db"
+    _make_db(backup, ["VOO"])
+    Path(f"{backup}-wal").write_bytes(b"uncommitted pages")
+
+    assert backup_service.verify_backup(backup) is False
+    assert backup_service.verify_vault_backup(backup) is False
 
 
 def test_verify_rejects_missing_and_empty(tmp_path):

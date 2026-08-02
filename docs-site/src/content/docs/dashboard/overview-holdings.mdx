@@ -22,6 +22,9 @@ The Holdings tab is where the verdict engine lives. Each position gets:
 Rows expand on the first click (no more double-clicking out of habit) and auto-refresh
 keeps prices current without a manual reload.
 
+At phone widths the filter and action controls stack into a content-sized header, so the
+first holding row remains reachable without scrolling through a desktop-sized spacer.
+
 <SenpaiTip>
 	Toggle Research mode when adding a ticker to follow the idea without treating it as money
 	you own — it stays out of P&L, allocation, largest-holding stats, briefings, and action-plan
@@ -78,6 +81,18 @@ the local review workflow—it never changes Portfolio math, a verdict, or what 
 None of this requires Claude. It's all part of Local Intelligence, running deterministically
 against live market data. Claude, when connected, adds narration on top — not a replacement
 for the underlying numbers.
+
+## DCA plans and review decisions
+
+Open the portfolio manager (press **M**) and choose **DCA** to mirror a recurring buy without
+connecting a brokerage. Each due interval waits in a local review bucket until you apply or
+skip it; applied buys can be undone exactly.
+
+Bulk apply, undo, skip, amount changes, and plan deletion use FolioOrb dialogs rather than
+browser-native prompts. Each dialog states what changes and what stays, keeps keyboard focus
+inside until you decide, cancels with Escape, and returns focus to the action you started
+from. A changed amount affects future intervals only. Deleting a plan keeps applied buys in
+the holding and is refused until any applied ledger entries are undone.
 
 ## Import & export (CSV)
 

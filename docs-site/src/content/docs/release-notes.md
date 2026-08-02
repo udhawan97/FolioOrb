@@ -7,6 +7,24 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.10.1 — Trust and flow patch
+
+- **Browsing the Backup Vault is read-only.** Listing, integrity checks, holding counts,
+  downloads, and restore selection no longer create SQLite WAL/SHM sidecars. An absent
+  vault stays absent, and a snapshot with a non-empty sibling WAL is refused as incomplete.
+  Live database backup counts remain WAL-aware.
+- **DCA decisions use in-app dialogs.** Apply all, undo applied, skip all, change amount,
+  and delete plan no longer depend on native browser prompts that WKWebView may not show.
+  The dialogs validate inline, trap focus, cancel with Escape, and return focus to the
+  opener. Ledger math and apply/undo behavior are unchanged.
+- **Holdings reaches its rows on a phone.** The compact toolbar no longer inherits a
+  320 px desktop flex basis after stacking vertically.
+- **The welcome guide opens at the top.** It focuses Close rather than auto-scrolling to
+  its footer action, while keeping its modal focus and Escape behavior.
+- **Every Review Orbit tab is visible.** Phone-width tabs wrap instead of hiding Backups
+  beyond a scrollbar-free strip; arrow-key navigation and tab semantics remain intact.
+- No schema changes or migration. Installing over v5.10.0 preserves local data and keys.
+
 ## v5.10.0 — Architecture pass
 
 - **Holdings can only be edited through the portfolio that owns them.** The edit,

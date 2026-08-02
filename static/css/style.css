@@ -3372,6 +3372,7 @@ table tbody tr:hover {
 
     .holdings-card-toolbar {
         width: 100%;
+        flex: 0 1 auto;
         flex-direction: column;
         align-items: stretch;
         gap: 0.55rem;
@@ -4303,7 +4304,8 @@ body > .sale-dialog-overlay {
 }
 
 /* ── Portfolio create / rename / delete dialogs ─────────────────────── */
-body > .portfolio-action-dialog-overlay {
+body > .portfolio-action-dialog-overlay,
+.portfolio-manager-popover > .dca-action-dialog-overlay {
     position: fixed;
     inset: 0;
     z-index: 13000;
@@ -4316,6 +4318,7 @@ body > .portfolio-action-dialog-overlay {
 }
 
 body > .portfolio-action-dialog-overlay[hidden] { display: none; }
+.portfolio-manager-popover > .dca-action-dialog-overlay[hidden] { display: none; }
 
 .portfolio-action-dialog {
     width: min(28rem, 100%);

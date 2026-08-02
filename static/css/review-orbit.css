@@ -550,7 +550,12 @@ body.review-orbit-open > .dashboard-senpai {
     .review-orbit-header { padding: 0.9rem 0.85rem 0.7rem; }
     .review-orbit-mark { width: 40px; height: 40px; flex-basis: 40px; }
     .review-orbit-count { display: none; }
-    .review-orbit-tabs { padding-inline: 0.85rem; }
+    .review-orbit-tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        row-gap: 0.35rem;
+        padding-inline: 0.85rem;
+    }
     .review-orbit-body { padding: 1rem 0.85rem 1.5rem; }
     .review-pane-heading { display: block; }
     .review-pane-heading > p { margin-top: 0.45rem; text-align: left; }

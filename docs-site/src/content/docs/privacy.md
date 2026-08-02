@@ -46,7 +46,8 @@ holdings, your share counts, or anything about your positions. There's no teleme
 analytics beacon, and no third service in between.
 
 Creating, listing, exporting, or restoring a Backup Vault snapshot is local file work and
-does not make an outbound request. Exporting a backup places a copy only at the location you
+does not make an outbound request. Listing and verification open closed snapshots read-only
+and do not create SQLite WAL/SHM sidecars. Exporting a backup places a copy only at the location you
 choose.
 
 ### The SEC contact address

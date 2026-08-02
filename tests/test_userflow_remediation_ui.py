@@ -1,5 +1,4 @@
-"""Regression contracts for the v5.9.3 user-flow remediation."""
-
+"""Regression contracts for the v5.9.3 and v5.10.1 user-flow remediations."""
 from pathlib import Path
 
 
@@ -7,6 +6,13 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX = (ROOT / "templates/index.html").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
 STYLE = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+REVIEW_STYLE = (ROOT / "static/css/review-orbit.css").read_text(encoding="utf-8")
+
+
+def _function(name: str, next_name: str) -> str:
+    start = DASHBOARD.index(f"function {name}(")
+    end = DASHBOARD.index(f"function {next_name}(", start)
+    return DASHBOARD[start:end]
 
 
 def test_holding_rows_expose_a_native_keyboard_disclosure():
@@ -67,3 +73,64 @@ def test_action_plan_header_stacks_on_phone_widths():
 def test_phone_nav_controls_keep_names_when_visible_labels_hide():
     assert 'aria-label="Open Review Orbit"' in INDEX
     assert 'aria-label="Manage portfolios"' in INDEX
+
+
+def test_mobile_holdings_toolbar_does_not_keep_desktop_flex_basis():
+    mobile = STYLE[STYLE.index("@media (max-width: 575.98px)"):]
+    toolbar = mobile[mobile.index(".holdings-card-toolbar"):]
+    toolbar = toolbar[:toolbar.index("}")]
+    assert "flex: 0 1 auto" in toolbar
+
+
+def test_mobile_review_tabs_wrap_so_every_destination_is_visible():
+    mobile = REVIEW_STYLE[REVIEW_STYLE.index("@media (max-width: 575.98px)"):]
+    tabs = mobile[mobile.index(".review-orbit-tabs"):]
+    tabs = tabs[:tabs.index("}")]
+    assert "flex-wrap: wrap" in tabs
+    assert "overflow-x: visible" in tabs
+
+
+def test_welcome_guide_opens_at_the_top_with_close_focused():
+    show = DASHBOARD[DASHBOARD.index("function maybeShowSenpaiWelcomeGuide"):]
+    show = show[:show.index("\n}\n")]
+    assert "body.scrollTop = 0" in show
+    assert 'document.getElementById("senpai-welcome-dismiss")' in show
+    assert 'document.getElementById("senpai-welcome-add-holding")' not in show
+
+
+def test_dca_bulk_and_plan_actions_use_the_in_app_dialog():
+    for marker in (
+        'id="dca-action-dialog"',
+        'id="dca-action-form"',
+        'id="dca-action-input"',
+        'id="dca-action-cancel"',
+        'id="dca-action-submit"',
+        'role="dialog"',
+        'aria-modal="true"',
+    ):
+        assert marker in INDEX
+
+    functions = (
+        ("dcaApplyAll", "dcaUndoAll"),
+        ("dcaUndoAll", "dcaSkip"),
+        ("dcaSkipAll", "dcaUndo"),
+        ("dcaEditAmount", "dcaDeletePlan"),
+        ("dcaDeletePlan", "hideDcaBackfillConfirm"),
+    )
+    for name, next_name in functions:
+        body = _function(name, next_name)
+        assert "openDcaActionDialog" in body
+        assert "window.confirm" not in body
+        assert "window.prompt" not in body
+
+
+def test_dca_action_dialog_traps_focus_and_restores_the_manager():
+    assert "function handleDcaActionDialogKeydown" in DASHBOARD
+    assert 'event.key === "Escape"' in _function(
+        "handleDcaActionDialogKeydown", "initDcaActionDialog"
+    )
+    assert "event.shiftKey && document.activeElement === first" in DASHBOARD
+    assert "!event.shiftKey && document.activeElement === last" in DASHBOARD
+    assert 'setAttribute("inert", "")' in DASHBOARD
+    assert 'removeAttribute("inert")' in DASHBOARD
+    assert "state.previousFocus.focus()" in DASHBOARD

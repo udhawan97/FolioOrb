@@ -1,3 +1,64 @@
+# FolioOrb v5.10.1 Release Notes
+
+**Release date:** August 2, 2026
+
+## Headline
+
+A trust-and-flow patch. The local Backup Vault is now genuinely read-only when
+you browse or verify it, DCA decisions use accessible in-app dialogs in the
+desktop window, and three compact-screen dead ends are gone.
+
+## Fixes
+
+### 💾 Looking at a backup no longer changes it
+
+Opening the Backups tab used normal SQLite connections for integrity and holding
+counts. Against a WAL-mode snapshot, SQLite could create `-shm` and `-wal`
+companions beside the vault file even though the user had only asked to list it.
+Vault inspection now uses an immutable read-only connection, listing an absent
+vault does not create its directory, and a non-empty sibling WAL is refused as
+an incomplete artifact instead of being silently ignored. Live-database counts
+remain WAL-aware, so safety backups still see every committed holding.
+
+Manual snapshots are verified through the same read-only path and remain one
+standalone `.db` file.
+
+### 🧾 DCA decisions stay inside the app
+
+Apply all, undo applied, skip all, change amount, and delete plan depended on
+browser-native confirm/prompt dialogs. WKWebView can fail to show those dialogs,
+turning a click into a silent no-op. Each action now uses one in-app dialog with
+plain consequences, inline amount validation, a focus trap, Escape-to-cancel,
+and focus restoration to the control that opened it. The DCA ledger and its
+apply/undo invariants are unchanged.
+
+### 📱 Holdings reaches the table on a phone
+
+The mobile Holdings toolbar inherited a 320 px desktop flex basis after it
+switched to a vertical layout, stretching the header to roughly 386 px at a
+375 px viewport and pushing the first row below the fold. The phone layout now
+sizes that toolbar from its content.
+
+### 👋 The first-run guide starts where the tour starts
+
+On a 320 × 568 window the welcome guide focused its footer action, which scrolled
+the panel more than 300 px down before the user saw it. It now resets to the top
+and focuses the close button; its existing Tab trap, Escape behavior, inert
+background, and focus return remain intact.
+
+### 🧭 Every Review Orbit destination is visible
+
+The compact tab strip hid Backups beyond a scrollbar-free horizontal overflow.
+Phone-width tabs now wrap into a visible second row while retaining tablist,
+tabpanel, arrow-key, and focus behavior.
+
+## Notes
+
+No schema changes and no migration. Installing over v5.10.0 preserves holdings,
+trades, snapshots, DCA history, theses, settings, and API keys.
+
+---
+
 # FolioOrb v5.10.0 Release Notes
 
 **Release date:** August 1, 2026

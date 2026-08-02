@@ -8,7 +8,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Review Orbit turns the dashboard into a repeatable review workflow. Choose **Review** in the
 top bar to open one keyboard-accessible workspace; on a narrow screen it becomes a full-height
 sheet. Escape closes it, Tab stays inside while it is open, and focus returns to the control
-that opened it.
+that opened it. At phone widths the five destination tabs wrap into view; Left and Right
+Arrow still move between them.
 
 <Aside type="note" title="Review, not execution">
 Review Orbit does not connect to a brokerage, place a trade, apply a DCA contribution, or
@@ -95,6 +96,12 @@ into one misleading table. Missing provider fields render as unavailable.
 
 The Backups tab creates transactionally consistent SQLite snapshots with SQLite's online
 backup API, then runs an integrity check and records the holding-row count.
+
+Browsing the vault is a read-only operation: listing, verification, holding counts, export
+selection, and restore selection do not create or modify database sidecars. If a snapshot
+has a non-empty sibling `-wal`, FolioOrb treats it as incomplete and refuses it instead of
+ignoring committed pages. An absent vault directory is not created until a snapshot is
+actually written.
 
 Manual vault snapshots contain the **portfolio database only**. They exclude `.env`, Claude
 API keys, update settings, and other config. Export uses a native Save dialog in the desktop

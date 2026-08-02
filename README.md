@@ -93,10 +93,10 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 🗞️ Open News | Grouped headlines for everything you hold or watch, plus optional Claude themes |
 | 🗂️ Read the filings | What your companies actually told the SEC — 8-K, 10-Q, 10-K — pulled straight from EDGAR and linked to the source. Public record, no key, no middleman |
 | 📥 Import / export CSV | Move holdings in and out — a strict template locally, or let Claude map a messy brokerage export onto it |
-| 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply — or undo — one tap at a time |
+| 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply or undo through an explicit in-app confirmation |
 | 🧭 Open Review Orbit | One calm workspace gathers price gaps, pending DCA buys, upcoming earnings, verdict calibration, and thesis reviews — prioritised locally, with no automatic trades |
 | 🛡️ Check data trust | See price, quote, fund-fee, dividend, ETF-overlap, thesis, and stored-history coverage before treating a read as complete. Missing stays missing |
-| 💾 Back up locally | Create, verify, export, and restore SQLite snapshots from a local Backup Vault. Restores happen only across a clean restart and preserve the current database first |
+| 💾 Back up locally | Create, verify, export, and restore standalone SQLite snapshots from a local Backup Vault. Browsing is read-only; restores happen only across a clean restart and preserve the current database first |
 | 📝 Run a monthly review | Build a monthly or quarterly pack from current valuation, stored snapshots, realized trades, movers, and thesis attention; save it as print-ready HTML or CSV |
 | ⏱️ Put theses on a cadence | Mark a holding thesis reviewed and choose when it should return to the inbox — or keep it uncadenced |
 | ⚖️ Compare research ideas | Compare two or three research-mode stocks by stock fundamentals, or ETFs by fund-specific data and published-holdings overlap |

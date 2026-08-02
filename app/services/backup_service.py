@@ -30,10 +30,16 @@ DEFAULT_KEEP = 5
 MANUAL_KEEP = 12
 
 
-def backups_dir() -> Path:
-    """Directory holding database backups, created on first use."""
+def backups_dir(*, create: bool = True) -> Path:
+    """Return the backup-vault directory, optionally creating it.
+
+    Inventory and download paths pass ``create=False`` so merely opening the
+    Backup Vault never changes the filesystem. Snapshot-producing paths keep
+    the default and create the directory on first write.
+    """
     directory = paths.data_dir() / BACKUP_DIRNAME
-    directory.mkdir(parents=True, exist_ok=True)
+    if create:
+        directory.mkdir(parents=True, exist_ok=True)
     return directory
 
 
@@ -86,10 +92,43 @@ def resolve_backup_name(name: str) -> Path:
     safe = Path(raw).name
     if not raw or safe != raw or not safe.endswith(".db"):
         raise ValueError("Invalid backup name")
-    path = (backups_dir() / safe).resolve()
-    if path.parent != backups_dir().resolve():
+    vault = backups_dir(create=False).resolve()
+    path = (vault / safe).resolve()
+    if path.parent != vault:
         raise ValueError("Invalid backup name")
     return path
+
+
+def _vault_connection(path: Path) -> sqlite3.Connection:
+    """Open one stable vault artifact without creating SQLite sidecars.
+
+    ``immutable=1`` is intentionally confined to closed backup artifacts. It
+    must never be used for the live database, whose committed state may still
+    reside in WAL. A non-empty sibling WAL means the artifact is not standalone
+    and is therefore refused rather than read incompletely.
+    """
+    path = Path(path)
+    wal = Path(f"{path}-wal")
+    if wal.exists() and wal.stat().st_size > 0:
+        raise sqlite3.DatabaseError("Backup has an uncommitted WAL sidecar")
+    return sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro&immutable=1", uri=True)
+
+
+def _count_vault_holdings(db_path: Path) -> int:
+    """Count holdings in a closed vault artifact without mutating it."""
+    db_path = Path(db_path)
+    if not db_path.exists():
+        return 0
+    try:
+        conn = _vault_connection(db_path)
+    except (OSError, sqlite3.DatabaseError):
+        return 0
+    try:
+        return conn.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
+    except sqlite3.DatabaseError:
+        return 0
+    finally:
+        conn.close()
 
 
 def backup_info(path: Path) -> dict:
@@ -102,14 +141,17 @@ def backup_info(path: Path) -> dict:
             path.stat().st_mtime, tz=timezone.utc
         ).isoformat(),
         "verified": verify_vault_backup(path),
-        "holding_count": count_holdings(path),
+        "holding_count": _count_vault_holdings(path),
     }
 
 
 def list_backups() -> list[dict]:
     """Newest-first inventory of the local database vault."""
+    vault = backups_dir(create=False)
+    if not vault.exists():
+        return []
     backup_paths = sorted(
-        backups_dir().glob("*.db"),
+        vault.glob("*.db"),
         key=lambda item: item.stat().st_mtime,
         reverse=True,
     )
@@ -264,8 +306,9 @@ def verify_backup(backup_path: Path, expected_min_holdings: int | None = None) -
     if not backup_path.exists() or backup_path.stat().st_size == 0:
         return False
 
-    conn = sqlite3.connect(str(backup_path))
+    conn = None
     try:
+        conn = _vault_connection(backup_path)
         result = conn.execute("PRAGMA integrity_check").fetchone()
         if not result or result[0] != "ok":
             return False
@@ -276,10 +319,11 @@ def verify_backup(backup_path: Path, expected_min_holdings: int | None = None) -
                 return expected_min_holdings == 0
             return count >= expected_min_holdings
         return True
-    except sqlite3.DatabaseError:
+    except (OSError, sqlite3.DatabaseError):
         return False
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def verify_vault_backup(backup_path: Path) -> bool:
@@ -287,7 +331,10 @@ def verify_vault_backup(backup_path: Path) -> bool:
     backup_path = Path(backup_path)
     if not verify_backup(backup_path):
         return False
-    conn = sqlite3.connect(str(backup_path))
+    try:
+        conn = _vault_connection(backup_path)
+    except (OSError, sqlite3.DatabaseError):
+        return False
     try:
         row = conn.execute(
             "SELECT 1 FROM sqlite_master "

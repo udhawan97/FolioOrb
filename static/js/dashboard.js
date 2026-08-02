@@ -11226,8 +11226,10 @@ function maybeShowSenpaiWelcomeGuide() {
         element.inert = true;
     });
     document.addEventListener("keydown", handleSenpaiWelcomeKeydown, true);
+    const body = guide.querySelector(".portfolio-manager-body");
+    if (body) body.scrollTop = 0;
     requestAnimationFrame(() => {
-        (document.getElementById("senpai-welcome-add-holding")
+        (document.getElementById("senpai-welcome-dismiss")
             || senpaiWelcomeFocusableElements()[0])?.focus();
     });
 }
@@ -11950,7 +11952,7 @@ function portfolioManagerFallbackFocus() {
 function handlePortfolioManagerKeydown(event) {
     const popover = document.getElementById("portfolioModal");
     if (!popover?.classList.contains("is-visible")) return;
-    if (document.querySelector("body > .sale-dialog-overlay")) return;
+    if (document.querySelector("body > .sale-dialog-overlay") || _dcaActionDialogState) return;
 
     if (event.key === "Escape") {
         event.preventDefault();
@@ -12333,6 +12335,7 @@ function initPortfolioManager() {
     if (!popover) return;
     popover.addEventListener("click", (e) => {
         if (!popover.classList.contains("is-visible")) return;
+        if (e.target.closest(".dca-action-dialog-overlay")) return;
         const panel = popover.querySelector(".portfolio-manager-panel");
         if (!panel?.contains(e.target)) closePortfolioManager();
     });
@@ -13332,6 +13335,7 @@ function initDca() {
     });
     document.getElementById("dca-confirm-cancel")
         ?.addEventListener("click", () => hideDcaBackfillConfirm());
+    initDcaActionDialog();
 }
 
 // On app open: book any missed buys, then badge the DCA button. A toast points
@@ -13538,6 +13542,118 @@ async function loadDcaHistory() {
 // One DCA mutation at a time: a second click while a request is in flight is
 // ignored, so double-taps can't fire a duplicate apply (and hit a 400) or race.
 let _dcaActionInFlight = false;
+let _dcaActionDialogState = null;
+
+function dcaActionDialogFocusableElements() {
+    const dialog = document.getElementById("dca-action-dialog");
+    if (!dialog || dialog.hidden) return [];
+    return Array.from(dialog.querySelectorAll(
+        "button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    )).filter(element => !element.closest("[hidden]") && element.getClientRects().length > 0);
+}
+
+function closeDcaActionDialog(result = null) {
+    const dialog = document.getElementById("dca-action-dialog");
+    const state = _dcaActionDialogState;
+    if (!dialog || !state) return;
+    _dcaActionDialogState = null;
+    dialog.hidden = true;
+    dialog.setAttribute("aria-hidden", "true");
+    document.querySelector("#portfolioModal > .portfolio-manager-panel")?.removeAttribute("inert");
+    state.resolve(result);
+    if (state.previousFocus?.focus) requestAnimationFrame(() => state.previousFocus.focus());
+}
+
+function openDcaActionDialog({ title, copy, confirmLabel, warning = "", value = null, danger = false }) {
+    const dialog = document.getElementById("dca-action-dialog");
+    const field = document.getElementById("dca-action-field");
+    const input = document.getElementById("dca-action-input");
+    if (!dialog || !field || !input || _dcaActionDialogState) return Promise.resolve(null);
+
+    document.getElementById("dca-action-title").textContent = title;
+    document.getElementById("dca-action-copy").textContent = copy;
+    const warningElement = document.getElementById("dca-action-warning");
+    warningElement.textContent = warning;
+    warningElement.hidden = !warning;
+    const hasValue = value !== null;
+    field.hidden = !hasValue;
+    input.value = hasValue ? String(value) : "";
+    input.classList.remove("is-invalid");
+    input.removeAttribute("aria-invalid");
+    document.getElementById("dca-action-error").hidden = true;
+    const submit = document.getElementById("dca-action-submit");
+    submit.textContent = confirmLabel;
+    submit.classList.toggle("btn-primary", !danger);
+    submit.classList.toggle("btn-danger", danger);
+    const previousFocus = document.activeElement;
+    document.querySelector("#portfolioModal > .portfolio-manager-panel")?.setAttribute("inert", "");
+    dialog.hidden = false;
+    dialog.setAttribute("aria-hidden", "false");
+    return new Promise(resolve => {
+        _dcaActionDialogState = { resolve, previousFocus, hasValue };
+        requestAnimationFrame(() => {
+            const target = hasValue ? input : document.getElementById("dca-action-cancel");
+            target?.focus();
+            if (hasValue) input.select();
+        });
+    });
+}
+
+function handleDcaActionDialogKeydown(event) {
+    if (!_dcaActionDialogState) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeDcaActionDialog();
+        return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = dcaActionDialogFocusableElements();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    } else if (!document.getElementById("dca-action-dialog")?.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+function initDcaActionDialog() {
+    const dialog = document.getElementById("dca-action-dialog");
+    const form = document.getElementById("dca-action-form");
+    if (!dialog || !form || form.dataset.bound) return;
+    form.dataset.bound = "true";
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        const state = _dcaActionDialogState;
+        if (!state) return;
+        if (!state.hasValue) {
+            closeDcaActionDialog({ confirmed: true });
+            return;
+        }
+        const input = document.getElementById("dca-action-input");
+        const amount = Number.parseFloat(input.value);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            input.classList.add("is-invalid");
+            input.setAttribute("aria-invalid", "true");
+            document.getElementById("dca-action-error").hidden = false;
+            input.focus();
+            return;
+        }
+        closeDcaActionDialog({ confirmed: true, value: amount });
+    });
+    document.getElementById("dca-action-cancel")?.addEventListener("click", () => closeDcaActionDialog());
+    dialog.addEventListener("mousedown", event => {
+        if (event.target === dialog) closeDcaActionDialog();
+    });
+    document.addEventListener("keydown", handleDcaActionDialogKeydown, true);
+}
 
 async function _dcaPost(path, okMessage) {
     if (_dcaActionInFlight) return null;
@@ -13574,10 +13690,13 @@ async function dcaApply(cid) {
 }
 
 async function dcaApplyAll(planId, count, total, ticker) {
-    if (!window.confirm(
-        `Apply all ${count} pending ${ticker} buys — ${formatCurrency(total)} into your holding?`
-        + `\n\nYou can reverse them later with "Undo applied".`
-    )) return;
+    const choice = await openDcaActionDialog({
+        title: `Apply ${count} ${ticker} buys?`,
+        copy: `${formatCurrency(total)} will be added to your holding using the recorded closes.`,
+        warning: `You can reverse these later with “Undo applied”.`,
+        confirmLabel: "Apply all buys",
+    });
+    if (!choice?.confirmed) return;
     const data = await _dcaPost(`/api/dca/plans/${planId}/apply-pending`);
     if (data) {
         showToast(`Applied ${data.applied} buys to ${data.ticker}`, "success");
@@ -13586,10 +13705,13 @@ async function dcaApplyAll(planId, count, total, ticker) {
 }
 
 async function dcaUndoAll(planId, count, ticker) {
-    if (!window.confirm(
-        `Reverse all ${count} applied ${ticker} buys? Your holding's shares and average cost `
-        + `roll back exactly, and the buys return to the pending bucket.`
-    )) return;
+    const choice = await openDcaActionDialog({
+        title: `Undo ${count} applied ${ticker} buys?`,
+        copy: "Your holding’s shares and average cost will roll back exactly.",
+        warning: "The buys return to the pending bucket and can be reviewed again.",
+        confirmLabel: "Undo applied buys",
+    });
+    if (!choice?.confirmed) return;
     const data = await _dcaPost(`/api/dca/plans/${planId}/undo-applied`);
     if (data) {
         showToast(`Reversed ${data.undone} buys for ${data.ticker}`, "success");
@@ -13605,10 +13727,14 @@ async function dcaSkip(cid) {
 }
 
 async function dcaSkipAll(planId, count, ticker) {
-    if (!window.confirm(
-        `Skip all ${count} pending ${ticker} buys? They won't be applied and won't reappear `
-        + `(the plan itself stays active — pause it if you want to stop future buys).`
-    )) return;
+    const choice = await openDcaActionDialog({
+        title: `Skip ${count} pending ${ticker} buys?`,
+        copy: "These buys won’t be applied and won’t reappear.",
+        warning: "The plan stays active. Pause it separately to stop future buys.",
+        confirmLabel: "Skip pending buys",
+        danger: true,
+    });
+    if (!choice?.confirmed) return;
     const data = await _dcaPost(`/api/dca/plans/${planId}/skip-pending`);
     if (data) {
         showToast(`Skipped ${data.skipped} buys for ${data.ticker}`, "success");
@@ -13645,13 +13771,14 @@ async function dcaTogglePause(planId, isActive) {
 }
 
 async function dcaEditAmount(planId, current) {
-    const raw = window.prompt("New dollar amount per interval:", String(current));
-    if (raw === null) return;
-    const amount = parseFloat(raw);
-    if (!Number.isFinite(amount) || amount <= 0) {
-        showToast("Enter a positive dollar amount", "warning");
-        return;
-    }
+    const choice = await openDcaActionDialog({
+        title: "Change DCA amount",
+        copy: "This amount applies to future intervals; recorded buys keep their original values.",
+        confirmLabel: "Save amount",
+        value: current,
+    });
+    if (!choice?.confirmed) return;
+    const amount = choice.value;
     try {
         const res = await fetch(`/api/dca/plans/${planId}`, {
             method: "PATCH",
@@ -13663,7 +13790,14 @@ async function dcaEditAmount(planId, current) {
 }
 
 async function dcaDeletePlan(planId, ticker) {
-    if (!window.confirm(`Delete the ${ticker} DCA plan? Applied buys stay in your holdings; pending and skipped buys are removed.`)) return;
+    const choice = await openDcaActionDialog({
+        title: `Delete the ${ticker} DCA plan?`,
+        copy: "Applied buys stay in your holdings.",
+        warning: "Pending and skipped buys are removed. This cannot be undone.",
+        confirmLabel: "Delete plan",
+        danger: true,
+    });
+    if (!choice?.confirmed) return;
     try {
         const res = await fetch(`/api/dca/plans/${planId}`, { method: "DELETE" });
         if (res.ok) { showToast(`${ticker} plan deleted`, "success"); loadDcaPanel(); }

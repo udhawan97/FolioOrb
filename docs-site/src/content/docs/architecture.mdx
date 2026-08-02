@@ -58,7 +58,7 @@ different rules for the same Portfolio:
 | `dca_ledger.py` | Plan persistence, catch-up, pending/applied/dismissed transitions, exact apply/undo | Catch-up is idempotent; no simulated buy mutates a holding until the user applies it; a plan with applied buys cannot be deleted until those buys are undone. |
 | `narrative_cache.py` | Portfolio and ticker cache reads/writes, TTL/price freshness, verdict encoding, JSON validation | Portfolio narratives are isolated under `BOOK:<portfolio_id>`; stale or corrupt rows regenerate safely; incomplete valuations never produce confident Portfolio-level Claude narration. |
 | `portfolio_review.py` | Review Inbox, trust coverage, period reports, type-aware research comparison, thesis cadence state | Reuses valuation/fee/income/overlap contracts; value change is not called investment return; Compare accepts only research-mode tickers of one security type. |
-| `backup_service.py` | WAL-safe snapshots, integrity verification, vault inventory, queued restore and safety copy | Manual restore happens before SQLAlchemy opens the database; an unverified or failed staged copy never replaces the live file. |
+| `backup_service.py` | WAL-safe snapshots, immutable read-only vault inspection, queued restore and safety copy | Live counts remain WAL-aware; closed vault artifacts reject non-empty sibling WAL files, and an unverified or failed staged copy never replaces the live file. |
 
 Pure DCA scheduling and cost math remains in `dca_service.py`, while routers and AI/analytics
 call these interfaces instead of reaching into each other's private helpers.
