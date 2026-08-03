@@ -369,5 +369,25 @@ def test_delete_plan_cascades_contributions(client, db):
     assert db.query(DcaContribution).count() == 0
 
 
+def test_delete_plan_surfaces_applied_buy_conflict(client, db):
+    plan_id = _create_weekly_plan(client).json()["plan"]["id"]
+    contribution = db.query(DcaContribution).filter(
+        DcaContribution.plan_id == plan_id
+    ).first()
+    contribution.status = "applied"
+    db.commit()
+
+    response = client.delete(f"/api/dca/plans/{plan_id}")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": (
+            "Undo applied buys before deleting this plan so its holding changes "
+            "remain traceable."
+        )
+    }
+    assert db.query(DcaPlan).filter(DcaPlan.id == plan_id).count() == 1
+
+
 def test_delete_missing_plan_404(client):
     assert client.delete("/api/dca/plans/999").status_code == 404

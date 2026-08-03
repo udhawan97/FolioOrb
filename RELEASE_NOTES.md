@@ -1,3 +1,31 @@
+# FolioOrb v5.10.2 Release Notes
+
+**Release date:** August 2, 2026
+
+## Headline
+
+A focused DCA follow-up. Deleting a plan now tells you up front that applied buys
+must be undone, and a refused delete shows the ledger's reason instead of looking
+like a button that did nothing.
+
+## Fixes
+
+### 🧾 DCA deletion explains the traceability rule
+
+FolioOrb deliberately refuses to delete a DCA plan while it has applied buys so
+the holding changes remain traceable. The v5.10.1 dialog incorrectly said those
+buys would stay in the holding, then ignored the API conflict that enforced the
+rule. The dialog now tells you to undo applied buys first, and any refusal is
+shown in-app. Once no applied buys remain, deletion removes pending and skipped
+entries as documented.
+
+## Notes
+
+No schema changes and no migration. Installing over v5.10.1 preserves holdings,
+trades, snapshots, DCA history, theses, settings, and API keys.
+
+---
+
 # FolioOrb v5.10.1 Release Notes
 
 **Release date:** August 2, 2026

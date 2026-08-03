@@ -13792,16 +13792,22 @@ async function dcaEditAmount(planId, current) {
 async function dcaDeletePlan(planId, ticker) {
     const choice = await openDcaActionDialog({
         title: `Delete the ${ticker} DCA plan?`,
-        copy: "Applied buys stay in your holdings.",
-        warning: "Pending and skipped buys are removed. This cannot be undone.",
+        copy: "Undo every applied buy before deleting this plan so its holding changes stay traceable.",
+        warning: "After applied buys are undone, deleting removes pending and skipped buys. This cannot be undone.",
         confirmLabel: "Delete plan",
         danger: true,
     });
     if (!choice?.confirmed) return;
     try {
         const res = await fetch(`/api/dca/plans/${planId}`, { method: "DELETE" });
-        if (res.ok) { showToast(`${ticker} plan deleted`, "success"); loadDcaPanel(); }
-    } catch { showToast("Could not delete plan", "danger"); }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(typeof data.detail === "string" ? data.detail : "Could not delete plan", "danger");
+            return;
+        }
+        showToast(`${ticker} plan deleted`, "success");
+        loadDcaPanel();
+    } catch { showToast("Could not delete plan — is the app online?", "danger"); }
 }
 
 // ── DCA plan creation (with double-count guard) ──────────────────────────────

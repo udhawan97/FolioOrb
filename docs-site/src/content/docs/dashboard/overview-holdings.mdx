@@ -91,8 +91,10 @@ skip it; applied buys can be undone exactly.
 Bulk apply, undo, skip, amount changes, and plan deletion use FolioOrb dialogs rather than
 browser-native prompts. Each dialog states what changes and what stays, keeps keyboard focus
 inside until you decide, cancels with Escape, and returns focus to the action you started
-from. A changed amount affects future intervals only. Deleting a plan keeps applied buys in
-the holding and is refused until any applied ledger entries are undone.
+from. A changed amount affects future intervals only. A plan cannot be deleted while it has
+applied buys: undo those buys first, then deletion removes its pending and skipped entries.
+If deletion is refused, FolioOrb shows the ledger's reason in-app instead of silently doing
+nothing.
 
 ## Import & export (CSV)
 

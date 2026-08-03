@@ -7,6 +7,14 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.10.2 — DCA deletion follow-up
+
+- **A refused DCA delete is no longer silent.** The plan dialog now explains that
+  applied buys must be undone first so their holding changes remain traceable. If
+  the ledger refuses deletion, FolioOrb shows that reason in-app. Once no applied
+  buys remain, deletion removes pending and skipped entries as documented.
+- No schema changes or migration. Installing over v5.10.1 preserves local data and keys.
+
 ## v5.10.1 — Trust and flow patch
 
 - **Browsing the Backup Vault is read-only.** Listing, integrity checks, holding counts,

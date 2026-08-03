@@ -1,4 +1,4 @@
-"""Regression contracts for the v5.9.3 and v5.10.1 user-flow remediations."""
+"""Regression contracts for the v5.9.3 through v5.10.2 user-flow remediations."""
 from pathlib import Path
 
 
@@ -134,3 +134,11 @@ def test_dca_action_dialog_traps_focus_and_restores_the_manager():
     assert 'setAttribute("inert", "")' in DASHBOARD
     assert 'removeAttribute("inert")' in DASHBOARD
     assert "state.previousFocus.focus()" in DASHBOARD
+
+
+def test_dca_delete_explains_and_surfaces_applied_buy_conflicts():
+    delete = _function("dcaDeletePlan", "hideDcaBackfillConfirm")
+    assert "Undo every applied buy before deleting this plan" in delete
+    assert 'typeof data.detail === "string" ? data.detail' in delete
+    assert "if (!res.ok)" in delete
+    assert 'showToast(`${ticker} plan deleted`, "success")' in delete
