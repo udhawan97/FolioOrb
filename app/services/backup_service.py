@@ -642,7 +642,10 @@ def create_backup(
                     dest_conn.close()
             finally:
                 source_conn.close()
-            with open(temp_path, "rb") as handle:
+            # Windows rejects fsync on a read-only CRT descriptor (EBADF), even
+            # though POSIX accepts it. Open the already-complete staging file
+            # read/write solely for the durability flush; no bytes are changed.
+            with open(temp_path, "r+b") as handle:
                 os.fsync(handle.fileno())
             if not verify_backup(
                 temp_path, expected_min_holdings=expected_min_holdings

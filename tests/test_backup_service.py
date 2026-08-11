@@ -46,6 +46,25 @@ def test_create_and_verify_preserves_rows(tmp_path):
     assert sorted(path.name for path in backup.parent.iterdir()) == [backup.name]
 
 
+def test_staging_durability_flush_uses_windows_safe_descriptor(tmp_path, monkeypatch):
+    src = tmp_path / "portfolio.db"
+    _make_db(src, ["VOO"])
+    observed_modes = []
+    real_open = open
+
+    def tracking_open(path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if str(path).endswith(".staging"):
+            observed_modes.append(mode)
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(backup_service, "open", tracking_open, raising=False)
+
+    backup_service.create_backup(src, label="test", dest_dir=tmp_path / "backups")
+
+    assert "r+b" in observed_modes
+
+
 def test_expected_holding_count_is_verified_before_publication(tmp_path, monkeypatch):
     src = tmp_path / "portfolio.db"
     _make_db(src, ["VOO", "AAPL"])
