@@ -58,7 +58,9 @@ different rules for the same Portfolio:
 | `dca_ledger.py` | Plan persistence, catch-up, pending/applied/dismissed transitions, exact apply/undo | Catch-up is idempotent; no simulated buy mutates a holding until the user applies it; a plan with applied buys cannot be deleted until those buys are undone. |
 | `narrative_cache.py` | Portfolio and ticker cache reads/writes, TTL/price freshness, verdict encoding, JSON validation | Portfolio narratives are isolated under `BOOK:<portfolio_id>`; stale or corrupt rows regenerate safely; incomplete valuations never produce confident Portfolio-level Claude narration. |
 | `portfolio_review.py` | Review Inbox, trust coverage, period reports, type-aware research comparison, thesis cadence state | Reuses valuation/fee/income/overlap contracts; value change is not called investment return; Compare accepts only research-mode tickers of one security type. |
-| `backup_service.py` | WAL-safe snapshots, immutable read-only vault inspection, queued restore and safety copy | Live counts remain WAL-aware; closed vault artifacts reject non-empty sibling WAL files, and an unverified or failed staged copy never replaces the live file. |
+| `portfolio_planning.py` | Target eligibility and replacement, target-versus-actual drift, read-only buy rehearsal, all-Portfolio known-value pulse | Targets are integer basis points over the full eligible set; drift requires complete usable USD quotes; rehearsals write nothing and use pre-buy known value plus external cash. |
+| `portfolio_records.py` | Annual realized recap and deterministically ordered portable ZIP export | Sale rows use stored facts; one read transaction materializes ordered CSVs and a checksummed manifest; limits are enforced before any response is emitted. |
+| `backup_service.py` | WAL-safe snapshots, immutable read-only vault inspection, manual freshness, opt-in automatic policy, queued restore and safety copy | Cross-process creation/verification/pruning is serialized; publication never replaces a destination; automatic retention is limited to verified `auto-*` artifacts. |
 
 Pure DCA scheduling and cost math remains in `dca_service.py`, while routers and AI/analytics
 call these interfaces instead of reaching into each other's private helpers.
@@ -106,7 +108,7 @@ app/
 ├── models.py               SQLAlchemy ORM models
 ├── schemas.py              Pydantic request/response contracts
 ├── routers/                Thin HTTP adapters: stocks, portfolio, DCA, AI, news, review, system
-└── services/               Lifecycle, valuation, review, backup, DCA, cache, analytics, signals, updates
+└── services/               Lifecycle, valuation, review, planning, records, backup, DCA, cache, analytics, signals, updates
 
 desktop/                    Desktop entry point (uvicorn + native window)
 packaging/                  PyInstaller spec, Inno Setup script, app icons
@@ -118,7 +120,7 @@ static/
 ├── css/style.css           Dashboard design system
 ├── js/core.js              Escaping, fetch + endpoint cache, holding-panel registry
 ├── js/dashboard.js         Main dashboard behavior
-├── js/review-orbit.js      Review workspace, reports, compare, thesis, and vault UI
+├── js/review-orbit.js      Review workspace, planning, records, reports, compare, thesis, and vault UI
 ├── js/analytics-charts.js  Chart.js analytics widgets
 └── js/updates.js           In-app update check and download
 ```

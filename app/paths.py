@@ -12,6 +12,7 @@ a project dependency), so it is safe to import from ``config`` and ``database``
 without creating an import cycle.
 """
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -95,6 +96,14 @@ def data_dir() -> Path:
     Source: the repo root, so source runs keep writing ``./database`` and
     ``./.env`` exactly as they always have.
     """
+    override = os.getenv("FOLIOORB_DATA_DIR")
+    if override:
+        # Release smoke tests set this before importing any app module. Bypass
+        # the normal frozen location *and* legacy migration so a package check
+        # cannot create or copy real per-user FolioOrb state.
+        directory = Path(override).resolve()
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
     if is_frozen():
         from platformdirs import user_data_dir
 

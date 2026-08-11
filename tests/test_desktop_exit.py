@@ -69,3 +69,12 @@ def test_no_bare_return_from_windowed_path_reaches_finalization():
     for node in ast.walk(main_fn):
         if isinstance(node, ast.Return):
             assert node.value is not None, "bare return in main() leaks to finalization"
+
+
+def test_smoke_path_isolates_database_and_skips_restore():
+    """Local frozen smoke checks must not mutate the user's live data directory."""
+    src = _source()
+    main_fn = src[src.index("def main("):src.index("\n\ndef _safe_download_name")]
+    assert "_configure_smoke_environment()" in main_fn
+    assert "if not smoke:" in main_fn
+    assert "backup_service.apply_pending_restore()" in main_fn

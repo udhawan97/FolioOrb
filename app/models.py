@@ -54,6 +54,10 @@ class Holding(Base):
     # Optional local workflow metadata. It never changes valuation or trading math.
     thesis_reviewed_at = Column(DateTime, nullable=True)
     thesis_review_interval_days = Column(Integer, nullable=True)
+    # Optional intended allocation in integer basis points (10_000 = 100%).
+    # It is descriptive planning state only: valuation and trade math never
+    # infer or execute a transaction from it.
+    target_weight_bps = Column(Integer, nullable=True)
     added_at = Column(DateTime, default=func.now())
 
     portfolio = relationship("Portfolio", back_populates="holdings")

@@ -3,9 +3,42 @@ title: Release Notes
 description: What's new in FolioOrb, release by release.
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
+
+## v5.11.0 — Plan & Protect
+
+- **Set a target course.** Store exact basis-point targets across the eligible
+  holdings in one Portfolio, then compare them with current allocation when every
+  required USD quote is usable. Missing and foreign-priced rows block drift rather
+  than being treated as zero.
+- **Rehearse an external-cash buy.** Preview shares, average cost, and projected
+  allocation for a ticker you already own. The rehearsal is read-only, buy-only,
+  USD-only, and neither a forecast nor a recommendation.
+- **See every book without blending performance.** The all-Portfolios pulse shows
+  known USD value and completeness per book, isolates quote failures, and keeps its
+  aggregate explicitly partial when any book is incomplete.
+- **Export the record, not a tax answer.** The annual realized CSV uses stored sale
+  facts and reconciles displayed rows. It does not model lots, fees, holding periods,
+  wash sales, or tax classification.
+- **Carry human-readable records.** A manifest-backed ZIP contains CSVs for
+  Portfolios, holdings, sales, snapshots, and the DCA ledger. It excludes settings,
+  secrets, AI caches, backups, and SQLite, so it is sensitive but not restorable.
+- **Know whether the safety net is fresh.** Manual-backup freshness stays separate
+  from an opt-in, once-per-local-day automatic policy. Auto retention touches only
+  verified `auto-*` snapshots.
+- Frozen smoke checks use an isolated data root, while native record exports stage
+  and fsync a private sibling file before an atomic destination swap.
+- Schema v6 adds a nullable target field; existing local data remains intact.
+
+<Aside type="caution" title="Bounded on purpose">
+Plan & Protect never places a trade. Targets are not recommendations, the buy rehearsal
+does not model taxes or forecast prices, the realized recap is not a tax filing, and a
+portable records ZIP is not a restore package.
+</Aside>
 
 ## v5.10.2 — DCA deletion follow-up
 

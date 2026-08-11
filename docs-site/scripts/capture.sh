@@ -24,6 +24,7 @@ export DATABASE_URL="sqlite:///$DB_PATH"
 export ANTHROPIC_API_KEY=""
 export DEFAULT_HOLDINGS=""
 export DEBUG="False"
+export FOLIO_DISABLE_UPDATE_SCHEDULER="1"
 
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"
@@ -49,4 +50,4 @@ done
 echo "→ Capturing screenshots…"
 ( cd docs-site && SHOT_BASE_URL="http://127.0.0.1:$PORT" node scripts/capture_shots.mjs )
 
-echo "✓ Done. Assets in docs-site/src/assets/shots/"
+echo "✓ Done. Assets in docs-site/public/assets/shots/ and docs/plan-protect.webp"

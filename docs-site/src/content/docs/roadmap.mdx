@@ -1,62 +1,45 @@
 ---
 title: Roadmap
-description: What's on the radar for future FolioOrb releases — a friendly sneak peek, not a delivery guarantee.
+description: What recently shipped in FolioOrb and how future work is communicated without invented dates.
 ---
 
 import { CardGrid, Card, Aside } from '@astrojs/starlight/components';
 import SenpaiTip from '../../components/SenpaiTip.astro';
 
-FolioOrb already earns its spot in your dock — but this is the opening chapter, and
-the lab is very much open. Below is what's *on the radar* for future releases. Read it as a
-peek through the workshop window, not a signed contract: every idea here is grounded in what
-the app can already do, but nothing is promised on a date.
+The previous roadmap named target weights, a trade export, and a what-if simulator. Those
+ideas shipped together in **v5.11.0** as a deliberately bounded Plan & Protect workflow.
+This page records that outcome instead of leaving shipped work labelled as future work.
 
-## On the radar
+## Recently shipped
 
 <CardGrid>
 	<Card title="Target weights & drift" icon="random">
-		Set the mix you're aiming for, then see at a glance how far today's prices have
-		nudged you off plan — the same allocation and exposure math the dashboard already
-		runs, pointed at your own targets.
-		<br /><br />**Status:** next up in the lab · *effort: medium*
+		Set a complete integer-basis-point course over owned eligible holdings, then compare
+		target and actual allocation only when every required USD quote is usable.
+		<br /><br />**Status:** shipped in v5.11.0
 	</Card>
-	<Card title="Tax-season trade export" icon="document">
-		Export every closed trade as a tidy CSV when tax season comes knocking — the
-		line-by-line detail behind the new year-end realized recap.
-		<br /><br />**Status:** next up in the lab · *effort: small*
+	<Card title="Annual realized recap" icon="document">
+		Export one calendar year of stored sales with an average-cost-basis recap. It is a
+		bookkeeping record, not tax-lot or tax-filing software.
+		<br /><br />**Status:** shipped in v5.11.0
 	</Card>
-	<Card title="A what-if simulator" icon="random">
-		Preview a buy or a trim *before* you touch anything real — regret-free rehearsals
-		that reuse the same exposure and risk math the dashboard already runs.
-		<br /><br />**Status:** being explored · *effort: medium*
+	<Card title="Buy rehearsal" icon="random">
+		Preview an external-cash USD buy for a ticker already held. It writes nothing,
+		does not trim, does not forecast, and is not a recommendation.
+		<br /><br />**Status:** shipped in v5.11.0
 	</Card>
 </CardGrid>
 
 <SenpaiTip>
-	Shipped since this list last changed: **thesis notes** (your reason for owning each
-	holding, in your own words) and a **dividend calendar** (which months actually pay you,
-	from each payer's real ex-dates). Neither was on this list — they jumped the queue, which
-	is allowed. Before those: insider trades, fundamentals over time, and the dividend income
-	view.
+	The same release also added an all-Portfolios known-value pulse, a checksummed portable
+	records ZIP, manual-backup freshness, and opt-in daily automatic backup.
 </SenpaiTip>
 
-## What the status labels mean
+## What comes next
 
-These are honest confidence levels, not marketing:
-
-| Label | Roughly means |
-| --- | --- |
-| **Quietly brewing** | Groundwork already exists in the app; mostly a matter of surfacing it. |
-| **Next up in the lab** | Clear, self-contained, and high on the list. |
-| **On the radar** | Genuinely wanted, a bit more design work before it lands. |
-| **Being explored** | Promising and feasible, still being shaped. |
-
-<SenpaiTip>
-	This roadmap is less of a blood oath and more of a friendly sneak peek. FolioOrb is
-	built part-time, so priorities may shift and you'll notice a distinct lack of hard dates.
-	That's on purpose — the direction is clear (more useful, more polished, more delightful),
-	the calendar is not.
-</SenpaiTip>
+There is no dated public promise for the next feature. Proposed work is discussed in GitHub
+issues and becomes a shipped claim only after the implementation, tests, packaged app, and
+release artifacts agree.
 
 <Aside type="tip" title="Got a feature you'd fight for?">
 	The list grows from real requests. [Open an

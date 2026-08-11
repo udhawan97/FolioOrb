@@ -18,11 +18,11 @@ if _ROOT not in sys.path:
 
 # A fresh, demo-only portfolio: one core ETF, one mega-cap stock, one watchlist item.
 DEMO_HOLDINGS = [
-    # ticker, shares, avg_cost, is_watchlist, hold_class
-    ("VOO", 18.0, 452.10, False, "anchor"),   # core S&P 500 ETF
-    ("MSFT", 22.0, 396.40, False, "auto"),     # mega-cap stock
-    ("SCHD", 60.0, 27.85, False, "auto"),      # dividend ETF, adds allocation variety
-    ("NVDA", 0.0, 0.0, True, "auto"),          # watchlist only (no position)
+    # ticker, shares, avg_cost, is_watchlist, hold_class, target_weight_bps
+    ("VOO", 18.0, 452.10, False, "anchor", 5500),
+    ("MSFT", 22.0, 396.40, False, "auto", 3000),
+    ("SCHD", 60.0, 27.85, False, "auto", 1500),
+    ("NVDA", 0.0, 0.0, True, "auto", None),
 ]
 
 
@@ -45,7 +45,7 @@ def main() -> int:
         db.add(portfolio)
         db.flush()
 
-        for ticker, shares, avg_cost, is_watchlist, hold_class in DEMO_HOLDINGS:
+        for ticker, shares, avg_cost, is_watchlist, hold_class, target_bps in DEMO_HOLDINGS:
             db.add(
                 models.Holding(
                     portfolio_id=portfolio.id,
@@ -54,12 +54,31 @@ def main() -> int:
                     avg_cost=avg_cost,
                     is_watchlist=is_watchlist,
                     hold_class=hold_class,
+                    target_weight_bps=target_bps,
                     is_active=True,
                 )
             )
+
+        long_horizon = models.Portfolio(
+            id=2, name="Long Horizon", description="Second fictional book for demo data"
+        )
+        db.add(long_horizon)
+        db.flush()
+        db.add(
+            models.Holding(
+                portfolio_id=long_horizon.id,
+                ticker="VTI",
+                shares=14.0,
+                avg_cost=241.30,
+                is_watchlist=False,
+                hold_class="anchor",
+                target_weight_bps=10_000,
+                is_active=True,
+            )
+        )
         db.commit()
 
-    print(f"Seeded demo portfolio with {len(DEMO_HOLDINGS)} holdings.")
+    print(f"Seeded two demo portfolios with {len(DEMO_HOLDINGS) + 1} holdings.")
     return 0
 
 

@@ -78,6 +78,37 @@ def test_existing_data_is_backed_up_and_preserved(file_db):
     assert backup_service.verify_backup(backups[0], expected_min_holdings=1)
 
 
+def test_v5_to_v6_adds_nullable_targets_idempotently_and_preserves_rows(file_db):
+    engine, _ = file_db
+    from app import models
+
+    models.Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO portfolios (name) VALUES ('Targets')"))
+        conn.execute(
+            text(
+                "INSERT INTO holdings (portfolio_id, ticker, shares, avg_cost, is_active) "
+                "VALUES (1, 'AAPL', 2, 100, 1)"
+            )
+        )
+        conn.execute(text("ALTER TABLE holdings DROP COLUMN target_weight_bps"))
+        schema_meta._ensure_app_meta(conn)
+        schema_meta._write_meta(conn, "schema_version", "5")
+
+    first = schema_meta.apply_migrations_safely(engine)
+    second = schema_meta.apply_migrations_safely(engine)
+
+    assert first.previous_schema_version == 5
+    assert first.schema_version == 6
+    assert first.backed_up is True
+    assert second.ran_migration is False
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT ticker, shares, avg_cost, target_weight_bps FROM holdings")
+        ).one()
+    assert tuple(row) == ("AAPL", 2.0, 100.0, None)
+
+
 def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
     """Regression: verification must use the DB's real holdings count, not 0.
 
@@ -101,7 +132,9 @@ def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
         schema_meta._ensure_app_meta(conn)
         schema_meta._write_meta(conn, "schema_version", "0")
 
-    def _empty_backup(source_db, label, dest_dir=None, ts=None):
+    def _empty_backup(
+        source_db, label, dest_dir=None, ts=None, expected_min_holdings=None
+    ):
         dest_dir = dest_dir or backup_service.backups_dir()
         dest_dir.mkdir(parents=True, exist_ok=True)
         empty = dest_dir / f"{label}-corrupt.db"

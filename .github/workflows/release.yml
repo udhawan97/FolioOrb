@@ -155,7 +155,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -r requirements-desktop.txt
+          python -m pip install -r requirements.txt -r requirements-desktop.txt pytest
+      - name: Exercise Windows backup safety
+        run: >-
+          python -m pytest -q
+          tests/test_backup_policy.py
+          tests/test_backup_service.py
       - name: Build app bundle
         run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
       - name: Smoke test the frozen bundle

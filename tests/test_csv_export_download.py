@@ -9,7 +9,10 @@ pure file-writing/sanitizing helpers are tested directly and the JS/HTML wiring 
 asserted at the source level (the pattern used by tests/test_desktop_exit.py).
 """
 import importlib.util
+import os
 from pathlib import Path
+
+import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -62,6 +65,38 @@ def test_write_keeps_html_plain_utf8(tmp_path):
     assert dest.read_bytes().startswith(b"<!doctype html>")
 
 
+def test_binary_write_is_atomic_and_preserves_existing_file_on_swap_failure(
+    tmp_path, monkeypatch
+):
+    dest = tmp_path / "records.zip"
+    dest.write_bytes(b"existing-complete-file")
+
+    def fail_swap(_source, _target):
+        raise OSError("simulated swap failure")
+
+    monkeypatch.setattr(desktop_main.os, "replace", fail_swap)
+    with pytest.raises(OSError, match="swap failure"):
+        desktop_main._write_binary_file(str(dest), b"replacement")
+
+    assert dest.read_bytes() == b"existing-complete-file"
+    assert not list(tmp_path.glob(".records.zip-*.tmp"))
+
+
+def test_smoke_environment_uses_an_isolated_data_root(tmp_path, monkeypatch):
+    smoke_root = tmp_path / "smoke-root"
+    monkeypatch.setenv("DATABASE_URL", "sqlite:////real/user/portfolio.db")
+    monkeypatch.setenv("FOLIOORB_DATA_DIR", "/real/user/data")
+    monkeypatch.setenv("FOLIOORB_SMOKE_TEST", "0")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "must-not-survive-smoke")
+    monkeypatch.setattr(desktop_main.tempfile, "mkdtemp", lambda **_kwargs: str(smoke_root))
+
+    selected = desktop_main._configure_smoke_environment()
+
+    assert selected == str(smoke_root)
+    assert os.environ["FOLIOORB_DATA_DIR"] == str(smoke_root)
+    assert os.environ["DATABASE_URL"] == f"sqlite:///{smoke_root / 'portfolio.db'}"
+
+
 # ── Desktop wiring: the native Save bridge is actually mounted on the window ─────
 
 
@@ -70,6 +105,7 @@ def test_desktop_exposes_save_bridge():
     assert "class _NativeBridge" in src
     assert "def save_file(" in src
     assert "def export_backup(" in src
+    assert "def export_portable_records(" in src
     assert "SAVE_DIALOG" in src
     # The bridge is useless unless it's actually handed to the window.
     assert "js_api=_NativeBridge()" in src

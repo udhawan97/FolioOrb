@@ -1,6 +1,6 @@
 ---
 title: Review Orbit
-description: Use the review inbox, data trust center, reports, research comparison, thesis cadence, and local backup vault.
+description: Review attention, data trust, reports, research, targets, records, and local backup protection in one workspace.
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
@@ -8,8 +8,9 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Review Orbit turns the dashboard into a repeatable review workflow. Choose **Review** in the
 top bar to open one keyboard-accessible workspace; on a narrow screen it becomes a full-height
 sheet. Escape closes it, Tab stays inside while it is open, and focus returns to the control
-that opened it. At phone widths the five destination tabs wrap into view; Left and Right
-Arrow still move between them.
+that opened it. At phone widths all seven destination tabs wrap into view; Left and Right
+Arrow still move between them. **Plan**, **Records**, and **Backups** form the Plan & Protect
+part of the same workspace rather than a second dashboard.
 
 <Aside type="note" title="Review, not execution">
 Review Orbit does not connect to a brokerage, place a trade, apply a DCA contribution, or
@@ -78,6 +79,71 @@ The review timestamp and interval stay in local SQLite. They control only when t
 returns to the Inbox; they do not change P&L, allocation, a verdict, or an action plan.
 Claude never reads or writes thesis text.
 
+## Plan & Protect
+
+### All-Portfolios pulse
+
+Plan starts with one row per Portfolio: its known USD value, quote coverage, and the tickers
+that keep it incomplete. The aggregate is deliberately **known value**, not account-level
+performance. One provider failure stays attached to its Portfolio and does not blank the
+other books.
+
+### Target weights and drift
+
+Targets use integer basis points: `10,000 bps = 100%`. An eligible target row is active,
+owned (positive shares), and not watchlisted. A complete target course must include every
+eligible row and total exactly 10,000 bps; duplicate, stale, foreign, or ineligible IDs are
+rejected. A Portfolio with no eligible holdings is incomplete.
+
+Changing shares or prices recomputes actual allocation and drift without erasing the target.
+Adding or removing an eligible holding makes the course incomplete until you save a new full
+set. If any required quote is missing, non-positive, non-finite, or not USD, FolioOrb names
+the gap and withholds all drift values instead of mixing known and unknown positions.
+
+### Buy rehearsal
+
+A rehearsal accepts a positive USD cash amount with at most two decimal places and one
+eligible ticker already held in the active Portfolio. It uses the ticker's current available
+positive USD quote and the same average-cost math as a real recorded buy. Projected allocation
+uses **pre-buy known Portfolio value + external cash** as its denominator.
+
+The rehearsal writes no holding, trade, snapshot, DCA, target, or settings row. It cannot
+model a sale or trim, forecast a price, include taxes or fees, or recommend a trade. When the
+Portfolio valuation is incomplete, share and average-cost math can still be shown for a usable
+ticker quote, but projected allocation stays unavailable.
+
+## Records
+
+### Annual realized recap CSV
+
+Choose a calendar year to export one row per stored sale. Each row uses its stored sale date,
+ticker, shares, proceeds, and average-cost basis—not the holding's current state. Displayed
+gain/loss is displayed proceeds minus displayed basis, and the total sums those rounded row
+values. Formula-like ticker text is neutralized for spreadsheet safety.
+
+This is a calendar-year bookkeeping recap, not a tax filing. It does not model tax lots,
+fees, holding periods, wash sales, or tax classification.
+
+### Portable records ZIP
+
+The archive is built from one consistent read transaction and contains deterministic CSVs for:
+
+- Portfolios
+- Holdings, including inactive/watchlist rows, notes, theses, and targets
+- Realized trades and Portfolio snapshots
+- DCA plans and DCA contributions
+- A manifest with format, schema and app versions, UTC generation time, row counts,
+  checksums, exclusions, and warnings
+
+Settings, secrets, AI caches, backups, and the SQLite database are excluded. The archive is
+human-readable and sensitive; it is **not** a Backup Vault snapshot and cannot be restored.
+FolioOrb emits no partial download if cumulative uncompressed data or the final compressed ZIP
+would exceed 64 MiB.
+
+The 64 MiB rule bounds the emitted archive, not peak process memory: the local export currently
+materializes each ordered dataset before serialization. Very large books should be split or
+archived outside FolioOrb rather than relying on this inspection-oriented export.
+
 ## Watchlist Compare
 
 Compare is deliberately limited to active **Research mode** rows:
@@ -106,6 +172,18 @@ actually written.
 Manual vault snapshots contain the **portfolio database only**. They exclude `.env`, Claude
 API keys, update settings, and other config. Export uses a native Save dialog in the desktop
 app and a normal download in a browser.
+
+The Backups tab reads the newest **verified manual** snapshot and labels it current (up to
+7 days old), due (8–30 days), stale (more than 30 days), or missing. A corrupt newer file is
+skipped rather than making the status look healthy. Every vault file is still same-device
+protection unless you export or copy it elsewhere.
+
+Automatic backup is off by default. If you opt in, launch schedules a best-effort attempt at
+most once per local calendar day. Creation, verification, publication, and pattern-scoped
+pruning are serialized across FolioOrb processes; a new file never replaces an existing
+destination. Automatic retention keeps seven verified `auto-*` snapshots and never prunes
+manual, update-safety, restore-safety, or exported copies. A claimed failed day is not retried
+silently; **Create verified backup** remains the explicit retry.
 
 ### Restore safely
 

@@ -1,3 +1,76 @@
+# FolioOrb v5.11.0 Release Notes
+
+**Release date:** August 11, 2026
+
+## Headline
+
+Plan with targets, rehearse a buy, export the records behind your book, and know
+whether your local safety net is current — all inside Review Orbit, without
+connecting a brokerage or turning incomplete market data into false precision.
+
+## Added
+
+### Plan & Protect in Review Orbit
+
+- **Target weights and drift.** Set integer basis-point targets across every owned,
+  active holding in a Portfolio. FolioOrb compares them with current allocation
+  only when every required USD quote is usable; otherwise it names the missing or
+  foreign-priced rows instead of producing partial drift.
+- **All-Portfolios pulse.** See known USD value and completeness for every book,
+  plus a known-value total. A quote failure is isolated to its Portfolio; the
+  overview does not pretend the total is a complete account-level performance
+  measure.
+- **Buy rehearsal.** Preview an external-cash USD buy for a ticker you already own.
+  It reuses current available quotes and average-cost math, makes no database
+  change, never trims, and is neither a forecast nor a recommendation.
+
+### Local records you can inspect
+
+- **Annual realized recap CSV.** One row per stored sale, using its stored date,
+  proceeds, and average-cost basis. Totals reconcile to the displayed rounded
+  rows. This is a calendar-year record, not a tax filing: it does not model lots,
+  fees, holding periods, wash sales, or tax classification.
+- **Portable records ZIP.** Export human-readable CSV files for Portfolios,
+  holdings (including inactive/watchlist rows, notes, theses, and targets),
+  realized trades, snapshots, DCA plans, and DCA contributions, plus a manifest
+  with row counts and checksums. The export excludes keys, settings, AI caches,
+  backups, and the SQLite database; it is sensitive and is not a restore package.
+
+### A clearer local backup posture
+
+- Review Orbit now grades the newest verified **manual** backup as current (up to
+  7 days), due (8–30 days), stale (over 30 days), or missing. Corrupt newer files
+  are skipped, and the UI keeps the same-device warning visible.
+- Optional launch-time automatic backups are off by default, attempt at most once
+  per local day, verify before publication, and retain seven verified `auto-*`
+  snapshots. They never prune manual, update-safety, restore-safety, or exported
+  backups.
+
+## Under the hood
+
+- Schema v6 adds one nullable `target_weight_bps` field to holdings. Existing
+  databases migrate additively and retain all holdings, trades, snapshots, DCA
+  history, theses, settings, and keys.
+- Backup creation now serializes manual, automatic, verification, and pruning work
+  across app processes; uses collision-proof names and private staging files; and
+  publishes without replacing an existing destination.
+- Portable exports materialize one pinned SQLite transaction, order rows
+  deterministically, and reject an archive before download if cumulative
+  uncompressed or final compressed output exceeds 64 MiB.
+- Frozen release smoke tests now force an isolated data root and database before
+  importing app modules, so package verification cannot migrate or create real
+  user state. Native record exports stage and fsync a private sibling file before
+  atomically replacing the chosen destination; cancellations and write failures
+  are reported separately.
+
+## Upgrade notes
+
+Install over v5.10.2 as normal. Target fields begin unset, automatic backup
+remains disabled until you opt in, and none of the new planning or export views
+mutates shares or places trades.
+
+---
+
 # FolioOrb v5.10.2 Release Notes
 
 **Release date:** August 2, 2026

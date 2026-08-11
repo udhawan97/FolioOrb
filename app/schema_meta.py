@@ -37,7 +37,9 @@ logger = logging.getLogger(__name__)
 # unchanged.
 # v5 adds optional thesis review timestamps and cadence to holdings. Both are
 # additive and ignored by older binaries, so rollback compatibility is unchanged.
-SCHEMA_VERSION = 5
+# v6 adds optional integer target weights to holdings. The column is additive,
+# nullable, and ignored by older binaries, so rollback compatibility is unchanged.
+SCHEMA_VERSION = 6
 
 # Oldest app version whose ORM models can still read this schema. Additive-only
 # migrations (new tables/columns/indexes) keep this unchanged, so a normal
@@ -158,7 +160,11 @@ def apply_migrations_safely(engine: Engine) -> MigrationResult:
             # can catch a backup that silently lost the table — a hardcoded
             # expectation of 0 would let that slip through undetected.
             pre_count = backup_service.count_holdings(source_db)
-            backup_path = backup_service.create_backup(source_db, label=f"pre-migrate-v{stored}")
+            backup_path = backup_service.create_backup(
+                source_db,
+                label=f"pre-migrate-v{stored}",
+                expected_min_holdings=pre_count,
+            )
             backed_up = backup_service.verify_backup(backup_path, expected_min_holdings=pre_count)
             if not backed_up:
                 logger.error("Pre-migration backup failed verification: %s", backup_path.name)

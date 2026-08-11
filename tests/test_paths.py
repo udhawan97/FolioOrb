@@ -28,6 +28,20 @@ def test_data_dir_is_repo_root():
     assert paths.data_dir() == REPO_ROOT
 
 
+def test_data_dir_override_bypasses_frozen_legacy_migration(tmp_path, monkeypatch):
+    isolated = tmp_path / "isolated-smoke"
+    monkeypatch.setenv("FOLIOORB_DATA_DIR", str(isolated))
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+
+    def forbidden_migration(_directory):
+        raise AssertionError("legacy migration must not run for an isolated data root")
+
+    monkeypatch.setattr(paths, "_migrate_legacy_data", forbidden_migration)
+
+    assert paths.data_dir() == isolated.resolve()
+    assert isolated.is_dir()
+
+
 def test_bundled_resources_resolve_from_resource_dir():
     assert (paths.resource_dir() / "static").is_dir()
     assert (paths.resource_dir() / "templates" / "index.html").is_file()

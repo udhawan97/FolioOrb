@@ -2490,8 +2490,15 @@
                         aria-selected="false" tabindex="-1" data-review-tab="report">Review pack</button>
                 <button type="button" role="tab" id="review-tab-compare" aria-controls="review-pane-compare"
                         aria-selected="false" tabindex="-1" data-review-tab="compare">Compare</button>
-                <button type="button" role="tab" id="review-tab-backups" aria-controls="review-pane-backups"
-                        aria-selected="false" tabindex="-1" data-review-tab="backups">Backups</button>
+                <span class="review-tab-cluster" role="presentation">
+                    <span class="review-tab-cluster-label" aria-hidden="true">Plan &amp; protect</span>
+                    <button type="button" role="tab" id="review-tab-plan" aria-controls="review-pane-plan"
+                            aria-selected="false" tabindex="-1" data-review-tab="plan">Plan</button>
+                    <button type="button" role="tab" id="review-tab-records" aria-controls="review-pane-records"
+                            aria-selected="false" tabindex="-1" data-review-tab="records">Records</button>
+                    <button type="button" role="tab" id="review-tab-backups" aria-controls="review-pane-backups"
+                            aria-selected="false" tabindex="-1" data-review-tab="backups">Backups</button>
+                </span>
             </nav>
 
             <div class="review-orbit-body">
@@ -2578,6 +2585,79 @@
                     <div class="review-compare-results" id="review-compare-results" aria-live="polite"></div>
                 </section>
 
+                <section class="review-pane" id="review-pane-plan" role="tabpanel"
+                         aria-labelledby="review-tab-plan" data-review-pane="plan" hidden>
+                    <div class="review-pane-heading">
+                        <div><p class="review-eyebrow">Set a course, then rehearse</p><h3>Portfolio plan</h3></div>
+                        <p>Targets describe your intent. FolioOrb never turns drift or a rehearsal into a trade.</p>
+                    </div>
+                    <div class="review-book-pulse" id="review-book-pulse" aria-live="polite"></div>
+                    <div class="review-plan-grid">
+                        <article class="review-course-card">
+                            <div id="review-course-summary" aria-live="polite"></div>
+                            <form id="review-target-form">
+                                <div id="review-target-table"></div>
+                                <div class="review-plan-actions">
+                                    <p id="review-target-status" class="review-inline-status" role="status"></p>
+                                    <button class="review-primary-btn" id="review-target-save" type="submit">Save target course</button>
+                                </div>
+                            </form>
+                        </article>
+                        <article class="review-rehearsal-card">
+                            <p class="review-eyebrow">No-write preview</p>
+                            <h4>Rehearse a buy</h4>
+                            <p class="review-card-copy">Preview one fully spent external USD contribution using the available quote.</p>
+                            <form id="review-rehearsal-form">
+                                <label for="review-rehearsal-holding">Held position
+                                    <select id="review-rehearsal-holding" required></select>
+                                </label>
+                                <label for="review-rehearsal-cash">External cash (USD)
+                                    <input id="review-rehearsal-cash" type="number" min="0.01" max="100000000"
+                                           step="0.01" inputmode="decimal" value="500.00" required>
+                                </label>
+                                <button class="review-primary-btn" id="review-rehearsal-run" type="submit">Run rehearsal</button>
+                            </form>
+                            <div id="review-rehearsal-result" class="review-rehearsal-result" aria-live="polite"></div>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="review-pane" id="review-pane-records" role="tabpanel"
+                         aria-labelledby="review-tab-records" data-review-pane="records" hidden>
+                    <div class="review-pane-heading">
+                        <div><p class="review-eyebrow">Portable, human-readable records</p><h3>Records desk</h3></div>
+                        <p>Take useful files with you without exporting API keys, settings, AI caches, backups, or SQLite internals.</p>
+                    </div>
+                    <div class="review-records-grid">
+                        <article class="review-record-card">
+                            <span class="review-record-index" aria-hidden="true">01</span>
+                            <div>
+                                <p class="review-eyebrow">Stored sale facts</p>
+                                <h4>Annual average-cost recap</h4>
+                                <p>One row per recorded sale, with displayed proceeds, average-cost basis, gain, and a reconciling total.</p>
+                                <form id="review-recap-form" class="review-record-action">
+                                    <label for="review-recap-year">UTC calendar year
+                                        <input id="review-recap-year" type="number" min="1900" step="1" required>
+                                    </label>
+                                    <button class="review-primary-btn" type="submit">Save recap CSV</button>
+                                </form>
+                                <p class="review-disclosure review-disclosure--warning">Average-cost recap only — not a tax form. It excludes lots, fees, holding periods, wash sales, and tax classification.</p>
+                            </div>
+                        </article>
+                        <article class="review-record-card">
+                            <span class="review-record-index" aria-hidden="true">02</span>
+                            <div>
+                                <p class="review-eyebrow">Format v1</p>
+                                <h4>Portable records ZIP</h4>
+                                <p>Human-readable CSV files plus a manifest of row counts, exclusions, and SHA-256 checksums.</p>
+                                <button class="review-primary-btn" id="review-portable-export" type="button">Save portable ZIP</button>
+                                <p class="review-disclosure review-disclosure--warning">Sensitive export: notes and thesis text are included. This ZIP is for inspection and portability; it is not a FolioOrb restore file.</p>
+                            </div>
+                        </article>
+                    </div>
+                    <p class="review-inline-status" id="review-records-status" role="status"></p>
+                </section>
+
                 <section class="review-pane" id="review-pane-backups" role="tabpanel"
                          aria-labelledby="review-tab-backups" data-review-pane="backups" hidden>
                     <div class="review-pane-heading">
@@ -2585,6 +2665,9 @@
                         <button type="button" class="review-primary-btn" id="review-backup-create">
                             <i class="bi bi-shield-plus" aria-hidden="true"></i> Create verified backup
                         </button>
+                    </div>
+                    <div class="review-protection-status" id="review-protection-status" aria-live="polite">
+                        <div class="review-loading">Manual-backup freshness and automatic protection are being checked…</div>
                     </div>
                     <p class="review-disclosure">Backups contain the SQLite portfolio database only. API keys and the local <code>.env</code> are excluded.</p>
                     <div class="review-restore-status" id="review-restore-status" hidden></div>

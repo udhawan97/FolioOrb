@@ -94,9 +94,14 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 🗂️ Read the filings | What your companies actually told the SEC — 8-K, 10-Q, 10-K — pulled straight from EDGAR and linked to the source. Public record, no key, no middleman |
 | 📥 Import / export CSV | Move holdings in and out — a strict template locally, or let Claude map a messy brokerage export onto it |
 | 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply or undo through an explicit in-app confirmation |
-| 🧭 Open Review Orbit | One calm workspace gathers price gaps, pending DCA buys, upcoming earnings, verdict calibration, and thesis reviews — prioritised locally, with no automatic trades |
+| 🧭 Open Review Orbit | One calm workspace gathers attention, data trust, reports, comparison, planning, records, and backup protection — prioritised locally, with no automatic trades |
+| ⚖️ Set a target course | Assign exact basis-point targets across the holdings you own, then compare target and actual allocation only when every required USD quote is usable |
+| 🧪 Rehearse a buy | Preview shares, average cost, and projected allocation for an external-cash USD buy in a ticker you already own — read-only, buy-only, and never a recommendation |
+| 🗂️ See every Portfolio | Compare known USD value and quote completeness across separate books without inventing an aggregate performance number |
+| 🧾 Export annual realized sales | Download a calendar-year average-cost recap from stored sale facts; it is a record, not tax-lot or tax-filing software |
+| 📦 Carry readable records | Export a checksummed ZIP of human-readable Portfolio, holding, sale, snapshot, and DCA CSVs; secrets and app internals stay out |
 | 🛡️ Check data trust | See price, quote, fund-fee, dividend, ETF-overlap, thesis, and stored-history coverage before treating a read as complete. Missing stays missing |
-| 💾 Back up locally | Create, verify, export, and restore standalone SQLite snapshots from a local Backup Vault. Browsing is read-only; restores happen only across a clean restart and preserve the current database first |
+| 💾 Back up locally | See manual-backup freshness, create/verify/export/restore standalone SQLite snapshots, or opt into one verified automatic snapshot per local day. Every vault copy stays on this device |
 | 📝 Run a monthly review | Build a monthly or quarterly pack from current valuation, stored snapshots, realized trades, movers, and thesis attention; save it as print-ready HTML or CSV |
 | ⏱️ Put theses on a cadence | Mark a holding thesis reviewed and choose when it should return to the inbox — or keep it uncadenced |
 | ⚖️ Compare research ideas | Compare two or three research-mode stocks by stock fundamentals, or ETFs by fund-specific data and published-holdings overlap |
@@ -110,6 +115,12 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
   <img src="docs/dashboard.webp" alt="The FolioOrb dashboard showing a demo portfolio: total value, today's P&amp;L, sector map, and today's impact" width="820">
   <br>
   <sub><em>The real dashboard, running a demo portfolio. Local market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
+</p>
+
+<p align="center">
+  <img src="docs/plan-protect.webp" alt="Review Orbit Plan and Protect showing all-Portfolio known value, target-versus-actual allocation, and a buy rehearsal for fictional demo holdings" width="820">
+  <br>
+  <sub><em>Plan &amp; Protect uses demo data here. Missing quotes stay visible, rehearsals are read-only, and records exports remain local.</em></sub>
 </p>
 
 ## Meet Senpai
@@ -183,17 +194,18 @@ FolioOrb works fully without Claude — Local Intelligence handles verdicts, ana
 
 </details>
 
-## 🔭 What's Brewing
+## 🛰️ Plan & Protect, New in v5.11.0
 
-FolioOrb already earns a place on your machine — but this is very much the opening chapter, and the lab is open. Here's what's *on the radar* for future releases. Think of it as a sneak peek through the workshop window, not a pinky promise carved in stone.
+Review Orbit now carries the whole pre-decision and safekeeping loop: check every
+Portfolio's quote coverage, set a target course, rehearse one external-cash buy,
+export the stored record, and see whether a verified manual backup is current.
+Automatic backup remains an explicit opt-in and retains only its own seven verified
+snapshots.
 
-| | On the radar | The gist | Status |
-| --- | --- | --- | --- |
-| ⚖️ | **Target weights & drift** | Set the mix you're aiming for, then see at a glance how far today's prices have nudged you off plan. | Next up in the lab |
-| 🧾 | **Tax-season trade export** | Hand your accountant a tidy CSV of every closed trade — the detail behind the year-end recap. | Next up in the lab |
-| 🔮 | **A what-if simulator** | Preview a buy or a trim *before* you touch anything real. Regret-free rehearsals. | Being explored |
-
-> **The fine print, minus the lawyers:** This roadmap is less of a blood oath and more of a friendly sneak peek. FolioOrb is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.
+The boundaries are deliberate. FolioOrb still does not connect to a brokerage or
+place trades. Targets are not recommendations; the rehearsal does not forecast
+prices or model taxes; the annual realized recap is not a tax filing; and the
+portable ZIP is sensitive human-readable data, not a restore package.
 
 Got a feature you'd fight for? [Open an issue](https://github.com/udhawan97/FolioOrb/issues/new) — Senpai reads every one and has opinions about most.
 
@@ -250,12 +262,13 @@ flowchart LR
 
 The browser view is identical whether you open `localhost:8000` yourself or launch the desktop app — the desktop build (PyInstaller + pywebview) runs the same FastAPI server in-process behind a native window.
 
-Portfolio lifecycle, valuation, recurring-investment state, Portfolio-scoped AI narratives,
-and the Review Orbit each have one service interface. That keeps deletion cascades,
-watchlist exclusions, realized/unrealized return math, quote-quality handling, DCA
-apply/undo, review provenance, and `BOOK:<portfolio_id>` cache isolation consistent across
-every route. See the [architecture guide](https://udhawan97.github.io/FolioOrb/architecture/)
-for the module map and invariants.
+Portfolio lifecycle, valuation, recurring-investment state, planning, records export,
+Portfolio-scoped AI narratives, and the Review Orbit each have one service interface.
+That keeps deletion cascades, watchlist exclusions, realized/unrealized return math,
+quote-quality handling, target eligibility, DCA apply/undo, review provenance, and
+`BOOK:<portfolio_id>` cache isolation consistent across every route. See the
+[architecture guide](https://udhawan97.github.io/FolioOrb/architecture/) for the module
+map and invariants.
 
 | Layer | Stack |
 | --- | --- |
@@ -329,7 +342,7 @@ More setup and runtime help: [Troubleshooting &amp; FAQ](https://udhawan97.githu
 
 ## Privacy
 
-FolioOrb is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Market data is requested from Yahoo Finance; Claude prompts are sent to Anthropic *only* when you enable Claude features. Generated AI summaries are cached locally. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioOrb/privacy/).
+FolioOrb is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Market data is requested from Yahoo Finance; Claude prompts are sent to Anthropic *only* when you enable Claude features. Generated AI summaries are cached locally. Backup snapshots stay on this device by default, and a portable records ZIP is human-readable sensitive data—not an encrypted restore file. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioOrb/privacy/).
 
 ## Contributing
 

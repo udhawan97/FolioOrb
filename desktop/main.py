@@ -14,6 +14,7 @@ import os
 import shutil
 import socket
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
@@ -88,14 +89,34 @@ def _run_server(port: int) -> None:
         _STARTUP_STATE["error"] = f"{type(exc).__name__}: {exc}"
 
 
+def _configure_smoke_environment() -> str:
+    """Select an isolated data root before a smoke run imports app modules."""
+    smoke_root = tempfile.mkdtemp(prefix="folioorb-smoke-")
+    os.environ["FOLIOORB_SMOKE_TEST"] = "1"
+    os.environ["FOLIOORB_DATA_DIR"] = smoke_root
+    os.environ["ANTHROPIC_API_KEY"] = ""
+    smoke_db = os.path.join(smoke_root, "portfolio.db")
+    os.environ["DATABASE_URL"] = f"sqlite:///{smoke_db}"
+    return smoke_root
+
+
 def main() -> int:
     smoke = "--smoke" in sys.argv
 
+    # A package smoke test must never open, migrate, restore, or record launch
+    # state against the user's real FolioOrb data. CI normally starts from a
+    # clean runner, but local release verification runs the same frozen binary
+    # on a developer machine. Force a throwaway database and let app.main
+    # suppress every nonessential startup side effect.
+    if smoke:
+        _configure_smoke_environment()
+
     # Apply an explicitly queued vault restore before the server thread imports
     # app.main and opens SQLAlchemy connections to the live database.
-    from app.services import backup_service
+    if not smoke:
+        from app.services import backup_service
 
-    backup_service.apply_pending_restore()
+        backup_service.apply_pending_restore()
 
     port = _find_free_port(PREFERRED_PORT)
     base_url = f"http://{HOST}:{port}"
@@ -143,6 +164,43 @@ def _safe_download_name(name: str) -> str:
     return base or "export.csv"
 
 
+def _fsync_parent(path: str) -> None:
+    """Persist an atomic destination swap on POSIX; Windows has no directory fsync."""
+    if os.name == "nt":
+        return
+    parent = os.path.dirname(os.path.abspath(path)) or "."
+    fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _write_binary_file(path: str, payload: bytes) -> str:
+    """Write through one private sibling temp, then atomically replace the target."""
+    target = os.path.abspath(path)
+    parent = os.path.dirname(target)
+    os.makedirs(parent, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{os.path.basename(target)}-", suffix=".tmp", dir=parent
+    )
+    try:
+        try:
+            os.chmod(temp_name, 0o600)
+        except OSError:
+            pass
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, target)
+        _fsync_parent(target)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+    return path
+
+
 def _write_text_file(path: str, content: str) -> str:
     """Write text as UTF-8, adding exactly one BOM for CSV files.
 
@@ -154,9 +212,7 @@ def _write_text_file(path: str, content: str) -> str:
     # CSV gets a BOM for Excel. HTML and other text exports stay plain UTF-8.
     is_csv = str(path).lower().endswith(".csv")
     encoding = "utf-8-sig" if is_csv and not content.startswith("﻿") else "utf-8"
-    with open(path, "w", encoding=encoding, newline="") as handle:
-        handle.write(content)
-    return path
+    return _write_binary_file(path, content.encode(encoding))
 
 
 class _NativeBridge:  # pylint: disable=too-few-public-methods
@@ -214,6 +270,31 @@ class _NativeBridge:  # pylint: disable=too-few-public-methods
             if not path:
                 return {"saved": False, "path": None}
             shutil.copyfile(source, path)
+            return {"saved": True, "path": path}
+        except Exception as exc:  # pylint: disable=broad-except
+            return {"saved": False, "path": None, "error": type(exc).__name__}
+
+    def export_portable_records(self) -> dict:
+        """Build and save the human-readable records ZIP without text decoding."""
+        try:
+            import webview
+
+            from app.database import SessionLocal
+            from app.services import portfolio_records
+
+            with SessionLocal() as db:
+                payload = portfolio_records.build_portable_archive(db)
+            window = webview.active_window()
+            if window is None:
+                return {"saved": False, "path": None}
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename="folioorb-portable-export.zip",
+            )
+            path = result[0] if isinstance(result, (list, tuple)) else result
+            if not path:
+                return {"saved": False, "path": None}
+            _write_binary_file(path, payload)
             return {"saved": True, "path": path}
         except Exception as exc:  # pylint: disable=broad-except
             return {"saved": False, "path": None, "error": type(exc).__name__}

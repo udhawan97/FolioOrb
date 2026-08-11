@@ -211,7 +211,11 @@ def _create_rollback_point() -> dict | None:
     try:
         source_db = backup_service.live_db_path()
         pre_count = backup_service.count_holdings(source_db)
-        db_backup = backup_service.create_backup(source_db, label=f"pre-update-v{__version__}")
+        db_backup = backup_service.create_backup(
+            source_db,
+            label=f"pre-update-v{__version__}",
+            expected_min_holdings=pre_count,
+        )
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Pre-update backup failed: %s", type(exc).__name__)
         return None

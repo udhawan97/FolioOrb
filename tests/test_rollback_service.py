@@ -127,7 +127,9 @@ def test_rollback_safety_backup_rejects_lost_holdings(rollback_env, monkeypatch)
     silently lost the holdings table — this proves the fix catches it and
     refuses to proceed with the rollback.
     """
-    def _empty_backup(source_db, label, dest_dir=None, ts=None):
+    def _empty_backup(
+        source_db, label, dest_dir=None, ts=None, expected_min_holdings=None
+    ):
         dest_dir = dest_dir or backup_service.backups_dir()
         dest_dir.mkdir(parents=True, exist_ok=True)
         empty = dest_dir / f"{label}-corrupt.db"

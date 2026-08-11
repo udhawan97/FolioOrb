@@ -221,6 +221,23 @@ body.review-orbit-open > .dashboard-senpai {
     color: var(--text-primary);
 }
 
+.review-tab-cluster {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-inline-start: auto;
+    padding-inline-start: 0.65rem;
+    border-inline-start: 1px solid var(--hairline);
+}
+
+.review-tab-cluster-label {
+    color: var(--accent-cyan);
+    font-size: 0.58rem;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
 .review-orbit-body {
     min-height: 0;
     overflow-y: auto;
@@ -471,6 +488,195 @@ body.review-orbit-open > .dashboard-senpai {
 .review-compare-metrics dd { margin: 0; overflow-wrap: anywhere; text-align: right; font-size: 0.69rem; font-weight: 650; }
 .review-overlap-note { grid-column: 1 / -1; color: var(--text-secondary); font-size: 0.72rem; }
 
+/* Plan & Protect — a single course-setting flow, not a dashboard of widgets. */
+.review-book-pulse,
+.review-course-card,
+.review-rehearsal-card,
+.review-record-card,
+.review-protection-status {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+}
+
+.review-book-pulse {
+    margin-bottom: 0.8rem;
+    border-radius: 18px;
+    overflow: hidden;
+}
+
+.review-book-pulse-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--hairline-soft);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent-cyan) 8%, transparent), transparent 55%);
+}
+
+.review-book-pulse-head > div { min-width: 0; }
+.review-book-pulse-head span { color: var(--text-tertiary); font-size: 0.64rem; }
+.review-book-pulse-head strong { display: block; margin-top: 0.12rem; font: 650 1.25rem/1.1 var(--font-display); }
+
+.review-plan-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
+    gap: 0.8rem;
+    align-items: start;
+}
+
+.review-course-card,
+.review-rehearsal-card { border-radius: 20px; padding: 1rem; }
+
+.review-course-summary {
+    display: grid;
+    grid-template-columns: 142px minmax(0, 1fr);
+    align-items: center;
+    gap: 1.15rem;
+    margin-bottom: 1rem;
+}
+
+.review-course-summary h4,
+.review-rehearsal-card h4,
+.review-record-card h4 {
+    margin: 0;
+    font: 650 1rem/1.2 var(--font-display);
+}
+
+.review-course-summary p:not(.review-eyebrow),
+.review-card-copy,
+.review-record-card p:not(.review-eyebrow):not(.review-disclosure) {
+    margin: 0.38rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.71rem;
+    line-height: 1.5;
+}
+
+.review-course-ring {
+    --target-angle: 0deg;
+    --actual-angle: 0deg;
+    position: relative;
+    width: 138px;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent-yellow) 0 var(--target-angle), var(--hairline) var(--target-angle) 360deg);
+    box-shadow: 0 0 32px color-mix(in srgb, var(--accent-cyan) 9%, transparent);
+}
+
+.review-course-ring::before {
+    content: "";
+    position: absolute;
+    inset: 13px;
+    border-radius: inherit;
+    background: conic-gradient(var(--accent-cyan) 0 var(--actual-angle), var(--popover-surface) var(--actual-angle) 360deg);
+}
+
+.review-course-ring::after {
+    content: "";
+    position: absolute;
+    inset: 27px;
+    border: 1px solid var(--hairline);
+    border-radius: inherit;
+    background: var(--popover-surface);
+}
+
+.review-course-ring > span {
+    position: relative;
+    z-index: 1;
+    max-width: 75px;
+    text-align: center;
+}
+
+.review-course-ring strong { display: block; font: 700 0.94rem/1 var(--font-display); }
+.review-course-ring small { display: block; margin-top: 0.28rem; color: var(--text-secondary); font-size: 0.62rem; }
+.review-course-ring.is-partial { filter: saturate(0.35); }
+.review-course-ring.is-partial::before { background: repeating-conic-gradient(var(--accent-cyan) 0 6deg, transparent 6deg 14deg); }
+
+.review-course-legend { display: flex; gap: 0.8rem; margin-top: 0.65rem; }
+.review-course-legend span { color: var(--text-tertiary); font-size: 0.64rem; }
+.review-course-legend span::before { content: ""; display: inline-block; width: 0.52rem; height: 0.52rem; margin-right: 0.3rem; border-radius: 50%; vertical-align: -0.03rem; }
+.review-course-legend [data-kind="actual"]::before { background: var(--accent-cyan); }
+.review-course-legend [data-kind="target"]::before { background: var(--accent-yellow); }
+
+.review-table-scroll { max-width: 100%; overflow-x: auto; }
+.review-plan-table { width: 100%; min-width: 570px; border-collapse: collapse; }
+.review-plan-table caption { padding: 0 0 0.55rem; color: var(--text-tertiary); font-size: 0.64rem; text-align: left; }
+.review-plan-table th,
+.review-plan-table td { padding: 0.58rem 0.6rem; border-bottom: 1px solid var(--hairline-soft); color: var(--text-secondary); font-size: 0.68rem; text-align: left; vertical-align: middle; }
+.review-plan-table th { color: var(--text-primary); font-weight: 650; }
+.review-plan-table thead th { color: var(--text-tertiary); font-size: 0.6rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.review-plan-table td:last-child { overflow-wrap: anywhere; }
+.review-plan-table input {
+    width: 6.5rem;
+    border: 1px solid var(--hairline);
+    border-radius: 9px;
+    padding: 0.42rem 0.5rem;
+    background: var(--control-bg);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.review-table-note { margin: 0; padding: 0.62rem 1rem 0.75rem; color: var(--text-tertiary); font-size: 0.64rem; }
+.review-plan-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.8rem; }
+
+.review-rehearsal-card {
+    background:
+        linear-gradient(150deg, color-mix(in srgb, var(--accent-yellow) 7%, transparent), transparent 42%),
+        var(--surface);
+}
+.review-rehearsal-card form { display: grid; gap: 0.7rem; margin-top: 0.9rem; }
+.review-rehearsal-card label,
+.review-record-action label { color: var(--text-secondary); font-size: 0.66rem; }
+.review-rehearsal-card select,
+.review-rehearsal-card input,
+.review-record-action input {
+    width: 100%;
+    margin-top: 0.3rem;
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 0.55rem 0.6rem;
+    background: var(--control-bg);
+    color: var(--text-primary);
+}
+.review-rehearsal-result { margin-top: 0.8rem; }
+.review-rehearsal-ticket { border-top: 1px solid var(--hairline); padding-top: 0.75rem; }
+.review-rehearsal-ticket header { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.67rem; }
+.review-rehearsal-ticket header span { color: var(--text-tertiary); }
+.review-rehearsal-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; margin-top: 0.65rem; }
+.review-rehearsal-metrics > div { border-left: 2px solid var(--accent-cyan); padding: 0.4rem 0.5rem; background: color-mix(in srgb, var(--accent-cyan) 5%, transparent); }
+.review-rehearsal-metrics span { display: block; color: var(--text-tertiary); font-size: 0.58rem; }
+.review-rehearsal-metrics strong { display: block; margin-top: 0.14rem; font-size: 0.72rem; }
+.review-rehearsal-ticket > p,
+.review-rehearsal-partial { color: var(--text-tertiary); font-size: 0.62rem; line-height: 1.45; }
+.review-rehearsal-partial { grid-column: 1 / -1; margin: 0; padding: 0.5rem; border-left: 2px solid var(--accent-yellow); }
+
+.review-records-grid { display: grid; gap: 0.75rem; }
+.review-record-card {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 18px;
+}
+.review-record-index { color: color-mix(in srgb, var(--accent-cyan) 56%, transparent); font: 700 2rem/1 var(--font-display); letter-spacing: -0.07em; }
+.review-record-action { display: flex; align-items: end; gap: 0.65rem; margin-top: 0.85rem; }
+.review-record-action label { max-width: 11rem; }
+.review-record-card > div > .review-primary-btn { margin-top: 0.85rem; }
+.review-disclosure--warning { margin-top: 0.85rem; border-left-color: var(--accent-yellow); background: color-mix(in srgb, var(--accent-yellow) 6%, transparent); }
+
+.review-protection-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; margin-bottom: 0.85rem; padding: 0.75rem; border-radius: 18px; }
+.review-protection-card { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; min-width: 0; padding: 0.2rem 0.25rem; }
+.review-protection-card strong,
+.review-protection-card span { display: block; }
+.review-protection-card strong { font-size: 0.78rem; }
+.review-protection-card > div > span { margin-top: 0.2rem; color: var(--text-tertiary); font-size: 0.62rem; line-height: 1.4; }
+.review-protection-limit { grid-column: 1 / -1; margin: 0; padding-top: 0.6rem; border-top: 1px solid var(--hairline-soft); color: var(--text-tertiary); font-size: 0.64rem; }
+.review-auto-switch { position: relative; width: 2.8rem; height: 1.55rem; flex: 0 0 auto; border: 1px solid var(--hairline-hover); border-radius: 999px; background: var(--control-bg); }
+.review-auto-switch span { position: absolute; width: 1.15rem; height: 1.15rem; top: 0.14rem; left: 0.18rem; border-radius: 50%; background: var(--text-tertiary); transition: transform 160ms ease, background 160ms ease; }
+.review-auto-switch[aria-checked="true"] { background: color-mix(in srgb, var(--accent-green) 18%, transparent); border-color: color-mix(in srgb, var(--accent-green) 45%, transparent); }
+.review-auto-switch[aria-checked="true"] span { transform: translateX(1.16rem); background: var(--accent-green); }
+
 .review-backup-list { display: grid; gap: 0.55rem; }
 .review-backup-row {
     display: grid;
@@ -523,13 +729,15 @@ body.review-orbit-open > .dashboard-senpai {
 .review-orbit button:focus-visible,
 .review-orbit textarea:focus-visible,
 .review-orbit select:focus-visible,
+.review-orbit input:focus-visible,
 .review-nav-trigger:focus-visible {
     outline: 2px solid var(--accent-blue);
     outline-offset: 2px;
 }
 
 @media (max-width: 840px) {
-    .review-orbit { padding: 0; }
+    .review-orbit,
+    body > .review-orbit { padding: 0; }
     .review-orbit-shell {
         width: 100%;
         height: 100dvh;
@@ -540,7 +748,9 @@ body.review-orbit-open > .dashboard-senpai {
     .review-pane-heading { align-items: start; }
     .review-report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .review-compare-results { grid-template-columns: 1fr; }
+    .review-plan-grid { grid-template-columns: 1fr; }
     .review-overlap-note { grid-column: auto; }
+    .review-tab-cluster { width: 100%; margin-inline-start: 0; padding: 0.35rem 0 0; border-inline-start: 0; border-top: 1px solid var(--hairline-soft); }
 }
 
 @media (max-width: 575.98px) {
@@ -556,6 +766,9 @@ body.review-orbit-open > .dashboard-senpai {
         row-gap: 0.35rem;
         padding-inline: 0.85rem;
     }
+    .review-orbit-tabs button { padding-inline: 0.65rem; }
+    .review-tab-cluster { flex-wrap: wrap; }
+    .review-tab-cluster-label { flex-basis: 100%; }
     .review-orbit-body { padding: 1rem 0.85rem 1.5rem; }
     .review-pane-heading { display: block; }
     .review-pane-heading > p { margin-top: 0.45rem; text-align: left; }
@@ -570,6 +783,14 @@ body.review-orbit-open > .dashboard-senpai {
     .review-report-actions button { width: 100%; }
     .review-backup-row { grid-template-columns: 1fr; }
     .review-backup-actions { flex-wrap: wrap; }
+    .review-course-summary { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    .review-course-legend { justify-content: center; }
+    .review-plan-actions,
+    .review-record-action { align-items: stretch; flex-direction: column; }
+    .review-record-action label { max-width: none; }
+    .review-record-card { grid-template-columns: 42px minmax(0, 1fr); gap: 0.7rem; }
+    .review-protection-status { grid-template-columns: 1fr; }
+    .review-protection-limit { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

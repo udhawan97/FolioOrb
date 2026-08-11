@@ -224,7 +224,9 @@ def test_install_rejects_backup_that_silently_lost_holdings(tmp_path, monkeypatc
     launched = []
     monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
 
-    def _empty_backup(source_db, label, dest_dir=None, ts=None):
+    def _empty_backup(
+        source_db, label, dest_dir=None, ts=None, expected_min_holdings=None
+    ):
         # Simulate a backup that "succeeded" but lost the holdings table.
         dest_dir = dest_dir or backup_service.backups_dir()
         dest_dir.mkdir(parents=True, exist_ok=True)

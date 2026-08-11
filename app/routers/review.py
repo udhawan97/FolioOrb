@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
@@ -14,6 +15,8 @@ from app.routers.deps import require_portfolio as _require_portfolio
 from app.services import (
     backup_service,
     holdings_repository,
+    portfolio_planning,
+    portfolio_records,
     portfolio_review,
     update_installer,
 )
@@ -28,6 +31,24 @@ class ThesisReviewIn(BaseModel):
 
 class RestoreIn(BaseModel):
     name: str
+
+
+class TargetAssignmentIn(BaseModel):
+    holding_id: int = Field(..., ge=1)
+    target_weight_bps: int | None = Field(default=None, ge=0, le=10_000, strict=True)
+
+
+class TargetSetIn(BaseModel):
+    items: list[TargetAssignmentIn] = Field(default_factory=list, max_length=500)
+
+
+class BuyRehearsalIn(BaseModel):
+    holding_id: int = Field(..., ge=1)
+    cash_usd: Decimal = Field(..., gt=0, le=portfolio_planning.MAX_REHEARSAL_CASH)
+
+
+class AutomaticBackupIn(BaseModel):
+    enabled: bool
 
 
 def _domain_call(operation, *args, **kwargs):
@@ -92,6 +113,81 @@ def review_watchlist(portfolio_id: int = 1, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/plan")
+def plan_portfolio(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    _require_portfolio(portfolio_id, db)
+    return _domain_call(portfolio_planning.build_target_plan, db, portfolio_id)
+
+
+@router.put("/plan/targets")
+def replace_plan_targets(
+    payload: TargetSetIn,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
+    _require_portfolio(portfolio_id, db)
+    assignments = [
+        (item.holding_id, item.target_weight_bps) for item in payload.items
+    ]
+    return _domain_call(
+        portfolio_planning.replace_targets, db, portfolio_id, assignments
+    )
+
+
+@router.post("/plan/rehearsal")
+def rehearse_plan_buy(
+    payload: BuyRehearsalIn,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
+    _require_portfolio(portfolio_id, db)
+    return _domain_call(
+        portfolio_planning.rehearse_buy,
+        db,
+        portfolio_id,
+        payload.holding_id,
+        payload.cash_usd,
+    )
+
+
+@router.get("/overview")
+def all_books_overview(db: Session = Depends(get_db)):
+    return portfolio_planning.build_all_books_overview(db)
+
+
+@router.get("/records/realized.csv")
+def export_realized_records(
+    year: int = Query(..., ge=portfolio_records.MIN_RECAP_YEAR),
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
+    _require_portfolio(portfolio_id, db)
+    content = _domain_call(
+        portfolio_records.build_realized_recap_csv, db, portfolio_id, year
+    )
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="folioorb-average-cost-recap-{year}-p{portfolio_id}.csv"'
+            )
+        },
+    )
+
+
+@router.get("/records/archive")
+def export_portable_records(db: Session = Depends(get_db)):
+    content = _domain_call(portfolio_records.build_portable_archive, db)
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="folioorb-portable-export.zip"'
+        },
+    )
+
+
 @router.get("/compare")
 def compare_watchlist(
     tickers: str = Query(..., min_length=3, max_length=40),
@@ -133,12 +229,24 @@ def list_backups():
         "items": backup_service.list_backups(),
         "pending_restore": settings.get("pending_db_restore"),
         "last_restore": settings.get("last_db_restore"),
+        "protection": backup_service.backup_protection_status(),
     }
 
 
 @router.post("/backups")
 def create_backup():
     return _domain_call(backup_service.create_manual_backup)
+
+
+@router.get("/backups/policy")
+def get_backup_policy():
+    return backup_service.backup_protection_status()
+
+
+@router.put("/backups/policy")
+def update_backup_policy(payload: AutomaticBackupIn):
+    backup_service.set_auto_backup_enabled(payload.enabled)
+    return backup_service.backup_protection_status()
 
 
 @router.get("/backups/{name}/download")

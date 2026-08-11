@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import os
 import re
 import threading
 from contextlib import asynccontextmanager
@@ -89,16 +90,24 @@ async def lifespan(_app: FastAPI):
             result.schema_version,
             result.backed_up,
         )
-    # Warm caches off the main thread so startup isn't blocked on Yahoo.
-    threading.Thread(target=_run_startup_warmup, daemon=True).start()
+    smoke_test = os.getenv("FOLIOORB_SMOKE_TEST") == "1"
+    # Warm caches off the main thread so startup isn't blocked on Yahoo. Frozen
+    # package smoke tests stay deterministic and must not touch user state or
+    # external providers.
+    if not smoke_test:
+        threading.Thread(target=_run_startup_warmup, daemon=True).start()
     # Record whether this is the first run on a freshly installed version, so the
     # UI can show a one-time "holdings intact" confirmation.
-    from app.services import update_service
+    from app.services import backup_service, update_service
 
-    update_service.note_launch()
-    # Quietly check for updates ~30 s after boot, then daily (respects the
-    # auto-check setting; never installs anything on its own).
-    update_service.start_auto_check_scheduler()
+    if not smoke_test:
+        update_service.note_launch()
+        # Automatic backups are opt-in, verified, and checked at most once per
+        # local day. The check runs away from startup latency and never blocks boot.
+        backup_service.start_auto_backup_check()
+        # Quietly check for updates ~30 s after boot, then daily (respects the
+        # auto-check setting; never installs anything on its own).
+        update_service.start_auto_check_scheduler()
     yield  # The app runs while we're "inside" this yield
 
 # Create the FastAPI application instance

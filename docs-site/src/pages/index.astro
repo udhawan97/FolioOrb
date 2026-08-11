@@ -42,8 +42,8 @@ const steps = [
   },
   {
     n: 3, title: 'You get plain-English answers',
-    body: 'Verdicts, drivers, and themes in language you can act on — then Review Orbit gathers data gaps, thesis checks, reports, comparisons, and backups into one calm ritual.',
-    senpai: 'Here’s the read, the loose ends, and a verified backup before you touch anything.',
+    body: 'Verdicts, drivers, and themes in language you can act on — then Review Orbit gathers data gaps, targets, a read-only buy rehearsal, records, and backup protection into one calm ritual.',
+    senpai: 'Here’s the read, the target gap, and a verified backup before you touch anything.',
   },
 ];
 
@@ -74,25 +74,25 @@ const features = [
   },
 ];
 
-// Act 8½ — the roadmap. Optimistic sneak peek, not a delivery promise.
+// Act 8½ — recently shipped. Do not present uncommitted ideas as promises.
 // Each icon is a compact stroke SVG (inner markup only) coloured by the act accent.
 const roadmap = [
   {
-    status: 'Next up in the lab',
+    status: 'Shipped · v5.11.0',
     title: 'Target weights & drift',
     body: 'Set the mix you’re aiming for, then see at a glance how far today’s prices have nudged you off plan.',
     icon: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M12 12l4-2.5"/>',
   },
   {
-    status: 'Next up in the lab',
-    title: 'Tax-season trade export',
-    body: 'Hand your accountant a tidy CSV of every closed trade — the detail behind the new year-end recap.',
+    status: 'Shipped · v5.11.0',
+    title: 'Annual realized recap',
+    body: 'Export stored sale facts and average-cost basis for one calendar year — a record, not a tax filing.',
     icon: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h4"/>',
   },
   {
-    status: 'Being explored',
-    title: 'A what-if simulator',
-    body: 'Preview a buy or a trim before you touch anything real. Regret-free rehearsals.',
+    status: 'Shipped · v5.11.0',
+    title: 'Buy rehearsal',
+    body: 'Preview one external-cash USD buy in a ticker you own. Read-only, buy-only, and not a recommendation.',
     icon: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   },
 ];
@@ -376,7 +376,7 @@ const roadmap = [
 					</div>
 					<figure class="moment-visual">
 						<div class="artifact artifact-market grad-border">
-							<div class="am-head"><span class="am-lock" aria-hidden="true"></span><b>Your machine</b><span class="am-badge">local · encrypted at rest</span></div>
+							<div class="am-head"><span class="am-lock" aria-hidden="true"></span><b>Your machine</b><span class="am-badge">local SQLite · no cloud account</span></div>
 							<div class="am-tape" aria-hidden="true">
 								<span class="am-tick up">S&amp;P +0.3%</span><span class="am-tick up">NASDAQ +0.5%</span>
 								<span class="am-tick down">FTSE −0.2%</span><span class="am-tick up">Nikkei +0.8%</span>
@@ -440,20 +440,13 @@ const roadmap = [
 					<div class="moment-copy">
 						<span class="kicker">Review Orbit · local workflow</span>
 						<h3>A review ritual, not another wall of cards.</h3>
-						<p>One workspace gathers missing data, pending DCA buys, thesis cadence, monthly or quarterly reports, type-aware watchlist comparison, and verified local backups. It points at work; it never places a trade.</p>
-						<div class="wf-note"><span class="wf-note-orb"></span><span>Coverage first. Conclusions second. Backup before bravery.</span></div>
+						<p>One workspace gathers missing data, targets, a read-only buy rehearsal, human-readable records, and verified local backups alongside the existing review tools. It points at work; it never places a trade.</p>
+						<div class="wf-note"><span class="wf-note-orb"></span><span>Coverage first. Rehearsal, not recommendation. Backup before bravery.</span></div>
 					</div>
 					<figure class="moment-visual">
-						<div class="artifact artifact-review grad-border" aria-label="Illustration of Review Orbit showing three review items and complete local history">
-							<div class="review-art-head">
-								<span class="review-art-orbit" aria-hidden="true"><i></i></span>
-								<div><small>Local review workspace</small><b>Review Orbit</b></div>
-								<span class="review-art-count">3 items</span>
-							</div>
-							<div class="review-art-tabs"><b>Inbox · 3</b><span>Trust</span><span>Review pack</span><span>Backups</span></div>
-							<div class="review-art-row"><i class="urgent"></i><span><b>Price coverage</b><small>1 ticker needs a usable quote</small></span><em>Inspect</em></div>
-							<div class="review-art-row"><i class="attention"></i><span><b>Thesis cadence</b><small>MSFT review due soon</small></span><em>Review</em></div>
-							<div class="review-art-row"><i class="quiet"></i><span><b>Stored history</b><small>31 local snapshots · complete</small></span><em>Report</em></div>
+						<div class="window-chrome window-chrome--sm">
+							<img class="moment-img" src={shot('plan-protect-demo.webp')}
+								alt="Review Orbit Plan and Protect showing all-Portfolio known value, target-versus-actual allocation, and buy rehearsal for fictional demo holdings." loading="lazy" decoding="async" />
 						</div>
 					</figure>
 				</article>
@@ -650,12 +643,12 @@ const roadmap = [
 							<div class="up-versions">
 								<span class="up-ver up-ver--now"><small>Installed</small>v5.8.0</span>
 								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
-								<span class="up-ver up-ver--new"><small>Latest</small>v5.10.2</span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v5.11.0</span>
 							</div>
 							<ul class="up-changes">
-								<li>One prioritised Review Inbox</li>
-								<li>Trust coverage with explicit missing data</li>
-								<li>Verified local backups and review exports</li>
+								<li>Target-versus-actual Portfolio course</li>
+								<li>Read-only external-cash buy rehearsal</li>
+								<li>Portable records and backup freshness</li>
 							</ul>
 							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
 							<div class="up-actions">
@@ -695,14 +688,14 @@ const roadmap = [
 				<div class="act-rail" aria-hidden="true">
 					<span class="act-rail-tick"></span>
 					<span class="act-rail-line"></span>
-					<p class="act-rail-label">What is next</p>
+					<p class="act-rail-label">Recently shipped</p>
 				</div>
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">The road ahead</span>
-					<h2 class="section-title">This is just the beginning.</h2>
-					<p class="rm-lede">The app already earns its spot in your dock — but the lab is very much open. Here’s what’s quietly brewing for future releases. A peek through the workshop window, not a signed contract.</p>
+					<span class="kicker">Plan &amp; Protect · v5.11.0</span>
+					<h2 class="section-title">The last roadmap became real.</h2>
+					<p class="rm-lede">Targets, an annual sale recap, and a bounded what-if workflow now ship together in Review Orbit. These cards describe verified behavior, not future promises.</p>
 				</div>
 
 				<div class="rm-grid reveal">
@@ -717,7 +710,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>The fine print, minus the lawyers:</strong> this roadmap is less of a blood oath and more of a friendly sneak peek. FolioOrb is built part-time, so priorities may shift and exact dates are deliberately missing in action — but the direction is clear: more useful, more polished, more delightful, one release at a time.</p>
+					<p class="rm-oath"><strong>Bounded on purpose:</strong> targets are not recommendations; the buy rehearsal is read-only and does not forecast; the realized recap is not tax filing software; portable records are sensitive and not restorable.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 				</div>
@@ -954,7 +947,7 @@ const roadmap = [
 				'act-trust': 'Local-first. Your database never texts anyone.',
 				'act-install': 'Browser, Mac, or Windows — pick your poison. I’ll behave. Mostly.',
 				'act-updates': 'Updates knock first, back up your data, and wait for a yes.',
-				'act-roadmap': 'More features are brewing. No dates — I’m an orb, not an oracle.',
+				'act-roadmap': 'Targets, rehearsal, records, backups. The old roadmap got busy.',
 			};
 			if (rail && orb && bubble && localStorage.getItem('fs-rail') !== 'off') {
 				rail.classList.add('on');
@@ -997,7 +990,7 @@ const roadmap = [
 					'Your “diversified” portfolio is four tech stocks in a trench coat.',
 					'The line went up. I have theories about why.',
 					'Green Tuesday? I’ll take partial credit.',
-					'More features are brewing. Dates? I plead the fifth.',
+					'The old roadmap shipped. The next one can wait for evidence.',
 					'Updates knock before they enter. Very well-mannered software.',
 					'Your data never left the building. I double-checked.',
 					'I read the 10-K so your group chat doesn’t have to.',

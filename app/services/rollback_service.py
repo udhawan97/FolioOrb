@@ -83,7 +83,11 @@ def rollback(restore_data: bool = False) -> dict:  # pylint: disable=too-many-re
     try:
         source_db = backup_service.live_db_path()
         pre_count = backup_service.count_holdings(source_db)
-        safety = backup_service.create_backup(source_db, label="pre-rollback")
+        safety = backup_service.create_backup(
+            source_db,
+            label="pre-rollback",
+            expected_min_holdings=pre_count,
+        )
         if not backup_service.verify_backup(safety, expected_min_holdings=pre_count):
             raise ValueError("safety backup failed verification")
     except Exception as exc:  # pylint: disable=broad-except

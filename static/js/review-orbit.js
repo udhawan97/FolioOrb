@@ -15,6 +15,8 @@ window.ReviewOrbit = (() => {
         report: null,
         reportPeriod: "month",
         watchlist: null,
+        plan: null,
+        overview: null,
         backups: null,
         thesisId: null,
         thesisReturnFocus: null,
@@ -39,12 +41,24 @@ window.ReviewOrbit = (() => {
     const pct = value => value === null || value === undefined
         ? "Unavailable"
         : `${number(value)}%`;
+    const bpsPct = value => value === null || value === undefined
+        ? "Not set"
+        : `${number(Number(value) / 100)}%`;
+    const preciseMoney = (value, digits = 2) => value === null || value === undefined
+        ? "Unavailable"
+        : new Intl.NumberFormat("en-US", {
+            style: "currency", currency: "USD",
+            minimumFractionDigits: digits, maximumFractionDigits: digits,
+        }).format(Number(value));
     const dateTime = value => {
         if (!value) return "Unknown time";
         const parsed = new Date(value);
         return Number.isNaN(parsed.getTime())
             ? String(value)
-            : parsed.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+            : parsed.toLocaleString(undefined, {
+                year: "numeric", month: "short", day: "numeric",
+                hour: "numeric", minute: "2-digit", timeZoneName: "short",
+            });
     };
     const bytes = value => {
         const amount = Number(value || 0);
@@ -174,6 +188,8 @@ window.ReviewOrbit = (() => {
         if (tab === "trust") loadTrust();
         if (tab === "report") loadReport();
         if (tab === "compare") loadWatchlist();
+        if (tab === "plan") loadPlan();
+        if (tab === "records") loadRecords();
         if (tab === "backups") loadBackups();
     }
 
@@ -326,6 +342,7 @@ window.ReviewOrbit = (() => {
             if (bridge) {
                 const result = await bridge.save_file(filename, content);
                 if (result?.saved) showToast(`Saved ${filename}`, "success");
+                else if (result?.error) showToast("Review export failed; no complete file was written.", "danger");
                 return;
             }
             browserSave(
@@ -439,8 +456,295 @@ window.ReviewOrbit = (() => {
         }
     }
 
+    function qualityText(value) {
+        return String(value || "unavailable").replaceAll("_", " ");
+    }
+
+    function renderBookPulse() {
+        const data = state.overview;
+        if (!data) return;
+        const target = $("review-book-pulse");
+        const rows = data.items.map(item => html`
+            <tr>
+                <th scope="row">${item.name}</th>
+                <td>${item.known_value_usd === null ? "Unavailable" : money(item.known_value_usd)}</td>
+                <td><span class="review-quality" data-quality="${item.data_quality}">${qualityText(item.data_quality)}</span></td>
+                <td>${item.error
+                    ? "This book could not be valued; other books remain visible."
+                    : item.missing_tickers.length || item.foreign_currency_tickers.length
+                        ? `Missing ${item.missing_tickers.join(", ") || "none"}; foreign-priced ${item.foreign_currency_tickers.join(", ") || "none"}`
+                        : item.data_quality === "empty" ? "No owned positions" : "Available USD coverage"}</td>
+            </tr>`);
+        target.innerHTML = html`
+            <div class="review-book-pulse-head">
+                <div><span>All portfolios · known USD only</span><strong>${money(data.known_value_usd)}</strong></div>
+                <span class="review-quality" data-quality="${data.data_quality}">${qualityText(data.data_quality)}</span>
+            </div>
+            <div class="review-table-scroll">
+                <table class="review-plan-table">
+                    <caption>Known USD value and quote coverage for every saved portfolio</caption>
+                    <thead><tr><th>Portfolio</th><th>Known value</th><th>Coverage</th><th>What is excluded</th></tr></thead>
+                    <tbody>${rows.length ? rows : html`<tr><td colspan="4">No saved portfolios.</td></tr>`}</tbody>
+                </table>
+            </div>
+            <p class="review-table-note">Foreign prices are not converted. No combined performance percentage is shown.</p>`;
+    }
+
+    function renderTargetPlan() {
+        const data = state.plan;
+        if (!data) return;
+        const select = $("review-rehearsal-holding");
+        const previousSelection = select?.value;
+        const save = $("review-target-save");
+        const run = $("review-rehearsal-run");
+        if (!data.items.length) {
+            $("review-course-summary").innerHTML = html`
+                <div class="review-empty">Add an owned position before setting a target course. Research-only and zero-share rows stay outside the plan.</div>`;
+            $("review-target-table").innerHTML = "";
+            if (select) select.innerHTML = '<option value="">No eligible positions</option>';
+            if (save) save.disabled = true;
+            if (run) run.disabled = true;
+            return;
+        }
+        if (save) save.disabled = false;
+        if (run) run.disabled = false;
+
+        const driftItems = data.items.filter(item => item.drift_bps !== null);
+        const focal = driftItems.sort((a, b) => Math.abs(b.drift_bps) - Math.abs(a.drift_bps))[0]
+            || data.items[0];
+        const ringAvailable = data.drift_available && focal.actual_weight_bps !== null
+            && focal.target_weight_bps !== null;
+        const ringLabel = ringAvailable
+            ? `${focal.ticker}: actual ${bpsPct(focal.actual_weight_bps)}, target ${bpsPct(focal.target_weight_bps)}, ${Math.abs(focal.drift_bps)} basis points ${focal.drift_direction}`
+            : data.complete
+                ? `Drift unavailable because valuation coverage is ${qualityText(data.valuation_quality)}`
+                : `Target course incomplete; ${Math.max(data.remaining_bps, 0)} basis points remain`;
+        $("review-course-summary").innerHTML = html`
+            <div class="review-course-summary">
+                <div class="review-course-ring ${ringAvailable ? "" : "is-partial"}"
+                     role="img" aria-label="${ringLabel}"
+                     style="--target-angle:${Number(focal.target_weight_bps || 0) / 10000 * 360}deg;--actual-angle:${Number(focal.actual_weight_bps || 0) / 10000 * 360}deg">
+                    <span><strong>${ringAvailable ? focal.ticker : data.complete ? "Partial" : "Draft"}</strong><small>${ringAvailable ? `${focal.drift_bps > 0 ? "+" : ""}${focal.drift_bps} bps` : `${number(data.target_total_bps)} / 10,000`}</small></span>
+                </div>
+                <div>
+                    <p class="review-eyebrow">Target course</p>
+                    <h4>${data.complete ? "Course saved" : "Finish the target mix"}</h4>
+                    <p>${ringLabel}.</p>
+                    <div class="review-course-legend"><span data-kind="actual">Actual</span><span data-kind="target">Target</span></div>
+                </div>
+            </div>`;
+        const tableRows = data.items.map(item => html`
+            <tr>
+                <th scope="row">${item.ticker}</th>
+                <td>${bpsPct(item.actual_weight_bps)}</td>
+                <td><label><span class="visually-hidden">${item.ticker} target basis points</span><input class="review-target-input" type="number" min="0" max="10000" step="1" inputmode="numeric" data-holding-id="${item.holding_id}" value="${item.target_weight_bps ?? ""}" placeholder="bps"></label></td>
+                <td>${item.drift_bps === null ? "Unavailable" : `${item.drift_bps > 0 ? "+" : ""}${item.drift_bps} bps · ${qualityText(item.drift_direction)}`}</td>
+            </tr>`);
+        $("review-target-table").innerHTML = html`
+            <div class="review-table-scroll">
+                <table class="review-plan-table">
+                    <caption>Saved target, current allocation, and descriptive drift by held position</caption>
+                    <thead><tr><th>Position</th><th>Actual</th><th>Target (bps)</th><th>Drift</th></tr></thead>
+                    <tbody>${tableRows}</tbody>
+                    <tfoot><tr><th scope="row">Target total</th><td></td><td>${number(data.target_total_bps)} / 10,000</td><td>${data.complete ? "Complete" : `${number(data.remaining_bps)} bps remaining`}</td></tr></tfoot>
+                </table>
+            </div>`;
+        if (select) {
+            select.innerHTML = data.items.map(item => html`
+                <option value="${item.holding_id}">${item.ticker}</option>`).join("");
+            if (data.items.some(item => String(item.holding_id) === previousSelection)) {
+                select.value = previousSelection;
+            }
+        }
+    }
+
+    async function loadPlan(force = false) {
+        if (!force && state.loaded.has("plan")) return;
+        setLoading("review-book-pulse", "Valuing each saved portfolio independently…");
+        setLoading("review-course-summary", "Loading target course and available USD quotes…");
+        $("review-target-table").innerHTML = "";
+        const [planResult, overviewResult] = await Promise.allSettled([
+            apiGet("/api/review/plan"),
+            apiGet("/api/review/overview"),
+        ]);
+        if (planResult.status === "fulfilled") {
+            state.plan = planResult.value;
+            renderTargetPlan();
+        } else {
+            setError("review-course-summary", planResult.reason);
+        }
+        if (overviewResult.status === "fulfilled") {
+            state.overview = overviewResult.value;
+            renderBookPulse();
+        } else {
+            setError("review-book-pulse", overviewResult.reason);
+        }
+        state.loaded.add("plan");
+    }
+
+    async function saveTargets(event) {
+        event.preventDefault();
+        const status = $("review-target-status");
+        const items = Array.from(document.querySelectorAll(".review-target-input")).map(input => ({
+            holding_id: Number(input.dataset.holdingId),
+            target_weight_bps: input.value === "" ? null : Number(input.value),
+        }));
+        status.textContent = "Saving target course locally…";
+        try {
+            await apiGet("/api/review/plan/targets", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items }),
+            });
+            state.loaded.delete("plan");
+            await loadPlan(true);
+            status.textContent = "Target course saved. No trade was placed.";
+            live("Target course saved locally; no trade was placed.");
+        } catch (error) {
+            status.textContent = apiErrorMessage(error, "Could not save target weights.");
+        }
+    }
+
+    function renderRehearsal(data) {
+        const allocation = data.allocation_available
+            ? html`<div><span>Projected allocation</span><strong>${pct(data.projected_selected_allocation_pct)}</strong></div><div><span>Largest position</span><strong>${pct(data.projected_largest_position_pct)}</strong></div>`
+            : html`<p class="review-rehearsal-partial">Projected allocation is unavailable because one or more required USD quotes are missing or foreign-priced.</p>`;
+        $("review-rehearsal-result").innerHTML = html`
+            <div class="review-rehearsal-ticket">
+                <header><span>${data.ticker} · available USD quote</span><strong>${preciseMoney(data.available_quote_usd)}</strong></header>
+                <div class="review-rehearsal-metrics">
+                    <div><span>Fractional shares added</span><strong>${number(data.buy_shares)}</strong></div>
+                    <div><span>Projected shares</span><strong>${number(data.projected_shares)}</strong></div>
+                    <div><span>Projected average cost</span><strong>${preciseMoney(data.projected_avg_cost_usd, 4)}</strong></div>
+                    ${allocation}
+                </div>
+                <p>Fully spends ${preciseMoney(data.cash_usd)}. Quote freshness is unknown. Fees and taxes are excluded. Nothing was written or ordered.</p>
+            </div>`;
+    }
+
+    async function runRehearsal(event) {
+        event.preventDefault();
+        setLoading("review-rehearsal-result", "Rehearsing in memory — no portfolio writes…");
+        try {
+            const data = await apiGet("/api/review/plan/rehearsal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    holding_id: Number($("review-rehearsal-holding").value),
+                    cash_usd: $("review-rehearsal-cash").value,
+                }),
+            });
+            renderRehearsal(data);
+            live(`Buy rehearsal complete for ${data.ticker}; nothing was written or ordered.`);
+        } catch (error) {
+            setError("review-rehearsal-result", error);
+        }
+    }
+
+    function loadRecords() {
+        if (state.loaded.has("records")) return;
+        const year = $("review-recap-year");
+        if (year && !year.value) {
+            year.max = String(new Date().getUTCFullYear());
+            year.value = year.max;
+        }
+        state.loaded.add("records");
+    }
+
+    async function saveRecap(event) {
+        event.preventDefault();
+        const status = $("review-records-status");
+        const year = $("review-recap-year").value;
+        status.textContent = "Building the average-cost recap from stored sale facts…";
+        try {
+            const response = await fetch(`/api/review/records/realized.csv?year=${encodeURIComponent(year)}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const filename = filenameFromResponse(response, `folioorb-average-cost-recap-${year}.csv`);
+            const bridge = typeof desktopSaveBridge === "function" ? desktopSaveBridge() : null;
+            if (bridge) {
+                const content = await response.text();
+                const result = await bridge.save_file(filename, content);
+                status.textContent = result?.saved
+                    ? `Saved ${filename}.`
+                    : result?.error
+                        ? "Average-cost recap export failed; no complete file was written."
+                        : "Save cancelled; no file was written.";
+            } else {
+                browserSave(filename, await response.arrayBuffer(), "text/csv;charset=utf-8");
+                status.textContent = `Saved ${filename}.`;
+            }
+            live(status.textContent);
+        } catch (error) {
+            status.textContent = apiErrorMessage(error, "Average-cost recap export failed.");
+        }
+    }
+
+    async function savePortableRecords() {
+        const button = $("review-portable-export");
+        const status = $("review-records-status");
+        button.disabled = true;
+        status.textContent = "Building one consistent, human-readable records ZIP…";
+        try {
+            const api = window.pywebview && window.pywebview.api;
+            if (api && typeof api.export_portable_records === "function") {
+                const result = await api.export_portable_records();
+                status.textContent = result?.saved
+                    ? "Portable records ZIP saved. Keep it somewhere private."
+                    : result?.error
+                        ? "Portable records export failed; no complete ZIP was written."
+                        : "Save cancelled; no file was written.";
+                live(status.textContent);
+                return;
+            }
+            const response = await fetch("/api/review/records/archive");
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const filename = filenameFromResponse(response, "folioorb-portable-export.zip");
+            browserSave(filename, await response.arrayBuffer(), "application/zip");
+            status.textContent = "Portable records ZIP saved. Keep it somewhere private.";
+        } catch (error) {
+            status.textContent = apiErrorMessage(error, "Portable records export failed.");
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    function renderProtection() {
+        const protection = state.backups?.protection;
+        const target = $("review-protection-status");
+        if (!protection || !target) return;
+        const manual = protection.manual_freshness;
+        const automatic = protection.automatic;
+        const manualCopy = manual.status === "none"
+            ? "No verified manual backup yet"
+            : `${qualityText(manual.status)} · ${manual.age_days} day${manual.age_days === 1 ? "" : "s"} old`;
+        const manualTime = manual.latest
+            ? `Last verified ${dateTime(manual.latest.created_at)}`
+            : "Create one before a major portfolio change";
+        const auto = automatic.last_auto_backup;
+        const autoCopy = !automatic.auto_backup_enabled
+            ? "Off by default"
+            : auto
+                ? `${qualityText(auto.status)} · ${dateTime(auto.attempted_at_utc)}`
+                : "On · first launch check pending";
+        target.innerHTML = html`
+            <article class="review-protection-card" data-status="${manual.status}">
+                <div><p class="review-eyebrow">Manual-backup freshness</p><strong>${manualCopy}</strong><span>${manualTime}. Newer corrupt manual files are ignored.</span></div>
+                <span class="review-quality" data-quality="${manual.status === "current" ? "complete" : manual.status === "none" || manual.status === "stale" ? "unavailable" : "partial"}">${manual.status}</span>
+            </article>
+            <article class="review-protection-card">
+                <div><p class="review-eyebrow">Automatic local protection</p><strong>${autoCopy}</strong><span>Checked at launch, at most once per local day. Keeps seven verified auto snapshots only.</span></div>
+                <button class="review-auto-switch" id="review-auto-switch" type="button" role="switch"
+                        aria-checked="${automatic.auto_backup_enabled}"
+                        aria-label="Automatic daily local backups">
+                    <span aria-hidden="true"></span>
+                </button>
+            </article>
+            <p class="review-protection-limit">Same-device protection only — copy an exported backup elsewhere for off-device recovery. Automatic snapshots never count as manual-backup freshness.</p>`;
+    }
+
     function renderBackups() {
         const data = state.backups;
+        renderProtection();
         const status = $("review-restore-status");
         const restore = data?.last_restore;
         if (status && restore) {
@@ -497,12 +801,33 @@ window.ReviewOrbit = (() => {
         }
     }
 
+    async function toggleAutoBackup() {
+        const current = Boolean(state.backups?.protection?.automatic?.auto_backup_enabled);
+        const button = $("review-auto-switch");
+        if (button) button.disabled = true;
+        try {
+            const protection = await apiGet("/api/review/backups/policy", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled: !current }),
+            });
+            state.backups.protection = protection;
+            renderProtection();
+            requestAnimationFrame(() => $("review-auto-switch")?.focus());
+            live(`Automatic local backups ${!current ? "enabled" : "disabled"}.`);
+        } catch (error) {
+            showToast(apiErrorMessage(error, "Could not change automatic backup policy"), "danger");
+            if (button) button.disabled = false;
+        }
+    }
+
     async function exportBackup(name) {
         try {
             const api = window.pywebview && window.pywebview.api;
             if (api && typeof api.export_backup === "function") {
                 const result = await api.export_backup(name);
                 if (result?.saved) showToast(`Saved ${name}`, "success");
+                else if (result?.error) showToast("Backup export failed; no complete file was written.", "danger");
                 return;
             }
             const anchor = document.createElement("a");
@@ -635,6 +960,7 @@ window.ReviewOrbit = (() => {
         const jobs = [loadInbox(true), loadTrust(true)];
         if (state.tab === "report") jobs.push(loadReport(true));
         if (state.tab === "compare") jobs.push(loadWatchlist(true));
+        if (state.tab === "plan") jobs.push(loadPlan(true));
         if (state.tab === "backups") jobs.push(loadBackups(true));
         await Promise.allSettled(jobs);
         live("Review Orbit refreshed.");
@@ -648,6 +974,7 @@ window.ReviewOrbit = (() => {
             button.addEventListener("click", () => activateTab(button.dataset.reviewTab));
             button.addEventListener("keydown", event => {
                 if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+                event.preventDefault();
                 const tabs = Array.from(document.querySelectorAll("[data-review-tab]"));
                 const direction = event.key === "ArrowRight" ? 1 : -1;
                 const next = tabs[(tabs.indexOf(button) + direction + tabs.length) % tabs.length];
@@ -685,7 +1012,14 @@ window.ReviewOrbit = (() => {
             syncCompareButton();
         });
         $("review-compare-run")?.addEventListener("click", runCompare);
+        $("review-target-form")?.addEventListener("submit", saveTargets);
+        $("review-rehearsal-form")?.addEventListener("submit", runRehearsal);
+        $("review-recap-form")?.addEventListener("submit", saveRecap);
+        $("review-portable-export")?.addEventListener("click", savePortableRecords);
         $("review-backup-create")?.addEventListener("click", createBackup);
+        $("review-protection-status")?.addEventListener("click", event => {
+            if (event.target.closest("#review-auto-switch")) toggleAutoBackup();
+        });
         $("review-backup-list")?.addEventListener("click", event => {
             const exportButton = event.target.closest("[data-backup-export]");
             const restoreButton = event.target.closest("[data-backup-restore]");

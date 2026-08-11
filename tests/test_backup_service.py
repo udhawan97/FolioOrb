@@ -46,6 +46,46 @@ def test_create_and_verify_preserves_rows(tmp_path):
     assert sorted(path.name for path in backup.parent.iterdir()) == [backup.name]
 
 
+def test_expected_holding_count_is_verified_before_publication(tmp_path, monkeypatch):
+    src = tmp_path / "portfolio.db"
+    _make_db(src, ["VOO", "AAPL"])
+    vault = tmp_path / "backups"
+    observed = []
+
+    def reject_staging(_path, expected_min_holdings=None):
+        observed.append(expected_min_holdings)
+        return False
+
+    monkeypatch.setattr(backup_service, "verify_backup", reject_staging)
+
+    with pytest.raises(ValueError, match="integrity verification"):
+        backup_service.create_backup(
+            src,
+            label="manual",
+            dest_dir=vault,
+            expected_min_holdings=2,
+        )
+
+    assert observed == [2]
+    assert not list(vault.glob("*.db"))
+    assert not list(vault.glob("*.staging"))
+
+
+def test_no_replace_collision_preserves_unowned_destination(tmp_path):
+    src = tmp_path / "portfolio.db"
+    _make_db(src, ["VOO"])
+    vault = tmp_path / "backups"
+    vault.mkdir()
+    existing = vault / "manual-fixed.db"
+    existing.write_bytes(b"belongs-to-another-process")
+
+    with pytest.raises(FileExistsError):
+        backup_service.create_backup(src, "manual", vault, ts="fixed")
+
+    assert existing.read_bytes() == b"belongs-to-another-process"
+    assert not list(vault.glob("*.staging"))
+
+
 def test_listing_absent_vault_does_not_create_it(tmp_path, monkeypatch):
     from app import paths
 

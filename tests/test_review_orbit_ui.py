@@ -20,9 +20,10 @@ def test_review_orbit_is_wired_as_one_accessible_workspace():
     assert "@media (max-width: 575.98px)" in styles
 
 
-def test_review_orbit_covers_all_six_feature_contracts():
+def test_review_orbit_covers_review_and_plan_protect_contracts():
     markup = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     script = (ROOT / "static" / "js" / "review-orbit.js").read_text(encoding="utf-8")
+    styles = (ROOT / "static" / "css" / "review-orbit.css").read_text(encoding="utf-8")
 
     for phrase in (
         "Data Trust Center",
@@ -31,6 +32,11 @@ def test_review_orbit_covers_all_six_feature_contracts():
         "Monthly review pack",
         "Review cadence",
         "Watchlist compare",
+        "Plan &amp; protect",
+        "Portfolio plan",
+        "Annual average-cost recap",
+        "Portable records ZIP",
+        "Manual-backup freshness",
     ):
         assert phrase in markup
     assert "/api/review/trust" in script
@@ -38,6 +44,18 @@ def test_review_orbit_covers_all_six_feature_contracts():
     assert "/api/review/report" in script
     assert "/api/review/compare" in script
     assert "/api/review/thesis/" in script
+    assert "/api/review/plan" in script
+    assert "/api/review/overview" in script
+    assert "/api/review/records/realized.csv" in script
+    assert "/api/review/records/archive" in script
+    assert "/api/review/backups/policy" in script
+    assert "review-course-ring" in styles
+    assert "not a tax form" in markup
+    assert "not a FolioOrb restore file" in markup
+    assert "Average-cost recap export failed; no complete file was written." in script
+    assert "Portable records export failed; no complete ZIP was written." in script
+    assert 'requestAnimationFrame(() => $("review-auto-switch")?.focus())' in script
+    assert 'timeZoneName: "short"' in script
 
 
 def test_review_orbit_root_wins_the_global_body_child_stacking_rule():

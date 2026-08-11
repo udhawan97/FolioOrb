@@ -5,7 +5,7 @@
  * Prereqs: the app must already be running with the seeded demo database
  * (see capture.sh, which orchestrates seed → boot → capture → optimize).
  *
- * Output: optimized WebP files in docs-site/src/assets/shots/, captured at
+ * Output: optimized WebP files in docs-site/public/assets/shots/, captured at
  * deviceScaleFactor 2 so they stay crisp on retina displays.
  */
 import { chromium } from 'playwright';
@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 const BASE_URL = process.env.SHOT_BASE_URL || 'http://127.0.0.1:8177';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'assets', 'shots');
+const README_PLAN_OUT = join(__dirname, '..', '..', 'docs', 'plan-protect.webp');
 const RAW_DIR = join(__dirname, '..', '_shots', 'raw');
 
 const VIEWPORT = { width: 1512, height: 950 };
@@ -30,6 +31,7 @@ const SHOTS = [
   { name: 'risk-analytics-demo', zone: 'analytics', analyticsPane: 'risk', selector: '.analytics-sub-pane[data-analytics-pane="risk"]', outWidth: 1600 },
   { name: 'news-themes-demo', zone: 'news', selector: '[data-zone-pane="news"]', outWidth: 1600 },
   { name: 'senpai-insight-demo', zone: 'overview', selector: '#dashboard-senpai', outWidth: 900 },
+  { name: 'plan-protect-demo', reviewTab: 'plan', selector: '.review-orbit-shell', outWidth: 1600 },
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -61,6 +63,12 @@ async function toWebp(pngBuffer, name, outWidth) {
     .resize({ width: outWidth, withoutEnlargement: true })
     .webp({ quality: 82, effort: 6 })
     .toFile(out);
+  if (name === 'plan-protect-demo') {
+    await sharp(pngBuffer)
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 82, effort: 6 })
+      .toFile(README_PLAN_OUT);
+  }
   return out;
 }
 
@@ -96,8 +104,16 @@ async function main() {
   const results = [];
   for (const shot of SHOTS) {
     try {
-      await switchZone(page, shot.zone);
+      if (shot.zone) await switchZone(page, shot.zone);
       if (shot.analyticsPane) await switchAnalyticsPane(page, shot.analyticsPane);
+      if (shot.reviewTab) {
+        await page.locator('#review-orbit-trigger').click();
+        await page.locator(`[data-review-tab="${shot.reviewTab}"]`).click();
+        await page.waitForSelector(`[data-review-pane="${shot.reviewTab}"]`, {
+          state: 'visible', timeout: 15000,
+        });
+        await sleep(3000);
+      }
 
       let png;
       if (shot.mode === 'viewport') {

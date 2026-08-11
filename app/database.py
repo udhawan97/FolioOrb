@@ -124,6 +124,10 @@ def ensure_startup_migrations(target_engine=None):
                     "ADD COLUMN thesis_review_interval_days INTEGER"
                 )
             )
+        if "target_weight_bps" not in columns:
+            conn.execute(
+                text("ALTER TABLE holdings ADD COLUMN target_weight_bps INTEGER")
+            )
         tables = {
             row[0]
             for row in conn.execute(
