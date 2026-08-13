@@ -23,6 +23,7 @@ import sqlite3
 import tempfile
 import threading
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -43,6 +44,22 @@ BACKUP_POLICY_DEFAULTS = {
     "auto_backup_enabled": False,
     "last_auto_backup": None,
 }
+
+
+@dataclass(frozen=True)
+class VerifiedBackup:
+    """A database artifact that passed FolioOrb's safety checks."""
+
+    database: Path
+    environment: Path | None = None
+
+
+class EnvironmentSnapshotError(RuntimeError):
+    """Environment capture failed after the database artifact was verified."""
+
+    def __init__(self, backup: VerifiedBackup):
+        super().__init__("Environment snapshot failed after database backup succeeded")
+        self.backup = backup
 
 
 def _fsync_directory(directory: Path) -> None:
@@ -445,19 +462,12 @@ def maybe_create_automatic_backup(local_day: date | None = None) -> dict:
         _write_policy_unlocked(policy)
         backup = None
         try:
-            source = live_db_path()
-            expected = count_holdings(source)
-            backup = create_backup(
-                source,
+            point = create_verified_backup(
                 label="auto",
                 dest_dir=vault,
-                expected_min_holdings=expected,
+                require_vault_schema=True,
             )
-            if (
-                not verify_backup(backup, expected_min_holdings=expected)
-                or not verify_vault_backup(backup)
-            ):
-                raise ValueError("Automatic backup verification failed")
+            backup = point.database
             _prune_auto_backups(vault)
             _prune_old_claims(vault, attempted_at)
             result = {
@@ -491,20 +501,12 @@ def create_manual_backup() -> dict:
     """Create and verify a user-requested database-only vault snapshot."""
     vault = backups_dir()
     with backup_operation(vault):
-        source = live_db_path()
-        expected = count_holdings(source)
-        backup = create_backup(
-            source,
+        point = create_verified_backup(
             label="manual",
             dest_dir=vault,
-            expected_min_holdings=expected,
+            require_vault_schema=True,
         )
-        if (
-            not verify_backup(backup, expected_min_holdings=expected)
-            or not verify_vault_backup(backup)
-        ):
-            _safe_remove(backup)
-            raise ValueError("Backup verification failed")
+        backup = point.database
         # A user-created snapshot must never evict an update or pre-restore
         # rollback point. Retention applies only to other manual snapshots.
         prune_backups(vault, keep=MANUAL_KEEP, pattern="manual-*.db")
@@ -546,15 +548,9 @@ def apply_pending_restore() -> dict | None:
         live = live_db_path()
         safety_name = None
         if live.exists():
-            expected = count_holdings(live)
-            safety = create_backup(
-                live,
+            safety = create_verified_backup(
                 label="pre-manual-restore",
-                expected_min_holdings=expected,
-            )
-            if not verify_backup(safety, expected_min_holdings=expected):
-                _safe_remove(safety)
-                raise ValueError("Safety backup failed verification")
+            ).database
             safety_name = safety.name
         restore_backup(requested, live)
         result = {
@@ -721,6 +717,49 @@ def verify_vault_backup(backup_path: Path) -> bool:
         return False
     finally:
         conn.close()
+
+
+def create_verified_backup(
+    label: str,
+    *,
+    source_db: Path | None = None,
+    dest_dir: Path | None = None,
+    include_environment: bool = False,
+    require_vault_schema: bool = False,
+) -> VerifiedBackup:
+    """Create one independently verified database backup and optional env copy.
+
+    Caller policy deliberately stays outside this function: migrations may
+    treat a failure as best effort, while update and rollback callers hard-stop.
+    The safety choreography itself lives here so no caller can omit the live
+    holdings count or the post-publication verification.
+    """
+    source = Path(source_db) if source_db is not None else live_db_path()
+    expected = count_holdings(source)
+    database = create_backup(
+        source,
+        label=label,
+        dest_dir=dest_dir,
+        expected_min_holdings=expected,
+    )
+    verified = verify_backup(database, expected_min_holdings=expected)
+    if verified and require_vault_schema:
+        verified = verify_vault_backup(database)
+    if not verified:
+        _safe_remove(database)
+        raise ValueError("Backup failed post-publication verification")
+
+    point = VerifiedBackup(database=database)
+    if not include_environment:
+        return point
+    try:
+        environment = snapshot_env(Path(f"{database}.env"))
+    except Exception as exc:
+        # The verified DB remains intentionally recoverable and is carried by
+        # the typed error; it must never be mistaken for a complete update
+        # rollback point when environment capture was requested.
+        raise EnvironmentSnapshotError(point) from exc
+    return VerifiedBackup(database=database, environment=environment)
 
 
 def restore_backup(backup_path: Path, target_db: Path, ts: str | None = None) -> bool:

@@ -79,8 +79,9 @@ def test_the_deleted_portfolio_fallback_still_runs():
     # because picking it reloads and this path re-scopes to a live one. It must
     # survive the caching change.
     body = _switcher().split("async function loadPortfolios")[1][:900]
-    assert "p.id === activePortfolioId" in body
-    assert "location.reload()" in body
+    assert "PortfolioWorkspace.reconcile(_portfolios)" in body
+    workspace = (ROOT / "static/js/portfolio-workspace.js").read_text(encoding="utf-8")
+    assert "reload();" in workspace
 
 
 def test_the_dashboard_script_is_cache_busted():
@@ -101,7 +102,7 @@ def test_world_markets_cache_is_global_not_per_portfolio():
     # cached copy survive a portfolio switch.
     js = _js()
     assert 'WORLD_MARKETS_KEY = "folioorb-world-markets-v1"' in js
-    assert "${activePortfolioId}" not in js.split("WORLD_MARKETS_KEY")[1][:400]
+    assert "${PortfolioWorkspace.id}" not in js.split("WORLD_MARKETS_KEY")[1][:400]
 
 
 def test_render_is_separated_from_the_fetch():

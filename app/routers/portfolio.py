@@ -24,6 +24,7 @@ from app.services import holdings_csv
 from app.services import holdings_repository
 from app.services import portfolio_lifecycle
 from app.services import portfolio_valuation
+from app.services import realized_sales
 from app.services.earnings_radar import get_earnings_events
 from app.services.dividend_income import compute_portfolio_income
 from app.services.etf_overlap import compute_etf_overlap
@@ -73,43 +74,6 @@ def _holdings_with_quote_data(holdings: list[dict]) -> list[dict]:
         if not quote.get("error")
     }
     return [{**quotes.get(h["ticker"], {}), **h} for h in holdings]
-
-
-def _record_reduction(holding, old_shares, new_shares, db, *, sale_price=None, sale_date=None):
-    """
-    If a holding's share count dropped, log the realized gain/loss for the sold
-    shares.
-
-    ``sale_price`` / ``sale_date`` let the caller record the *actual* sale (e.g.
-    a sale made last month at a different price). When omitted, the live market
-    price and today's date are used, preserving the original behavior.
-    """
-    sold = round(old_shares - new_shares, 6)
-    if sold <= 0:
-        return
-
-    basis = holding.avg_cost or 0.0
-    if sale_price and sale_price > 0:
-        price = sale_price
-    else:
-        quote = get_stock_data(holding.ticker)
-        live = quote.get("current_price") or 0.0
-        price = live if live > 0 else basis  # fall back to basis (gain 0) if no quote
-
-    trade = RealizedTrade(
-        portfolio_id=holding.portfolio_id,
-        ticker=holding.ticker,
-        shares_sold=sold,
-        sale_price=round(price, 2),
-        avg_cost=round(basis, 2),
-        realized_gain=round((price - basis) * sold, 2),
-    )
-    if sale_date:
-        # Stamp the trade on the real sale date (noon, to survive any tz shift in
-        # display) so the year-end recap buckets it into the correct tax year.
-        parsed = date.fromisoformat(sale_date)
-        trade.created_at = datetime(parsed.year, parsed.month, parsed.day, 12, 0)
-    db.add(trade)
 
 
 # ── Portfolio Endpoints ────────────────────────────────────────────────
@@ -475,9 +439,11 @@ def update_holding(
     # while we still know the old share count and avg cost. Watchlist (research
     # mode) holdings can hold nonzero shares too, but they're promised to never
     # touch P&L — skip recording for them, matching remove_holding's guard below.
-    if data.shares is not None and data.shares < holding.shares and not holding.is_watchlist:
-        _record_reduction(
-            holding, holding.shares, data.shares, db,
+    if data.shares is not None and data.shares < holding.shares:
+        realized_sales.RealizedSaleLedger(
+            db, portfolio_id, quote_loader=get_stock_data
+        ).stage_reduction(
+            holding, data.shares,
             sale_price=data.sale_price, sale_date=data.sale_date,
         )
 
@@ -526,8 +492,9 @@ def remove_holding(
         raise HTTPException(status_code=404, detail="Holding not found")
 
     # Watchlist (research-mode) holdings are discarded silently — no realized gain recorded.
-    if not holding.is_watchlist:
-        _record_reduction(holding, holding.shares, 0, db)
+    realized_sales.RealizedSaleLedger(
+        db, portfolio_id, quote_loader=get_stock_data
+    ).stage_reduction(holding, 0)
 
     holding.is_active = False
     db.commit()
@@ -560,43 +527,24 @@ def update_realized_trade(
     a row by primary key alone lets a request scoped to one portfolio rewrite
     another portfolio's trade.
     """
-    trade = (
-        db.query(RealizedTrade)
-        .filter(
-            RealizedTrade.id == trade_id,
-            RealizedTrade.portfolio_id == portfolio_id,
+    try:
+        trade = realized_sales.RealizedSaleLedger(db, portfolio_id).correct(
+            trade_id,
+            realized_sales.SaleCorrection(
+                shares_sold=data.shares_sold,
+                sale_price=data.sale_price,
+                avg_cost=data.avg_cost,
+                sale_date=data.sale_date,
+            ),
         )
-        .first()
-    )
-    if not trade:
-        raise HTTPException(status_code=404, detail="Realized trade not found")
-
-    if data.shares_sold is not None:
-        trade.shares_sold = data.shares_sold
-    if data.sale_price is not None:
-        trade.sale_price = round(data.sale_price, 2)
-    if data.avg_cost is not None:
-        trade.avg_cost = round(data.avg_cost, 2)
-    if data.sale_date is not None:
-        # Noon, matching _record_reduction, so a timezone shift on display can't
-        # walk the stamp across midnight and into the wrong tax year.
-        parsed = date.fromisoformat(data.sale_date)
-        trade.created_at = datetime(parsed.year, parsed.month, parsed.day, 12, 0)
-
-    trade.realized_gain = round(
-        (float(trade.sale_price) - float(trade.avg_cost)) * float(trade.shares_sold), 2
-    )
-    ticker = trade.ticker
-    realized_gain = trade.realized_gain
-    db.commit()
-
-    # Same correction the delete path makes: past snapshots stay as history, and
-    # today's is only rewritten when quotes are actually available.
-    portfolio_valuation.evaluate(db, portfolio_id, record_snapshot=True)
+    except realized_sales.RealizedSaleNotFound as exc:
+        raise HTTPException(
+            status_code=404, detail="Realized trade not found"
+        ) from exc
     return {
-        "ticker": ticker,
-        "realized_gain": realized_gain,
-        "message": f"Updated realized sale for {ticker}",
+        "ticker": trade.ticker,
+        "realized_gain": trade.realized_gain,
+        "message": f"Updated realized sale for {trade.ticker}",
     }
 
 
@@ -605,24 +553,12 @@ def remove_realized_trade(
     trade_id: int, db: Session = Depends(get_db), portfolio_id: int = 1
 ):
     """Delete one realized sale and refresh today's snapshot."""
-    trade = (
-        db.query(RealizedTrade)
-        .filter(
-            RealizedTrade.id == trade_id,
-            RealizedTrade.portfolio_id == portfolio_id,
-        )
-        .first()
-    )
-    if not trade:
-        raise HTTPException(status_code=404, detail="Realized trade not found")
-
-    ticker = trade.ticker
-    db.delete(trade)
-    db.commit()
-
-    # Past snapshots remain history; only today's snapshot is corrected — but not
-    # while quotes are unavailable, which would stamp today at a misleading $0.
-    portfolio_valuation.evaluate(db, portfolio_id, record_snapshot=True)
+    try:
+        ticker = realized_sales.RealizedSaleLedger(db, portfolio_id).remove(trade_id)
+    except realized_sales.RealizedSaleNotFound as exc:
+        raise HTTPException(
+            status_code=404, detail="Realized trade not found"
+        ) from exc
     return {"ticker": ticker, "message": f"Removed realized sale for {ticker}"}
 
 

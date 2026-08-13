@@ -140,42 +140,57 @@ def _is_reporting_currency(currency: str) -> bool:
     return currency.upper() == REPORTING_CURRENCY
 
 
-def _upsert_snapshot(db: Session, valuation: PortfolioValuation) -> bool:
+def _today_snapshot(db: Session, portfolio_id: int) -> PortfolioSnapshot | None:
     today = date.today().isoformat()
-
-    def _today_snapshot():
-        return (
-            db.query(PortfolioSnapshot)
-            .filter(
-                PortfolioSnapshot.portfolio_id == valuation.portfolio_id,
-                PortfolioSnapshot.snapshot_date == today,
-            )
-            .first()
+    return (
+        db.query(PortfolioSnapshot)
+        .filter(
+            PortfolioSnapshot.portfolio_id == portfolio_id,
+            PortfolioSnapshot.snapshot_date == today,
         )
+        .first()
+    )
 
-    def _apply(target: PortfolioSnapshot) -> None:
-        target.total_value = valuation.total_value
-        target.total_cost_basis = valuation.total_cost_basis
-        target.unrealized_gain = valuation.total_unrealized_gain
-        target.realized_gain = valuation.realized_gain
-        target.total_return = valuation.total_return
 
-    snapshot = _today_snapshot()
+def _apply_snapshot(target: PortfolioSnapshot, valuation: PortfolioValuation) -> None:
+    target.total_value = valuation.total_value
+    target.total_cost_basis = valuation.total_cost_basis
+    target.unrealized_gain = valuation.total_unrealized_gain
+    target.realized_gain = valuation.realized_gain
+    target.total_return = valuation.total_return
+
+
+def stage_today_snapshot(db: Session, valuation: PortfolioValuation) -> PortfolioSnapshot:
+    """Stage today's derived valuation without committing the caller's transaction."""
+    snapshot = _today_snapshot(db, valuation.portfolio_id)
     if snapshot is None:
         snapshot = PortfolioSnapshot(
             portfolio_id=valuation.portfolio_id,
-            snapshot_date=today,
+            snapshot_date=date.today().isoformat(),
         )
         db.add(snapshot)
-    _apply(snapshot)
+    _apply_snapshot(snapshot, valuation)
+    return snapshot
+
+
+def discard_today_snapshot(db: Session, portfolio_id: int) -> None:
+    """Stage removal of today's derived row when it cannot be made trustworthy."""
+    snapshot = _today_snapshot(db, portfolio_id)
+    if snapshot is not None:
+        db.delete(snapshot)
+
+
+def _upsert_snapshot(db: Session, valuation: PortfolioValuation) -> bool:
+    stage_today_snapshot(db, valuation)
+
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        snapshot = _today_snapshot()
+        snapshot = _today_snapshot(db, valuation.portfolio_id)
         if snapshot is None:
             return False
-        _apply(snapshot)
+        _apply_snapshot(snapshot, valuation)
         db.commit()
     return True
 

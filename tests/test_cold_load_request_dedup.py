@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DASHBOARD = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
 ANALYTICS = (ROOT / "static/js/analytics-charts.js").read_text(encoding="utf-8")
-CORE = (ROOT / "static/js/core.js").read_text(encoding="utf-8")
+WORKSPACE = (ROOT / "static/js/portfolio-workspace.js").read_text(encoding="utf-8")
 
 
 def _fn(source: str, signature: str) -> str:
@@ -52,10 +52,10 @@ def _fn(source: str, signature: str) -> str:
 def test_the_endpoint_cache_still_coalesces_in_flight_callers():
     # Every fix below assumes concurrent callers share one request. If this
     # helper ever stops memoising, the duplicates come back silently.
-    body = _fn(CORE, "function apiGetCached(url)")
-    assert "_CORE_ENDPOINT_CACHE.get(url)" in body
-    assert "if (hit) return hit" in body
-    assert "_CORE_ENDPOINT_CACHE.set(url, pending)" in body
+    body = _fn(WORKSPACE, "function cached(url)")
+    assert "cache.get(key)" in body
+    assert "if (hit) return hit.promise" in body
+    assert "cache.set(key, entry)" in body
 
 
 # ── 1. Sparkline history: two renders, one request ───────────────────────────
@@ -66,15 +66,14 @@ def test_the_endpoint_cache_still_coalesces_in_flight_callers():
 
 def test_trend_history_goes_through_the_shared_cache():
     body = _fn(DASHBOARD, "async function loadTrendData(tickers)")
-    assert "apiGetCached(" in body, "loadTrendData must share the in-flight promise"
-    assert "await apiGet(" not in body, "a private apiGet re-requests per render pass"
+    assert "PortfolioWorkspace.cached(" in body
 
 
 def test_a_refresh_drops_the_trend_entry_first():
     # Without this the sparklines would pin the first payload for the session.
     assert 'TREND_HISTORY_URL_PREFIX = "/api/stocks/history/batch"' in DASHBOARD
     body = _fn(DASHBOARD, "function refreshDashboardData({")
-    assert "apiGetCached.invalidate(TREND_HISTORY_URL_PREFIX)" in body
+    assert "PortfolioWorkspace.invalidate(TREND_HISTORY_URL_PREFIX)" in body
 
 
 def test_both_render_paths_still_share_one_loader():
@@ -84,18 +83,24 @@ def test_both_render_paths_still_share_one_loader():
     assert "loadTrendData(tickers)" in body
 
 
+def test_registered_holding_panel_endpoints_use_their_fetch_factory():
+    body = _fn(DASHBOARD, "async function loadTargetedHoldingIntelligence(ticker)")
+    assert "PortfolioWorkspace.json(panel.fetch(normalized))" in body
+    assert "panel.PortfolioWorkspace" not in body
+
+
 # ── 2. Benchmark comparison: off raw fetch, onto the cache ───────────────────
 
 
 def test_benchmark_chart_uses_the_shared_cache_not_raw_fetch():
     body = _fn(ANALYTICS, "async function loadBenchmarkChart()")
-    assert "apiGetCached(BENCHMARK_COMPARISON_URL)" in body
+    assert "PortfolioWorkspace.cached(BENCHMARK_COMPARISON_URL)" in body
     assert 'fetch("/api/portfolio/benchmark-comparison")' not in body
 
 
 def test_a_refresh_drops_the_benchmark_entry():
     body = _fn(ANALYTICS, "function onRefresh()")
-    assert "apiGetCached.invalidate(BENCHMARK_COMPARISON_URL)" in body
+    assert "PortfolioWorkspace.invalidate(BENCHMARK_COMPARISON_URL)" in body
 
 
 # ── 3. Analytics insights: a "changed" handler that fired when nothing did ───
@@ -122,8 +127,8 @@ def test_a_real_mode_change_still_does_the_work():
 
 def test_local_insights_go_through_the_shared_cache():
     body = _fn(ANALYTICS, "async function loadWidgetInsights(forceRefresh = false)")
-    assert "apiGetCached(ANALYTICS_INSIGHTS_LOCAL_URL)" in body
-    assert "if (forceRefresh) apiGetCached.invalidate(ANALYTICS_INSIGHTS_LOCAL_URL)" in body
+    assert "PortfolioWorkspace.cached(ANALYTICS_INSIGHTS_LOCAL_URL)" in body
+    assert "if (forceRefresh) PortfolioWorkspace.invalidate(ANALYTICS_INSIGHTS_LOCAL_URL)" in body
 
 
 # ── 4. The paid path deserved the same guard ─────────────────────────────────

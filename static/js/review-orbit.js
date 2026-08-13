@@ -240,7 +240,7 @@ window.ReviewOrbit = (() => {
         if (!force && state.loaded.has("inbox")) return;
         setLoading("review-inbox-list");
         try {
-            state.inbox = await apiGet("/api/review/inbox");
+            state.inbox = await PortfolioWorkspace.json("/api/review/inbox");
             state.loaded.add("inbox");
             renderInbox();
         } catch (error) {
@@ -275,7 +275,7 @@ window.ReviewOrbit = (() => {
         if (!force && state.loaded.has("trust")) return;
         setLoading("review-trust-grid", "Checking coverage and source freshness…");
         try {
-            state.trust = await apiGet("/api/review/trust");
+            state.trust = await PortfolioWorkspace.json("/api/review/trust");
             state.loaded.add("trust");
             renderTrust();
         } catch (error) {
@@ -303,7 +303,7 @@ window.ReviewOrbit = (() => {
         if (!force && state.loaded.has("report")) return;
         setLoading("review-report-summary", "Building the review pack from stored history…");
         try {
-            state.report = await apiGet(`/api/review/report?period=${encodeURIComponent(state.reportPeriod)}`);
+            state.report = await PortfolioWorkspace.json(`/api/review/report?period=${encodeURIComponent(state.reportPeriod)}`);
             state.loaded.add("report");
             renderReport();
         } catch (error) {
@@ -311,13 +311,7 @@ window.ReviewOrbit = (() => {
         }
     }
 
-    function filenameFromResponse(response, fallback) {
-        const disposition = response.headers.get("Content-Disposition") || "";
-        const match = disposition.match(/filename="?([^";]+)"?/i);
-        return match ? match[1] : fallback;
-    }
-
-    function browserSave(filename, content, mediaType) {
+    function browserSaveBinary(filename, content, mediaType) {
         const blob = new Blob([content], { type: mediaType });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -332,24 +326,16 @@ window.ReviewOrbit = (() => {
     async function exportReport(format) {
         const endpoint = `/api/review/report/export?period=${encodeURIComponent(state.reportPeriod)}&format=${encodeURIComponent(format)}`;
         try {
-            const response = await fetch(endpoint);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const content = await response.text();
-            const filename = filenameFromResponse(
-                response, `folioorb-${state.reportPeriod}-review.${format}`
-            );
-            const bridge = typeof desktopSaveBridge === "function" ? desktopSaveBridge() : null;
-            if (bridge) {
-                const result = await bridge.save_file(filename, content);
-                if (result?.saved) showToast(`Saved ${filename}`, "success");
-                else if (result?.error) showToast("Review export failed; no complete file was written.", "danger");
-                return;
+            const response = await PortfolioWorkspace.response(endpoint);
+            const result = await LocalTextExport.saveResponse(response, {
+                fallbackFilename: `folioorb-${state.reportPeriod}-review.${format}`,
+                mediaType: format === "csv"
+                    ? "text/csv;charset=utf-8"
+                    : "text/html;charset=utf-8",
+            });
+            if (result.status === "saved" && result.path) {
+                showToast(`Saved ${result.filename}`, "success");
             }
-            browserSave(
-                filename,
-                content,
-                format === "csv" ? "text/csv;charset=utf-8" : "text/html;charset=utf-8"
-            );
         } catch (error) {
             showToast(apiErrorMessage(error, "Review export failed"), "danger");
         }
@@ -386,7 +372,7 @@ window.ReviewOrbit = (() => {
         if (!force && state.loaded.has("compare")) return;
         setLoading("review-watchlist-picks", "Loading research-mode holdings…");
         try {
-            state.watchlist = await apiGet("/api/review/watchlist");
+            state.watchlist = await PortfolioWorkspace.json("/api/review/watchlist");
             state.loaded.add("compare");
             renderWatchlist();
         } catch (error) {
@@ -449,7 +435,7 @@ window.ReviewOrbit = (() => {
         setLoading("review-compare-results", "Building a type-aware comparison…");
         try {
             const tickers = selected.map(input => input.value).join(",");
-            const data = await apiGet(`/api/review/compare?tickers=${encodeURIComponent(tickers)}`);
+            const data = await PortfolioWorkspace.json(`/api/review/compare?tickers=${encodeURIComponent(tickers)}`);
             renderComparison(data);
         } catch (error) {
             setError("review-compare-results", error);
@@ -564,8 +550,8 @@ window.ReviewOrbit = (() => {
         setLoading("review-course-summary", "Loading target course and available USD quotes…");
         $("review-target-table").innerHTML = "";
         const [planResult, overviewResult] = await Promise.allSettled([
-            apiGet("/api/review/plan"),
-            apiGet("/api/review/overview"),
+            PortfolioWorkspace.json("/api/review/plan"),
+            PortfolioWorkspace.json("/api/review/overview"),
         ]);
         if (planResult.status === "fulfilled") {
             state.plan = planResult.value;
@@ -591,7 +577,7 @@ window.ReviewOrbit = (() => {
         }));
         status.textContent = "Saving target course locally…";
         try {
-            await apiGet("/api/review/plan/targets", {
+            await PortfolioWorkspace.json("/api/review/plan/targets", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ items }),
@@ -626,7 +612,7 @@ window.ReviewOrbit = (() => {
         event.preventDefault();
         setLoading("review-rehearsal-result", "Rehearsing in memory — no portfolio writes…");
         try {
-            const data = await apiGet("/api/review/plan/rehearsal", {
+            const data = await PortfolioWorkspace.json("/api/review/plan/rehearsal", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -657,25 +643,20 @@ window.ReviewOrbit = (() => {
         const year = $("review-recap-year").value;
         status.textContent = "Building the average-cost recap from stored sale facts…";
         try {
-            const response = await fetch(`/api/review/records/realized.csv?year=${encodeURIComponent(year)}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const filename = filenameFromResponse(response, `folioorb-average-cost-recap-${year}.csv`);
-            const bridge = typeof desktopSaveBridge === "function" ? desktopSaveBridge() : null;
-            if (bridge) {
-                const content = await response.text();
-                const result = await bridge.save_file(filename, content);
-                status.textContent = result?.saved
-                    ? `Saved ${filename}.`
-                    : result?.error
-                        ? "Average-cost recap export failed; no complete file was written."
-                        : "Save cancelled; no file was written.";
-            } else {
-                browserSave(filename, await response.arrayBuffer(), "text/csv;charset=utf-8");
-                status.textContent = `Saved ${filename}.`;
-            }
+            const response = await PortfolioWorkspace.response(`/api/review/records/realized.csv?year=${encodeURIComponent(year)}`);
+            const result = await LocalTextExport.saveResponse(response, {
+                fallbackFilename: `folioorb-average-cost-recap-${year}.csv`,
+                mediaType: "text/csv;charset=utf-8",
+            });
+            status.textContent = result.status === "saved"
+                ? `Saved ${result.filename}.`
+                : "Save cancelled; no file was written.";
             live(status.textContent);
         } catch (error) {
-            status.textContent = apiErrorMessage(error, "Average-cost recap export failed.");
+            status.textContent = apiErrorMessage(
+                error,
+                "Average-cost recap export failed; no complete file was written.",
+            );
         }
     }
 
@@ -696,10 +677,13 @@ window.ReviewOrbit = (() => {
                 live(status.textContent);
                 return;
             }
-            const response = await fetch("/api/review/records/archive");
+            const response = await PortfolioWorkspace.response("/api/review/records/archive");
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const filename = filenameFromResponse(response, "folioorb-portable-export.zip");
-            browserSave(filename, await response.arrayBuffer(), "application/zip");
+            browserSaveBinary(
+                "folioorb-portable-export.zip",
+                await response.arrayBuffer(),
+                "application/zip",
+            );
             status.textContent = "Portable records ZIP saved. Keep it somewhere private.";
         } catch (error) {
             status.textContent = apiErrorMessage(error, "Portable records export failed.");
@@ -778,7 +762,7 @@ window.ReviewOrbit = (() => {
         if (!force && state.loaded.has("backups")) return;
         setLoading("review-backup-list", "Verifying the local vault…");
         try {
-            state.backups = await apiGet("/api/review/backups");
+            state.backups = await PortfolioWorkspace.json("/api/review/backups");
             state.loaded.add("backups");
             renderBackups();
         } catch (error) {
@@ -790,7 +774,7 @@ window.ReviewOrbit = (() => {
         const button = $("review-backup-create");
         if (button) button.disabled = true;
         try {
-            const item = await apiGet("/api/review/backups", { method: "POST" });
+            const item = await PortfolioWorkspace.json("/api/review/backups", { method: "POST" });
             showToast(`Verified backup ${item.name}`, "success");
             state.loaded.delete("backups");
             await loadBackups(true);
@@ -806,7 +790,7 @@ window.ReviewOrbit = (() => {
         const button = $("review-auto-switch");
         if (button) button.disabled = true;
         try {
-            const protection = await apiGet("/api/review/backups/policy", {
+            const protection = await PortfolioWorkspace.json("/api/review/backups/policy", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ enabled: !current }),
@@ -865,7 +849,7 @@ window.ReviewOrbit = (() => {
         const name = state.restoreName;
         $("review-restore-accept").disabled = true;
         try {
-            const result = await apiGet("/api/review/backups/restore", {
+            const result = await PortfolioWorkspace.json("/api/review/backups/restore", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name }),
@@ -915,7 +899,7 @@ window.ReviewOrbit = (() => {
         status.textContent = "Saving locally…";
         const cadence = $("review-thesis-cadence").value;
         try {
-            await apiGet(`/api/review/thesis/${state.thesisId}`, {
+            await PortfolioWorkspace.json(`/api/review/thesis/${state.thesisId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -940,9 +924,7 @@ window.ReviewOrbit = (() => {
         if (action === "thesis") return openThesisEditor(Number(button.dataset.reviewHolding));
         if (action === "manage-dca") {
             close();
-            if (typeof openPortfolioManager === "function") openPortfolioManager();
-            const panel = $("dca-panel");
-            if (panel?.hidden && typeof toggleDcaPanel === "function") toggleDcaPanel();
+            window.DcaWorkflow?.open?.();
             return;
         }
         if (action === "holding" && button.dataset.reviewTicker) {

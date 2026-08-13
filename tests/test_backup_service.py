@@ -349,3 +349,88 @@ def test_queued_restore_applies_before_start_and_keeps_safety_copy(tmp_path, mon
     assert _holdings(live) == ["CURRENT"]
     assert result["safety_backup"].startswith("pre-manual-restore-")
     assert backup_service.resolve_backup_name(result["safety_backup"]).exists()
+
+
+def test_create_verified_backup_owns_count_create_and_verification(tmp_path):
+    source = tmp_path / "portfolio.db"
+    _make_db(source, ["AAPL", "MSFT"])
+
+    point = backup_service.create_verified_backup(
+        "pre-change", source_db=source, dest_dir=tmp_path / "backups"
+    )
+
+    assert point.database.exists()
+    assert point.environment is None
+    assert backup_service.verify_backup(point.database, expected_min_holdings=2)
+
+
+def test_vault_verified_backup_rechecks_the_published_holdings_count(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "portfolio.db"
+    _make_db(source, ["AAPL", "MSFT"])
+    checks = []
+    verify_backup = backup_service.verify_backup
+
+    def record_check(path, expected_min_holdings=None):
+        checks.append((Path(path), expected_min_holdings))
+        return verify_backup(path, expected_min_holdings)
+
+    monkeypatch.setattr(backup_service, "verify_backup", record_check)
+
+    point = backup_service.create_verified_backup(
+        "manual",
+        source_db=source,
+        dest_dir=tmp_path / "backups",
+        require_vault_schema=True,
+    )
+
+    assert (point.database, 2) in checks
+
+
+def test_create_verified_backup_rejects_and_removes_a_corrupt_result(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "portfolio.db"
+    _make_db(source, ["AAPL"])
+    corrupt = tmp_path / "backups" / "pre-change-corrupt.db"
+
+    def publish_corrupt(*_args, **_kwargs):
+        corrupt.parent.mkdir(parents=True, exist_ok=True)
+        corrupt.write_text("not sqlite", encoding="utf-8")
+        return corrupt
+
+    monkeypatch.setattr(backup_service, "create_backup", publish_corrupt)
+
+    with pytest.raises(ValueError, match="verification"):
+        backup_service.create_verified_backup(
+            "pre-change", source_db=source, dest_dir=corrupt.parent
+        )
+
+    assert not corrupt.exists()
+
+
+def test_environment_snapshot_failure_keeps_the_verified_database_artifact(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "portfolio.db"
+    _make_db(source, ["AAPL"])
+
+    def fail_environment(_destination):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(backup_service, "snapshot_env", fail_environment)
+
+    with pytest.raises(backup_service.EnvironmentSnapshotError) as caught:
+        backup_service.create_verified_backup(
+            "pre-update",
+            source_db=source,
+            dest_dir=tmp_path / "backups",
+            include_environment=True,
+        )
+
+    assert caught.value.backup.database.exists()
+    assert caught.value.backup.environment is None
+    assert backup_service.verify_backup(
+        caught.value.backup.database, expected_min_holdings=1
+    )

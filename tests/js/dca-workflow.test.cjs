@@ -1,0 +1,147 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const { createDcaWorkflow } = require("../../static/js/dca-workflow.js");
+
+function element(overrides = {}) {
+    return {
+        hidden: false,
+        dataset: {},
+        innerHTML: "",
+        textContent: "",
+        setAttribute() {},
+        addEventListener() {},
+        ...overrides,
+    };
+}
+
+function fakeDocument() {
+    const elements = new Map([
+        ["dca-panel", element({ hidden: true })],
+        ["dca-btn", element()],
+        ["dca-plans-section", element()],
+        ["dca-plans-list", element()],
+        ["dca-pending-section", element()],
+        ["dca-pending-list", element()],
+        ["dca-badge", element()],
+        ["dca-history-list", element({ hidden: true })],
+    ]);
+    return {
+        elements,
+        activeElement: null,
+        getElementById: id => elements.get(id) || null,
+        addEventListener() {},
+        querySelector() { return null; },
+    };
+}
+
+function actionEvent(dataset) {
+    return { target: { closest: () => ({ dataset }) } };
+}
+
+function emptyWorkspace(overrides = {}) {
+    return {
+        json: async url => url.includes("plans")
+            ? { plans: [] }
+            : { contributions: [] },
+        response: async () => new Response("{}", { status: 200 }),
+        ...overrides,
+    };
+}
+
+test("open is the navigation seam and loads the panel through the workspace", async () => {
+    const document = fakeDocument();
+    const requests = [];
+    let managerOpens = 0;
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            json: async url => {
+                requests.push(url);
+                return url.includes("plans") ? { plans: [] } : { contributions: [] };
+            },
+        }),
+        document,
+        openManager: () => { managerOpens += 1; },
+    });
+
+    assert.equal(workflow.open(), true);
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.equal(managerOpens, 1);
+    assert.equal(document.elements.get("dca-panel").hidden, false);
+    assert.deepEqual(requests.slice(0, 2), [
+        "/api/dca/plans",
+        "/api/dca/contributions?status=pending",
+    ]);
+});
+
+test("one mutation in flight blocks a double apply", async () => {
+    const document = fakeDocument();
+    let resolveMutation;
+    let mutationCalls = 0;
+    const pending = new Promise(resolve => { resolveMutation = resolve; });
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => {
+                mutationCalls += 1;
+                return pending;
+            },
+        }),
+        document,
+    });
+    const event = actionEvent({ dcaAction: "apply", cid: "3" });
+
+    const first = workflow.handleAction(event);
+    const second = await workflow.handleAction(event);
+    assert.equal(second, null);
+    assert.equal(mutationCalls, 1);
+
+    resolveMutation(new Response(JSON.stringify({ message: "Applied" }), { status: 200 }));
+    await first;
+});
+
+test("cancelling a bulk action sends no mutation", async () => {
+    let mutations = 0;
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => {
+                mutations += 1;
+                return new Response("{}", { status: 200 });
+            },
+        }),
+        document: fakeDocument(),
+        confirmAction: async () => null,
+    });
+
+    const result = await workflow.handleAction(actionEvent({
+        dcaAction: "apply-all",
+        planId: "7",
+        count: "2",
+        total: "50",
+        ticker: "AAPL",
+    }));
+
+    assert.equal(result, null);
+    assert.equal(mutations, 0);
+});
+
+test("failed action reports the error without refreshing holdings", async () => {
+    const messages = [];
+    let refreshes = 0;
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => new Response(
+                JSON.stringify({ detail: "Already applied" }),
+                { status: 400 },
+            ),
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+        holdingsChanged: async () => { refreshes += 1; },
+    });
+
+    await workflow.handleAction(actionEvent({ dcaAction: "apply", cid: "3" }));
+
+    assert.equal(refreshes, 0);
+    assert.deepEqual(messages[0], ["Already applied", "danger"]);
+});

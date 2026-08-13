@@ -1,7 +1,7 @@
 /**
  * core.js
  * The runtime the rest of the dashboard is built on: HTML escaping, data
- * access, an endpoint cache, and the holding-panel registry.
+ * error normalization and the holding-panel registry.
  *
  * Loaded first, so these globals exist before analytics-charts.js or
  * dashboard.js runs. There is no build step and no module system here —
@@ -12,10 +12,6 @@
  *   escaping       — `html` escapes every interpolation, so a forgotten wrap
  *                    can no longer be an XSS; `raw` is the one visible seam
  *                    for opting out.
- *   data access    — `apiGet` absorbs the request, the ok-guard and the JSON
- *                    parse that every call site used to spell out.
- *   endpoint cache — `apiGetCached` collapses per-caller caches of one URL
- *                    into one shared promise: one payload, one request.
  *   panel registry — `registerHoldingPanel` + `renderHoldingPanels` turn "add
  *                    a panel to a holding row" into one registration instead
  *                    of an edit at every render site.
@@ -134,94 +130,6 @@ function apiErrorMessage(err, fallback = "Something went wrong") {
     }
     return detail ? String(detail) : fallback;
 }
-
-// Build the Error a failed response throws. Only a JSON body is trusted to
-// carry a message — a proxy's HTML error page would otherwise become the toast
-// text — so anything else falls back to the `HTTP <status>` the hand-written
-// guards threw.
-function _coreHttpError(res, body) {
-    const fallback = `HTTP ${res.status}`;
-    let detail = null;
-    try {
-        detail = body ? JSON.parse(body) : null;
-    } catch (_) { /* not JSON — the status line is the best we can say */ }
-    const err = new Error(detail === null ? fallback : apiErrorMessage(detail, fallback));
-    err.status = res.status;
-    err.body = body;
-    return err;
-}
-
-/**
- * Fetch a JSON endpoint. Absorbs the three steps every call site used to spell
- * out by hand — the request, the !res.ok guard, and the JSON parse — so a
- * caller writes one await and handles one kind of failure.
- *
- * `options` passes straight through to fetch (method, headers, body, signal…),
- * so this covers mutations too, not just reads.
- *
- * A non-2xx response throws an Error carrying:
- *   .message — apiErrorMessage() of the parsed body when it is JSON, so a
- *              FastAPI {"detail": …} still reaches the user verbatim;
- *              `HTTP <status>` otherwise.
- *   .status  — the HTTP status code.
- *   .body    — the raw response text, "" when it could not be read.
- */
-async function apiGet(url, options) {
-    // Deliberately the *global* fetch, resolved at call time: dashboard.js
-    // monkeypatches window.fetch to stamp the active portfolio_id onto
-    // portfolio-scoped URLs. Capturing a reference here — this file loads
-    // before that patch installs — would silently unscope every call made
-    // through apiGet and leak one portfolio's data into another.
-    const res = await fetch(url, options);
-    if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw _coreHttpError(res, body);
-    }
-    return res.json();
-}
-
-// ── Endpoint cache ────────────────────────────────────────────────────────
-
-// url → in-flight-or-settled promise. One entry per endpoint, shared by every
-// caller, so two features wanting the same payload cost one request instead of
-// two private caches and two round-trips. A rejected entry is dropped so a
-// transient failure does not stick.
-const _CORE_ENDPOINT_CACHE = new Map();
-
-/**
- * apiGet, memoised on the URL. Concurrent callers share the in-flight promise;
- * later callers get the resolved payload with no second request.
- *
- * For idempotent reads only: the URL is the whole cache key, which is why this
- * takes no fetch options. Call apiGetCached.invalidate() when the data
- * underneath moves.
- */
-function apiGetCached(url) {
-    const hit = _CORE_ENDPOINT_CACHE.get(url);
-    if (hit) return hit;
-    const pending = apiGet(url).catch(err => {
-        _CORE_ENDPOINT_CACHE.delete(url);
-        throw err;
-    });
-    _CORE_ENDPOINT_CACHE.set(url, pending);
-    return pending;
-}
-
-/**
- * Drop cached endpoints so the next read refetches. Matches by prefix, so
- * `apiGetCached.invalidate("/api/ai/")` clears a whole family, an exact URL
- * clears one entry, and no argument clears everything.
- */
-apiGetCached.invalidate = function invalidateCachedEndpoints(urlOrPrefix) {
-    if (urlOrPrefix === undefined || urlOrPrefix === null) {
-        _CORE_ENDPOINT_CACHE.clear();
-        return;
-    }
-    const prefix = String(urlOrPrefix);
-    Array.from(_CORE_ENDPOINT_CACHE.keys())
-        .filter(key => key.startsWith(prefix))
-        .forEach(key => _CORE_ENDPOINT_CACHE.delete(key));
-};
 
 // ── Holding-panel registry ────────────────────────────────────────────────
 

@@ -155,20 +155,11 @@ def apply_migrations_safely(engine: Engine) -> MigrationResult:
         try:
             from app.services import backup_service
 
-            source_db = backup_service.live_db_path()
-            # The database's real current holdings count, so verification below
-            # can catch a backup that silently lost the table — a hardcoded
-            # expectation of 0 would let that slip through undetected.
-            pre_count = backup_service.count_holdings(source_db)
-            backup_path = backup_service.create_backup(
-                source_db,
+            point = backup_service.create_verified_backup(
                 label=f"pre-migrate-v{stored}",
-                expected_min_holdings=pre_count,
             )
-            backed_up = backup_service.verify_backup(backup_path, expected_min_holdings=pre_count)
-            if not backed_up:
-                logger.error("Pre-migration backup failed verification: %s", backup_path.name)
-                backup_path = None
+            backup_path = point.database
+            backed_up = True
         except Exception as exc:  # pylint: disable=broad-except
             logger.error("Could not create pre-migration backup: %s", type(exc).__name__)
             backup_path = None

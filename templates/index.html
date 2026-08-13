@@ -2697,8 +2697,11 @@
     <script defer src="/static/vendor/chartjs-chart-matrix-2.0.1.min.js"></script>
     <script defer src="/static/vendor/chartjs-chart-treemap-3.0.0.min.js"></script>
     <script defer src="/static/js/core.js?v=0"></script>
+    <script defer src="/static/js/portfolio-workspace.js?v=0"></script>
+    <script defer src="/static/js/local-text-export.js?v=0"></script>
     <script defer src="/static/js/analytics-charts.js?v=0"></script>
     <script defer src="/static/js/dashboard.js?v=0"></script>
+    <script defer src="/static/js/dca-workflow.js?v=0"></script>
     <script defer src="/static/js/updates.js?v=0"></script>
     <script defer src="/static/js/review-orbit.js?v=0"></script>
 
@@ -2892,7 +2895,7 @@
                     </button>
                     <button type="button" class="btn btn-sm manage-io-btn" id="dca-btn"
                             aria-expanded="false" aria-controls="dca-panel"
-                            onclick="toggleDcaPanel()"
+                            data-dca-action="toggle-panel"
                             title="Mirror your brokerage auto-invest: recurring buys you review and apply">
                         <svg class="manage-lucide manage-lucide--btn" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/><path d="M12 7v5l3 3"/></svg>
                         DCA
@@ -3036,7 +3039,7 @@
 
                     <div class="dca-section dca-history-toggle-wrap">
                         <button type="button" class="btn btn-sm btn-link dca-history-toggle" id="dca-history-toggle"
-                                aria-expanded="false" onclick="toggleDcaHistory()">
+                                aria-expanded="false" data-dca-action="toggle-history">
                             Show history
                         </button>
                         <div class="dca-history-list" id="dca-history-list" hidden></div>

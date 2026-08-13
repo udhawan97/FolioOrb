@@ -4,41 +4,6 @@
  * Runs automatically when the page loads.
  */
 
-// ── Active portfolio ──────────────────────────────────────────────────────
-// Which portfolio the dashboard is showing. Persisted so a reload keeps it.
-const ACTIVE_PORTFOLIO_KEY = "folioorb-active-portfolio";
-let activePortfolioId = 1;
-try {
-    const saved = parseInt(localStorage.getItem(ACTIVE_PORTFOLIO_KEY), 10);
-    if (Number.isFinite(saved) && saved > 0) activePortfolioId = saved;
-} catch (_) { /* localStorage unavailable — default to 1 */ }
-
-// Single chokepoint for portfolio scoping: stamp the active portfolio_id onto
-// every portfolio-scoped API call. This covers every fetch site (dashboard.js,
-// analytics-charts.js, and any future one) without threading an id through ~60
-// call sites — so a switch can never leak one portfolio's data into another.
-// Global endpoints (heartbeat, configure-key, verdict-report, /api/stocks, …)
-// simply ignore the extra query param.
-(function installPortfolioFetchScope() {
-    const realFetch = window.fetch.bind(window);
-    const SCOPED = /^\/api\/(portfolio|ai|news|dca|review)\//;
-    window.fetch = function scopedFetch(input, init) {
-        // Only string URLs are rewritten — every fetch in the app passes a string,
-        // and reconstructing a Request could consume a POST body. Request-object
-        // inputs (none today) pass through untouched.
-        if (typeof input === "string") {
-            try {
-                const u = new URL(input, window.location.origin);
-                if (u.origin === window.location.origin && SCOPED.test(u.pathname)) {
-                    u.searchParams.set("portfolio_id", String(activePortfolioId));
-                    input = u.pathname + u.search + u.hash;
-                }
-            } catch (_) { /* malformed URL — pass through untouched */ }
-        }
-        return realFetch(input, init);
-    };
-})();
-
 const toNumber = (n, fallback = 0) => {
     const value = Number(n);
     return Number.isFinite(value) ? value : fallback;
@@ -849,8 +814,8 @@ let cachedPortfolioExposure = null;
 let cachedMarketRegime = null;
 let portfolioSnapshotExposurePromise = null;
 // Read by the snapshot strip here and by the Analytics exposure pane in
-// analytics-charts.js. apiGetCached keys on the URL string, so the two files
-// sharing one request rests on them spelling it the same way — hence one const
+// analytics-charts.js. PortfolioWorkspace keys on identity plus URL, so sharing
+// one request rests on both files spelling it the same way — hence one const
 // rather than two literals.
 const PORTFOLIO_EXPOSURE_URL = "/api/ai/portfolio-exposure";
 // Prefix, not a full URL: the ticker list varies, so invalidation matches the
@@ -1297,7 +1262,7 @@ let _portfolioValuePromise = null;
 // prices fetch in the background.
 // Keyed per portfolio so switching never paints the previous portfolio's value.
 function _portfolioValueCacheKey() {
-    return `folioorb-portfolio-value-v1:${activePortfolioId}`;
+    return `folioorb-portfolio-value-v1:${PortfolioWorkspace.id}`;
 }
 
 function persistPortfolioValueCache(data) {
@@ -1436,7 +1401,7 @@ async function loadPortfolioValue() {
     if (_portfolioValuePromise) return _portfolioValuePromise;
     _portfolioValuePromise = (async () => {
     try {
-        const data = await apiGet("/api/portfolio/value");
+        const data = await PortfolioWorkspace.json("/api/portfolio/value");
 
         if (data.degraded) {
             // The local server answered, but market data is unreachable, so the
@@ -1620,7 +1585,7 @@ function ensureRangePerformance() {
     _rangePerf.signature = signature;
     _rangePerf.data = null;
     _rangePerf.error = false;
-    _rangePerf.promise = apiGet("/api/portfolio/range-performance")
+    _rangePerf.promise = PortfolioWorkspace.json("/api/portfolio/range-performance")
         .then(data => {
             if (_rangePerf.signature === signature) {
                 _rangePerf.data = data;
@@ -2359,12 +2324,12 @@ function renderSnapshotSectorEmpty(message, icon = "bi-hourglass-split") {
 }
 
 // The snapshot strip and the Analytics exposure pane want the same payload.
-// apiGetCached is what keeps that to one request: whichever asks first pays for
+// PortfolioWorkspace is what keeps that to one request: whichever asks first pays for
 // it, the other reads the shared promise. Both still keep their own decoded
 // copy, because each renders from it on its own schedule.
 async function ensurePortfolioSnapshotExposure() {
     if (cachedPortfolioExposure?.sector_exposure?.length || portfolioSnapshotExposurePromise) return;
-    portfolioSnapshotExposurePromise = apiGetCached(PORTFOLIO_EXPOSURE_URL)
+    portfolioSnapshotExposurePromise = PortfolioWorkspace.cached(PORTFOLIO_EXPOSURE_URL)
         .then(data => {
             cachedPortfolioExposure = data || cachedPortfolioExposure;
             // A payload with no sectors in it is worth asking about again — the
@@ -2373,7 +2338,7 @@ async function ensurePortfolioSnapshotExposure() {
             // the guard above was satisfied; dropping the shared entry keeps
             // that, rather than pinning an empty answer for the session.
             if (!cachedPortfolioExposure?.sector_exposure?.length) {
-                apiGetCached.invalidate(PORTFOLIO_EXPOSURE_URL);
+                PortfolioWorkspace.invalidate(PORTFOLIO_EXPOSURE_URL);
             }
             renderPortfolioSnapshot();
             return data;
@@ -3082,7 +3047,7 @@ function renderHoldings() {
 
 async function loadEarningsRadar() {
     try {
-        const data = await apiGet("/api/portfolio/earnings");
+        const data = await PortfolioWorkspace.json("/api/portfolio/earnings");
         const map = {};
         (data.events || []).forEach(e => { if (e && e.ticker) map[e.ticker] = e; });
         cachedEarnings = map;
@@ -3352,7 +3317,7 @@ let latestPnlStaleDays = 0;
 
 async function loadPnl() {
     try {
-        const data = await apiGet("/api/portfolio/pnl");
+        const data = await PortfolioWorkspace.json("/api/portfolio/pnl");
         const history = data.history || [];
 
         // Decide if the user has meaningful portfolio data
@@ -3428,7 +3393,7 @@ async function loadMarketReferenceChart(rangeKey = performanceRange) {
     try {
         const config = PERFORMANCE_RANGES[normalizePerformanceRange(rangeKey)];
         const params = new URLSearchParams({ tickers: "SPY", period: config.marketPeriod });
-        const data = await apiGet(`/api/stocks/history/batch?${params}`);
+        const data = await PortfolioWorkspace.json(`/api/stocks/history/batch?${params}`);
         const hist = filterHistoryForPerformanceRange(
             (data.data?.SPY || []).filter(h => h.close > 0),
             rangeKey,
@@ -3629,7 +3594,7 @@ async function loadRealizedRecap(year) {
     const active = year != null ? year : _realizedRecapYear;
     try {
         const qs = active != null ? `?year=${encodeURIComponent(active)}` : "";
-        renderRealizedRecap(await apiGet(`/api/portfolio/realized-summary${qs}`));
+        renderRealizedRecap(await PortfolioWorkspace.json(`/api/portfolio/realized-summary${qs}`));
     } catch (err) {
         console.warn("Unable to load realized recap:", err);
         host.hidden = true;
@@ -3713,7 +3678,7 @@ async function loadVerdictReportCard() {
     const body = document.getElementById("verdict-report-body");
     if (!body) return;
     try {
-        renderVerdictReport(await apiGet("/api/ai/verdict-report"));
+        renderVerdictReport(await PortfolioWorkspace.json("/api/ai/verdict-report"));
         _verdictReportLoaded = true;
     } catch (err) {
         console.warn("Unable to load verdict report:", err);
@@ -3839,7 +3804,7 @@ function ensureProjectionLoaded() {
 
 async function loadProjection() {
     try {
-        latestProjectionData = await apiGet("/api/portfolio/projection");
+        latestProjectionData = await PortfolioWorkspace.json("/api/portfolio/projection");
         projectionLoadPromise = null;
 
         const callout = document.getElementById("projection-empty-callout");
@@ -3927,7 +3892,7 @@ function _toggleAnalyticsCard(cardId, visible) {
  *
  *   card    — element id of the card to show or hide.
  *   loading — element id of its shimmer.
- *   url     — endpoint to read; goes through apiGet, so the portfolio-scoping
+ *   url     — endpoint to read; goes through PortfolioWorkspace, so portfolio scoping
  *             fetch patch and the ok-guard both still apply.
  *   render  — (payload) => void. Paints the card body.
  *   warning — console.warn prefix for a failed read.
@@ -3935,7 +3900,7 @@ function _toggleAnalyticsCard(cardId, visible) {
 async function loadCard({ card, loading, url, render, warning }) {
     _cardLoading(loading, true);
     try {
-        render(await apiGet(url));
+        render(await PortfolioWorkspace.json(url));
         _toggleAnalyticsCard(card, true);
         return true;
     } catch (err) {
@@ -4087,7 +4052,7 @@ async function loadIncomeCalendar() {
     const host = document.getElementById("income-calendar");
     if (!host) return;
     try {
-        const res = await fetch("/api/portfolio/income-calendar");
+        const res = await PortfolioWorkspace.response("/api/portfolio/income-calendar");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         renderIncomeCalendar(await res.json());
     } catch (err) {
@@ -4547,7 +4512,7 @@ async function loadTrendData(tickers) {
             tickers: tickers.join(","),
             period: "1mo",
         });
-        const data = await apiGetCached(`${TREND_HISTORY_URL_PREFIX}?${params}`);
+        const data = await PortfolioWorkspace.cached(`${TREND_HISTORY_URL_PREFIX}?${params}`);
         return data.data || {};
     } catch (err) {
         console.warn("Unable to load trend data:", err);
@@ -5737,7 +5702,7 @@ async function saveThesisNotes(section, ticker, text) {
     if (errorEl) errorEl.hidden = true;
     const trimmed = String(text ?? "").slice(0, 500);
     try {
-        const res = await fetch(`/api/portfolio/holdings/${holding.id}`, {
+        const res = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holding.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ notes: trimmed }),
@@ -7036,7 +7001,7 @@ function renderAnalystRecCell(rec) {
 
 async function loadAnalystRecommendations() {
     try {
-        const data = await apiGet("/api/ai/analyst-recommendations/all");
+        const data = await PortfolioWorkspace.json("/api/ai/analyst-recommendations/all");
         Object.entries(data.recommendations || {}).forEach(([ticker, rec]) => {
             cachedRecommendations[ticker] = rec;
             const cell = document.getElementById(`rec-cell-${ticker}`);
@@ -8292,7 +8257,7 @@ function _renderBookExposureStrip(ticker) {
 async function loadDeepIntelligence(ticker) {
     if (cachedDeepIntel[ticker]) return cachedDeepIntel[ticker];
     try {
-        const data = await apiGet(`/api/ai/intelligence/${encodeURIComponent(ticker)}/deep`);
+        const data = await PortfolioWorkspace.json(`/api/ai/intelligence/${encodeURIComponent(ticker)}/deep`);
         cachedDeepIntel[ticker] = data;
         return data;
     } catch (_) {
@@ -9700,7 +9665,7 @@ async function loadAiCostStats() {
     if (!valueEl || !metaEl) return;
 
     try {
-        const data = await apiGet("/api/ai/cache/stats");
+        const data = await PortfolioWorkspace.json("/api/ai/cache/stats");
         const billingActive = data.billing_active !== false;
         const totalTokens = toNumber(data.estimated_total_tokens);
         const claudeCachedCount = toNumber(data.claude_cached_summaries, toNumber(data.cached_summaries));
@@ -9951,7 +9916,7 @@ function refreshDashboardData({
     // Sparkline history is shared through the endpoint cache to collapse the
     // double render on load. A refresh is exactly when that entry should stop
     // being reused, so drop the family before the jobs below re-request it.
-    apiGetCached.invalidate(TREND_HISTORY_URL_PREFIX);
+    PortfolioWorkspace.invalidate(TREND_HISTORY_URL_PREFIX);
 
     const refreshButton = document.querySelector(".btn-refresh-data");
     if (animateButton) refreshButton?.classList.remove("is-refreshing");
@@ -10101,7 +10066,7 @@ async function forceRefreshEverything() {
 
 async function updateMarketStatus() {
     try {
-        const res = await fetch("/api/stocks/market-status");
+        const res = await PortfolioWorkspace.response("/api/stocks/market-status");
         const data = await res.json();
         const el = document.getElementById("market-status");
         if (el) {
@@ -10216,7 +10181,7 @@ async function loadClaudeHeartbeat() {
     updateClaudeHeartbeatUi(_lastClaudeHeartbeat, true);
 
     try {
-        _lastClaudeHeartbeat = await apiGet("/api/ai/heartbeat");
+        _lastClaudeHeartbeat = await PortfolioWorkspace.json("/api/ai/heartbeat");
     } catch (err) {
         console.warn("Claude heartbeat failed:", err);
         _lastClaudeHeartbeat = {
@@ -10689,7 +10654,7 @@ async function loadPortfolioBriefing(mode, forceRefresh = false) {
     try {
         const params = new URLSearchParams({ mode, range: rangeKey });
         if (forceRefresh) params.set("force_refresh", "true");
-        const data = await apiGet(`/api/ai/portfolio-summary?${params}`);
+        const data = await PortfolioWorkspace.json(`/api/ai/portfolio-summary?${params}`);
 
         _cachedBriefing[cacheKey] = data;
         if (isCurrent()) {
@@ -10871,7 +10836,7 @@ async function loadActionPlan(forceRefresh = false) {
         if (isLocalIntelligenceMode() || _isClaudeApiLive === false) {
             params.set("force_local", "true");
         }
-        const data = await apiGet(`/api/ai/action-plan?${params}`);
+        const data = await PortfolioWorkspace.json(`/api/ai/action-plan?${params}`);
 
         _cachedActionPlan = data;
         _actionPlanShowSkeleton(false);
@@ -10964,7 +10929,7 @@ function initApiKeyPanel() {
             if (!confirm("Disconnect Claude and remove the saved API key? Local Intelligence keeps running.")) return;
             removeBtn.disabled = true;
             try {
-                const res = await fetch("/api/ai/configure-key", { method: "DELETE" });
+                const res = await PortfolioWorkspace.response("/api/ai/configure-key", { method: "DELETE" });
                 const data = await res.json().catch(() => ({}));
                 if (res.ok) {
                     showToast(data.message || "Claude disconnected — Local Intelligence is still running.", "success");
@@ -11062,7 +11027,7 @@ function initApiKeyPanel() {
         status.className = "api-key-status";
 
         try {
-            const res = await fetch("/api/ai/configure-key", {
+            const res = await PortfolioWorkspace.response("/api/ai/configure-key", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 // Only send the key — nothing else that could be misused
@@ -11459,7 +11424,6 @@ async function initDashboard() {
         loadActionPlan();
         startClaudeHeartbeat();
         ensureAiCostStatsLoaded();
-        runDcaCatchup();  // book any DCA buys missed while the app was closed
         if (isLocalIntelligenceMode()) loadHoldingIntelligence();
     });
 }
@@ -11561,10 +11525,10 @@ function renderWorldMarkets(markets) {
 
 async function loadWorldMarkets() {
     try {
-        // apiGet throws (rather than silently returning) on a non-OK status, so it
+        // PortfolioWorkspace.json throws on a non-OK status, so it
         // hits the catch below and replaces the shimmer skeletons with the
         // "unavailable" fallback instead of spinning forever.
-        const { markets } = await apiGet("/api/stocks/world-markets");
+        const { markets } = await PortfolioWorkspace.json("/api/stocks/world-markets");
         renderWorldMarkets(markets || []);
         persistWorldMarkets(markets || []);
     } catch (err) {
@@ -11658,7 +11622,7 @@ async function fetchSingleIntelligenceWithRetry(ticker, options = {}) {
         if (options.aiHoldingsFallback && !isLocalIntelligenceMode()) {
             params.set("ai_holdings_fallback", "true");
         }
-        const intel = await apiGet(`/api/ai/intelligence/${encodeURIComponent(ticker)}?${params}`);
+        const intel = await PortfolioWorkspace.json(`/api/ai/intelligence/${encodeURIComponent(ticker)}?${params}`);
         cachedIntelligence[ticker] = intel;
         if (marketPulseLoaded(intel)) {
             intelligenceExhaustedTickers.delete(ticker);
@@ -11757,16 +11721,16 @@ async function loadTargetedHoldingIntelligence(ticker) {
 
     try {
         const holdingsFallback = isLocalIntelligenceMode() ? "" : "&ai_holdings_fallback=true";
-        const intelP = apiGet(`/api/ai/intelligence/${encodeURIComponent(normalized)}?retry=${Date.now()}${holdingsFallback}`);
-        const moveP = apiGet("/api/ai/move-explanations/all");
+        const intelP = PortfolioWorkspace.json(`/api/ai/intelligence/${encodeURIComponent(normalized)}?retry=${Date.now()}${holdingsFallback}`);
+        const moveP = PortfolioWorkspace.json("/api/ai/move-explanations/all");
         const verdictSuffix = isLocalIntelligenceMode() ? "?force_local=true" : "";
-        const verdictP = apiGet(`/api/ai/investment-signal/${encodeURIComponent(normalized)}${verdictSuffix}`);
+        const verdictP = PortfolioWorkspace.json(`/api/ai/investment-signal/${encodeURIComponent(normalized)}${verdictSuffix}`);
         // Panels that carry their own endpoint fetch it here, in the same batch,
         // so a registered panel needs no edit in this function to get its data.
         const lazyPanels = HOLDING_PANELS.filter(panel => panel.fetch && panel.cache);
-        const lazyP = lazyPanels.map(panel => apiGet(panel.fetch(normalized)));
+        const lazyP = lazyPanels.map(panel => PortfolioWorkspace.json(panel.fetch(normalized)));
 
-        // allSettled over apiGet: a fulfilled entry carries the parsed payload,
+        // A fulfilled entry carries the parsed payload,
         // and a rejected one is any failure at all — unreachable server, or a
         // status the endpoint refused on. One check per slot instead of two, and
         // each slot still lands independently of the others.
@@ -11852,9 +11816,9 @@ async function loadHoldingIntelligence(options = {}) {
     if (hub) hub.disabled = true;
 
     try {
-        const intelP = fetch("/api/ai/intelligence/all/batch");
-        const moveP = fetch("/api/ai/move-explanations/all");
-        const verdictP = fetch(intelligenceSignalsUrl());
+        const intelP = PortfolioWorkspace.response("/api/ai/intelligence/all/batch");
+        const moveP = PortfolioWorkspace.response("/api/ai/move-explanations/all");
+        const verdictP = PortfolioWorkspace.response(intelligenceSignalsUrl());
 
         const [intelRes, moveRes, verdictRes] = await Promise.all([intelP, moveP, verdictP]);
 
@@ -11952,7 +11916,10 @@ function portfolioManagerFallbackFocus() {
 function handlePortfolioManagerKeydown(event) {
     const popover = document.getElementById("portfolioModal");
     if (!popover?.classList.contains("is-visible")) return;
-    if (document.querySelector("body > .sale-dialog-overlay") || _dcaActionDialogState) return;
+    if (
+        document.querySelector("body > .sale-dialog-overlay")
+        || !document.getElementById("dca-action-dialog")?.hidden
+    ) return;
 
     if (event.key === "Escape") {
         event.preventDefault();
@@ -12084,16 +12051,13 @@ function hydratePortfolioSwitcherFromCache() {
 
 async function loadPortfolios() {
     try {
-        _portfolios = await apiGet("/api/portfolio/");
+        _portfolios = await PortfolioWorkspace.json("/api/portfolio/");
     } catch (_) { return; }
     persistPortfolioList(_portfolios);
-    if (_portfolios.length && !_portfolios.some(p => p.id === activePortfolioId)) {
+    if (PortfolioWorkspace.reconcile(_portfolios)) {
         // The saved portfolio no longer exists (deleted in another session). The
         // early data loads already fired against the dead id — fall back to the
         // first portfolio and reload so every panel re-scopes cleanly.
-        activePortfolioId = _portfolios[0].id;
-        try { localStorage.setItem(ACTIVE_PORTFOLIO_KEY, String(activePortfolioId)); } catch (_) { /* ignore */ }
-        location.reload();
         return;
     }
     renderPortfolioSwitcher();
@@ -12103,7 +12067,7 @@ async function loadPortfolios() {
 function renderPortfolioSwitcher() {
     const label = document.getElementById("portfolio-switcher-label");
     const list = document.getElementById("portfolio-switcher-list");
-    const active = _portfolios.find(p => p.id === activePortfolioId);
+    const active = _portfolios.find(p => p.id === PortfolioWorkspace.id);
     if (label) label.textContent = active ? active.name : "Portfolio";
     // Name the portfolio being edited in the Manage modal, so a multi-portfolio
     // user always knows which book their edits land in.
@@ -12111,9 +12075,9 @@ function renderPortfolioSwitcher() {
     if (title) title.textContent = active ? `Manage · ${active.name}` : "Manage Portfolio";
     if (!list) return;
     list.innerHTML = _portfolios.map(p => `
-        <div class="portfolio-switcher-row${p.id === activePortfolioId ? " is-active" : ""}" role="none" data-pid="${p.id}">
+        <div class="portfolio-switcher-row${p.id === PortfolioWorkspace.id ? " is-active" : ""}" role="none" data-pid="${p.id}">
             <button type="button" class="portfolio-switcher-pick" role="menuitem" onclick="switchPortfolio(${p.id})">
-                <i class="bi ${p.id === activePortfolioId ? "bi-check-circle-fill" : "bi-circle"}" aria-hidden="true"></i>
+                <i class="bi ${p.id === PortfolioWorkspace.id ? "bi-check-circle-fill" : "bi-circle"}" aria-hidden="true"></i>
                 <span>${escapeHtml(p.name)}</span>
             </button>
             <span class="portfolio-switcher-row-actions">
@@ -12125,9 +12089,7 @@ function renderPortfolioSwitcher() {
 
 function switchPortfolio(id) {
     closeSwitcherMenu();
-    if (id === activePortfolioId) return;
-    try { localStorage.setItem(ACTIVE_PORTFOLIO_KEY, String(id)); } catch (_) { /* ignore */ }
-    location.reload();
+    PortfolioWorkspace.select(id);
 }
 
 let _portfolioNameDialogState = null;
@@ -12245,7 +12207,7 @@ async function createNewPortfolio() {
     });
     if (name === null) return;
     try {
-        const res = await fetch("/api/portfolio/create", {
+        const res = await PortfolioWorkspace.response("/api/portfolio/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: name.trim() || "New Portfolio" }),
@@ -12270,7 +12232,7 @@ async function renamePortfolioPrompt(id) {
     });
     if (name === null) return;
     try {
-        const res = await fetch(`/api/portfolio/${id}`, {
+        const res = await PortfolioWorkspace.response(`/api/portfolio/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: name.trim() }),
@@ -12287,11 +12249,11 @@ async function deletePortfolioConfirm(id) {
     closeSwitcherMenu();
     if (!await openPortfolioDeleteDialog(p)) return;
     try {
-        const res = await fetch(`/api/portfolio/${id}`, { method: "DELETE" });
+        const res = await PortfolioWorkspace.response(`/api/portfolio/${id}`, { method: "DELETE" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) { showToast(apiErrorMessage(data, "Couldn't delete portfolio"), "danger"); return; }
         try { localStorage.removeItem(`folioorb-portfolio-value-v1:${id}`); } catch (_) { /* ignore */ }
-        if (id === activePortfolioId) {
+        if (id === PortfolioWorkspace.id) {
             switchPortfolio(1);  // deleted the active one → drop to the default (reloads)
         } else {
             await loadPortfolios();
@@ -12302,7 +12264,9 @@ async function deletePortfolioConfirm(id) {
 
 function updateExportAnchor() {
     const a = document.getElementById("export-csv-btn");
-    if (a) a.setAttribute("href", `/api/portfolio/holdings/export?portfolio_id=${activePortfolioId}`);
+    if (a) a.setAttribute(
+        "href", `/api/portfolio/holdings/export?portfolio_id=${PortfolioWorkspace.id}`
+    );
 }
 
 function closeSwitcherMenu() {
@@ -12341,7 +12305,6 @@ function initPortfolioManager() {
     });
     initManageHoldingsSearch();
     initCsvImport();
-    initDca();
 }
 
 function initManageHoldingsSearch() {
@@ -12513,7 +12476,7 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
     }
 
     try {
-        const data = await apiGet("/api/portfolio/holdings");
+        const data = await PortfolioWorkspace.json("/api/portfolio/holdings");
         if (requestId !== manageHoldingsRequestId) return;
 
         manageHoldingsCache = data.holdings || [];
@@ -12677,7 +12640,7 @@ async function updateHolding(holdingId, options = {}) {
         if (saleDetails.sale_date) payload.sale_date = saleDetails.sale_date;
     }
 
-    const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
+    const res = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -12711,7 +12674,7 @@ async function refreshAiVerdicts(options = {}) {
         return;
     }
     try {
-        const data = await apiGet(intelligenceSignalsUrl({ claude: useClaude }));
+        const data = await PortfolioWorkspace.json(intelligenceSignalsUrl({ claude: useClaude }));
         Object.entries(data.signals || {}).forEach(([ticker, sig]) => {
             cachedVerdicts[ticker] = sig;
         });
@@ -12792,7 +12755,7 @@ async function setHoldMode(event, holdingId, ticker, mode) {
     grid?.classList.add("is-saving");
 
     try {
-        const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
+        const res = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ hold_class: nextClass }),
@@ -12841,7 +12804,7 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
         : `Remove ${ticker} from your portfolio? This will record any realized gain/loss.`;
     if (!confirm(msg)) return;
 
-    const res = await fetch(`/api/portfolio/holdings/${holdingId}`, {
+    const res = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
         method: "DELETE"
     });
     if (res.ok) {
@@ -12878,7 +12841,7 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
 async function removeTrade(tradeId, ticker) {
     if (!confirm("Remove this realized sale from your P&L? This adjusts your realized gain.")) return;
 
-    const res = await fetch(`/api/portfolio/trades/${tradeId}`, { method: "DELETE" });
+    const res = await PortfolioWorkspace.response(`/api/portfolio/trades/${tradeId}`, { method: "DELETE" });
     if (res.ok) {
         showToast(`Removed realized sale for ${ticker}`, "warning");
         await Promise.allSettled([loadPnl(), loadPortfolioValue()]);
@@ -13016,7 +12979,7 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
     setAddHoldingBusy(e.target, true, ticker);
 
     try {
-        const res = await fetch("/api/portfolio/holdings", {
+        const res = await PortfolioWorkspace.response("/api/portfolio/holdings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -13106,15 +13069,6 @@ function toggleCsvImportPanel() {
     if (open) updateImportPanelMode();
 }
 
-// The desktop WebView has no download chrome: an <a download> or a blob-URL
-// click just navigates and renders the file inline, with no back button. When
-// the native bridge is present, route CSV saves through a real "Save As…"
-// dialog. In a real browser the bridge is absent and we do a normal download.
-function desktopSaveBridge() {
-    const api = window.pywebview && window.pywebview.api;
-    return api && typeof api.save_file === "function" ? api : null;
-}
-
 // In the desktop WebView, target="_blank" links open a chrome-less frame (or
 // nothing) instead of the system browser — stranding the user (e.g. can't reach
 // console.anthropic.com to get a Claude key). Route external links through the
@@ -13134,67 +13088,41 @@ function initDesktopLinkHandler() {
     });
 }
 
-function browserDownloadCsv(filename, csv) {
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-}
-
-async function saveCsv(filename, csv) {
-    const bridge = desktopSaveBridge();
-    if (bridge) {
-        try {
-            const res = await bridge.save_file(filename, csv);
-            if (res && res.saved) {
-                const shown = res.path ? res.path.split(/[\\/]/).pop() : filename;
-                showToast(`Saved ${shown}`, "success");
-            }
-            return; // handled natively — a user cancel still counts as handled
-        } catch (err) {
-            console.warn("Native save failed, falling back to download:", err);
-        }
-    }
-    browserDownloadCsv(filename, csv);
-}
-
 function downloadHoldingsTemplate() {
     const csv = "﻿ticker,shares,avg_cost,is_watchlist,hold_class,notes\n"
         + "VOO,10,412.5,false,auto,\n"
         + "NVDA,0,,true,auto,Watching for a pullback\n";
-    saveCsv("folioorb-holdings-template.csv", csv);
+    LocalTextExport.saveText(
+        "folioorb-holdings-template.csv", csv, "text/csv;charset=utf-8"
+    ).then(result => {
+        if (result.status === "saved" && result.path) {
+            showToast(`Saved ${result.filename}`, "success");
+        }
+    }).catch(error => {
+        console.warn("CSV template save failed:", error);
+        showToast("Template save failed — please try again.", "error");
+    });
 }
 
-// Export lives on an <a href download> so a real browser just downloads it.
-// Inside the desktop WebView that navigation would render the CSV inline, so
-// intercept there, fetch the CSV, and hand it to the native Save dialog.
+// Always use the shared adapter: it chooses native Save As in the desktop and
+// a browser Blob download elsewhere without duplicating response handling.
 function handleExportClick(event) {
-    if (!desktopSaveBridge()) return true; // browser: let the anchor download
     event.preventDefault();
     const href = event.currentTarget.getAttribute("href");
     exportHoldingsCsv(href);
     return false;
 }
 
-function _filenameFromDisposition(res) {
-    const cd = res.headers.get("Content-Disposition") || "";
-    const match = /filename="?([^"]+)"?/.exec(cd);
-    return match ? match[1] : null;
-}
-
 async function exportHoldingsCsv(href) {
     try {
-        const res = await fetch(href);
-        if (!res.ok) throw new Error(`export ${res.status}`);
-        const csv = await res.text();
-        const filename = _filenameFromDisposition(res)
-            || `folioorb-holdings-${new Date().toISOString().slice(0, 10)}.csv`;
-        await saveCsv(filename, csv);
+        const res = await PortfolioWorkspace.response(href);
+        const result = await LocalTextExport.saveResponse(res, {
+            fallbackFilename: `folioorb-holdings-${new Date().toISOString().slice(0, 10)}.csv`,
+            mediaType: "text/csv;charset=utf-8",
+        });
+        if (result.status === "saved" && result.path) {
+            showToast(`Saved ${result.filename}`, "success");
+        }
     } catch (err) {
         console.warn("CSV export failed:", err);
         showToast("Export failed — please try again.", "error");
@@ -13212,12 +13140,12 @@ async function handleImportFile(file) {
             `${manageLucide("loader-2", "manage-lucide manage-lucide--btn manage-lucide--spin")} Importing…`;
     }
 
-    const url = "/api/portfolio/holdings/import?portfolio_id=1"
-        + (isLocalIntelligenceMode() ? "&force_local=true" : "");
+    const url = "/api/portfolio/holdings/import"
+        + (isLocalIntelligenceMode() ? "?force_local=true" : "");
     try {
         const fd = new FormData();
         fd.append("file", file);
-        const res = await fetch(url, { method: "POST", body: fd });
+        const res = await PortfolioWorkspace.response(url, { method: "POST", body: fd });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
             renderImportResult(data);
@@ -13303,603 +13231,6 @@ function initCsvImport() {
         if (file) handleImportFile(file);
         input.value = "";  // allow re-selecting the same file
     });
-}
-
-
-// ── DCA auto-invest (simulated locally) ──────────────────────────────────────
-// Plans mirror a brokerage auto-invest: each interval books a buy at that day's
-// real close into a "pending" bucket the user reviews. Nothing touches holdings
-// until a buy is applied, and every apply is undoable. See app/routers/dca.py.
-
-function toggleDcaPanel() {
-    const panel = document.getElementById("dca-panel");
-    const btn = document.getElementById("dca-btn");
-    if (!panel) return;
-    const open = panel.hidden;
-    panel.hidden = !open;
-    btn?.setAttribute("aria-expanded", String(open));
-    if (open) loadDcaPanel();
-}
-
-function initDca() {
-    const form = document.getElementById("dca-create-form");
-    if (!form || form.dataset.bound) return;
-    form.dataset.bound = "true";
-    const startInput = document.getElementById("dca-start-date");
-    const today = new Date().toISOString().slice(0, 10);
-    startInput.max = today;         // backend rejects future starts too
-    startInput.value = today;
-    form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        handleDcaCreate();
-    });
-    document.getElementById("dca-confirm-cancel")
-        ?.addEventListener("click", () => hideDcaBackfillConfirm());
-    initDcaActionDialog();
-}
-
-// On app open: book any missed buys, then badge the DCA button. A toast points
-// the user at the review bucket only when NEW buys just landed (no nagging).
-async function runDcaCatchup() {
-    try {
-        const res = await fetch("/api/dca/run?portfolio_id=1", { method: "POST" });
-        if (!res.ok) return;
-        const data = await res.json();
-        const unpriced = (data.plans || []).filter(p => !p.price_data);
-        if (unpriced.length) {
-            showToast(`Couldn't fetch prices for ${unpriced.map(p => p.ticker).join(", ")} — DCA buys not booked yet`, "warning");
-        }
-        if (data.buys_added > 0) {
-            showToast(`${data.buys_added} DCA buy${data.buys_added === 1 ? "" : "s"} ready to review in Manage → DCA`, "info");
-        }
-        updateDcaBadge();
-    } catch (err) {
-        console.warn("DCA catch-up failed:", err);
-    }
-}
-
-async function updateDcaBadge() {
-    const badge = document.getElementById("dca-badge");
-    if (!badge) return;
-    try {
-        const pending = await apiGet("/api/dca/contributions?portfolio_id=1&status=pending");
-        const count = pending.contributions.length;
-        badge.textContent = count > 99 ? "99+" : String(count);
-        badge.hidden = count === 0;
-    } catch { /* badge is cosmetic — stay quiet offline */ }
-}
-
-async function loadDcaPanel() {
-    try {
-        const [plansRes, pendingRes] = await Promise.all([
-            fetch("/api/dca/plans?portfolio_id=1"),
-            fetch("/api/dca/contributions?portfolio_id=1&status=pending"),
-        ]);
-        const plans = plansRes.ok ? (await plansRes.json()).plans : [];
-        const pending = pendingRes.ok ? (await pendingRes.json()).contributions : [];
-        renderDcaPlans(plans);
-        renderDcaPending(pending, plans);
-        updateDcaBadge();
-        const historyList = document.getElementById("dca-history-list");
-        if (historyList && !historyList.hidden) loadDcaHistory();
-    } catch (err) {
-        console.warn("DCA panel load failed:", err);
-    }
-}
-
-function renderDcaPlans(plans) {
-    const section = document.getElementById("dca-plans-section");
-    const list = document.getElementById("dca-plans-list");
-    if (!section || !list) return;
-    section.hidden = plans.length === 0;
-    list.innerHTML = plans.map(p => {
-        const applied = p.applied_count
-            ? `${formatCurrency(p.applied_amount)} → ${p.applied_shares.toFixed(4)} sh @ ${formatCurrency(p.applied_avg_cost)}`
-            : "nothing applied yet";
-        const badge = p.is_active
-            ? (p.next_date
-                ? `<span class="dca-plan-next">Next buy ${escapeHtml(p.next_date)}</span>`
-                : "")
-            : `<span class="dca-plan-flag">Paused</span>`;
-        return `
-        <div class="dca-plan-card${p.is_active ? "" : " dca-plan-card--paused"}" data-plan-id="${p.id}">
-            <div class="dca-plan-head">
-                <div class="dca-plan-id">
-                    <span class="dca-plan-ticker">${escapeHtml(p.ticker)}</span>
-                    <span class="dca-plan-terms">${formatCurrency(p.amount)} · ${escapeHtml(p.frequency)}</span>
-                </div>
-                ${badge}
-            </div>
-            <div class="dca-plan-sub">Applied so far: ${applied}</div>
-            <div class="dca-plan-actions">
-                <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaTogglePause(${p.id}, ${p.is_active})">
-                    ${p.is_active ? "Pause" : "Resume"}
-                </button>
-                <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaEditAmount(${p.id}, ${p.amount})">
-                    Edit amount
-                </button>
-                ${p.applied_count ? `<button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaUndoAll(${p.id}, ${p.applied_count}, '${escapeHtml(p.ticker)}')">
-                    Undo applied
-                </button>` : ""}
-                <button type="button" class="btn btn-sm dca-chip-btn dca-chip-btn--danger" onclick="dcaDeletePlan(${p.id}, '${escapeHtml(p.ticker)}')">
-                    Delete
-                </button>
-            </div>
-        </div>`;
-    }).join("");
-}
-
-function dcaBuyRow(c, endHtml) {
-    return `
-        <div class="dca-buy-row" data-cid="${c.id}">
-            <span class="dca-buy-date">${escapeHtml(c.exec_date)}</span>
-            <span class="dca-buy-detail">
-                <span class="dca-buy-shares">${c.shares.toFixed(4)} sh</span>
-                <span class="dca-buy-meta">@ ${formatCurrency(c.price)} · ${formatCurrency(c.amount)}</span>
-            </span>
-            <span class="dca-buy-end">${endHtml}</span>
-        </div>`;
-}
-
-function renderDcaPending(pending, plans) {
-    const section = document.getElementById("dca-pending-section");
-    const list = document.getElementById("dca-pending-list");
-    if (!section || !list) return;
-    section.hidden = pending.length === 0;
-    if (!pending.length) { list.innerHTML = ""; return; }
-
-    const planById = Object.fromEntries((plans || []).map(p => [p.id, p]));
-    const byPlan = new Map();
-    pending.forEach(c => {
-        if (!byPlan.has(c.plan_id)) byPlan.set(c.plan_id, []);
-        byPlan.get(c.plan_id).push(c);
-    });
-
-    list.innerHTML = [...byPlan.entries()].map(([planId, buys]) => {
-        const plan = planById[planId];
-        const ticker = plan?.ticker || buys[0].ticker || "?";
-        const terms = plan ? `${formatCurrency(plan.amount)} ${escapeHtml(plan.frequency)}` : "";
-        const total = buys.reduce((sum, c) => sum + c.amount, 0);
-        // Keep the DOM light for a big backfill: show the most recent slice and
-        // nudge the rest toward the bulk actions in the group header.
-        const CAP = 15;
-        const rows = buys.slice(0, CAP).map(c => dcaBuyRow(c, `
-            <button type="button" class="btn btn-sm btn-success dca-act-btn" onclick="dcaApply(${c.id})">Apply</button>
-            <button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaSkip(${c.id})">Skip</button>
-        `)).join("") + (buys.length > CAP
-            ? `<div class="dca-more-note">…and ${buys.length - CAP} more — use “Apply all ${buys.length}” or “Skip all” above.</div>`
-            : "");
-        const bulk = buys.length > 1 ? `
-            <span class="dca-bulk-actions">
-                <button type="button" class="btn btn-sm btn-link dca-bulk-link" onclick="dcaApplyAll(${planId}, ${buys.length}, ${total}, '${escapeHtml(ticker)}')">Apply all ${buys.length}</button>
-                <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" onclick="dcaSkipAll(${planId}, ${buys.length}, '${escapeHtml(ticker)}')">Skip all</button>
-            </span>` : "";
-        return `
-        <div class="dca-pending-group">
-            <div class="dca-pending-group-head">
-                <span class="dca-group-ticker">${escapeHtml(ticker)}</span>
-                ${terms ? `<span class="dca-group-terms">${terms}</span>` : ""}
-                <span class="dca-group-count">${buys.length} buy${buys.length === 1 ? "" : "s"} awaiting</span>
-                ${bulk}
-            </div>
-            ${rows}
-        </div>`;
-    }).join("");
-}
-
-async function toggleDcaHistory() {
-    const listEl = document.getElementById("dca-history-list");
-    const btn = document.getElementById("dca-history-toggle");
-    if (!listEl || !btn) return;
-    const show = listEl.hidden;
-    listEl.hidden = !show;
-    btn.textContent = show ? "Hide history" : "Show history";
-    btn.setAttribute("aria-expanded", String(show));
-    if (show) loadDcaHistory();
-}
-
-async function loadDcaHistory() {
-    const listEl = document.getElementById("dca-history-list");
-    if (!listEl) return;
-    try {
-        const all = await apiGet("/api/dca/contributions?portfolio_id=1&status=all");
-        const rows = all.contributions.filter(c => c.status !== "pending");
-        if (!rows.length) {
-            listEl.innerHTML = `<div class="dca-history-empty">No applied or skipped buys yet.</div>`;
-            return;
-        }
-        // Rows arrive newest-first; cap the render so a long history stays snappy.
-        const CAP = 80;
-        const shown = rows.slice(0, CAP);
-        const moreNote = rows.length > CAP
-            ? `<div class="dca-history-empty">Showing the latest ${CAP} of ${rows.length}.</div>`
-            : "";
-        listEl.innerHTML = shown.map(c => {
-            const action = c.status === "applied"
-                ? `<button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaUndo(${c.id})">Undo</button>`
-                : `<button type="button" class="btn btn-sm dca-chip-btn" onclick="dcaRestore(${c.id})">Restore</button>`;
-            const ticker = c.ticker ? `<span class="dca-buy-ticker">${escapeHtml(c.ticker)}</span>` : "";
-            const end = `
-                <span class="dca-buy-status dca-buy-status--${c.status}">${escapeHtml(c.status)}</span>
-                ${action}`;
-            return `
-            <div class="dca-buy-row dca-buy-row--${c.status}" data-cid="${c.id}">
-                <span class="dca-buy-date">${ticker}${escapeHtml(c.exec_date)}</span>
-                <span class="dca-buy-detail">
-                    <span class="dca-buy-shares">${c.shares.toFixed(4)} sh</span>
-                    <span class="dca-buy-meta">@ ${formatCurrency(c.price)} · ${formatCurrency(c.amount)}</span>
-                </span>
-                <span class="dca-buy-end">${end}</span>
-            </div>`;
-        }).join("") + moreNote;
-    } catch (err) {
-        console.warn("DCA history load failed:", err);
-    }
-}
-
-// ── DCA actions ──────────────────────────────────────────────────────────────
-
-// One DCA mutation at a time: a second click while a request is in flight is
-// ignored, so double-taps can't fire a duplicate apply (and hit a 400) or race.
-let _dcaActionInFlight = false;
-let _dcaActionDialogState = null;
-
-function dcaActionDialogFocusableElements() {
-    const dialog = document.getElementById("dca-action-dialog");
-    if (!dialog || dialog.hidden) return [];
-    return Array.from(dialog.querySelectorAll(
-        "button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])"
-    )).filter(element => !element.closest("[hidden]") && element.getClientRects().length > 0);
-}
-
-function closeDcaActionDialog(result = null) {
-    const dialog = document.getElementById("dca-action-dialog");
-    const state = _dcaActionDialogState;
-    if (!dialog || !state) return;
-    _dcaActionDialogState = null;
-    dialog.hidden = true;
-    dialog.setAttribute("aria-hidden", "true");
-    document.querySelector("#portfolioModal > .portfolio-manager-panel")?.removeAttribute("inert");
-    state.resolve(result);
-    if (state.previousFocus?.focus) requestAnimationFrame(() => state.previousFocus.focus());
-}
-
-function openDcaActionDialog({ title, copy, confirmLabel, warning = "", value = null, danger = false }) {
-    const dialog = document.getElementById("dca-action-dialog");
-    const field = document.getElementById("dca-action-field");
-    const input = document.getElementById("dca-action-input");
-    if (!dialog || !field || !input || _dcaActionDialogState) return Promise.resolve(null);
-
-    document.getElementById("dca-action-title").textContent = title;
-    document.getElementById("dca-action-copy").textContent = copy;
-    const warningElement = document.getElementById("dca-action-warning");
-    warningElement.textContent = warning;
-    warningElement.hidden = !warning;
-    const hasValue = value !== null;
-    field.hidden = !hasValue;
-    input.value = hasValue ? String(value) : "";
-    input.classList.remove("is-invalid");
-    input.removeAttribute("aria-invalid");
-    document.getElementById("dca-action-error").hidden = true;
-    const submit = document.getElementById("dca-action-submit");
-    submit.textContent = confirmLabel;
-    submit.classList.toggle("btn-primary", !danger);
-    submit.classList.toggle("btn-danger", danger);
-    const previousFocus = document.activeElement;
-    document.querySelector("#portfolioModal > .portfolio-manager-panel")?.setAttribute("inert", "");
-    dialog.hidden = false;
-    dialog.setAttribute("aria-hidden", "false");
-    return new Promise(resolve => {
-        _dcaActionDialogState = { resolve, previousFocus, hasValue };
-        requestAnimationFrame(() => {
-            const target = hasValue ? input : document.getElementById("dca-action-cancel");
-            target?.focus();
-            if (hasValue) input.select();
-        });
-    });
-}
-
-function handleDcaActionDialogKeydown(event) {
-    if (!_dcaActionDialogState) return;
-    if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        closeDcaActionDialog();
-        return;
-    }
-    if (event.key !== "Tab") return;
-    const focusable = dcaActionDialogFocusableElements();
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-    } else if (!document.getElementById("dca-action-dialog")?.contains(document.activeElement)) {
-        event.preventDefault();
-        first.focus();
-    }
-}
-
-function initDcaActionDialog() {
-    const dialog = document.getElementById("dca-action-dialog");
-    const form = document.getElementById("dca-action-form");
-    if (!dialog || !form || form.dataset.bound) return;
-    form.dataset.bound = "true";
-    form.addEventListener("submit", event => {
-        event.preventDefault();
-        const state = _dcaActionDialogState;
-        if (!state) return;
-        if (!state.hasValue) {
-            closeDcaActionDialog({ confirmed: true });
-            return;
-        }
-        const input = document.getElementById("dca-action-input");
-        const amount = Number.parseFloat(input.value);
-        if (!Number.isFinite(amount) || amount <= 0) {
-            input.classList.add("is-invalid");
-            input.setAttribute("aria-invalid", "true");
-            document.getElementById("dca-action-error").hidden = false;
-            input.focus();
-            return;
-        }
-        closeDcaActionDialog({ confirmed: true, value: amount });
-    });
-    document.getElementById("dca-action-cancel")?.addEventListener("click", () => closeDcaActionDialog());
-    dialog.addEventListener("mousedown", event => {
-        if (event.target === dialog) closeDcaActionDialog();
-    });
-    document.addEventListener("keydown", handleDcaActionDialogKeydown, true);
-}
-
-async function _dcaPost(path, okMessage) {
-    if (_dcaActionInFlight) return null;
-    _dcaActionInFlight = true;
-    try {
-        const res = await fetch(path, { method: "POST" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            showToast(typeof data.detail === "string" ? data.detail : "DCA action failed", "danger");
-            return null;
-        }
-        if (okMessage) showToast(okMessage, "success");
-        return data;
-    } catch {
-        showToast("DCA action failed — is the app online?", "danger");
-        return null;
-    } finally {
-        _dcaActionInFlight = false;
-    }
-}
-
-async function _dcaAfterHoldingsChange() {
-    await loadDcaPanel();
-    loadManageHoldings({ preserveExisting: true });
-    refreshDashboardData({ includeManageHoldings: false });
-}
-
-async function dcaApply(cid) {
-    const data = await _dcaPost(`/api/dca/contributions/${cid}/apply`);
-    if (data) {
-        showToast(data.message || "Buy applied", "success");
-        _dcaAfterHoldingsChange();
-    }
-}
-
-async function dcaApplyAll(planId, count, total, ticker) {
-    const choice = await openDcaActionDialog({
-        title: `Apply ${count} ${ticker} buys?`,
-        copy: `${formatCurrency(total)} will be added to your holding using the recorded closes.`,
-        warning: `You can reverse these later with “Undo applied”.`,
-        confirmLabel: "Apply all buys",
-    });
-    if (!choice?.confirmed) return;
-    const data = await _dcaPost(`/api/dca/plans/${planId}/apply-pending`);
-    if (data) {
-        showToast(`Applied ${data.applied} buys to ${data.ticker}`, "success");
-        _dcaAfterHoldingsChange();
-    }
-}
-
-async function dcaUndoAll(planId, count, ticker) {
-    const choice = await openDcaActionDialog({
-        title: `Undo ${count} applied ${ticker} buys?`,
-        copy: "Your holding’s shares and average cost will roll back exactly.",
-        warning: "The buys return to the pending bucket and can be reviewed again.",
-        confirmLabel: "Undo applied buys",
-    });
-    if (!choice?.confirmed) return;
-    const data = await _dcaPost(`/api/dca/plans/${planId}/undo-applied`);
-    if (data) {
-        showToast(`Reversed ${data.undone} buys for ${data.ticker}`, "success");
-        _dcaAfterHoldingsChange();
-        loadDcaHistory();
-    }
-}
-
-async function dcaSkip(cid) {
-    const data = await _dcaPost(`/api/dca/contributions/${cid}/skip`,
-        "Buy skipped — plan still active (pause it in Plans if needed)");
-    if (data) loadDcaPanel();
-}
-
-async function dcaSkipAll(planId, count, ticker) {
-    const choice = await openDcaActionDialog({
-        title: `Skip ${count} pending ${ticker} buys?`,
-        copy: "These buys won’t be applied and won’t reappear.",
-        warning: "The plan stays active. Pause it separately to stop future buys.",
-        confirmLabel: "Skip pending buys",
-        danger: true,
-    });
-    if (!choice?.confirmed) return;
-    const data = await _dcaPost(`/api/dca/plans/${planId}/skip-pending`);
-    if (data) {
-        showToast(`Skipped ${data.skipped} buys for ${data.ticker}`, "success");
-        loadDcaPanel();
-    }
-}
-
-async function dcaUndo(cid) {
-    const data = await _dcaPost(`/api/dca/contributions/${cid}/undo`);
-    if (data) {
-        showToast(data.message || "Buy undone", "success");
-        _dcaAfterHoldingsChange();
-        loadDcaHistory();
-    }
-}
-
-async function dcaRestore(cid) {
-    const data = await _dcaPost(`/api/dca/contributions/${cid}/restore`, "Buy restored to pending");
-    if (data) { loadDcaPanel(); loadDcaHistory(); }
-}
-
-async function dcaTogglePause(planId, isActive) {
-    try {
-        const res = await fetch(`/api/dca/plans/${planId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_active: !isActive }),
-        });
-        if (res.ok) {
-            showToast(isActive ? "Plan paused — no new buys will book" : "Plan resumed", "success");
-            loadDcaPanel();
-        }
-    } catch { showToast("Could not update plan", "danger"); }
-}
-
-async function dcaEditAmount(planId, current) {
-    const choice = await openDcaActionDialog({
-        title: "Change DCA amount",
-        copy: "This amount applies to future intervals; recorded buys keep their original values.",
-        confirmLabel: "Save amount",
-        value: current,
-    });
-    if (!choice?.confirmed) return;
-    const amount = choice.value;
-    try {
-        const res = await fetch(`/api/dca/plans/${planId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount }),
-        });
-        if (res.ok) { showToast("Plan amount updated", "success"); loadDcaPanel(); }
-    } catch { showToast("Could not update plan", "danger"); }
-}
-
-async function dcaDeletePlan(planId, ticker) {
-    const choice = await openDcaActionDialog({
-        title: `Delete the ${ticker} DCA plan?`,
-        copy: "Undo every applied buy before deleting this plan so its holding changes stay traceable.",
-        warning: "After applied buys are undone, deleting removes pending and skipped buys. This cannot be undone.",
-        confirmLabel: "Delete plan",
-        danger: true,
-    });
-    if (!choice?.confirmed) return;
-    try {
-        const res = await fetch(`/api/dca/plans/${planId}`, { method: "DELETE" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            showToast(typeof data.detail === "string" ? data.detail : "Could not delete plan", "danger");
-            return;
-        }
-        showToast(`${ticker} plan deleted`, "success");
-        loadDcaPanel();
-    } catch { showToast("Could not delete plan — is the app online?", "danger"); }
-}
-
-// ── DCA plan creation (with double-count guard) ──────────────────────────────
-
-function hideDcaBackfillConfirm() {
-    const confirmBox = document.getElementById("dca-backfill-confirm");
-    if (confirmBox) confirmBox.hidden = true;
-}
-
-// If the ticker is already held AND the start date is in the past, the user's
-// existing share count may already include those buys (e.g. they mirrored a
-// real auto-invest). Applying a backfill on top would double-count — so ask.
-async function handleDcaCreate() {
-    const ticker = document.getElementById("dca-ticker").value.trim().toUpperCase();
-    const amount = parseFloat(document.getElementById("dca-amount").value);
-    const frequency = document.getElementById("dca-frequency").value;
-    const startDate = document.getElementById("dca-start-date").value;
-    if (!ticker || !Number.isFinite(amount) || amount <= 0 || !startDate) {
-        showToast("Fill in ticker, amount, and start date", "warning");
-        return;
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    if (startDate < today) {
-        let held = null;
-        try {
-            const owned = await apiGet("/api/portfolio/holdings?portfolio_id=1");
-            held = (owned.holdings || []).find(h => h.ticker === ticker && h.shares > 0);
-        } catch { /* offline — fall through and just create */ }
-        if (held) {
-            const confirmBox = document.getElementById("dca-backfill-confirm");
-            const text = document.getElementById("dca-confirm-text");
-            const heldShares = Number(held.shares.toFixed(4));
-            text.textContent =
-                `You already hold ${heldShares} ${ticker}. If that count already includes your past `
-                + `auto-invest buys, applying a backfill would double-count them. Track from today, `
-                + `or backfill anyway and review each buy before applying.`;
-            confirmBox.hidden = false;
-            document.getElementById("dca-confirm-today").onclick = () => {
-                hideDcaBackfillConfirm();
-                submitDcaPlan({ ticker, amount, frequency, start_date: today });
-            };
-            document.getElementById("dca-confirm-backfill").onclick = () => {
-                hideDcaBackfillConfirm();
-                submitDcaPlan({ ticker, amount, frequency, start_date: startDate });
-            };
-            return;
-        }
-    }
-    submitDcaPlan({ ticker, amount, frequency, start_date: startDate });
-}
-
-async function submitDcaPlan(payload) {
-    const btn = document.getElementById("dca-create-btn");
-    btn.disabled = true;
-    try {
-        const res = await fetch("/api/dca/plans?portfolio_id=1", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            const detail = data.detail;
-            const msg = typeof detail === "string" ? detail
-                : detail?.message || detail?.[0]?.msg || "Could not create plan";
-            showToast(msg, "danger");
-            return;
-        }
-        document.getElementById("dca-create-form").reset();
-        initDcaFormDefaults();
-        const n = data.buys_added;
-        showToast(n > 0
-            ? `${payload.ticker} plan created — ${n} buy${n === 1 ? "" : "s"} ready to review`
-            : `${payload.ticker} plan created — first buy books on the next interval`,
-            "success");
-        loadDcaPanel();
-    } catch {
-        showToast("Could not create plan — is the app online?", "danger");
-    } finally {
-        btn.disabled = false;
-    }
-}
-
-function initDcaFormDefaults() {
-    const startInput = document.getElementById("dca-start-date");
-    if (!startInput) return;
-    const today = new Date().toISOString().slice(0, 10);
-    startInput.max = today;
-    startInput.value = today;
-    const freq = document.getElementById("dca-frequency");
-    if (freq) freq.value = "weekly";
 }
 
 
@@ -14555,7 +13886,7 @@ function _newsRenderFilings(filingsData) {
 /** Fetch the filings timeline. Local-safe: never gated on Claude. */
 async function _newsLoadFilings() {
     try {
-        _newsRenderFilings(await apiGet("/api/news/filings"));
+        _newsRenderFilings(await PortfolioWorkspace.json("/api/news/filings"));
     } catch (err) {
         // A missing timeline is a quiet absence, not a broken news zone.
         console.warn("Filings fetch failed:", err);
@@ -14605,7 +13936,7 @@ async function _newsLoadThemes() {
             <div class="news-skeleton news-skeleton--line news-skeleton--medium"></div>`;
     }
     try {
-        const res = await fetch("/api/news/themes");
+        const res = await PortfolioWorkspace.response("/api/news/themes");
         if (res.status === 503) {
             // Claude offline — AI section stays hidden via data-engine-claude-only
             if (briefingBody) briefingBody.innerHTML = "";
@@ -14634,7 +13965,7 @@ async function loadNewsZone() {
     _newsShowEmpty(false);
 
     try {
-        _newsFeedData = await apiGet("/api/news/feed");
+        _newsFeedData = await PortfolioWorkspace.json("/api/news/feed");
         _newsRenderFeed(_newsFeedData);
         feedLoaded = true;
     } catch (err) {

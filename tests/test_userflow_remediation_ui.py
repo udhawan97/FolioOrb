@@ -5,14 +5,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = (ROOT / "templates/index.html").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
+DCA = (ROOT / "static/js/dca-workflow.js").read_text(encoding="utf-8")
 STYLE = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 REVIEW_STYLE = (ROOT / "static/css/review-orbit.css").read_text(encoding="utf-8")
 
 
-def _function(name: str, next_name: str) -> str:
-    start = DASHBOARD.index(f"function {name}(")
-    end = DASHBOARD.index(f"function {next_name}(", start)
-    return DASHBOARD[start:end]
+def _function(name: str, next_name: str, source: str = DASHBOARD) -> str:
+    start = source.index(f"function {name}(")
+    end = source.index(f"function {next_name}(", start)
+    return source[start:end]
 
 
 def test_holding_rows_expose_a_native_keyboard_disclosure():
@@ -110,35 +111,30 @@ def test_dca_bulk_and_plan_actions_use_the_in_app_dialog():
     ):
         assert marker in INDEX
 
-    functions = (
-        ("dcaApplyAll", "dcaUndoAll"),
-        ("dcaUndoAll", "dcaSkip"),
-        ("dcaSkipAll", "dcaUndo"),
-        ("dcaEditAmount", "dcaDeletePlan"),
-        ("dcaDeletePlan", "hideDcaBackfillConfirm"),
-    )
-    for name, next_name in functions:
-        body = _function(name, next_name)
-        assert "openDcaActionDialog" in body
-        assert "window.confirm" not in body
-        assert "window.prompt" not in body
+    for action in ("apply-all", "undo-all", "skip-all", "edit-plan", "delete-plan"):
+        assert f'action === "{action}"' in DCA
+    body = _function("handleAction", "hideBackfillConfirm", DCA)
+    assert "openDialog" in body
+    assert "window.confirm" not in body
+    assert "window.prompt" not in body
+    assert 'data-dca-action="apply-all"' in DCA
 
 
 def test_dca_action_dialog_traps_focus_and_restores_the_manager():
-    assert "function handleDcaActionDialogKeydown" in DASHBOARD
+    assert "function handleDialogKeydown" in DCA
     assert 'event.key === "Escape"' in _function(
-        "handleDcaActionDialogKeydown", "initDcaActionDialog"
+        "handleDialogKeydown", "initDialog", DCA
     )
-    assert "event.shiftKey && document.activeElement === first" in DASHBOARD
-    assert "!event.shiftKey && document.activeElement === last" in DASHBOARD
-    assert 'setAttribute("inert", "")' in DASHBOARD
-    assert 'removeAttribute("inert")' in DASHBOARD
-    assert "state.previousFocus.focus()" in DASHBOARD
+    assert "event.shiftKey && document.activeElement === first" in DCA
+    assert "!event.shiftKey && document.activeElement === last" in DCA
+    assert 'setAttribute("inert", "")' in DCA
+    assert 'removeAttribute("inert")' in DCA
+    assert "state.previousFocus.focus()" in DCA
 
 
 def test_dca_delete_explains_and_surfaces_applied_buy_conflicts():
-    delete = _function("dcaDeletePlan", "hideDcaBackfillConfirm")
+    delete = _function("handleAction", "hideBackfillConfirm", DCA)
     assert "Undo every applied buy before deleting this plan" in delete
     assert 'typeof data.detail === "string" ? data.detail' in delete
-    assert "if (!res.ok)" in delete
-    assert 'showToast(`${ticker} plan deleted`, "success")' in delete
+    assert "if (!response.ok)" in delete
+    assert 'notify(`${ticker} plan deleted`, "success")' in delete

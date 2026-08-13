@@ -18,6 +18,12 @@ def test_dashboard_js_wires_csv():
     assert "initCsvImport" in js
 
 
+def test_local_import_adds_its_first_query_parameter_with_a_question_mark():
+    js = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
+    assert 'isLocalIntelligenceMode() ? "?force_local=true" : ""' in js
+    assert 'isLocalIntelligenceMode() ? "&force_local=true" : ""' not in js
+
+
 def test_index_html_has_import_panel():
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     assert 'id="import-csv-panel"' in html

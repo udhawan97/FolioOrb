@@ -209,26 +209,18 @@ def _create_rollback_point() -> dict | None:
     from app import app_settings
 
     try:
-        source_db = backup_service.live_db_path()
-        pre_count = backup_service.count_holdings(source_db)
-        db_backup = backup_service.create_backup(
-            source_db,
+        point = backup_service.create_verified_backup(
             label=f"pre-update-v{__version__}",
-            expected_min_holdings=pre_count,
+            include_environment=True,
         )
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Pre-update backup failed: %s", type(exc).__name__)
         return None
 
-    if not backup_service.verify_backup(db_backup, expected_min_holdings=pre_count):
-        logger.error("Pre-update backup failed verification")
-        return None
-
-    env_backup = backup_service.snapshot_env(Path(str(db_backup) + ".env"))
     rollback = {
         "version": __version__,
-        "db_backup": str(db_backup),
-        "env_backup": str(env_backup) if env_backup else None,
+        "db_backup": str(point.database),
+        "env_backup": str(point.environment) if point.environment else None,
         "installer": None,  # the archived current-version installer (Phase 6)
         "created_at": datetime.now(timezone.utc).isoformat(),
     }

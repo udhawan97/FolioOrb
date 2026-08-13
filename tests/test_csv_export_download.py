@@ -111,22 +111,22 @@ def test_desktop_exposes_save_bridge():
     assert "js_api=_NativeBridge()" in src
 
 
-# ── Frontend wiring: export intercepts in the app, template routes through saveCsv ─
+# ── Frontend wiring: every text export routes through the shared adapter ──────
 
 
 def test_dashboard_js_routes_through_native_save():
     js = (_ROOT / "static" / "js" / "dashboard.js").read_text(encoding="utf-8")
-    assert "function desktopSaveBridge()" in js
-    assert "async function saveCsv(" in js
     assert "function handleExportClick(" in js
-    # Template download must go through saveCsv, not a raw blob click.
+    assert "function desktopSaveBridge()" not in js
     template = js[js.index("function downloadHoldingsTemplate("):]
     template = template[: template.index("}") + 1]
-    assert "saveCsv(" in template
+    assert "LocalTextExport.saveText(" in template
+    assert "LocalTextExport.saveResponse(" in js
 
 
 def test_export_anchor_intercepts_in_app():
     html = (_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'onclick="return handleExportClick(event)"' in html
-    # Keep the href+download so a real browser still downloads with no JS help.
+    # Keep the href+download as progressive fallback if the bundle cannot boot.
     assert 'href="/api/portfolio/holdings/export?portfolio_id=1" download' in html
+    assert 'src="/static/js/local-text-export.js?v=0"' in html

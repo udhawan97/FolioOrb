@@ -44,7 +44,7 @@ const AnalyticsCharts = (() => {
     let _sectorHoldingContribs = {};
     let _sectorTiltSelectedTicker = null;
 
-    // The URL dashboard.js declares, because apiGetCached keys on the string and
+    // The URL dashboard.js declares, because PortfolioWorkspace keys on identity and URL and
     // the snapshot strip over there reads the same endpoint — one spelling is
     // what keeps the two files to one request. Falls back to the literal so this
     // file still works if dashboard.js is not on the page.
@@ -58,7 +58,7 @@ const AnalyticsCharts = (() => {
     const ANALYTICS_INSIGHTS_LOCAL_URL = "/api/ai/analytics-insights?mode=local";
 
     // Three panes here want this payload and so does the dashboard snapshot.
-    // apiGetCached is the shared layer: concurrent callers await one in-flight
+    // PortfolioWorkspace is the shared layer: concurrent callers await one in-flight
     // request and later ones get the settled payload. The local copy above it
     // stays because the dashboard may have already put a fresher payload in
     // cachedPortfolioExposure (it arrives on the verdict response too), and that
@@ -70,8 +70,8 @@ const AnalyticsCharts = (() => {
             return cachedPortfolioExposure;
         }
         const url = exposureUrl();
-        if (refresh) apiGetCached.invalidate(url);
-        _portfolioExposureCache = await apiGetCached(url);
+        if (refresh) PortfolioWorkspace.invalidate(url);
+        _portfolioExposureCache = await PortfolioWorkspace.cached(url);
         return _portfolioExposureCache;
     }
     const MODULE_LABELS = {
@@ -363,8 +363,8 @@ const AnalyticsCharts = (() => {
             // the zone-enter fetch is still open) slipped past it and produced a
             // second identical request, so the shared endpoint cache backs it up.
             // Forcing still refetches — it drops the entry first.
-            if (forceRefresh) apiGetCached.invalidate(ANALYTICS_INSIGHTS_LOCAL_URL);
-            _moduleInsightsCache.local = await apiGetCached(ANALYTICS_INSIGHTS_LOCAL_URL);
+            if (forceRefresh) PortfolioWorkspace.invalidate(ANALYTICS_INSIGHTS_LOCAL_URL);
+            _moduleInsightsCache.local = await PortfolioWorkspace.cached(ANALYTICS_INSIGHTS_LOCAL_URL);
             applyWidgetInsights();
             if (widgetInsightMode() === "ai") {
                 void loadAiWidgetInsights(false);
@@ -393,7 +393,7 @@ const AnalyticsCharts = (() => {
         try {
             const params = new URLSearchParams({ mode: "ai" });
             if (forceRefresh) params.set("force_refresh", "true");
-            const payload = await apiGet(`/api/ai/analytics-insights?${params}`);
+            const payload = await PortfolioWorkspace.json(`/api/ai/analytics-insights?${params}`);
             if (payload?.source === "claude") {
                 _moduleInsightsCache.ai = payload;
             } else {
@@ -544,7 +544,7 @@ const AnalyticsCharts = (() => {
         showEmpty("portfolio-outlook-empty", false);
 
         try {
-            const data = await apiGet(analyticsSignalsUrl());
+            const data = await PortfolioWorkspace.json(analyticsSignalsUrl());
             renderSignalBoard(data);
             renderPortfolioOutlook(data);
         } catch (err) {
@@ -569,8 +569,8 @@ const AnalyticsCharts = (() => {
         showEmpty("risk-reward-empty", false);
         try {
             const [riskRes, sigRes] = await Promise.all([
-                fetch("/api/portfolio/risk-metrics"),
-                fetch(analyticsSignalsUrl()),
+                PortfolioWorkspace.response("/api/portfolio/risk-metrics"),
+                PortfolioWorkspace.response(analyticsSignalsUrl()),
             ]);
             const data = await riskRes.json();
             const sigData = sigRes.ok ? await sigRes.json() : {};
@@ -1105,7 +1105,7 @@ const AnalyticsCharts = (() => {
         showEmpty("correlation-empty", false);
         showCorrelationScale(false);
         try {
-            const res = await fetch("/api/portfolio/correlation");
+            const res = await PortfolioWorkspace.response("/api/portfolio/correlation");
             const data = await res.json();
             const tickers = data.tickers || [];
 
@@ -1282,7 +1282,7 @@ const AnalyticsCharts = (() => {
         showLoading("drawdown-loading", true);
         showEmpty("drawdown-empty", false);
         try {
-            const res = await fetch("/api/portfolio/drawdown");
+            const res = await PortfolioWorkspace.response("/api/portfolio/drawdown");
             const data = await res.json();
 
             if (!data.has_data) {
@@ -1479,7 +1479,7 @@ const AnalyticsCharts = (() => {
             // Both the pane loader and the post-render pass ask for this on a
             // cold load. Sharing the in-flight promise makes that one request;
             // onRefresh() invalidates so a refresh still refetches.
-            const data = await apiGetCached(BENCHMARK_COMPARISON_URL);
+            const data = await PortfolioWorkspace.cached(BENCHMARK_COMPARISON_URL);
             if (!data.has_data) {
                 showEmpty("benchmark-empty", true);
                 benchmarkChart?.destroy();
@@ -1587,7 +1587,7 @@ const AnalyticsCharts = (() => {
         showLoading("beta-loading", true);
         showEmpty("beta-empty", false);
         try {
-            const res = await fetch("/api/portfolio/beta");
+            const res = await PortfolioWorkspace.response("/api/portfolio/beta");
             const data = await res.json();
             if (!data.has_data) {
                 showEmpty("beta-empty", true);
@@ -1613,7 +1613,7 @@ const AnalyticsCharts = (() => {
         showLoading("rolling-vol-loading", true);
         showEmpty("rolling-vol-empty", false);
         try {
-            const res = await fetch("/api/portfolio/rolling-volatility");
+            const res = await PortfolioWorkspace.response("/api/portfolio/rolling-volatility");
             const data = await res.json();
             if (!data.has_data) {
                 showEmpty("rolling-vol-empty", true);
@@ -1993,7 +1993,7 @@ const AnalyticsCharts = (() => {
         showLoading("sector-tilt-loading", true);
         showEmpty("sector-tilt-empty", false);
         try {
-            const res = await fetch("/api/portfolio/sector-tilt");
+            const res = await PortfolioWorkspace.response("/api/portfolio/sector-tilt");
             const data = await res.json();
             if (!data.has_data) {
                 showEmpty("sector-tilt-empty", true);
@@ -2093,7 +2093,7 @@ const AnalyticsCharts = (() => {
         showLoading("conviction-gap-loading", true);
         showEmpty("conviction-gap-empty", false);
         try {
-            const res = await fetch("/api/portfolio/conviction-gaps");
+            const res = await PortfolioWorkspace.response("/api/portfolio/conviction-gaps");
             const data = await res.json();
             if (!data.has_data) {
                 showEmpty("conviction-gap-empty", true);
@@ -2184,7 +2184,7 @@ const AnalyticsCharts = (() => {
         showLoading("confidence-spectrum-loading", true);
         showEmpty("confidence-spectrum-empty", false);
         try {
-            const res = await fetch("/api/portfolio/confidence-spectrum");
+            const res = await PortfolioWorkspace.response("/api/portfolio/confidence-spectrum");
             const data = await res.json();
             if (!data.has_data) {
                 showEmpty("confidence-spectrum-empty", true);
@@ -2232,7 +2232,7 @@ const AnalyticsCharts = (() => {
         showLoading("macro-alignment-loading", true);
         showEmpty("macro-alignment-empty", false);
         try {
-            const res = await fetch("/api/portfolio/macro-alignment");
+            const res = await PortfolioWorkspace.response("/api/portfolio/macro-alignment");
             const data = await res.json();
             if (!data.has_data || !data.points?.length) {
                 showEmpty("macro-alignment-empty", true);
@@ -2650,7 +2650,7 @@ const AnalyticsCharts = (() => {
         showLoading("contribution-loading", true);
         showEmpty("contribution-empty", false);
         try {
-            const res = await fetch(`/api/portfolio/contribution?period=${contributionPeriod}`);
+            const res = await PortfolioWorkspace.response(`/api/portfolio/contribution?period=${contributionPeriod}`);
             const data = await res.json();
 
             if (!data.has_data) {
@@ -3014,7 +3014,7 @@ const AnalyticsCharts = (() => {
 
     async function refreshMarketsFromApi() {
         try {
-            renderMarketsContext(await apiGet("/api/portfolio/market-context"));
+            renderMarketsContext(await PortfolioWorkspace.json("/api/portfolio/market-context"));
         } catch (err) {
             console.warn("Markets context failed:", err);
         }
@@ -3107,10 +3107,10 @@ const AnalyticsCharts = (() => {
         // without this the next read would be served the old one from the
         // endpoint cache and "refresh" would quietly stop refetching.
         _portfolioExposureCache = null;
-        apiGetCached.invalidate(exposureUrl());
+        PortfolioWorkspace.invalidate(exposureUrl());
         // Same reason as the exposure line above: these are shared entries now,
         // so a refresh has to drop them or the panes redraw yesterday's payload.
-        apiGetCached.invalidate(BENCHMARK_COMPARISON_URL);
+        PortfolioWorkspace.invalidate(BENCHMARK_COMPARISON_URL);
         loadWidgetInsights(true);
         if (activePane === "performance" && rendered.has("performance")) loadPerformancePane();
         if (activePane === "risk" && rendered.has("risk")) loadRiskPane();
