@@ -9155,35 +9155,64 @@ body > .dashboard-senpai {
     }
 }
 
-/* ── Mobile: Senpai collapses to a corner orb; bubble expands on tap or message ─
-   Selectors are prefixed with `body > .dashboard-senpai` so they outrank the base
-   .dashboard-senpai-bubble rule that follows them in source order. */
+/* ── Mobile: Senpai joins the document flow instead of covering portfolio truth ─
+   Automatic activity stays compact. The full line expands only after an explicit
+   tap, in a row after the dashboard content, so values and controls remain clear. */
 @media (max-width: 575.98px) {
     body > .dashboard-senpai {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        width: calc(100% - 28px);
+        max-width: none;
+        min-height: 54px;
         grid-template-columns: 54px;
-        right: 14px;
-        bottom: 14px;
+        justify-content: end;
         gap: 0;
+        margin: 1rem 14px calc(14px + env(safe-area-inset-bottom));
+        z-index: 10;
+        contain: layout style;
+    }
+    body > .dashboard-senpai.is-hidden {
+        display: none;
+    }
+    body > .dashboard-senpai.is-expanded {
+        grid-template-columns: minmax(0, 268px) 54px;
+        gap: 10px;
     }
     body > .dashboard-senpai .dashboard-senpai-bubble {
-        position: fixed;
-        right: 14px;
-        bottom: 78px;
+        position: relative;
+        right: auto;
+        bottom: auto;
         left: auto;
-        width: min(80vw, 268px);
-        z-index: 1041;
-        transform-origin: bottom right;
-        transform: scale(0.62);
-        opacity: 0;
-        pointer-events: none;
-        animation: none; /* no idle float on mobile — clean scale/fade instead */
-        transition: opacity 0.18s ease, transform 0.22s var(--spring);
-    }
-    body > .dashboard-senpai.is-expanded .dashboard-senpai-bubble,
-    body > .dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-bubble {
-        transform: scale(1);
+        display: none;
+        width: 100%;
+        min-width: 0;
+        z-index: auto;
+        transform: none;
         opacity: 1;
         pointer-events: auto;
+        animation: none;
+        transition: none;
+    }
+    body > .dashboard-senpai.is-expanded .dashboard-senpai-bubble {
+        display: block;
+    }
+    body > .dashboard-senpai .dashboard-senpai-orb {
+        grid-column: -1;
+    }
+    body > .dashboard-senpai .dashboard-senpai-texting {
+        right: 62px;
+        top: 50%;
+        transform: translate3d(0, -50%, 0) scale(0.92) rotate(-2deg);
+    }
+    body > .dashboard-senpai.is-texting:not(.is-hidden) .dashboard-senpai-texting {
+        transform: translate3d(0, -50%, 0) scale(1) rotate(-2deg);
+    }
+    body > .dashboard-senpai.is-expanded .dashboard-senpai-texting {
+        visibility: hidden;
+        opacity: 0;
+        animation: none;
     }
 }
 

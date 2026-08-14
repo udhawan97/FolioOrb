@@ -18,19 +18,7 @@ export default defineConfig({
         { icon: 'github', label: 'GitHub', href: 'https://github.com/udhawan97/FolioOrb' },
       ],
       customCss: ['./src/styles/custom.css'],
-      // The docs share the landing page's type system (see src/styles/tokens.css).
-      // The landing page loads these itself in its own <head>.
-      head: [
-        { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
-        { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
-        {
-          tag: 'link',
-          attrs: {
-            rel: 'stylesheet',
-            href: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap',
-          },
-        },
-      ],
+      // The docs and landing page share the offline system stacks in tokens.css.
       components: {
         Search: './src/components/Search.astro',
         TableOfContents: './src/components/TableOfContents.astro',

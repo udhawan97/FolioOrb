@@ -16,8 +16,12 @@
 </p>
 
 <p align="center">
-  <strong>Runs entirely on your machine</strong> — use it in your browser as a local web app, or install it as a
-  <br>desktop app on macOS or Windows. No account, no cloud, nothing phones home.
+  <strong>Runs on your machine</strong> — use it in your browser as a local web app, or install it as a
+  <br>desktop app on macOS or Windows. No FolioOrb account, cloud sync, telemetry, or brokerage connection.
+</p>
+
+<p align="center">
+  <sub>Market and filing lookups use named public providers, and News can load remote thumbnails. With an Anthropic key configured, credential-only availability checks run periodically; Claude prompts send bounded derived context only for Claude-backed actions. The local database is never uploaded.</sub>
 </p>
 
 <p align="center">
@@ -72,7 +76,7 @@ FolioOrb is the same dashboard whichever way you launch it — a local server th
 
 Most portfolio trackers stop at the number. Green means good, red means bad — and if you want to know *why*, that's a separate tab, a separate app, or a group chat with someone who read the news this morning and you didn't.
 
-FolioOrb closes that gap: holdings, live prices, risk math, market regime, news, SEC filings, and optional Claude-written narration, all in one place that runs on your own machine and reports to nobody. It doesn't connect to a brokerage and it doesn't place trades — but it will tell you, with a straight face, whether your "diversified" portfolio is actually just four tech stocks in a trench coat.
+FolioOrb closes that gap: holdings, live prices, risk math, market regime, news, SEC filings, and optional Claude-written narration, all in one place that runs on your own machine without a FolioOrb account, telemetry, or cloud sync. It doesn't connect to a brokerage and it doesn't place trades — but it will tell you, with a straight face, whether your "diversified" portfolio is actually just four tech stocks in a trench coat.
 
 | Do this | Get this |
 | --- | --- |
@@ -96,7 +100,7 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply or undo through an explicit in-app confirmation |
 | 🧭 Open Review Orbit | One calm workspace gathers attention, data trust, reports, comparison, planning, records, and backup protection — prioritised locally, with no automatic trades |
 | ⚖️ Set a target course | Assign exact basis-point targets across the holdings you own, then compare target and actual allocation only when every required USD quote is usable |
-| 🧪 Rehearse a buy | Preview shares, average cost, and projected allocation for an external-cash USD buy in a ticker you already own — read-only, buy-only, and never a recommendation |
+| 🧪 Rehearse a buy | Preview shares, average cost, and projected allocation for an external-cash USD buy in a ticker you already own — read-only, buy-only, never a recommendation, and marked outdated as soon as its inputs change |
 | 🗂️ See every Portfolio | Compare known USD value and quote completeness across separate books without inventing an aggregate performance number |
 | 🧾 Export annual realized sales | Download a calendar-year average-cost recap from stored sale facts; it is a record, not tax-lot or tax-filing software |
 | 📦 Carry readable records | Export a checksummed ZIP of human-readable Portfolio, holding, sale, snapshot, and DCA CSVs; secrets and app internals stay out |
@@ -105,7 +109,7 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 📝 Run a monthly review | Build a monthly or quarterly pack from current valuation, stored snapshots, realized trades, movers, and thesis attention; save it as print-ready HTML or CSV |
 | ⏱️ Put theses on a cadence | Mark a holding thesis reviewed and choose when it should return to the inbox — or keep it uncadenced |
 | ⚖️ Compare research ideas | Compare two or three research-mode stocks by stock fundamentals, or ETFs by fund-specific data and published-holdings overlap |
-| 🔐 Paste a Claude key | The dashboard validates it, verifies it reaches Anthropic, and connects live — no restart (disconnect any time) |
+| 🔐 Paste a Claude key | The dashboard validates its format, saves it locally, then checks Anthropic; it shows connected only when the live check succeeds — no restart (disconnect any time) |
 
 > **Local Intelligence is not a downgraded mode.** It's the deterministic engine that runs the dashboard by default. Claude adds narration *on top* — it never gates the core experience, and everything it generates is cached in SQLite so refreshing doesn't mean paying again.
 
@@ -127,7 +131,7 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 
 <img src="static/img/brand/folio-orbit-icon.svg" alt="Senpai" width="54" align="left">
 
-**Senpai** is the small orbiting mark in the corner of the dashboard — it watches your portfolio so you don't have to stare at it alone. It reads the room: sharp when Claude is narrating, dry on Local Intelligence, quietly sympathetic when Claude is offline. Tap it for a new line; it also talks on its own, whether you asked it to or not. Senpai doesn't manage your portfolio. Senpai has *opinions* about your portfolio. [Say hello →](https://udhawan97.github.io/FolioOrb/meet-senpai/)
+**Senpai** is the small orbiting mark beside the dashboard — it watches your portfolio so you don't have to stare at it alone. It reads the room: sharp when Claude is narrating, dry on Local Intelligence, quietly sympathetic when Claude is offline. Tap it for a new line; on a phone it stays in its own row below the financial content and expands only when you ask. Senpai doesn't manage your portfolio. Senpai has *opinions* about your portfolio. [Say hello →](https://udhawan97.github.io/FolioOrb/meet-senpai/)
 
 <br clear="left">
 
@@ -190,21 +194,25 @@ Set `FOLIO_REF` (e.g. `latest-main`) to install a specific tag or the dev channe
 
 <br>
 
-FolioOrb works fully without Claude — Local Intelligence handles verdicts, analytics, and summaries on its own. To add Claude-powered briefings and action plans, provide an Anthropic key either in the dashboard (click the brand mark, paste an `sk-ant-*` key) or in `.env` (`ANTHROPIC_API_KEY=...`, then restart). The key format is validated before it's saved.
+FolioOrb works fully without Claude — Local Intelligence handles verdicts, analytics, and summaries on its own. To add Claude-backed narration and CSV assistance, provide an Anthropic key either in the dashboard (click the **key icon beside the brand**, paste an `sk-ant-*` key) or in `.env` (`ANTHROPIC_API_KEY=...`, then restart). The key format is validated before it's saved. While a key remains configured, a credential-only Anthropic availability check runs periodically even in Local mode; it sends no prompt or portfolio context.
 
 </details>
 
-## 🛰️ Plan & Protect, New in v5.11.0
+## 🛰️ Calm at Every Size, New in v5.12.0
 
-Review Orbit now carries the whole pre-decision and safekeeping loop: check every
-Portfolio's quote coverage, set a target course, rehearse one external-cash buy,
-export the stored record, and see whether a verified manual backup is current.
-Automatic backup remains an explicit opt-in and retains only its own seven verified
-snapshots.
+The v5.12.0 pass closes five small gaps that mattered in real use. Closed header
+panels now leave the keyboard path, Senpai sits below phone-width financial cards,
+and Review Orbit's Plan cards fit 320 px while their tables scroll locally. Escape
+cancels an exact restore confirmation before it closes Review Orbit. Once a restore
+request is submitted, a busy state cannot falsely imply cancellation; interrupted
+responses are checked against persisted Backup Vault status and stay visibly unknown
+when no safe answer is available. A buy rehearsal
+is replaced with **Preview outdated** the instant its holding or cash
+input changes—even if an older network response arrives later.
 
-The boundaries are deliberate. FolioOrb still does not connect to a brokerage or
-place trades. Targets are not recommendations; the rehearsal does not forecast
-prices or model taxes; the annual realized recap is not a tax filing; and the
+Plan & Protect remains deliberately bounded. FolioOrb does not connect to a
+brokerage or place trades; targets are not recommendations; rehearsals do not
+forecast prices or model taxes; annual realized recaps are not tax filings; and a
 portable ZIP is sensitive human-readable data, not a restore package.
 
 Got a feature you'd fight for? [Open an issue](https://github.com/udhawan97/FolioOrb/issues/new) — Senpai reads every one and has opinions about most.
@@ -342,7 +350,7 @@ More setup and runtime help: [Troubleshooting &amp; FAQ](https://udhawan97.githu
 
 ## Privacy
 
-FolioOrb is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Market data is requested from Yahoo Finance; Claude prompts are sent to Anthropic *only* when you enable Claude features. Generated AI summaries are cached locally. Backup snapshots stay on this device by default, and a portable records ZIP is human-readable sensitive data—not an encrypted restore file. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioOrb/privacy/).
+FolioOrb is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Yahoo Finance, SEC EDGAR, the US Treasury, and GitHub receive only the bounded requests needed for market context, filings, yield-curve data, or updates; article thumbnails can load directly from publisher/CDN hosts without a referrer. With a key configured, Anthropic receives periodic credential-only availability checks even in Local mode. Claude-backed actions can send compact derived portfolio or security context—and, for messy CSV mapping, at most five sanitized sample rows. Thesis text, the SQLite database, backups, settings, and `.env` are not included in those prompts. Generated summaries are cached locally. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioOrb/privacy/).
 
 ## Contributing
 

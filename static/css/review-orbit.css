@@ -523,10 +523,11 @@ body.review-orbit-open > .dashboard-senpai {
     grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
     gap: 0.8rem;
     align-items: start;
+    min-width: 0;
 }
 
 .review-course-card,
-.review-rehearsal-card { border-radius: 20px; padding: 1rem; }
+.review-rehearsal-card { min-width: 0; border-radius: 20px; padding: 1rem; }
 
 .review-course-summary {
     display: grid;
@@ -600,7 +601,7 @@ body.review-orbit-open > .dashboard-senpai {
 .review-course-legend [data-kind="actual"]::before { background: var(--accent-cyan); }
 .review-course-legend [data-kind="target"]::before { background: var(--accent-yellow); }
 
-.review-table-scroll { max-width: 100%; overflow-x: auto; }
+.review-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; }
 .review-plan-table { width: 100%; min-width: 570px; border-collapse: collapse; }
 .review-plan-table caption { padding: 0 0 0.55rem; color: var(--text-tertiary); font-size: 0.64rem; text-align: left; }
 .review-plan-table th,
@@ -650,6 +651,16 @@ body.review-orbit-open > .dashboard-senpai {
 .review-rehearsal-ticket > p,
 .review-rehearsal-partial { color: var(--text-tertiary); font-size: 0.62rem; line-height: 1.45; }
 .review-rehearsal-partial { grid-column: 1 / -1; margin: 0; padding: 0.5rem; border-left: 2px solid var(--accent-yellow); }
+.review-rehearsal-outdated {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--accent-yellow) 42%, var(--hairline));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent-yellow) 7%, transparent);
+}
+.review-rehearsal-outdated strong { color: var(--text-primary); font-size: 0.72rem; }
+.review-rehearsal-outdated span { color: var(--text-secondary); font-size: 0.64rem; line-height: 1.45; }
 
 .review-records-grid { display: grid; gap: 0.75rem; }
 .review-record-card {
@@ -705,6 +716,10 @@ body.review-orbit-open > .dashboard-senpai {
 }
 .review-restore-confirm p { margin: 0.2rem 0 0; color: var(--text-secondary); font-size: 0.7rem; }
 .review-restore-confirm > div:last-child { display: flex; gap: 0.45rem; }
+.review-restore-confirm[aria-busy="true"] button:disabled {
+    cursor: wait;
+    opacity: 0.58;
+}
 
 .review-empty,
 .review-loading {

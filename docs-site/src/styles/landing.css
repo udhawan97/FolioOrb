@@ -6,9 +6,9 @@
  * FolioOrb landing page. Tokens live in tokens.css; this file is canvas,
  * acts, and motion. No dependencies.
  *
- * Two voices, deliberately: the product speaks in Space Grotesk (plain
- * English), the instrument speaks in IBM Plex Mono (every value the
- * machine computed). Keep that boundary — mono is never prose.
+ * Two voices, deliberately: the system display stack speaks plain English;
+ * the system mono stack reports every value the machine computed. Keep that
+ * boundary — mono is never prose and no webfont request is required.
  */
 
 @import url('./tokens.css');
@@ -774,7 +774,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--page-gutter); }
 
 /* ── Footer · Ft5 statement ───────────────────────────────────────
    The page argues one thing — that this runs on your machine and
-   nothing leaves it. The footer says it out loud rather than dissolving
+   the database stays local. The footer says it out loud rather than dissolving
    into a link sitemap. */
 .footer { border-top: var(--rule-hair) solid var(--color-rule); margin-top: var(--space-2xl); }
 .footer-inner { max-width: var(--maxw); margin: 0 auto; padding: var(--space-2xl) var(--page-gutter) var(--space-xl); display: grid; gap: var(--space-xl); }

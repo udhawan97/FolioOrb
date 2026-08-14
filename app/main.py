@@ -189,4 +189,8 @@ async def dashboard():
 @app.get("/health")
 async def health_check():
     """Simple endpoint to confirm the server is running."""
-    return {"status": "healthy"}
+    payload = {"status": "healthy"}
+    capture_token = os.getenv("FOLIOORB_CAPTURE_TOKEN", "").strip()
+    if capture_token:
+        payload["capture_token"] = capture_token
+    return payload

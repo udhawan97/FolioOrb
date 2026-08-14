@@ -102,7 +102,7 @@
                     </span>
                     <span class="brand-wordmark">FolioOrb</span>
                 </a>
-                <div class="brand-intro-callout" id="brand-intro-callout" role="status" aria-live="polite" aria-hidden="true">
+                <div class="brand-intro-callout" id="brand-intro-callout" role="status" aria-live="polite" aria-hidden="true" inert>
                     <span class="brand-intro-version">v5</span>
                     <span class="brand-intro-kicker">FolioOrb</span>
                     <span class="brand-intro-title">Portfolio butler, at your service</span>
@@ -116,12 +116,12 @@
                     <i class="bi bi-key" aria-hidden="true"></i>
                 </button>
                 <div class="api-key-panel" id="api-key-panel" role="dialog"
-                     aria-modal="false" aria-label="Connect Claude AI" aria-hidden="true">
+                     aria-modal="false" aria-label="Connect Claude AI" aria-hidden="true" inert>
                     <div class="api-key-panel-header">
                         <i class="bi bi-stars api-key-panel-icon" aria-hidden="true"></i>
                         <div>
                             <div class="api-key-panel-title">Connect Claude AI</div>
-                            <div class="api-key-panel-sub">Your key stays on this machine — it is never shared</div>
+                            <div class="api-key-panel-sub">Stored locally; sent only to Anthropic for authentication</div>
                         </div>
                         <button class="api-key-panel-close" id="api-key-panel-close" type="button"
                                 aria-label="Close API key panel">
@@ -197,7 +197,7 @@
                     </span>
                     <span class="hud-status-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
                 </button>
-                <div class="hud-popover" id="hud-popover" role="tooltip" aria-hidden="true">
+                <div class="hud-popover" id="hud-popover" role="tooltip" aria-hidden="true" inert>
                     <div class="hud-popover-header">
                         <span class="hud-popover-header-dot" aria-hidden="true"></span>
                         <span class="hud-popover-header-label">Live Feed</span>
@@ -282,7 +282,7 @@
                             aria-label="More options" title="More options">
                         <i class="bi bi-three-dots" aria-hidden="true"></i>
                     </button>
-                    <div class="nav-overflow-menu" id="nav-overflow-menu" role="menu" aria-hidden="true">
+                    <div class="nav-overflow-menu" id="nav-overflow-menu" role="menu" aria-hidden="true" inert>
 
                         <div class="nav-menu-section">Appearance</div>
                         <div class="nav-menu-row" role="menuitem">
@@ -333,7 +333,7 @@
                                 <span class="brand-cost-notif" id="brand-cost-notif" aria-hidden="true" aria-label="Cost updated"></span>
                             </span>
                         </button>
-                        <div class="brand-cost-callout" id="brand-cost-callout" role="tooltip" aria-hidden="true" data-engine-claude-only>
+                        <div class="brand-cost-callout" id="brand-cost-callout" role="tooltip" aria-hidden="true" inert data-engine-claude-only>
                             <span class="brand-cost-kicker">AI token cost</span>
                             <span class="brand-cost-value" id="brand-cost-value">Checking...</span>
                             <span class="brand-cost-meta" id="brand-cost-meta">Estimated from cached summaries</span>
@@ -444,7 +444,7 @@
                     </li>
                     <li>
                         <i class="bi bi-lock-fill lig-list-icon lig-list-icon--cyan" aria-hidden="true"></i>
-                        <span><strong>Fully private</strong> — your portfolio data never leaves your machine in local mode</span>
+                        <span><strong>No Claude prompts in Local mode</strong> — public providers still receive bounded ticker lookups</span>
                     </li>
                     <li>
                         <i class="bi bi-stars lig-list-icon lig-list-icon--purple" aria-hidden="true"></i>
@@ -2672,10 +2672,13 @@
                     <p class="review-disclosure">Backups contain the SQLite portfolio database only. API keys and the local <code>.env</code> are excluded.</p>
                     <div class="review-restore-status" id="review-restore-status" hidden></div>
                     <div class="review-backup-list" id="review-backup-list" aria-live="polite"></div>
-                    <div class="review-restore-confirm" id="review-restore-confirm" hidden role="alert">
+                    <div class="review-restore-confirm" id="review-restore-confirm" hidden
+                         role="alertdialog" aria-modal="false"
+                         aria-labelledby="review-restore-title"
+                         aria-describedby="review-restore-description">
                         <div>
                             <strong id="review-restore-title">Restore this backup?</strong>
-                            <p>FolioOrb first saves the current database, then restores after a clean restart.</p>
+                            <p id="review-restore-description">FolioOrb first saves the current database, then restores after a clean restart.</p>
                         </div>
                         <div>
                             <button type="button" class="review-secondary-btn" id="review-restore-cancel">Cancel</button>
@@ -2700,6 +2703,7 @@
     <script defer src="/static/js/portfolio-workspace.js?v=0"></script>
     <script defer src="/static/js/local-text-export.js?v=0"></script>
     <script defer src="/static/js/analytics-charts.js?v=0"></script>
+    <script defer src="/static/js/interaction-state.js?v=0"></script>
     <script defer src="/static/js/dashboard.js?v=0"></script>
     <script defer src="/static/js/dca-workflow.js?v=0"></script>
     <script defer src="/static/js/updates.js?v=0"></script>

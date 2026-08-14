@@ -10,15 +10,15 @@
  */
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const BASE_URL = process.env.SHOT_BASE_URL || 'http://127.0.0.1:8177';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'assets', 'shots');
+const README_DASHBOARD_OUT = join(__dirname, '..', '..', 'docs', 'dashboard.webp');
 const README_PLAN_OUT = join(__dirname, '..', '..', 'docs', 'plan-protect.webp');
-const RAW_DIR = join(__dirname, '..', '_shots', 'raw');
 
 const VIEWPORT = { width: 1512, height: 950 };
 const SCALE = 2;
@@ -26,13 +26,17 @@ const SCALE = 2;
 // Each shot: name, how to reach it, what to capture, and the final WebP width.
 // `zone` clicks the top dashboard tab; `analyticsPane` clicks an analytics sub-tab.
 const SHOTS = [
-  { name: 'hero-dashboard-demo', zone: 'overview', mode: 'viewport', outWidth: 2400 },
-  { name: 'verdicts-demo', zone: 'holdings', selector: '[data-zone-pane="holdings"]', outWidth: 1600 },
+  { name: 'readme-dashboard', zone: 'overview', mode: 'viewport', outWidth: 1600 },
   { name: 'risk-analytics-demo', zone: 'analytics', analyticsPane: 'risk', selector: '.analytics-sub-pane[data-analytics-pane="risk"]', outWidth: 1600 },
-  { name: 'news-themes-demo', zone: 'news', selector: '[data-zone-pane="news"]', outWidth: 1600 },
-  { name: 'senpai-insight-demo', zone: 'overview', selector: '#dashboard-senpai', outWidth: 900 },
   { name: 'plan-protect-demo', reviewTab: 'plan', selector: '.review-orbit-shell', outWidth: 1600 },
+  { name: 'senpai-mobile-flow', zone: 'overview', mode: 'mobile-flow', outWidth: 750 },
 ];
+const requestedNames = new Set(
+  (process.env.SHOT_NAMES || '').split(',').map((name) => name.trim()).filter(Boolean),
+);
+const selectedShots = requestedNames.size
+  ? SHOTS.filter((shot) => requestedNames.has(shot.name))
+  : SHOTS;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -57,6 +61,13 @@ async function switchAnalyticsPane(page, pane) {
 }
 
 async function toWebp(pngBuffer, name, outWidth) {
+  if (name === 'readme-dashboard') {
+    await sharp(pngBuffer)
+      .resize({ width: outWidth, withoutEnlargement: true })
+      .webp({ quality: 82, effort: 6 })
+      .toFile(README_DASHBOARD_OUT);
+    return README_DASHBOARD_OUT;
+  }
   await mkdir(OUT_DIR, { recursive: true });
   const out = join(OUT_DIR, `${name}.webp`);
   await sharp(pngBuffer)
@@ -73,9 +84,9 @@ async function toWebp(pngBuffer, name, outWidth) {
 }
 
 async function main() {
-  await rm(RAW_DIR, { recursive: true, force: true });
-  await mkdir(RAW_DIR, { recursive: true });
-
+  if (requestedNames.size && !selectedShots.length) {
+    throw new Error(`SHOT_NAMES did not match a product shot: ${[...requestedNames].join(', ')}`);
+  }
   const browser = await chromium.launch();
   const page = await browser.newPage({
     viewport: VIEWPORT,
@@ -102,8 +113,34 @@ async function main() {
   await sleep(2500);
 
   const results = [];
-  for (const shot of SHOTS) {
+  for (const shot of selectedShots) {
     try {
+      if (shot.mode === 'mobile-flow') {
+        if (await page.locator('#review-orbit').getAttribute('aria-hidden') === 'false') {
+          await page.keyboard.press('Escape');
+        }
+        await page.setViewportSize({ width: 375, height: 812 });
+        await switchZone(page, shot.zone);
+        const senpai = page.locator('#dashboard-senpai');
+        await senpai.evaluate((element) => element.classList.remove('is-hidden', 'is-expanded'));
+        await page.locator('#dashboard-senpai-toggle').click({ force: true });
+        await sleep(300);
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await sleep(150);
+        const png = await page.screenshot({ type: 'png' });
+        const out = await toWebp(png, shot.name, shot.outWidth);
+        console.log(`  ✓ ${shot.name} → ${out}`);
+        results.push(shot.name);
+        continue;
+      }
+      // Senpai can be hidden from the real overflow control. Keep product
+      // captures unobscured; the mobile-flow artifact exercises it separately.
+      await page.evaluate(() => {
+        const senpai = document.getElementById('dashboard-senpai');
+        if (!senpai) return;
+        senpai.classList.add('is-hidden');
+        senpai.classList.remove('is-expanded');
+      });
       if (shot.zone) await switchZone(page, shot.zone);
       if (shot.analyticsPane) await switchAnalyticsPane(page, shot.analyticsPane);
       if (shot.reviewTab) {
@@ -116,13 +153,24 @@ async function main() {
       }
 
       let png;
-      if (shot.mode === 'viewport') {
-        png = await page.screenshot({ type: 'png' }); // viewport clip
-      } else {
-        const el = page.locator(shot.selector).first();
-        await el.scrollIntoViewIfNeeded().catch(() => {});
-        await sleep(600);
-        png = await el.screenshot({ type: 'png' });
+      const captureCss = [
+        '#dashboard-senpai { display: none !important; }',
+        shot.name === 'risk-analytics-demo'
+          ? 'body > .navbar { position: static !important; }'
+          : '',
+      ].filter(Boolean).join('\n');
+      const captureOverride = await page.addStyleTag({ content: captureCss });
+      try {
+        if (shot.mode === 'viewport') {
+          png = await page.screenshot({ type: 'png' }); // viewport clip
+        } else {
+          const el = page.locator(shot.selector).first();
+          await el.scrollIntoViewIfNeeded().catch(() => {});
+          await sleep(600);
+          png = await el.screenshot({ type: 'png' });
+        }
+      } finally {
+        await captureOverride?.evaluate((element) => element.remove()).catch(() => {});
       }
       const out = await toWebp(png, shot.name, shot.outWidth);
       console.log(`  ✓ ${shot.name} → ${out}`);
@@ -133,8 +181,11 @@ async function main() {
   }
 
   await browser.close();
-  console.log(`\nCaptured ${results.length}/${SHOTS.length} shots.`);
-  if (results.length < SHOTS.length) process.exitCode = 1;
+  console.log(`\nCaptured ${results.length}/${selectedShots.length} shots.`);
+  if (results.length < selectedShots.length) process.exitCode = 1;
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

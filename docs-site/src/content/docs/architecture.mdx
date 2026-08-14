@@ -69,10 +69,12 @@ call these interfaces instead of reaching into each other's private helpers.
 
 The service layer's core is a modular Intelligence Engine split into two halves:
 
-- **Local Intelligence** — always on, fully offline. Covers `investment_signal`,
-  `market_regime`, `portfolio_exposure`, and `event_calendar`, producing verdicts,
-  scenarios, regime classification, exposure breakdowns, peer comparisons, and
-  calibration data.
+- **Local Intelligence** — always available, with deterministic evaluation performed on
+  your machine. It covers `investment_signal`, `market_regime`, `portfolio_exposure`, and
+  `event_calendar`, producing verdicts, scenarios, regime classification, exposure
+  breakdowns, peer comparisons, and calibration data. Its inputs can still be refreshed
+  through FolioOrb's bounded Yahoo Finance, SEC, and US Treasury lookups; it sends no Claude
+  prompt.
 - **Claude AI** — optional. Lives in `ai_service.py`, exposing `generate_action_plan()` and
   `generate_news_themes()`, backed by a 24-hour SQLite cache and live token cost tracking. It
   uses Claude Haiku 4.5 for fast narration and Claude Sonnet 4.5 for action plans.
@@ -86,7 +88,7 @@ adapter rather than the place the engine lives:
 | `action_plan.py` | `cache_type()`, `build_snapshot()`, `build_plan()`, `build_fallback()` — turns a `ScanResult` into a Sonnet prompt and back, with a deterministic plan when Claude is unavailable. |
 | `portfolio_briefing.py` | `cache_type()`, `build_snapshot()`, `build_local()`, `build_briefing()`, `build_fallback()` — the same shape for the daily briefing. |
 | `ai_narrative.py` | `narrative()`, `valuation_is_complete()` — the cache-then-generate-then-fall-back sequence every narrated endpoint repeated. |
-| `api_key_store.py` | `save()`, `clear()`, `InvalidKeyError`, `KeyStorageError` — validates a Claude key against the live API before it is persisted. |
+| `api_key_store.py` | `save()`, `clear()`, `InvalidKeyError`, `KeyStorageError` — rejects malformed keys before disk, persists a well-formed key with restricted permissions, hot-swaps the client, then reports connected only after a live heartbeat succeeds. |
 
 Two supporting modules keep repeated mechanics in one place: `holdings_repository.py`
 (`active()`, `active_by_ticker()`, `active_tickers()`, `active_tickers_or_default()`,

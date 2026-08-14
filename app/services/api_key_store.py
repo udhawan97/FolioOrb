@@ -63,7 +63,9 @@ def _update_env_file(key: str, value: str) -> None:
     plaintext, which is the standard mitigation for local secret files (same
     approach used by ~/.netrc, ~/.aws/credentials, etc). This is intentional,
     local-only storage: FolioOrb is a single-user, local-first app with no
-    server-side secrets store, so the key never leaves the user's machine.
+    server-side secrets store. The file stays on the user's machine; a configured
+    key is still transmitted to Anthropic as the credential for availability
+    checks and Claude-backed requests.
 
     The write is in place rather than write-temp-then-rename: a crash mid-write
     can truncate the file, and on first creation the mode is tightened just

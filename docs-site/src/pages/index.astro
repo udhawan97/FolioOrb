@@ -1,6 +1,6 @@
 ---
 /**
- * FolioOrb landing page — v3 "private cockpit".
+ * FolioOrb landing page — v5.12 "private cockpit".
  *
  * A single cinematic story told in acts (hero → workflow → features → demo →
  * trust → download → developer), narrated by a Senpai scroll companion. Real
@@ -37,7 +37,7 @@ const steps = [
   },
   {
     n: 2, title: 'It reads the whole picture',
-    body: 'Exposure, risk, concentration, news, and market regime — computed on-device.',
+    body: 'It fetches public market context, then computes exposure, risk, concentration, and market regime on-device.',
     senpai: 'I checked risk, concentration, headlines, and whether your “diversification” is just tech in a trench coat.',
   },
   {
@@ -78,21 +78,21 @@ const features = [
 // Each icon is a compact stroke SVG (inner markup only) coloured by the act accent.
 const roadmap = [
   {
-    status: 'Shipped · v5.11.0',
-    title: 'Target weights & drift',
-    body: 'Set the mix you’re aiming for, then see at a glance how far today’s prices have nudged you off plan.',
+    status: 'Shipped · v5.12.0',
+    title: 'Closed means closed',
+    body: 'Header details now leave the keyboard path when they close, with focus returning to the control that opened them.',
     icon: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M12 12l4-2.5"/>',
   },
   {
-    status: 'Shipped · v5.11.0',
-    title: 'Annual realized recap',
-    body: 'Export stored sale facts and average-cost basis for one calendar year — a record, not a tax filing.',
+    status: 'Shipped · v5.12.0',
+    title: 'Phone-width calm',
+    body: 'Senpai sits below portfolio truth, and Review Plan keeps cards inside 320 px while wide tables scroll on their own.',
     icon: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h4"/>',
   },
   {
-    status: 'Shipped · v5.11.0',
-    title: 'Buy rehearsal',
-    body: 'Preview one external-cash USD buy in a ticker you own. Read-only, buy-only, and not a recommendation.',
+    status: 'Shipped · v5.12.0',
+    title: 'Context-bound decisions',
+    body: 'Escape cancels the exact restore prompt first, and edited rehearsal inputs can never keep or repaint an older projection.',
     icon: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   },
 ];
@@ -105,16 +105,8 @@ const roadmap = [
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>FolioOrb — Your portfolio, finally speaks back.</title>
 
-		{/* Two voices: Space Grotesk is the product speaking English, IBM Plex
-		    Mono is the instrument reporting values. Plex Sans bridges them —
-		    it shares a skeleton with Plex Mono, so the data rows and the prose
-		    read as one system. */}
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link
-			rel="stylesheet"
-			href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-		/>
+		{/* System display/body/mono stacks keep the public surface complete
+		    offline and avoid a font-provider request before the user chooses one. */}
 		<meta name="description" content="Local-first portfolio intelligence you run yourself — in your browser as a web app, or as a desktop app for macOS and Windows. FolioOrb turns holdings, risk, news, and market context into plain-English portfolio reads — on your machine, Claude-optional, built for trust." />
 		<link rel="icon" type="image/svg+xml" href={asset('folio-orbit-icon.svg')} />
 		<meta property="og:title" content="FolioOrb — Your portfolio, finally speaks back." />
@@ -178,8 +170,8 @@ const roadmap = [
 						<h1 class="display reveal">Your portfolio, finally <em>speaks&nbsp;back.</em></h1>
 						<p class="lede reveal">
 							FolioOrb turns holdings, risk, news, and market context into
-							plain-English portfolio reads — running entirely on your machine.
-							Claude-optional, built for trust.
+							plain-English portfolio reads. Your database and settings stay on
+							your machine; Claude is optional, and there is no telemetry.
 						</p>
 
 						<div class="cta-row reveal">
@@ -371,8 +363,8 @@ const roadmap = [
 					<div class="moment-copy">
 						<span class="kicker">Local-first · live context</span>
 						<h3>Runs on your machine. Watches the whole market.</h3>
-						<p>Quotes, history, market regime, and world indices — computed and cached locally. Your database never leaves your laptop. And if the market's unreachable, it keeps your last-known values instead of flashing a scary $0.</p>
-						<div class="wf-note"><span class="wf-note-orb"></span><span>Your data stays home. The market comes to you.</span></div>
+						<p>Public quotes, history, headlines, and indices are fetched on demand; FolioOrb computes analysis and caches results locally. Your database never leaves your laptop. And if the market's unreachable, it keeps your last-known values instead of flashing a scary $0.</p>
+						<div class="wf-note"><span class="wf-note-orb"></span><span>Your database stays home. The market context comes to you.</span></div>
 					</div>
 					<figure class="moment-visual">
 						<div class="artifact artifact-market grad-border">
@@ -393,7 +385,7 @@ const roadmap = [
 					<div class="moment-copy">
 						<span class="kicker">Claude, optional</span>
 						<h3>Local by default. Narrated when you want.</h3>
-						<p>Add an Anthropic key for briefings, action plans, and news themes. Everything else never needed it.</p>
+						<p>Add an Anthropic key for optional briefings, action plans, verdict and analytics narration, security summaries, news themes, ETF fallback seeds, or bounded CSV help. Local mode sends no prompts; a configured key still performs credential-only availability checks.</p>
 						<div class="wf-note"><span class="wf-note-orb"></span><span>I’m eloquent either way. Claude just adds adjectives.</span></div>
 					</div>
 					<figure class="moment-visual">
@@ -441,7 +433,7 @@ const roadmap = [
 						<span class="kicker">Review Orbit · local workflow</span>
 						<h3>A review ritual, not another wall of cards.</h3>
 						<p>One workspace gathers missing data, targets, a read-only buy rehearsal, human-readable records, and verified local backups alongside the existing review tools. It points at work; it never places a trade.</p>
-						<div class="wf-note"><span class="wf-note-orb"></span><span>Coverage first. Rehearsal, not recommendation. Backup before bravery.</span></div>
+						<div class="wf-note"><span class="wf-note-orb"></span><span>Coverage first. Changed input, outdated preview. Backup before bravery.</span></div>
 					</div>
 					<figure class="moment-visual">
 						<div class="window-chrome window-chrome--sm">
@@ -510,7 +502,7 @@ const roadmap = [
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<h2 class="section-title">Open source. Traceable builds. Your data stays on your machine.</h2>
+					<h2 class="section-title">Open source. Traceable builds. Your database stays on your machine.</h2>
 				</div>
 				<div class="trust-console grad-border reveal">
 					<div class="tc-col">
@@ -518,7 +510,7 @@ const roadmap = [
 							<div><b>Every build is traceable</b><p>Each download links back to its Release, the commit it was built from, and the Actions run that produced it.</p></div>
 						</div>
 						<div class="tc-item"><span class="tc-ic tc-ic-lock" aria-hidden="true"></span>
-							<div><b>Your data stays local</b><p>Holdings and config live in SQLite and a local <code>.env</code>. Market data comes from Yahoo Finance; Claude is called only when you enable it.</p></div>
+							<div><b>Your database stays local</b><p>Holdings and config live in SQLite and a local <code>.env</code>. Named public providers receive bounded lookups; remote news thumbnails can load without a referrer. A configured key enables Anthropic availability checks, while compact derived context is sent only for Claude-backed actions.</p></div>
 						</div>
 					</div>
 					<div class="tc-verify">
@@ -552,7 +544,7 @@ const roadmap = [
 					<article class="dl-card grad-border" data-plat="web">
 						<span class="dl-glyph dl-glyph-web" aria-hidden="true"></span>
 						<div class="dl-head"><h3>In your browser</h3><span class="arch">macOS · Windows · Linux</span></div>
-						<p>Run it locally from source. One script, then it opens at <code>localhost:8000</code> — no installer, and nothing leaves your machine.</p>
+						<p>Run it locally from source. One script, then it opens at <code>localhost:8000</code> — no installer, no FolioOrb account, and no cloud sync.</p>
 						<a class="dl-btn" href="#install-cmds">See the commands ↓</a>
 						<a class="dl-more" href={doc('build-from-source')}>Build-from-source guide →</a>
 					</article>
@@ -641,14 +633,14 @@ const roadmap = [
 								<span class="up-size">≈ 38 MB · relaunch</span>
 							</div>
 							<div class="up-versions">
-								<span class="up-ver up-ver--now"><small>Installed</small>v5.8.0</span>
+								<span class="up-ver up-ver--now"><small>Installed</small>v5.11.0</span>
 								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
-								<span class="up-ver up-ver--new"><small>Latest</small>v5.11.0</span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v5.12.0</span>
 							</div>
 							<ul class="up-changes">
-								<li>Target-versus-actual Portfolio course</li>
-								<li>Read-only external-cash buy rehearsal</li>
-								<li>Portable records and backup freshness</li>
+								<li>Closed panels leave the keyboard path</li>
+								<li>Phone-width dashboard and Plan containment</li>
+								<li>Context-bound restore and rehearsal state</li>
 							</ul>
 							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
 							<div class="up-actions">
@@ -693,9 +685,9 @@ const roadmap = [
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Plan &amp; Protect · v5.11.0</span>
-					<h2 class="section-title">The last roadmap became real.</h2>
-					<p class="rm-lede">Targets, an annual sale recap, and a bounded what-if workflow now ship together in Review Orbit. These cards describe verified behavior, not future promises.</p>
+					<span class="kicker">Calm at every size · v5.12.0</span>
+					<h2 class="section-title">The quiet parts are reliable.</h2>
+					<p class="rm-lede">Keyboard closure, compact-screen layout, restore cancellation, and buy-preview freshness now share explicit, browser-verified contracts. These cards describe shipped behavior, not future promises.</p>
 				</div>
 
 				<div class="rm-grid reveal">
@@ -710,7 +702,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>Bounded on purpose:</strong> targets are not recommendations; the buy rehearsal is read-only and does not forecast; the realized recap is not tax filing software; portable records are sensitive and not restorable.</p>
+					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.12 changes interaction state and module seams, not portfolio math. Targets are not recommendations; rehearsals remain read-only; restores still require exact confirmation and a clean restart.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 				</div>
@@ -754,7 +746,7 @@ const roadmap = [
 			<div class="footer-inner">
 				{/* The page argues one thing the whole way down. The footer says it
 				    rather than dissolving into a sitemap. */}
-				<p class="footer-stmt">Your holdings never <em>leave the&nbsp;room.</em></p>
+				<p class="footer-stmt">Your database never <em>leaves the&nbsp;room.</em></p>
 				<div class="footer-meta">
 					<div class="footer-brand">
 						<img src={asset('folio-orbit-icon.svg')} alt="" width="32" height="32" />
@@ -992,7 +984,7 @@ const roadmap = [
 					'Green Tuesday? I’ll take partial credit.',
 					'The old roadmap shipped. The next one can wait for evidence.',
 					'Updates knock before they enter. Very well-mannered software.',
-					'Your data never left the building. I double-checked.',
+					'Your database stayed local. The network boundaries are documented.',
 					'I read the 10-K so your group chat doesn’t have to.',
 					'Rebalancing: spring cleaning for people who own ETFs.',
 					'Past performance guarantees nothing. Neither do I — but I’m charming.',

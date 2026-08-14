@@ -7,10 +7,11 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 
 Review Orbit turns the dashboard into a repeatable review workflow. Choose **Review** in the
 top bar to open one keyboard-accessible workspace; on a narrow screen it becomes a full-height
-sheet. Escape closes it, Tab stays inside while it is open, and focus returns to the control
-that opened it. At phone widths all seven destination tabs wrap into view; Left and Right
-Arrow still move between them. **Plan**, **Records**, and **Backups** form the Plan & Protect
-part of the same workspace rather than a second dashboard.
+sheet. Tab stays inside while it is open, and closing returns focus to the control that opened
+it. Escape closes the current layer first: an exact restore confirmation is cancelled before
+another Escape closes Review Orbit. At phone widths all seven destination tabs wrap into view;
+Left and Right Arrow still move between them. **Plan**, **Records**, and **Backups** form the
+Plan & Protect part of the same workspace rather than a second dashboard.
 
 <Aside type="note" title="Review, not execution">
 Review Orbit does not connect to a brokerage, place a trade, apply a DCA contribution, or
@@ -100,6 +101,10 @@ Adding or removing an eligible holding makes the course incomplete until you sav
 set. If any required quote is missing, non-positive, non-finite, or not USD, FolioOrb names
 the gap and withholds all drift values instead of mixing known and unknown positions.
 
+At 320–575 px the two Plan cards stack and stay inside the sheet. The wide all-Portfolios and
+target tables scroll within their own labelled region; they do not widen the Review workspace
+or the page.
+
 ### Buy rehearsal
 
 A rehearsal accepts a positive USD cash amount with at most two decimal places and one
@@ -111,6 +116,11 @@ The rehearsal writes no holding, trade, snapshot, DCA, target, or settings row. 
 model a sale or trim, forecast a price, include taxes or fees, or recommend a trade. When the
 Portfolio valuation is incomplete, share and average-cost math can still be shown for a usable
 ticker quote, but projected allocation stays unavailable.
+
+The displayed projection remains valid only for the exact holding and cash text that produced
+it. Editing either field immediately replaces the numbers with **Preview outdated**. FolioOrb
+also invalidates the pending request, so an older or out-of-order response cannot repaint a
+projection for inputs that are no longer on screen.
 
 ## Records
 
@@ -189,11 +199,22 @@ silently; **Create verified backup** remains the explicit retry.
 
 <Steps>
 1. Choose **Restore…** beside a verified snapshot and confirm the exact filename.
-2. FolioOrb queues the request instead of replacing an open database.
-3. Quit/restart (the packaged app quits after queuing; reopen it).
-4. Before restore, FolioOrb creates and verifies a fresh safety copy of the current database.
-5. The requested snapshot is staged and verified again, then swapped into place.
+2. Before choosing **Queue restore**, press Escape or choose **Cancel** to back out. Only the
+   confirmation closes, and keyboard focus returns to the Restore control; Review Orbit stays open.
+3. After **Queue restore** is submitted, the confirmation becomes busy and cannot imply that the
+   in-flight request was cancelled. Escape, Cancel, closing Review Orbit, and changing Review tabs
+   wait for the response.
+4. FolioOrb queues the request instead of replacing an open database. An explicit server rejection
+   re-enables retry and Cancel without changing the database. If the response is interrupted,
+   FolioOrb reads Backup Vault status before making a claim: a confirmed queue stays visible, a
+   confirmed absence becomes retryable, and an unreachable status remains locked as **Status
+   unknown** until you reload and inspect Backup Vault.
+5. Quit/restart (the packaged app quits after queuing; reopen it).
+6. Before restore, FolioOrb creates and verifies a fresh safety copy of the current database.
+7. The requested snapshot is staged and verified again, then swapped into place.
 </Steps>
 
 If staging or verification fails, the live database is left untouched. The next launch
 reports whether the restore succeeded and names the retained safety backup.
+A queued restore remains visible in Backup Vault and disables another Restore action until the
+clean restart consumes it.

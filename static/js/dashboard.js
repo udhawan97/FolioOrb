@@ -787,7 +787,7 @@ const LOCAL_INTEL_SCAN_MESSAGES = [
     "FolioOrb is reading positions with on-device signal logic.",
     "Deterministic models are doing the math with quiet dignity.",
     "FolioOrb lowered the noise and let local signals take the wheel.",
-    "Matching benchmarks, checking catalysts — no cloud required.",
+    "Matching benchmarks, checking catalysts — no Claude required.",
     "Local signals are unusually brave with your holdings today.",
     "FolioOrb is maintaining financial composure on local horsepower.",
     "Context received. Nuance forming locally.",
@@ -7267,7 +7267,7 @@ function _verdictInfoTip() {
     return _verdictTip({
         title: isLocal ? "How local intelligence works" : "How FolioOrb decides",
         body: isLocal
-            ? "Purely on your machine — analyst data, price zones, trend, and quality are weighted into Add, Hold, or Trim. No cloud calls. Same math every time, fully explainable via the bars below."
+            ? "Computed on your machine — analyst data, price zones, trend, and quality are weighted into Add, Hold, or Trim. No Claude prompt; bounded provider lookups can refresh the inputs. Same math every time, fully explainable via the bars below."
             : "It blends the signals that fit each holding — analyst consensus for stocks, price-zone and fund quality for ETFs — with the recent trend and your position size. It defaults to Hold and only leans Add or Trim when the evidence clearly points there.",
         hint: "Re-scan to refresh on the latest prices. Not financial advice.",
         icon: isLocal ? "bi-cpu-fill" : "bi-dice-5-fill",
@@ -8558,7 +8558,7 @@ function _renderQuip(quip, verdict) {
     const isAi = verdict && _isAiVerdictActive(verdict);
     const isLocal = isLocalIntelligenceMode() && !isAi;
     const tipBody = isLocal
-        ? "A rotating one-liner from the same deterministic signals — no cloud, no API cost. Refreshes when you re-scan."
+        ? "A rotating one-liner from the same deterministic signals — no Claude prompt, no AI cost. Refreshes when you re-scan."
         : "FolioOrb writes this one line from the same signals — color commentary, not a separate recommendation. It's cached, so it costs almost nothing and only refreshes when the verdict or the market mood changes.";
     return `<div class="verdict-quote${isLocal ? " is-local-quote" : ""}">
         <span class="verdict-tea-label">${isLocal ? "Quick take:" : "FolioOrb thinks:"}</span>
@@ -9467,6 +9467,19 @@ function initDashboardSenpai() {
     const isMobileSenpai = () =>
         window.matchMedia?.("(max-width: 575.98px)").matches ?? false;
 
+    function syncSenpaiDisclosure() {
+        if (!isMobileSenpai()) {
+            toggle.setAttribute("aria-expanded", String(isVisible()));
+            toggle.setAttribute("aria-label", isVisible() ? "Hide Senpai" : "Show Senpai");
+            toggle.title = isVisible() ? "Hide Senpai" : "Show Senpai";
+            return;
+        }
+        const expanded = isVisible() && senpai.classList.contains("is-expanded");
+        toggle.setAttribute("aria-expanded", String(expanded));
+        toggle.setAttribute("aria-label", expanded ? "Collapse Senpai message" : "Expand Senpai message");
+        toggle.title = expanded ? "Collapse Senpai message" : "Expand Senpai message";
+    }
+
     // Desktop keeps the bubble open only long enough to read it, then lets it
     // settle back to the orb so it stops covering the panel underneath. Mobile
     // already collapses on its own, so it opts out here.
@@ -9530,9 +9543,6 @@ function initDashboardSenpai() {
     function setVisible(visible, persist = true) {
         senpai.classList.toggle("is-hidden", !visible);
         senpai.setAttribute("aria-hidden", String(!visible));
-        toggle.setAttribute("aria-expanded", String(visible));
-        toggle.setAttribute("aria-label", visible ? "Hide Senpai" : "Show Senpai");
-        toggle.title = visible ? "Hide Senpai" : "Show Senpai";
         navToggle.setAttribute("aria-pressed", String(visible));
         navToggle.setAttribute("aria-label", visible ? "Hide Senpai" : "Show Senpai");
         navToggle.title = visible ? "Hide Senpai" : "Show Senpai";
@@ -9547,6 +9557,7 @@ function initDashboardSenpai() {
             bubble.classList.remove("is-talking");
             iconShell?.classList.remove("is-reacting");
         }
+        syncSenpaiDisclosure();
     }
 
     let savedVisible = true;
@@ -9562,6 +9573,7 @@ function initDashboardSenpai() {
         // bubble rather than hiding all of Senpai (use the menu toggle to hide).
         if (isMobileSenpai()) {
             senpai.classList.toggle("is-expanded");
+            syncSenpaiDisclosure();
             return;
         }
         // On desktop the bubble settles away after its dwell. Clicking the orb
@@ -9597,6 +9609,11 @@ function initDashboardSenpai() {
             return;
         }
         scheduleSenpaiQuote();
+    });
+
+    window.matchMedia?.("(max-width: 575.98px)").addEventListener?.("change", () => {
+        senpai.classList.remove("is-expanded");
+        syncSenpaiDisclosure();
     });
 
     _dashboardSenpaiSpeak = speak;
@@ -9733,6 +9750,10 @@ async function loadAiCostStats() {
     }
 }
 
+function setHeaderPopoverState(trigger, panel, open, openClass) {
+    window.FolioInteractionState.setDisclosureState(trigger, panel, open, openClass);
+}
+
 function initBrandCostCallout() {
     const trigger = document.getElementById("brand-cost-trigger");
     const callout = document.getElementById("brand-cost-callout");
@@ -9740,15 +9761,11 @@ function initBrandCostCallout() {
 
     function openCallout() {
         ensureAiCostStatsLoaded();
-        callout.classList.add("is-visible");
-        callout.setAttribute("aria-hidden", "false");
-        trigger.setAttribute("aria-expanded", "true");
+        setHeaderPopoverState(trigger, callout, true, "is-visible");
     }
 
     function closeCallout() {
-        callout.classList.remove("is-visible");
-        callout.setAttribute("aria-hidden", "true");
-        trigger.setAttribute("aria-expanded", "false");
+        setHeaderPopoverState(trigger, callout, false, "is-visible");
     }
 
     trigger.addEventListener("click", (e) => {
@@ -9765,8 +9782,17 @@ function initBrandCostCallout() {
         if (!callout.contains(e.target) && !trigger.contains(e.target)) {
             closeCallout();
         }
-    });
-
+    }, true);
+    document.addEventListener("keydown", (event) => {
+        window.FolioInteractionState.closeDisclosureForEscape(event, {
+            panel: callout,
+            openClass: "is-visible",
+            close: closeCallout,
+            focusTarget: trigger,
+            parentTrigger: document.getElementById("nav-overflow-trigger"),
+            parentPanel: document.getElementById("nav-overflow-menu"),
+        });
+    }, true);
 }
 
 let _aiCostStatsInterval = null;
@@ -9786,21 +9812,15 @@ function initNavOverflow() {
     const closeCostDetail = () => {
         const callout = document.getElementById("brand-cost-callout");
         const costTrigger = document.getElementById("brand-cost-trigger");
-        callout?.classList.remove("is-visible");
-        callout?.setAttribute("aria-hidden", "true");
-        costTrigger?.setAttribute("aria-expanded", "false");
+        setHeaderPopoverState(costTrigger, callout, false, "is-visible");
     };
 
     const open = () => {
-        menu.classList.add("is-visible");
-        menu.setAttribute("aria-hidden", "false");
-        trigger.setAttribute("aria-expanded", "true");
+        setHeaderPopoverState(trigger, menu, true, "is-visible");
     };
     const close = () => {
         if (!menu.classList.contains("is-visible")) return;
-        menu.classList.remove("is-visible");
-        menu.setAttribute("aria-hidden", "true");
-        trigger.setAttribute("aria-expanded", "false");
+        setHeaderPopoverState(trigger, menu, false, "is-visible");
         closeCostDetail();
         document.getElementById("senpai-mode-toggle")
             ?.closest(".nav-menu-row")
@@ -9831,13 +9851,17 @@ function initNavOverflow() {
     menu.querySelector('[onclick*="showKeyboardHelp"]')
         ?.addEventListener("click", close);
 
-    document.addEventListener("click", close);
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && menu.classList.contains("is-visible")) {
-            close();
-            trigger.focus();
-        }
-    });
+    document.addEventListener("click", (event) => {
+        if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
+    }, true);
+    document.addEventListener("keydown", (event) => {
+        window.FolioInteractionState.closeDisclosureForEscape(event, {
+            panel: menu,
+            openClass: "is-visible",
+            close,
+            focusTarget: trigger,
+        });
+    }, true);
 }
 
 function initBrandIntro() {
@@ -9845,10 +9869,10 @@ function initBrandIntro() {
     const callout = document.getElementById("brand-intro-callout");
     if (!trigger || !callout) return;
 
-    const hideIntro = () => {
-        callout.classList.remove("is-visible");
-        callout.setAttribute("aria-hidden", "true");
-        trigger.setAttribute("aria-expanded", "false");
+    const hideIntro = ({ restoreFocus = false } = {}) => {
+        const hadFocus = callout.contains(document.activeElement);
+        setHeaderPopoverState(trigger, callout, false, "is-visible");
+        if (restoreFocus && hadFocus) trigger.focus();
     };
 
     const playIntro = (event) => {
@@ -9856,9 +9880,7 @@ function initBrandIntro() {
 
         const costCallout = document.getElementById("brand-cost-callout");
         const costTrigger = document.getElementById("brand-cost-trigger");
-        costCallout?.classList.remove("is-visible");
-        costCallout?.setAttribute("aria-hidden", "true");
-        costTrigger?.setAttribute("aria-expanded", "false");
+        setHeaderPopoverState(costTrigger, costCallout, false, "is-visible");
 
         window.clearTimeout(_brandIntroTimer);
         window.clearTimeout(_brandIntroAnimTimer);
@@ -9872,10 +9894,8 @@ function initBrandIntro() {
             }, 820);
         }
 
-        callout.classList.add("is-visible");
-        callout.setAttribute("aria-hidden", "false");
-        trigger.setAttribute("aria-expanded", "true");
-        _brandIntroTimer = window.setTimeout(hideIntro, 5200);
+        setHeaderPopoverState(trigger, callout, true, "is-visible");
+        _brandIntroTimer = window.setTimeout(() => hideIntro({ restoreFocus: true }), 5200);
     };
 
     trigger.addEventListener("click", playIntro);
@@ -9889,7 +9909,18 @@ function initBrandIntro() {
             window.clearTimeout(_brandIntroTimer);
             hideIntro();
         }
-    });
+    }, true);
+    document.addEventListener("keydown", (event) => {
+        window.FolioInteractionState.closeDisclosureForEscape(event, {
+            panel: callout,
+            openClass: "is-visible",
+            close: () => {
+                window.clearTimeout(_brandIntroTimer);
+                hideIntro();
+            },
+            focusTarget: trigger,
+        });
+    }, true);
 }
 
 document.addEventListener("DOMContentLoaded", () => { initDashboard(); HoldingsBg.init(); });
@@ -10249,6 +10280,7 @@ function initHudPopover() {
     if (!pill || !popover) return;
 
     let clockInterval = null;
+    let returnFocus = pill;
 
     function updatePopoverContent() {
         const popUpdated = document.getElementById("hud-pop-updated");
@@ -10270,12 +10302,11 @@ function initHudPopover() {
         popover.style.top = `${top}px`;
     }
 
-    function showPopover() {
+    function showPopover(opener = pill) {
+        returnFocus = opener;
         updatePopoverContent();
         positionPopover();
-        popover.classList.add("is-visible");
-        popover.setAttribute("aria-hidden", "false");
-        pill.setAttribute("aria-expanded", "true");
+        setHeaderPopoverState(pill, popover, true, "is-visible");
         mobileTrigger?.setAttribute("aria-expanded", "true");
         clockInterval = setInterval(() => {
             const popClock = document.getElementById("hud-pop-clock");
@@ -10284,33 +10315,49 @@ function initHudPopover() {
     }
 
     function hidePopover() {
-        popover.classList.remove("is-visible");
-        popover.setAttribute("aria-hidden", "true");
-        pill.setAttribute("aria-expanded", "false");
+        setHeaderPopoverState(pill, popover, false, "is-visible");
         mobileTrigger?.setAttribute("aria-expanded", "false");
         if (clockInterval) { clearInterval(clockInterval); clockInterval = null; }
     }
 
     pill.addEventListener("click", (e) => {
         e.stopPropagation();
-        popover.classList.contains("is-visible") ? hidePopover() : showPopover();
+        popover.classList.contains("is-visible") ? hidePopover() : showPopover(pill);
     });
 
     mobileTrigger?.addEventListener("click", (e) => {
         e.stopPropagation();
         const menu = document.getElementById("nav-overflow-menu");
         const navTrigger = document.getElementById("nav-overflow-trigger");
-        menu?.classList.remove("is-visible");
-        menu?.setAttribute("aria-hidden", "true");
-        navTrigger?.setAttribute("aria-expanded", "false");
-        popover.classList.contains("is-visible") ? hidePopover() : showPopover();
+        if (popover.classList.contains("is-visible")) {
+            hidePopover();
+            return;
+        }
+        setHeaderPopoverState(navTrigger, menu, false, "is-visible");
+        showPopover(mobileTrigger);
     });
 
     document.addEventListener("click", (e) => {
-        if (!popover.contains(e.target) && !pill.contains(e.target)) {
+        if (!popover.contains(e.target) && !pill.contains(e.target) &&
+            !mobileTrigger?.contains(e.target)) {
             hidePopover();
         }
-    });
+    }, true);
+    document.addEventListener("keydown", (event) => {
+        const mobileReturn = returnFocus === mobileTrigger;
+        window.FolioInteractionState.closeDisclosureForEscape(event, {
+            panel: popover,
+            openClass: "is-visible",
+            close: hidePopover,
+            focusTarget: returnFocus,
+            parentTrigger: mobileReturn
+                ? document.getElementById("nav-overflow-trigger")
+                : null,
+            parentPanel: mobileReturn
+                ? document.getElementById("nav-overflow-menu")
+                : null,
+        });
+    }, true);
 }
 
 document.addEventListener("keydown", (e) => {
@@ -10900,17 +10947,14 @@ function initApiKeyPanel() {
     }
 
     function openPanel() {
-        panel.classList.add("is-open");
-        panel.setAttribute("aria-hidden", "false");
-        trigger.setAttribute("aria-expanded", "true");
+        setHeaderPopoverState(trigger, panel, true, "is-open");
         reflectKeyState();
         input.focus();
     }
 
-    function closePanel() {
-        panel.classList.remove("is-open");
-        panel.setAttribute("aria-hidden", "true");
-        trigger.setAttribute("aria-expanded", "false");
+    function closePanel({ restoreFocus = false } = {}) {
+        if (restoreFocus) trigger.focus();
+        setHeaderPopoverState(trigger, panel, false, "is-open");
     }
 
     trigger.addEventListener("click", (e) => {
@@ -10922,7 +10966,7 @@ function initApiKeyPanel() {
         }
     });
 
-    closeBtn.addEventListener("click", closePanel);
+    closeBtn.addEventListener("click", () => closePanel({ restoreFocus: true }));
 
     if (removeBtn) {
         removeBtn.addEventListener("click", async () => {
@@ -10949,18 +10993,20 @@ function initApiKeyPanel() {
 
     // Close when clicking outside
     document.addEventListener("click", (e) => {
-        if (!panel.contains(e.target) && e.target !== trigger) {
+        if (!panel.contains(e.target) && !trigger.contains(e.target)) {
             closePanel();
         }
-    });
+    }, true);
 
     // Esc closes
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && panel.classList.contains("is-open")) {
-            closePanel();
-            trigger.focus();
-        }
-    });
+    document.addEventListener("keydown", (event) => {
+        window.FolioInteractionState.closeDisclosureForEscape(event, {
+            panel,
+            openClass: "is-open",
+            close: closePanel,
+            focusTarget: trigger,
+        });
+    }, true);
 
     // Show/hide toggle
     reveal.addEventListener("click", () => {
@@ -11051,7 +11097,9 @@ function initApiKeyPanel() {
 
                 // Refresh the HUD heartbeat immediately; only auto-close on success.
                 if (typeof loadClaudeHeartbeat === "function") loadClaudeHeartbeat();
-                if (connected) setTimeout(closePanel, 1400);
+                if (connected) {
+                    setTimeout(() => closePanel({ restoreFocus: true }), 1400);
+                }
             } else {
                 const msg = typeof data.detail === "string" ? data.detail : "Could not save key. Try again.";
                 status.textContent = msg;
@@ -13727,7 +13775,8 @@ function _newsClearAiSection() {
 function _newsArticleCardHtml(item) {
     const thumb = item.thumbnail_url
         ? html`<img class="news-article-thumb" src="${item.thumbnail_url}"
-                alt="" loading="lazy" onerror="this.style.display='none'">`
+                alt="" loading="lazy" referrerpolicy="no-referrer"
+                onerror="this.style.display='none'">`
         : "";
     const timeStr = item.published_at ? timeAgo(item.published_at) : "";
     const meta    = [item.source, timeStr].filter(Boolean).join(" · ");

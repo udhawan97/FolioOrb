@@ -1,18 +1,17 @@
 /**
- * v3 asset capture: a clean cockpit hero (onboarding banner dismissed) and a
- * markets-tab still. Dev-only; run via the same seed+boot flow as capture.sh.
+ * v3 asset capture: a clean cockpit hero with onboarding dismissed. Dev-only;
+ * invoked by the canonical seed+boot workflow in capture.sh.
  * Output: optimized WebP in docs-site/public/assets/shots/.
  */
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const BASE_URL = process.env.SHOT_BASE_URL || 'http://127.0.0.1:8177';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'assets', 'shots');
-const RAW_DIR = join(__dirname, '..', '_shots', 'raw');
 const VIEWPORT = { width: 1512, height: 950 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -22,6 +21,7 @@ async function dismissBanner(page) {
   await page.evaluate(() => {
     document.getElementById('local-intel-guide')?.setAttribute('hidden', '');
     document.querySelector('.local-intel-guide')?.style.setProperty('display', 'none');
+    document.getElementById('dashboard-senpai')?.style.setProperty('display', 'none', 'important');
   }).catch(() => {});
 }
 
@@ -33,8 +33,6 @@ async function toWebp(buf, name, w) {
 }
 
 async function main() {
-  await rm(RAW_DIR, { recursive: true, force: true });
-  await mkdir(RAW_DIR, { recursive: true });
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: 'dark' });
   await p.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 45000 });
@@ -49,18 +47,6 @@ async function main() {
 
   // Hero cockpit — viewport clip of the (now banner-free) overview.
   await toWebp(await p.screenshot({ type: 'png' }), 'hero-cockpit-v3', 2400);
-
-  // Markets still — analytics → markets pane.
-  await p.click('[data-zone="analytics"]').catch(() => {});
-  await sleep(1500);
-  await p.click('[data-analytics-pane="markets"], #analytics-tab-markets').catch(() => {});
-  await sleep(2600);
-  const markets = p.locator('[data-analytics-pane="markets"]').first();
-  if (await markets.count()) {
-    await markets.scrollIntoViewIfNeeded().catch(() => {});
-    await sleep(500);
-    await toWebp(await markets.screenshot({ type: 'png' }), 'markets-demo', 1600);
-  }
 
   await b.close();
   console.log('v3 assets done');

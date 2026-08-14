@@ -9,6 +9,34 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.12.0 — Calm at every size
+
+- **Closed header panels leave the keyboard path.** Brand, Claude-key, live-feed,
+  overflow, and cost details now synchronize their visible, ARIA, and inert state;
+  Escape closes the active panel and returns focus to its trigger.
+- **Senpai stops covering phone-width portfolio truth.** Below 576 px the compact
+  orb occupies a row after the dashboard, automatic activity stays compact, and
+  the full line expands only after an explicit tap.
+- **Review Plan fits 320 px.** Its cards shrink with the sheet while wide
+  portfolio and target tables keep their own horizontal scrollers.
+- **Restore cancellation is layered.** When an exact restore confirmation is
+  open, the first Escape cancels it and returns keyboard focus to Restore; a
+  second Escape closes Review Orbit. After **Queue restore** is submitted, its
+  busy state blocks misleading Escape, Cancel, close, and tab actions until the
+  request finishes. Explicit failures safely re-enable both choices; interrupted
+  responses are reconciled with persisted Backup Vault state and otherwise stay
+  visibly **Status unknown**.
+- **Rehearsals cannot go stale silently.** Changing the holding or cash replaces
+  the old projection with **Preview outdated**, and late or out-of-order responses
+  are ignored.
+- Shared service/client seams now carry portfolio scoping, valuation,
+  realized-sales math, backup handling, DCA state, local exports, and Review
+  Orbit behavior without changing the financial or recovery contracts.
+- Privacy docs now distinguish credential-only Anthropic availability checks,
+  prompted Claude payloads, and publisher/CDN news-thumbnail requests.
+- No schema migration. Installing over v5.11.0 preserves local data, backups,
+  settings, and keys.
+
 ## v5.11.0 — Plan & Protect
 
 - **Set a target course.** Store exact basis-point targets across the eligible
@@ -346,7 +374,7 @@ FolioOrb is the native desktop app for local-first portfolio intelligence.
 - **Data stays local** in the normal per-user app data directory for your
   platform.
 - **Privacy posture stays clear** — FolioOrb is local-first, Claude-optional,
-  never places trades, and reports to nobody.
+  never places trades, and has no FolioOrb telemetry or cloud account.
 
 ## v4.5.2 — Reliability patch
 

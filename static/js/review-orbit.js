@@ -18,11 +18,14 @@ window.ReviewOrbit = (() => {
         plan: null,
         overview: null,
         backups: null,
+        rehearsalRequestId: 0,
+        rehearsalSnapshot: null,
         thesisId: null,
         thesisReturnFocus: null,
-        restoreName: null,
         restoreReturnFocus: null,
+        restoreStatusUnknown: false,
     };
+    const restoreConfirmation = window.FolioInteractionState.createPendingConfirmation();
 
     const $ = id => document.getElementById(id);
     const orbit = () => $("review-orbit");
@@ -94,6 +97,15 @@ window.ReviewOrbit = (() => {
         if (!state.open) return;
         if (event.key === "Escape") {
             event.preventDefault();
+            const restoreConfirm = $("review-restore-confirm");
+            if (restoreConfirmation.selection && restoreConfirm && !restoreConfirm.hidden) {
+                if (restoreConfirmation.pending) {
+                    live(restoreLockedMessage());
+                    return;
+                }
+                cancelRestore();
+                return;
+            }
             close();
             return;
         }
@@ -153,6 +165,13 @@ window.ReviewOrbit = (() => {
     function close() {
         const root = orbit();
         if (!root || !state.open) return false;
+        if (restoreConfirmation.pending) {
+            live(restoreLockedMessage());
+            return false;
+        }
+        if (restoreConfirmation.selection) {
+            clearRestoreConfirmation({ restoreFocus: false });
+        }
         state.open = false;
         root.hidden = true;
         root.setAttribute("aria-hidden", "true");
@@ -546,6 +565,7 @@ window.ReviewOrbit = (() => {
 
     async function loadPlan(force = false) {
         if (!force && state.loaded.has("plan")) return;
+        if (force) resetRehearsal();
         setLoading("review-book-pulse", "Valuing each saved portfolio independently…");
         setLoading("review-course-summary", "Loading target course and available USD quotes…");
         $("review-target-table").innerHTML = "";
@@ -591,6 +611,43 @@ window.ReviewOrbit = (() => {
         }
     }
 
+    function currentRehearsalSnapshot() {
+        return {
+            holdingId: $("review-rehearsal-holding")?.value || "",
+            cashUsd: $("review-rehearsal-cash")?.value.trim() || "",
+        };
+    }
+
+    function sameRehearsalSnapshot(left, right) {
+        return Boolean(left && right &&
+            left.holdingId === right.holdingId && left.cashUsd === right.cashUsd);
+    }
+
+    function renderRehearsalOutdated({ announce = true } = {}) {
+        const target = $("review-rehearsal-result");
+        if (!target) return;
+        target.innerHTML = html`
+            <div class="review-rehearsal-outdated" role="status">
+                <strong>Preview outdated</strong>
+                <span>Inputs changed. Run the rehearsal again before using this projection.</span>
+            </div>`;
+        if (announce) live("Buy rehearsal inputs changed; the previous preview is outdated.");
+    }
+
+    function resetRehearsal() {
+        state.rehearsalRequestId += 1;
+        state.rehearsalSnapshot = null;
+        $("review-rehearsal-result")?.replaceChildren();
+    }
+
+    function invalidateRehearsal() {
+        if (!state.rehearsalSnapshot ||
+            sameRehearsalSnapshot(state.rehearsalSnapshot, currentRehearsalSnapshot())) return;
+        state.rehearsalRequestId += 1;
+        state.rehearsalSnapshot = null;
+        renderRehearsalOutdated();
+    }
+
     function renderRehearsal(data) {
         const allocation = data.allocation_available
             ? html`<div><span>Projected allocation</span><strong>${pct(data.projected_selected_allocation_pct)}</strong></div><div><span>Largest position</span><strong>${pct(data.projected_largest_position_pct)}</strong></div>`
@@ -610,19 +667,33 @@ window.ReviewOrbit = (() => {
 
     async function runRehearsal(event) {
         event.preventDefault();
+        const snapshot = currentRehearsalSnapshot();
+        const requestId = state.rehearsalRequestId + 1;
+        state.rehearsalRequestId = requestId;
+        state.rehearsalSnapshot = snapshot;
         setLoading("review-rehearsal-result", "Rehearsing in memory — no portfolio writes…");
         try {
             const data = await PortfolioWorkspace.json("/api/review/plan/rehearsal", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    holding_id: Number($("review-rehearsal-holding").value),
-                    cash_usd: $("review-rehearsal-cash").value,
+                    holding_id: Number(snapshot.holdingId),
+                    cash_usd: snapshot.cashUsd,
                 }),
             });
+            if (requestId !== state.rehearsalRequestId) return;
+            if (!sameRehearsalSnapshot(snapshot, currentRehearsalSnapshot())) {
+                invalidateRehearsal();
+                return;
+            }
             renderRehearsal(data);
             live(`Buy rehearsal complete for ${data.ticker}; nothing was written or ordered.`);
         } catch (error) {
+            if (requestId !== state.rehearsalRequestId) return;
+            if (!sameRehearsalSnapshot(snapshot, currentRehearsalSnapshot())) {
+                invalidateRehearsal();
+                return;
+            }
             setError("review-rehearsal-result", error);
         }
     }
@@ -730,8 +801,12 @@ window.ReviewOrbit = (() => {
         const data = state.backups;
         renderProtection();
         const status = $("review-restore-status");
+        const pending = data?.pending_restore;
         const restore = data?.last_restore;
-        if (status && restore) {
+        if (status && pending?.name) {
+            status.hidden = false;
+            status.textContent = `Restore ${pending.name} is queued for the next clean restart.`;
+        } else if (status && restore) {
             status.hidden = false;
             status.textContent = restore.status === "restored"
                 ? `Restored ${restore.name} successfully. A safety copy of the previous database was kept.`
@@ -753,7 +828,7 @@ window.ReviewOrbit = (() => {
                 </div>
                 <div class="review-backup-actions">
                     <button type="button" class="review-secondary-btn" data-backup-export="${item.name}" ${item.verified ? "" : "disabled"}>Export</button>
-                    <button type="button" class="review-danger-btn" data-backup-restore="${item.name}" ${item.verified ? "" : "disabled"}>Restore…</button>
+                    <button type="button" class="review-danger-btn" data-backup-restore="${item.name}" ${item.verified && !pending ? "" : "disabled"}>Restore…</button>
                 </div>
             </article>`).join("");
     }
@@ -825,44 +900,138 @@ window.ReviewOrbit = (() => {
         }
     }
 
-    function askRestore(name) {
-        state.restoreName = name;
-        state.restoreReturnFocus = document.activeElement;
+    function askRestore(name, returnFocus = document.activeElement) {
+        if (restoreConfirmation.pending) return;
+        restoreConfirmation.select(name);
+        state.restoreStatusUnknown = false;
+        state.restoreReturnFocus = returnFocus;
         $("review-restore-title").textContent = `Restore ${name}?`;
         $("review-restore-confirm").hidden = false;
         requestAnimationFrame(() => $("review-restore-cancel")?.focus());
     }
 
-    function cancelRestore() {
+    function restoreLockedMessage() {
+        return state.restoreStatusUnknown
+            ? "Restore status could not be confirmed. Reload FolioOrb and inspect Backup Vault before taking another restore action."
+            : "Restore is already being queued; wait for that request to finish.";
+    }
+
+    function setRestorePendingUi(
+        pending,
+        name = restoreConfirmation.selection,
+        { unknown = false } = {},
+    ) {
+        const confirm = $("review-restore-confirm");
+        const description = $("review-restore-description");
+        const cancel = $("review-restore-cancel");
+        const accept = $("review-restore-accept");
+        confirm?.setAttribute("aria-busy", String(pending && !unknown));
+        document.querySelectorAll("[data-review-tab]").forEach(button => {
+            button.disabled = pending;
+        });
+        if (cancel) cancel.disabled = pending;
+        if (accept) {
+            accept.disabled = pending;
+            accept.textContent = unknown
+                ? "Status unknown"
+                : pending ? "Queuing…" : "Queue restore";
+        }
+        if (name) {
+            $("review-restore-title").textContent = unknown
+                ? `Could not confirm the restore status for ${name}`
+                : pending ? `Queuing restore for ${name}…` : `Restore ${name}?`;
+        }
+        if (description) {
+            description.textContent = unknown
+                ? "Reload FolioOrb, reopen Backup Vault, and inspect its queued status before retrying."
+                : pending
+                    ? "Waiting for FolioOrb to record the request. It cannot be cancelled after submission."
+                    : "FolioOrb first saves the current database, then restores after a clean restart.";
+        }
+    }
+
+    function clearRestoreConfirmation({ restoreFocus = true } = {}) {
         const previous = state.restoreReturnFocus;
-        state.restoreName = null;
+        const name = restoreConfirmation.selection;
+        restoreConfirmation.clear();
+        state.restoreStatusUnknown = false;
         state.restoreReturnFocus = null;
+        setRestorePendingUi(false, name);
         $("review-restore-confirm").hidden = true;
+        if (!restoreFocus) return;
         requestAnimationFrame(() => {
             if (previous?.isConnected) previous.focus();
             else document.querySelector("[data-review-tab='backups']")?.focus();
         });
     }
 
+    function cancelRestore() {
+        if (restoreConfirmation.pending) {
+            live(restoreLockedMessage());
+            return false;
+        }
+        clearRestoreConfirmation();
+        return true;
+    }
+
+    async function reconcileRestoreAfterUnknownResponse(name) {
+        try {
+            const backups = await PortfolioWorkspace.json("/api/review/backups");
+            state.backups = backups;
+            state.loaded.add("backups");
+            renderBackups();
+            if (backups.pending_restore?.name === name) {
+                clearRestoreConfirmation();
+                const message = `Restore ${name} was queued, but its confirmation response was interrupted. Restart FolioOrb to finish.`;
+                live(message);
+                showToast(message, "warning");
+                return;
+            }
+            restoreConfirmation.fail();
+            state.restoreStatusUnknown = false;
+            setRestorePendingUi(false, name);
+            showToast("Restore was not queued; the status check found no pending restore.", "danger");
+            live("Restore was not queued. You can retry or cancel this confirmation.");
+            requestAnimationFrame(() => $("review-restore-accept")?.focus());
+        } catch (_) {
+            state.restoreStatusUnknown = true;
+            setRestorePendingUi(true, name, { unknown: true });
+            showToast(
+                "Could not confirm whether the restore was queued. Reload FolioOrb and inspect Backup Vault before retrying.",
+                "danger",
+            );
+            live(restoreLockedMessage());
+        }
+    }
+
     async function acceptRestore() {
-        if (!state.restoreName) return;
-        const name = state.restoreName;
-        $("review-restore-accept").disabled = true;
+        const name = restoreConfirmation.start();
+        if (!name) return;
+        state.restoreStatusUnknown = false;
+        setRestorePendingUi(true, name);
+        live(`Queuing restore for ${name}; this step can no longer be cancelled.`);
         try {
             const result = await PortfolioWorkspace.json("/api/review/backups/restore", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name }),
             });
-            cancelRestore();
+            clearRestoreConfirmation({ restoreFocus: !result.will_quit });
             live(result.message);
             showToast(result.message, "warning");
             state.loaded.delete("backups");
             if (!result.will_quit) await loadBackups(true);
         } catch (error) {
+            if (!Number.isInteger(error?.status)) {
+                await reconcileRestoreAfterUnknownResponse(name);
+                return;
+            }
+            restoreConfirmation.fail();
+            state.restoreStatusUnknown = false;
+            setRestorePendingUi(false, name);
             showToast(apiErrorMessage(error, "Restore was not queued"), "danger");
-        } finally {
-            $("review-restore-accept").disabled = false;
+            live("Restore was not queued. You can retry or cancel this confirmation.");
+            requestAnimationFrame(() => $("review-restore-accept")?.focus());
         }
     }
 
@@ -995,7 +1164,10 @@ window.ReviewOrbit = (() => {
         });
         $("review-compare-run")?.addEventListener("click", runCompare);
         $("review-target-form")?.addEventListener("submit", saveTargets);
-        $("review-rehearsal-form")?.addEventListener("submit", runRehearsal);
+        const rehearsalForm = $("review-rehearsal-form");
+        rehearsalForm?.addEventListener("submit", runRehearsal);
+        rehearsalForm?.addEventListener("input", invalidateRehearsal);
+        rehearsalForm?.addEventListener("change", invalidateRehearsal);
         $("review-recap-form")?.addEventListener("submit", saveRecap);
         $("review-portable-export")?.addEventListener("click", savePortableRecords);
         $("review-backup-create")?.addEventListener("click", createBackup);
@@ -1006,7 +1178,7 @@ window.ReviewOrbit = (() => {
             const exportButton = event.target.closest("[data-backup-export]");
             const restoreButton = event.target.closest("[data-backup-restore]");
             if (exportButton) exportBackup(exportButton.dataset.backupExport);
-            if (restoreButton) askRestore(restoreButton.dataset.backupRestore);
+            if (restoreButton) askRestore(restoreButton.dataset.backupRestore, restoreButton);
         });
         $("review-restore-cancel")?.addEventListener("click", cancelRestore);
         $("review-restore-accept")?.addEventListener("click", acceptRestore);

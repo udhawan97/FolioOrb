@@ -84,7 +84,7 @@
   <!-- Local sub-box — x=48, y=313, w=355, h=76 -->
   <rect x="48" y="313" width="355" height="76" rx="7" fill="#091A0E" stroke="#1A5C30" stroke-width="1"/>
   <circle cx="68" cy="332" r="4" fill="#22C55E"/>
-  <text x="82" y="328" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" font-weight="600" fill="#22C55E">Local Intelligence  ·  always on, fully offline</text>
+  <text x="82" y="328" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" font-weight="600" fill="#22C55E">Local Intelligence  ·  always on, local computation</text>
   <text x="82" y="343" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"   fill="#3A8A3A">investment_signal  ·  market_regime</text>
   <text x="82" y="357" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"   fill="#3A8A3A">portfolio_exposure  ·  event_calendar</text>
   <text x="82" y="372" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"   fill="#2A6030">Verdicts  ·  Scenarios  ·  Regime  ·  Exposure  ·  Peer  ·  Calibration</text>
@@ -127,5 +127,5 @@
   <text x="718" y="515" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9"    font-weight="600" fill="#F59E0B" text-anchor="middle">optional · bring your own key</text>
 
   <!-- ── Footer ── -->
-  <text x="430" y="545" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#48484A" text-anchor="middle">pytest  ·  Pylint  ·  pip-audit  ·  CodeQL  ·  GitHub CI (Python 3.11 + 3.12)  ·  no data leaves your machine without your key</text>
+  <text x="430" y="545" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" fill="#48484A" text-anchor="middle">pytest  ·  Pylint  ·  pip-audit  ·  CodeQL  ·  GitHub CI (Python 3.11 + 3.12)  ·  local database  ·  no telemetry</text>
 </svg>

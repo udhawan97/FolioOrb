@@ -1,3 +1,71 @@
+# FolioOrb v5.12.0 Release Notes
+
+**Release date:** August 13, 2026
+
+## Headline
+
+The dashboard now stays calm at every size: closed header panels leave the
+keyboard path, Senpai stops covering phone-width portfolio truth, Review Plan
+contains its wide tables, and restore or rehearsal state cannot outlive the
+input that created it.
+
+## Fixed
+
+### Header details close completely
+
+- Brand, Claude-key, live-feed, overflow, and cost panels now share one
+  disclosure contract. Closing one synchronizes its visual state,
+  `aria-expanded`, `aria-hidden`, and `inert` state, so invisible controls are
+  not still reachable by Tab.
+- Escape closes the active panel and returns keyboard focus to the control that
+  opened it. Pointer behavior and the existing visual transitions are unchanged.
+
+### Phone-width content keeps the numbers clear
+
+- Below 576 px, Senpai now occupies a compact row after the dashboard instead
+  of a fixed layer over portfolio cards. Automatic commentary shows only the
+  activity indicator; the full line expands after an explicit tap.
+- Review Orbit's Plan cards can shrink to the 320 px viewport. Wide portfolio
+  and target tables keep their own horizontal scroller instead of widening the
+  whole sheet.
+
+### Review decisions stay bound to their context
+
+- When restore confirmation is visible, the first Escape cancels only that
+  confirmation and returns keyboard focus to its Restore control. A second
+  Escape closes Review Orbit.
+- Once **Queue restore** is submitted, the confirmation enters a visible busy
+  state and cannot falsely imply cancellation while the request is in flight.
+  Tabs remain locked during that request. An explicit failure restores Retry
+  and Cancel; an interrupted response is reconciled against persisted Backup
+  Vault state and remains **Status unknown** rather than claiming cancellation
+  if FolioOrb cannot confirm the outcome.
+- A buy rehearsal is now tied to the exact holding and cash input that produced
+  it. Editing either field replaces the old projection with an explicit
+  **Preview outdated** state, and a late or out-of-order response cannot repaint
+  stale numbers.
+
+## Under the hood
+
+- Portfolio scoping, valuation, realized-sales math, backup handling, DCA
+  workflow state, local exports, and Review Orbit now run through smaller shared
+  service/client seams. This is a structural hardening pass: the financial and
+  recovery contracts remain unchanged and have dedicated Python and JavaScript
+  regression coverage.
+- The public docs now describe outbound data accurately: the local database is
+  never uploaded, provider requests remain bounded, remote news thumbnails are
+  identified, and Anthropic availability checks are separated from the compact
+  derived context or sanitized CSV sample sent by prompted Claude features.
+
+## Upgrade notes
+
+Install over v5.11.0 as normal. There is no schema migration. Holdings, realized
+sales, snapshots, DCA history, theses, settings, backups, and API keys remain in
+the existing local data directory. FolioOrb still does not connect to a
+brokerage or place trades.
+
+---
+
 # FolioOrb v5.11.0 Release Notes
 
 **Release date:** August 11, 2026
@@ -1117,8 +1185,9 @@ and logs in the normal per-user data directory for your platform.
 **Download assets and docs now use the FolioOrb name** —
 `FolioOrb-macOS-arm64-v5.0.0.dmg` and `FolioOrb-Windows-x64-v5.0.0-Setup.exe`.
 
-FolioOrb remains local-first, Claude-optional, never places trades, and reports
-to nobody.
+FolioOrb remains local-first, Claude-optional, and never places trades. It has
+no telemetry or FolioOrb-hosted account; bounded provider requests and optional
+Claude paths are documented in the current Privacy guide.
 
 ## Upgrade Notes
 
@@ -1555,7 +1624,7 @@ v4.2 is still not financial advice. It's just the release where the orb got a na
 
 > *v4.1 is the release where setup stopped requiring a text editor. You can now hand Claude your API key from the dashboard itself — and watch it spend every token in real time.*
 
-FolioOrb now has an **in-dashboard API key panel**. Click the brand mark, paste your `sk-ant-*` key, and the dashboard validates it, writes it to `.env`, and reconnects Claude without a restart. No terminal. No `.env` file hunting. Input is validated client-side and server-side against the canonical Anthropic key format before a single character touches disk.
+FolioOrb now has an **in-dashboard API key panel**. In v4.1 it opened from the brand mark; current releases use the dedicated key icon beside the brand. Paste your `sk-ant-*` key and the dashboard validates it, writes it to `.env`, and reconnects Claude without a restart. No terminal. No `.env` file hunting. Input is validated client-side and server-side against the canonical Anthropic key format before a single character touches disk.
 
 The cost HUD in the nav got honest. Instead of estimating from cache occupancy, the dashboard now tracks **real token counts** across every Claude call made in the session. The nav breakdown shows actual input and output tokens, a live cost figure, and a predicted per-run annotation derived from backend constants — so you always know what a full scan costs before you click refresh again.
 
@@ -1570,7 +1639,7 @@ v4.1 is a tightening: the same cockpit, now easier to configure and harder to mi
 ### In-Dashboard API Key Configuration
 
 - **`POST /api/ai/configure-key`** — accepts an `api_key` body, validates against `^sk-ant-[A-Za-z0-9_\-]{20,300}$`, writes a single `ANTHROPIC_API_KEY=…` line to `.env` (creating the file if absent), and reloads the Anthropic client in-process. No restart required.
-- **API Key panel** — accessible from the brand mark in the nav. Password-type input with show/hide toggle, live keystroke validation (strips paste garbage, checks format character-by-character), a save button that activates only when the key is structurally valid, and an inline status message on success or failure. Closes on click-outside and Escape.
+- **API Key panel** — accessible from the key icon beside the brand in the nav. Password-type input with show/hide toggle, live keystroke validation (strips paste garbage, checks format character-by-character), a save button that activates only when the key is structurally valid, and an inline status message on success or failure. Closes on click-outside and Escape.
 - **Heartbeat reconnect** — on a successful key save the panel triggers a fresh `/api/ai/heartbeat` call so the HUD mode chip updates from Local → Claude AI without reloading the page.
 - **`reinitialize_client()`** in `ai_service.py` — hot-swaps the module-level Anthropic client with a new key, allowing the server to pick up a key change without process restart.
 
@@ -1947,7 +2016,7 @@ Open [http://localhost:8000](http://localhost:8000). Anthropic API key is option
 4. Copy `database/` and `.env` into the new tree.
 5. Run setup once, then `start.sh` / `start.ps1` going forward.
 
-The `verdict_snapshots` table is created automatically on startup. No `.env` changes required. `force_local=true` still skips Claude; all local intelligence works offline.
+The `verdict_snapshots` table is created automatically on startup. No `.env` changes required. `force_local=true` still skips Claude and keeps deterministic evaluation on-device; it does not disable FolioOrb's separate bounded public-data lookups.
 
 ---
 
