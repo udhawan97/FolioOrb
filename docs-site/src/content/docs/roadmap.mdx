@@ -9,11 +9,30 @@ import SenpaiTip from '../../components/SenpaiTip.astro';
 The previous roadmap named target weights, a trade export, and a what-if simulator. Those
 ideas shipped together in **v5.11.0** as a deliberately bounded Plan & Protect workflow.
 **v5.12.0** then tightened the real keyboard and compact-screen journeys around that work.
+**v5.13.0** extended the same keyboard treatment to the panels that were still hidden by
+fading alone, checked every symbol that arrives in a web address before it is looked up,
+and scoped DCA undo to the portfolio that owns the plan.
 This page records outcomes instead of leaving shipped work labelled as future work.
 
 ## Recently shipped
 
 <CardGrid>
+	<Card title="Closed means closed — everywhere" icon="check-circle">
+		The panels that hid by fading out now leave the keyboard path too — the portfolio
+		manager, the first-run welcome, the collapse pill, a hidden Senpai orb, the
+		holdings table during a scan, and the loading splash.
+		<br /><br />**Status:** shipped in v5.13.0
+	</Card>
+	<Card title="A junk symbol is refused" icon="warning">
+		A stock symbol arriving in a web address is checked against one rule — letters,
+		numbers, `.`, `-` or `^`, up to 10 characters — before FolioOrb looks it up.
+		<br /><br />**Status:** shipped in v5.13.0
+	</Card>
+	<Card title="Undo stays in its own book" icon="random">
+		Undoing a DCA buy can only change a holding in the portfolio that owns the plan;
+		the buy itself is still addressed by its own id.
+		<br /><br />**Status:** shipped in v5.13.0
+	</Card>
 	<Card title="Closed means closed" icon="check-circle">
 		Closed header details are inert as well as invisible, and Escape restores focus to
 		the trigger that opened them.

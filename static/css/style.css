@@ -530,13 +530,20 @@ body > .navbar {
     transform: translateY(-6px) scale(0.97);
     transform-origin: top right;
     pointer-events: none;
-    transition: opacity 0.18s ease, transform 0.18s var(--ease);
+    /* visibility (not just pointer-events) is what pulls the closed menu's
+       controls out of the tab order and the accessibility tree; it flips only
+       after the fade finishes so the exit animation still plays. */
+    visibility: hidden;
+    transition: opacity 0.18s ease, transform 0.18s var(--ease),
+        visibility 0s linear 0.18s;
     z-index: 1060;
 }
 .nav-overflow-menu.is-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .nav-menu-section {
@@ -705,8 +712,14 @@ body > .navbar {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    /* Redeclaring `transition` here replaces the shorthand, so the visibility
+       component has to be restated or the closed menu would flip hidden before
+       its (shortened) fade finishes. */
     .nav-overflow-menu,
-    .nav-overflow-menu .brand-cost-callout { transition: opacity 0.12s ease; transform: none; }
+    .nav-overflow-menu .brand-cost-callout {
+        transition: opacity 0.12s ease, visibility 0s linear 0.12s;
+        transform: none;
+    }
 }
 
 .brand-cost-notif {
@@ -765,7 +778,11 @@ body > .navbar {
     transform: translateY(-6px) scale(0.98);
     transform-origin: top left;
     pointer-events: none;
-    transition: opacity 0.18s ease, transform 0.18s var(--ease);
+    /* Keeps the closed callout's link out of the tab order — see
+       .nav-overflow-menu. */
+    visibility: hidden;
+    transition: opacity 0.18s ease, transform 0.18s var(--ease),
+        visibility 0s linear 0.18s;
     z-index: 1060;
 }
 
@@ -785,6 +802,8 @@ body > .navbar {
 .brand-intro-callout.is-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .brand-intro-kicker,
@@ -1094,13 +1113,19 @@ body > .navbar {
     opacity: 0;
     transform: translateY(-6px) scale(0.97);
     pointer-events: none;
-    transition: opacity 0.18s ease, transform 0.18s ease;
+    /* Keeps the API-key field and its buttons out of the tab order while the
+       panel is closed — see .nav-overflow-menu. */
+    visibility: hidden;
+    transition: opacity 0.18s ease, transform 0.18s ease,
+        visibility 0s linear 0.18s;
     will-change: opacity, transform;
 }
 .api-key-panel.is-open {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .api-key-panel-header {
@@ -1757,6 +1782,11 @@ table tbody tr:hover {
 #holdings-card.is-ai-checking .table-responsive {
     opacity: 0;
     pointer-events: none;
+    /* The faded-out table still holds a disclosure button per holding row plus
+       the header tips; without this they stay tabbable for the whole scan —
+       see .nav-overflow-menu. */
+    visibility: hidden;
+    transition: opacity 0.18s var(--ease), visibility 0s linear 0.18s;
 }
 
 .holdings-table {
@@ -3603,14 +3633,21 @@ body > .portfolio-manager-popover.is-visible {
     overflow: hidden;
     transform: translateY(-8px) scale(0.985);
     opacity: 0;
+    /* The closed manager holds the largest run of controls on the dashboard
+       (rename, delete, switch), so leaving it out of the tab order matters
+       most here — see .nav-overflow-menu. */
+    visibility: hidden;
     /* Snappy enter: 120ms → feels instant */
-    transition: transform 0.12s var(--ease), opacity 0.1s var(--ease);
+    transition: transform 0.12s var(--ease), opacity 0.1s var(--ease),
+        visibility 0s linear 0.12s;
     will-change: transform, opacity;
 }
 
 body > .portfolio-manager-popover.is-visible .portfolio-manager-panel {
     transform: translateY(0) scale(1);
     opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .portfolio-manager-header {
@@ -9130,6 +9167,14 @@ body > .dashboard-senpai {
     opacity: 0;
     pointer-events: none;
     transform: translateY(18px) scale(0.88);
+    /* "Hide Senpai" is persisted, so without this the orb's toggle button stays
+       a tab stop on every load while invisible and aria-hidden — see
+       .nav-overflow-menu. */
+    visibility: hidden;
+    transition:
+        opacity 0.22s var(--ease),
+        transform 0.32s var(--spring),
+        visibility 0s linear 0.32s;
 }
 
 /* ── Desktop: the bubble settles after it has been read ──────────────────────
@@ -9734,11 +9779,16 @@ body > .dashboard-senpai {
     justify-content: center;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.22s ease;
+    /* Keeps the closed shortcut overlay out of the tab order — see
+       .nav-overflow-menu. */
+    visibility: hidden;
+    transition: opacity 0.22s ease, visibility 0s linear 0.22s;
 }
 #kbd-overlay.kbd-visible {
     opacity: 1;
     pointer-events: all;
+    visibility: visible;
+    transition-delay: 0s;
 }
 .kbd-panel {
     background: var(--popover-surface);
@@ -10927,12 +10977,19 @@ body > .dashboard-senpai {
     transform: translateY(3px) scale(0.985);
     transform-origin: 50% 50%;
     pointer-events: none;
-    transition: opacity 0.16s var(--ease), transform 0.2s var(--spring);
+    /* Chart.js builds this tooltip from divs, so there is nothing focusable to
+       strand; hiding it keeps it out of the accessibility tree and matches the
+       other closed overlays — see .nav-overflow-menu. */
+    visibility: hidden;
+    transition: opacity 0.16s var(--ease), transform 0.2s var(--spring),
+        visibility 0s linear 0.2s;
 }
 
 .alloc-popover.is-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .alloc-popover-hero {
@@ -11554,14 +11611,20 @@ body > .dashboard-senpai {
     transform: translateY(-5px) scale(0.97);
     transform-origin: top center;
     pointer-events: none;
+    /* Keeps the closed HUD popover's control out of the tab order — see
+       .nav-overflow-menu. */
+    visibility: hidden;
     transition:
         opacity 0.18s var(--ease, ease),
-        transform 0.22s cubic-bezier(0.34,1.52,0.64,1);
+        transform 0.22s cubic-bezier(0.34,1.52,0.64,1),
+        visibility 0s linear 0.22s;
 }
 .hud-popover.is-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 /* scanline texture */
@@ -15237,16 +15300,22 @@ body > .holding-expand-fab {
        horizontal slide + scale animate the entrance. */
     transform: translateY(-50%) translateX(12px) scale(0.96);
     pointer-events: none;
+    /* The collapse pill is aria-hidden while parked, so it must leave the tab
+       order too — otherwise it is a focus stop that announces nothing. */
+    visibility: hidden;
     transition:
         opacity 0.22s ease,
         transform 0.22s var(--spring, cubic-bezier(0.22, 1, 0.36, 1)),
-        box-shadow 0.18s ease;
+        box-shadow 0.18s ease,
+        visibility 0s linear 0.22s;
 }
 
 .holding-expand-fab.is-visible {
     opacity: 1;
     transform: translateY(-50%) translateX(0) scale(1);
     pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .holding-expand-fab:hover {
@@ -22669,7 +22738,18 @@ body > .boot-splash {
     transition: opacity .26s var(--ease);
 }
 .boot-splash[hidden] { display: none; }
-.boot-splash.is-leaving { opacity: 0; pointer-events: none; }
+/* The panel holds a real Skip button, so the leaving splash has to drop out of
+   the tab order as it fades — see .nav-overflow-menu. The JS sets `inert` at the
+   same moment, which is what actually frees the Skip button; this keeps the CSS
+   consistent with the other overlays. The duration must stay in step with the
+   260ms `setTimeout(drop, 260)` in dashboard.js that sets [hidden] — a longer
+   fade here would be cut off mid-curve. */
+.boot-splash.is-leaving {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity .26s var(--ease), visibility 0s linear .26s;
+}
 
 /* The dashboard must not scroll behind the overlay. */
 body.is-booting { overflow: hidden; }
@@ -22824,6 +22904,10 @@ body.is-booting { overflow: hidden; }
     .boot-splash-curve-fill,
     .boot-splash-stage,
     .boot-splash-stage::before { transition: none; }
+    /* `.boot-splash.is-leaving` is more specific than `.boot-splash`, and a media
+       query adds no specificity, so the leaving state has to be named here or it
+       keeps its transition under reduced motion. */
+    .boot-splash.is-leaving { transition: none; }
     /* The animated mark is the only looping motion here; freeze it. */
     .boot-splash-mark { animation: none; }
 }

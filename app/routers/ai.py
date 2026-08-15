@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.routers import deps
 from app.models import AISummary, VerdictSnapshot
 from app.services.ai_service import (
     MODEL,
@@ -43,7 +44,6 @@ from app.services.stock_service import (
     QUOTE_FETCH_ERROR,
     get_all_quotes,
     get_stock_data,
-    ticker_shape_is_safe,
 )
 from app.services.insider_activity import get_insider_activity
 from app.services.fundamentals import get_fundamentals
@@ -388,7 +388,7 @@ def remove_api_key():
 
 @router.get("/summary/{ticker}")
 def get_stock_summary(
-    ticker: str,
+    ticker: str = Depends(deps.safe_ticker),
     force_refresh: bool = False,
     db: Session = Depends(get_db),
 ):
@@ -397,7 +397,6 @@ def get_stock_summary(
     Checks the database cache first — only calls Claude if needed.
     Cache expires after 24 hours. Use force_refresh=true to bypass.
     """
-    ticker = ticker.upper()
     stock_data = get_stock_data(ticker)
     cache = narrative_cache.NarrativeCache(
         db,
@@ -557,13 +556,12 @@ _UNCLEAR_RESULT = {
 # ── Move explanation endpoints ─────────────────────────────────────────────
 
 @router.get("/move-explanation/{ticker}")
-def get_move_explanation(ticker: str):
+def get_move_explanation(ticker: str = Depends(deps.safe_ticker)):
     """
     Explain why a ticker moved today.
     Returns market context, attribution type, and likely drivers.
     Not cached — prices and benchmark context change throughout the day.
     """
-    ticker = ticker.upper()
     stock_data = get_stock_data(ticker)
     if stock_data.get("error"):
         raise HTTPException(status_code=404, detail=QUOTE_FETCH_ERROR)
@@ -575,7 +573,7 @@ def get_move_explanation(ticker: str):
 
 
 @router.get("/insider-activity/{ticker}")
-def get_insider_activity_endpoint(ticker: str):
+def get_insider_activity_endpoint(ticker: str = Depends(deps.safe_ticker)):
     """Recent open-market insider trades (SEC Form 4) for one holding.
 
     Per-ticker and user-initiated, so it may spend the EDGAR round trips the
@@ -583,23 +581,17 @@ def get_insider_activity_endpoint(ticker: str):
     no insiders at all — return an honest empty-but-live result rather than an
     error, so the caller can render "nothing to show" without special-casing.
     """
-    symbol = (ticker or "").strip().upper()
-    if not ticker_shape_is_safe(symbol):
-        raise HTTPException(status_code=422, detail="Invalid ticker.")
-    return get_insider_activity(symbol)
+    return get_insider_activity(ticker)
 
 
 @router.get("/fundamentals/{ticker}")
-def get_fundamentals_endpoint(ticker: str):
+def get_fundamentals_endpoint(ticker: str = Depends(deps.safe_ticker)):
     """Annual revenue, net income, and diluted EPS from SEC XBRL filings.
 
     Per-ticker and user-initiated. Funds and non-filers have no financials and
     return an honest empty-but-live payload rather than an error.
     """
-    symbol = (ticker or "").strip().upper()
-    if not ticker_shape_is_safe(symbol):
-        raise HTTPException(status_code=422, detail="Invalid ticker.")
-    return get_fundamentals(symbol)
+    return get_fundamentals(ticker)
 
 
 @router.get("/move-explanations/all")
@@ -643,12 +635,14 @@ def get_all_move_explanations(
 # ── Holding Intelligence endpoints ────────────────────────────────────────────
 
 @router.get("/intelligence/{ticker}")
-def get_holding_intelligence_single(ticker: str, ai_holdings_fallback: bool = False):
+def get_holding_intelligence_single(
+    ticker: str = Depends(deps.safe_ticker),
+    ai_holdings_fallback: bool = False,
+):
     """
     Return structured intelligence for a single holding:
     what it covers (sectors, countries, top holdings, strategy, benchmarks).
     """
-    ticker = ticker.upper()
     stock_data = get_stock_data(ticker)
     if stock_data.get("error"):
         raise HTTPException(status_code=404, detail=QUOTE_FETCH_ERROR)
@@ -785,7 +779,7 @@ def _portfolio_cache_ticker(portfolio_id: int = 1) -> str:
 
 @router.get("/investment-signal/{ticker}")
 def get_investment_signal_single(
-    ticker: str,
+    ticker: str = Depends(deps.safe_ticker),
     portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
@@ -852,12 +846,11 @@ def get_verdict_report(portfolio_id: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/intelligence/{ticker}/deep")
-def get_holding_intelligence_deep(ticker: str):
+def get_holding_intelligence_deep(ticker: str = Depends(deps.safe_ticker)):
     """
     Tier-2 intelligence fetch — richer data for expanded holding panel.
     Does not block initial verdict render; called async on expand.
     """
-    ticker = ticker.upper()
     stock_data = get_stock_data(ticker)
     if stock_data.get("error"):
         raise HTTPException(status_code=404, detail=QUOTE_FETCH_ERROR)
@@ -903,12 +896,11 @@ def get_holding_intelligence_deep(ticker: str):
 
 
 @router.get("/analyst-recommendation/{ticker}")
-def get_analyst_recommendation_single(ticker: str):
+def get_analyst_recommendation_single(ticker: str = Depends(deps.safe_ticker)):
     """
     Return analyst consensus for a single ticker.
     ETFs return ETF quality instead of a stock analyst rating.
     """
-    ticker = ticker.upper()
     rec = get_analyst_recommendation(ticker)
     return rec_to_dict(rec)
 

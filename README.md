@@ -198,17 +198,16 @@ FolioOrb works fully without Claude — Local Intelligence handles verdicts, ana
 
 </details>
 
-## 🛰️ Calm at Every Size, New in v5.12.0
+## 🛰️ Checked at the Edges, New in v5.13.0
 
-The v5.12.0 pass closes five small gaps that mattered in real use. Closed header
-panels now leave the keyboard path, Senpai sits below phone-width financial cards,
-and Review Orbit's Plan cards fit 320 px while their tables scroll locally. Escape
-cancels an exact restore confirmation before it closes Review Orbit. Once a restore
-request is submitted, a busy state cannot falsely imply cancellation; interrupted
-responses are checked against persisted Backup Vault status and stay visibly unknown
-when no safe answer is available. A buy rehearsal
-is replaced with **Preview outdated** the instant its holding or cash
-input changes—even if an older network response arrives later.
+A small, careful pass over three edges. Panels that were hidden by fading —
+the portfolio manager, the first-run welcome, the collapse pill on an expanded
+holding, and three more — could still catch your Tab key
+and park focus somewhere you couldn't see. They now step out of the keyboard
+path entirely, opening and closing exactly as before. A stock symbol arriving in
+a web address is checked before FolioOrb looks it up, so a malformed one is
+refused rather than handed to a data provider. And undoing a DCA buy only ever
+touches a holding in the portfolio that owns the plan.
 
 Plan & Protect remains deliberately bounded. FolioOrb does not connect to a
 brokerage or place trades; targets are not recommendations; rehearsals do not

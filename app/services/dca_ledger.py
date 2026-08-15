@@ -441,18 +441,25 @@ class DcaLedger:
         }
 
     def _reverse(self, contribution: DcaContribution) -> str | None:
+        # Scoped by the plan's portfolio, mirroring `_apply`. `applied_holding_id`
+        # is a bare integer with no foreign key, so resolving it by primary key
+        # alone let an undo rewrite a holding owned by a different portfolio.
         holding = (
-            self.db.query(Holding)
-            .filter(Holding.id == contribution.applied_holding_id)
-            .first()
+            holdings_repository.in_portfolio(
+                self.db,
+                contribution.plan.portfolio_id,
+                contribution.applied_holding_id,
+            )
             if contribution.applied_holding_id
             else None
         )
         note = None
         if holding is None:
+            # Covers both "the holding was deleted" and "it belongs to another
+            # portfolio", so the wording does not assert it no longer exists.
             note = (
-                "Holding no longer exists; buy returned to pending without "
-                "changing holdings."
+                "No matching holding in this portfolio; buy returned to pending "
+                "without changing holdings."
             )
         else:
             holding.shares, holding.avg_cost = dca_service.undo_from_holding(

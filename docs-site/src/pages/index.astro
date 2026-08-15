@@ -1,6 +1,6 @@
 ---
 /**
- * FolioOrb landing page — v5.12 "private cockpit".
+ * FolioOrb landing page — v5.13 "private cockpit".
  *
  * A single cinematic story told in acts (hero → workflow → features → demo →
  * trust → download → developer), narrated by a Senpai scroll companion. Real
@@ -78,21 +78,21 @@ const features = [
 // Each icon is a compact stroke SVG (inner markup only) coloured by the act accent.
 const roadmap = [
   {
-    status: 'Shipped · v5.12.0',
-    title: 'Closed means closed',
-    body: 'Header details now leave the keyboard path when they close, with focus returning to the control that opened them.',
+    status: 'Shipped · v5.13.0',
+    title: 'Closed means closed — everywhere',
+    body: 'Panels that hid by fading — the portfolio manager, the first-run welcome, the collapse pill and three more — now leave the keyboard path too.',
     icon: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M12 12l4-2.5"/>',
   },
   {
-    status: 'Shipped · v5.12.0',
-    title: 'Phone-width calm',
-    body: 'Senpai sits below portfolio truth, and Review Plan keeps cards inside 320 px while wide tables scroll on their own.',
+    status: 'Shipped · v5.13.0',
+    title: 'A junk symbol is refused',
+    body: 'A stock symbol arriving in a web address is checked against one rule before FolioOrb looks it up, instead of being passed along.',
     icon: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h4"/>',
   },
   {
-    status: 'Shipped · v5.12.0',
-    title: 'Context-bound decisions',
-    body: 'Escape cancels the exact restore prompt first, and edited rehearsal inputs can never keep or repaint an older projection.',
+    status: 'Shipped · v5.13.0',
+    title: 'Undo stays in its own book',
+    body: 'Undoing a DCA buy can only ever change a holding in the portfolio that owns the plan.',
     icon: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   },
 ];
@@ -633,14 +633,14 @@ const roadmap = [
 								<span class="up-size">≈ 38 MB · relaunch</span>
 							</div>
 							<div class="up-versions">
-								<span class="up-ver up-ver--now"><small>Installed</small>v5.11.0</span>
+								<span class="up-ver up-ver--now"><small>Installed</small>v5.12.0</span>
 								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
-								<span class="up-ver up-ver--new"><small>Latest</small>v5.12.0</span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v5.13.0</span>
 							</div>
 							<ul class="up-changes">
-								<li>Closed panels leave the keyboard path</li>
-								<li>Phone-width dashboard and Plan containment</li>
-								<li>Context-bound restore and rehearsal state</li>
+								<li>Faded-out panels leave the keyboard path</li>
+								<li>Every ticker in a URL is checked before use</li>
+								<li>DCA undo can only touch its own portfolio's holding</li>
 							</ul>
 							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
 							<div class="up-actions">
@@ -685,9 +685,9 @@ const roadmap = [
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Calm at every size · v5.12.0</span>
+					<span class="kicker">Checked at the edges · v5.13.0</span>
 					<h2 class="section-title">The quiet parts are reliable.</h2>
-					<p class="rm-lede">Keyboard closure, compact-screen layout, restore cancellation, and buy-preview freshness now share explicit, browser-verified contracts. These cards describe shipped behavior, not future promises.</p>
+					<p class="rm-lede">Keyboard closure, symbol validation, and portfolio-scoped undo now have explicit, tested contracts. These cards describe shipped behavior, not future promises.</p>
 				</div>
 
 				<div class="rm-grid reveal">
@@ -702,7 +702,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.12 changes interaction state and module seams, not portfolio math. Targets are not recommendations; rehearsals remain read-only; restores still require exact confirmation and a clean restart.</p>
+					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.13 tightens keyboard closure, input checking, and portfolio scoping — not portfolio math. Targets are not recommendations; rehearsals remain read-only; restores still require exact confirmation and a clean restart.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 				</div>

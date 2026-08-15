@@ -13,7 +13,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import Holding
-from app.services import portfolio_lifecycle, portfolio_valuation
+from app.services import holdings_repository, portfolio_lifecycle, portfolio_valuation
 from app.services.dca_service import apply_to_holding
 from app.services.stock_service import get_portfolio_quotes
 
@@ -23,18 +23,21 @@ MAX_REHEARSAL_CASH = Decimal("100000000.00")
 
 
 def _eligible_holdings(db: Session, portfolio_id: int) -> list[Holding]:
-    """Active owned positions eligible for targets, in stable insertion order."""
-    return (
-        db.query(Holding)
-        .filter(
-            Holding.portfolio_id == portfolio_id,
-            Holding.is_active.is_(True),
-            Holding.is_watchlist.is_(False),
-            Holding.shares > 0,
-        )
-        .order_by(Holding.id.asc())
-        .all()
-    )
+    """Active owned positions eligible for targets, in stable insertion order.
+
+    "Active in this portfolio" belongs to `holdings_repository`; only the two
+    planning-specific predicates (a target needs a real, owned position) are
+    applied here.  The repository already guarantees ascending-id order, so the
+    local ORDER BY goes with the query.
+    """
+    # `is_watchlist is False` rather than `not holding.is_watchlist`: the column
+    # is nullable, and the SQL predicate this replaced (`is_(False)`) excluded a
+    # NULL row. Keeping that exact semantic makes the swap behaviour-preserving.
+    return [
+        holding
+        for holding in holdings_repository.active(db, portfolio_id)
+        if holding.is_watchlist is False and (holding.shares or 0) > 0
+    ]
 
 
 def _valid_target(value) -> bool:

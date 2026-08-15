@@ -4,12 +4,18 @@ Like move-explanation it is per-ticker and user-initiated, so it may spend the
 EDGAR round trips the batch paths avoid. The endpoint itself holds no logic
 worth duplicating — these tests pin the contract: it passes the ticker through,
 returns the service payload, and never raises for a ticker with no insiders.
+
+Exercised through the router rather than by calling the handler as a function.
+The ticker-shape check is now the ``deps.safe_ticker`` dependency shared by every
+``/{ticker}`` route (see tests/test_ticker_path_shape_guard.py), and a
+dependency only runs when FastAPI resolves the request — calling the handler
+directly would skip the very guard these tests exist to pin.
 """
 # pylint: disable=protected-access
 from app.routers import ai as ai_router
 
 
-def test_endpoint_returns_the_service_payload(monkeypatch):
+def test_endpoint_returns_the_service_payload(monkeypatch, api_client):
     captured = {}
 
     def _fake(ticker, **_kw):
@@ -18,46 +24,49 @@ def test_endpoint_returns_the_service_payload(monkeypatch):
                 "data_quality": "live"}
 
     monkeypatch.setattr(ai_router, "get_insider_activity", _fake)
-    result = ai_router.get_insider_activity_endpoint("aapl")
+    response = api_client(ai_router.router).get("/api/ai/insider-activity/aapl")
+
+    assert response.status_code == 200
     assert captured["ticker"] == "AAPL"  # normalized before the service sees it
-    assert result["buys"] == 2
-    assert result["data_quality"] == "live"
+    body = response.json()
+    assert body["buys"] == 2
+    assert body["data_quality"] == "live"
 
 
-def test_endpoint_is_calm_about_a_ticker_with_no_insiders(monkeypatch):
+def test_endpoint_is_calm_about_a_ticker_with_no_insiders(monkeypatch, api_client):
     monkeypatch.setattr(
         ai_router,
         "get_insider_activity",
         lambda t, **_kw: {"ticker": t, "buys": 0, "sells": 0,
                           "transactions": [], "data_quality": "live"},
     )
-    result = ai_router.get_insider_activity_endpoint("VOO")
-    assert result["transactions"] == []
-    assert result["data_quality"] == "live"
+    response = api_client(ai_router.router).get("/api/ai/insider-activity/VOO")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["transactions"] == []
+    assert body["data_quality"] == "live"
 
 
-def test_endpoint_rejects_a_malformed_ticker(monkeypatch):
+def test_endpoint_rejects_a_malformed_ticker(monkeypatch, api_client):
     # Guard the EDGAR round trip behind the same ticker-shape check the rest of
     # the app uses, so junk never reaches the network layer.
     called = []
     monkeypatch.setattr(
         ai_router, "get_insider_activity", lambda t, **_kw: called.append(t) or {}
     )
-    from fastapi import HTTPException  # local: only this test needs it
+    # A single path segment that survives routing but fails TICKER_PATTERN, so
+    # the guard — not the router's 404 — is what rejects it.
+    response = api_client(ai_router.router).get("/api/ai/insider-activity/AAPL;rm")
 
-    try:
-        ai_router.get_insider_activity_endpoint("../etc/passwd")
-        raised = False
-    except HTTPException as exc:
-        raised = exc.status_code == 422
-    assert raised
+    assert response.status_code == 422
     assert not called
 
 
 # --- fundamentals endpoint (same lazy, non-filer-safe contract) ---
 
 
-def test_fundamentals_endpoint_returns_the_service_payload(monkeypatch):
+def test_fundamentals_endpoint_returns_the_service_payload(monkeypatch, api_client):
     captured = {}
 
     def _fake(ticker, **_kw):
@@ -66,22 +75,19 @@ def test_fundamentals_endpoint_returns_the_service_payload(monkeypatch):
                 "data_quality": "live"}
 
     monkeypatch.setattr(ai_router, "get_fundamentals", _fake)
-    result = ai_router.get_fundamentals_endpoint("aapl")
+    response = api_client(ai_router.router).get("/api/ai/fundamentals/aapl")
+
+    assert response.status_code == 200
     assert captured["ticker"] == "AAPL"
-    assert result["periods"][0]["year"] == 2025
+    assert response.json()["periods"][0]["year"] == 2025
 
 
-def test_fundamentals_endpoint_rejects_a_malformed_ticker(monkeypatch):
+def test_fundamentals_endpoint_rejects_a_malformed_ticker(monkeypatch, api_client):
     called = []
     monkeypatch.setattr(
         ai_router, "get_fundamentals", lambda t, **_kw: called.append(t) or {}
     )
-    from fastapi import HTTPException
+    response = api_client(ai_router.router).get("/api/ai/fundamentals/AAPL;rm")
 
-    try:
-        ai_router.get_fundamentals_endpoint("../x")
-        raised = False
-    except HTTPException as exc:
-        raised = exc.status_code == 422
-    assert raised
+    assert response.status_code == 422
     assert not called

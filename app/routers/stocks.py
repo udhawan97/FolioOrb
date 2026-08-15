@@ -1,6 +1,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from app.routers import deps
 from app.services import market_hours
 from app.services.stock_service import (
     DEFAULT_HOLDINGS,
@@ -37,12 +38,11 @@ def get_all_prices():
 
 
 @router.get("/price/{ticker}")
-def get_price(ticker: str):
+def get_price(ticker: str = Depends(deps.safe_ticker)):
     """
     Return a live quote for a single ticker.
     Example: GET /api/stocks/price/VOO
     """
-    ticker = ticker.upper()
     quote = get_stock_data(ticker)
     # If the stock service couldn't fetch data, return a 404 with the reason
     if quote.get("error"):
@@ -61,8 +61,11 @@ def get_batch_history(
     period: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
     Example: GET /api/stocks/history/batch?period=1mo
     """
+    # The shape rule has to reach symbols that arrive in the query string too,
+    # not just the `/{ticker}` path routes: every element here is handed to the
+    # vendor and to a log line by `_fetch_ticker_history`.
     ticker_list = (
-        [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        [deps.safe_ticker(t) for t in tickers.split(",") if t.strip()]
         if tickers
         else DEFAULT_HOLDINGS
     )
@@ -79,7 +82,7 @@ def get_batch_history(
 
 @router.get("/history/{ticker}")
 def get_price_history(
-    ticker: str,
+    ticker: str = Depends(deps.safe_ticker),
     # Query parameter with a strict list of allowed values; defaults to 1 month
     period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|10y|ytd|max)$"),
 ):
@@ -87,8 +90,8 @@ def get_price_history(
     Return OHLCV (open/high/low/close/volume) price history for a ticker.
     Example: GET /api/stocks/history/VOO?period=3mo
     """
-    history = get_historical_prices(ticker.upper(), period)
-    return {"ticker": ticker.upper(), "period": period, "data": history}
+    history = get_historical_prices(ticker, period)
+    return {"ticker": ticker, "period": period, "data": history}
 
 @router.get("/market-status")
 async def get_market_status():

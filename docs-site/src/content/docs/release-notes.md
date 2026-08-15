@@ -9,6 +9,29 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.13.0 — Checked at the edges
+
+- **Faded-out panels leave the keyboard path.** v5.12.0 gave five header panels
+  one closing behaviour; other surfaces were hidden a different way — faded to
+  invisible, with clicks switched off — which stops a mouse but not the Tab key.
+  On a freshly loaded dashboard 14 of 47 keyboard stops were controls of this
+  kind, sitting past the last visible one. The portfolio manager, the first-run
+  welcome panel, the collapse pill, the hidden Senpai orb, the holdings table
+  during a scan, and the loading splash now all leave the tab order while hidden,
+  opening and closing exactly as before.
+- **A junk symbol is refused instead of looked up.** FolioOrb's rule for a symbol
+  — letters, numbers, `.`, `-` or `^`, up to 10 characters — was applied when you
+  add a holding but not when one is read back. 2 of the 12 addresses that take a
+  symbol checked it; the rest passed whatever arrived to the market-data provider
+  and into the log. All of them now check first, including the two that take a
+  comma-separated list. Valid symbols are unchanged.
+- **Undoing a DCA buy can only touch its own portfolio's holding.** The undo found its
+  holding by internal row number alone, and that number carries no portfolio with
+  it, so it could change a holding in a different book while reporting success.
+  It now looks the holding up inside the plan's own portfolio.
+- No schema migration. Installing over v5.12.0 preserves local data, backups,
+  settings and keys.
+
 ## v5.12.0 — Calm at every size
 
 - **Closed header panels leave the keyboard path.** Brand, Claude-key, live-feed,

@@ -1,3 +1,115 @@
+# FolioOrb v5.13.0 Release Notes
+
+**Release date:** August 15, 2026
+
+## Headline
+
+Three edges where a value crossed a boundary unchecked. Panels that were hidden
+only by fading now leave the keyboard path as well. A stock symbol arriving in a
+web address is checked before FolioOrb looks it up. And undoing a DCA buy can
+only change a holding in the portfolio that owns the plan.
+
+## Fixed
+
+### Faded-out panels leave the keyboard path
+
+v5.12.0 gave five header panels one closing behaviour. Other surfaces were hidden
+a different way — faded to invisible, with clicks switched off — and kept theirs.
+Switching off clicks stops a mouse but not the Tab key, so their controls stayed
+in the keyboard path while invisible on screen and unannounced by a screen
+reader.
+
+- On a freshly loaded dashboard, 14 of 47 keyboard stops were controls of this
+  kind: 10 in the closed portfolio manager, 3 in the first-run welcome panel, and
+  the collapse pill for an expanded holding. They sit at the end of the tab
+  order, so a keyboard user tabbing to the bottom of the page ran out of visible
+  controls and kept going with no focus ring anywhere on screen.
+- Three more were found while reviewing the fix, and are included: the Senpai orb
+  when you have hidden it (a saved setting, so it applied on every load), the
+  holdings table while an AI scan runs (its per-row disclosure buttons and the
+  header tips), and the loading splash as it fades away (its **Skip** button).
+- All of them now leave the tab order while hidden. Opening and closing them
+  looks exactly as before; the switch happens after the fade finishes.
+- Verified on the running dashboard: a 20-press Tab walk from the top of the page
+  now lands on 20 visible, named controls, where the same walk previously reached
+  an invisible one. Panels still open and close normally, including with reduced
+  motion.
+
+### A junk symbol is refused instead of looked up
+
+FolioOrb has one rule for what a stock symbol may look like: letters, numbers,
+`.`, `-` or `^`, up to 10 characters. Adding or importing a holding already
+applied it. Reading did not — 2 of the 12 addresses that take a symbol checked
+it, and the rest passed whatever arrived straight through to the market-data
+provider and into the log.
+
+- An 80-character piece of junk used to come back as an ordinary 200 answer; the
+  provider was asked for it by name, and the name was written to the log.
+- Every address that takes a symbol now applies the rule first, including the two
+  that take a comma-separated list. A symbol that does not fit is refused up
+  front. Valid symbols are unchanged, and lower case still works — `aapl` and
+  `AAPL` behave identically.
+- Nothing the dashboard itself produces can be refused: every stored symbol
+  passed the same rule when it was added, so no existing bookmark, deep link or
+  saved portfolio stops working.
+
+### Undoing a DCA buy can only touch its own portfolio's holding
+
+Applying a DCA buy has always written to a holding in the plan's own portfolio.
+Undoing one did not check: it found the holding by its internal row number alone,
+and that number carries no portfolio with it. If it ever pointed at a holding in
+a different portfolio, the undo changed that holding's share count — and could
+mark it inactive — while reporting an ordinary success.
+
+- The undo now looks the holding up inside the plan's own portfolio, so it can
+  only change a position in the book the plan belongs to.
+- If no such holding is there, the buy still returns to pending and the message
+  says so, instead of claiming a clean undo.
+- Nothing in FolioOrb is known to create a plan whose buy points outside its own
+  portfolio, so this is very unlikely to have affected your numbers; there was
+  simply nothing preventing it. If you keep more than one portfolio and a share
+  count ever looked wrong after an undo, it is worth a check.
+- What this does and does not change: an undo now always writes to the plan's own
+  portfolio. It still finds a buy by that buy's own number, so the fix is about
+  where the change lands, not about which buys can be named — and the dashboard
+  only ever offers you buys from the portfolio you are in.
+
+## Under the hood
+
+- Two analytics views — conviction gaps and confidence spectrum — now read the
+  verdict scan directly instead of calling another endpoint's handler inside the
+  app. Same numbers, one less layer.
+- Target planning and the rest of the app now ask the same place for "the active
+  holdings in this portfolio", so that rule cannot drift between screens.
+
+## Upgrade notes
+
+- No schema migration, no configuration change, no new dependency. Installing
+  over v5.12.0 preserves your local data: holdings, realized sales, snapshots,
+  DCA history, theses, settings, backups and API keys all stay where they are.
+
+## Notes
+
+- **If you script against the local API:** eight addresses now answer `422` for a
+  symbol outside the rule above, where they previously answered `200` —
+  `/api/ai/summary/{ticker}`, `/api/ai/move-explanation/{ticker}`,
+  `/api/ai/intelligence/{ticker}`, `/api/ai/intelligence/{ticker}/deep`,
+  `/api/ai/investment-signal/{ticker}`, `/api/ai/analyst-recommendation/{ticker}`,
+  `/api/stocks/price/{ticker}` and `/api/stocks/history/{ticker}`.
+  `GET /api/stocks/history/batch?tickers=…` and `GET /api/review/compare?tickers=…`
+  now reject the whole request if any symbol in the list is malformed, rather than
+  passing the bad element along. `/api/ai/insider-activity/{ticker}` and
+  `/api/ai/fundamentals/{ticker}` already rejected malformed symbols; only their
+  message text has changed.
+- Valid symbols are unaffected on every one of those addresses. This is a minor
+  version rather than a major one because the API is loopback-only and serves the
+  bundled dashboard, and only input that was already malformed changes behaviour.
+- If you set `DEFAULT_HOLDINGS` in `.env`, any entry that does not fit the symbol
+  rule is now skipped when a new default portfolio is seeded, instead of being
+  planted as a row nothing can price.
+
+---
+
 # FolioOrb v5.12.0 Release Notes
 
 **Release date:** August 13, 2026

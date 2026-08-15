@@ -11395,6 +11395,9 @@ const BootSplash = (() => {
             document.body.classList.remove("is-booting");
             if (!el) return;
             el.classList.add("is-leaving");
+            // The fade lasts 260ms; without this the Skip button stays in the
+            // tab order for all of it, invisible and already aria-hidden.
+            el.setAttribute("inert", "");
             const drop = () => {
                 el.hidden = true;
                 el.setAttribute("aria-hidden", "true");

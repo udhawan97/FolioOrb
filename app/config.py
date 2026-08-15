@@ -1,7 +1,11 @@
+import logging
 import os
 from dotenv import load_dotenv
 
 from app.paths import data_dir, is_frozen
+from app.services.ticker import ticker_shape_is_safe
+
+logger = logging.getLogger(__name__)
 
 # Load variables from the .env file into the process environment.
 # This must run before we call os.getenv() below. In a source checkout
@@ -15,6 +19,25 @@ def _csv_env(name: str, default: str = "", uppercase: bool = False) -> list[str]
     raw = os.getenv(name, default)
     items = [item.strip() for item in raw.split(",") if item.strip()]
     return [item.upper() for item in items] if uppercase else items
+
+
+def _seed_tickers(name: str) -> list[str]:
+    """Comma-separated seed symbols, keeping only those shaped like a ticker.
+
+    Named rather than dropped silently: this is the one path that seeds a holding
+    without going through the request schemas, so a typo in `.env` would otherwise
+    plant a row nothing can price and give no clue why it never loads.
+    """
+    kept, skipped = [], []
+    for symbol in _csv_env(name, uppercase=True):
+        (kept if ticker_shape_is_safe(symbol) else skipped).append(symbol)
+    if skipped:
+        logger.warning(
+            "Ignoring %s entries that are not shaped like a ticker: %s",
+            name,
+            ", ".join(skipped),
+        )
+    return kept
 
 
 def _default_database_url() -> str:
@@ -59,7 +82,7 @@ class Settings:
     )
     # Optional comma-separated tickers pre-loaded when the default portfolio is created.
     # Empty by default so forks do not inherit anyone's personal portfolio.
-    DEFAULT_HOLDINGS: list[str] = _csv_env("DEFAULT_HOLDINGS", uppercase=True)
+    DEFAULT_HOLDINGS: list[str] = _seed_tickers("DEFAULT_HOLDINGS")
 
 
 # Single shared settings object — import this everywhere instead of creating Settings()

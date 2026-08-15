@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app import app_settings, paths
 from app.database import get_db
 from app.routers.deps import require_portfolio as _require_portfolio
+from app.routers.deps import safe_ticker
 from app.services import (
     backup_service,
     holdings_repository,
@@ -195,7 +196,11 @@ def compare_watchlist(
     db: Session = Depends(get_db),
 ):
     _require_portfolio(portfolio_id, db)
-    selected = [ticker for ticker in tickers.split(",") if ticker.strip()]
+    # Same shape rule as the `/{ticker}` routes and the batch history request:
+    # a symbol arriving in the query string is still a symbol. The membership
+    # check below would reject an unknown one anyway, but the rule belongs at
+    # the edge, before the value is echoed back in an error message.
+    selected = [safe_ticker(ticker) for ticker in tickers.split(",") if ticker.strip()]
     return _domain_call(
         portfolio_review.compare_watchlist, db, portfolio_id, selected
     )

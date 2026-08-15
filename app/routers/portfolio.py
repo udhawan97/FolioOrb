@@ -25,6 +25,7 @@ from app.services import holdings_repository
 from app.services import portfolio_lifecycle
 from app.services import portfolio_valuation
 from app.services import realized_sales
+from app.services import verdict_pipeline
 from app.services.earnings_radar import get_earnings_events
 from app.services.dividend_income import compute_portfolio_income
 from app.services.etf_overlap import compute_etf_overlap
@@ -798,27 +799,19 @@ def get_sector_tilt(portfolio_id: int = 1, db: Session = Depends(get_db)):
 @router.get("/conviction-gaps")
 def get_conviction_gaps(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Verdict vs position-size mismatches."""
-    from app.routers.ai import get_all_investment_signals
-
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    sig_payload = get_all_investment_signals(
-        portfolio_id=portfolio_id, db=db, force_local=True
-    )
-    return compute_conviction_gaps(result, sig_payload.get("signals") or {})
+    scan = verdict_pipeline.scan_portfolio(db, portfolio_id, force_local=True)
+    return compute_conviction_gaps(result, scan.signals or {})
 
 
 @router.get("/confidence-spectrum")
 def get_confidence_spectrum(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Allocation-weighted confidence distribution."""
-    from app.routers.ai import get_all_investment_signals
-
     _require_portfolio(portfolio_id, db)
     result = portfolio_valuation.evaluate(db, portfolio_id).holdings
-    sig_payload = get_all_investment_signals(
-        portfolio_id=portfolio_id, db=db, force_local=True
-    )
-    return compute_confidence_spectrum(result, sig_payload.get("signals") or {})
+    scan = verdict_pipeline.scan_portfolio(db, portfolio_id, force_local=True)
+    return compute_confidence_spectrum(result, scan.signals or {})
 
 
 @router.get("/fee-drag")
