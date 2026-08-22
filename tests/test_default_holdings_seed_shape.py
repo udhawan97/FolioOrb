@@ -36,4 +36,7 @@ def test_dropped_symbols_are_named_in_the_log(monkeypatch, caplog):
 
 def test_an_unset_variable_seeds_nothing(monkeypatch):
     monkeypatch.delenv("DEFAULT_HOLDINGS", raising=False)
-    assert _seed_tickers("DEFAULT_HOLDINGS") == []
+    # A list, not just something falsey: the caller iterates the result.
+    seeded = _seed_tickers("DEFAULT_HOLDINGS")
+    assert isinstance(seeded, list)
+    assert not seeded

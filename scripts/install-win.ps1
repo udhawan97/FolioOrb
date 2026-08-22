@@ -3,7 +3,7 @@
 #
 # Installs the latest stable release by default. Set $env:FOLIO_REF to pin a tag
 # or track the dev channel before running, e.g.:
-#   $env:FOLIO_REF = "v5.13.0"      # a specific release
+#   $env:FOLIO_REF = "v5.14.0"      # a specific release
 #   $env:FOLIO_REF = "latest-main"  # newest main build
 #   $env:FOLIO_REF = "main"         # current main branch
 #

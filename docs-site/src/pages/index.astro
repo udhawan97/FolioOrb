@@ -1,6 +1,6 @@
 ---
 /**
- * FolioOrb landing page — v5.13 "private cockpit".
+ * FolioOrb landing page — v5.14 "private cockpit".
  *
  * A single cinematic story told in acts (hero → workflow → features → demo →
  * trust → download → developer), narrated by a Senpai scroll companion. Real
@@ -78,22 +78,22 @@ const features = [
 // Each icon is a compact stroke SVG (inner markup only) coloured by the act accent.
 const roadmap = [
   {
-    status: 'Shipped · v5.13.0',
-    title: 'Closed means closed — everywhere',
-    body: 'Panels that hid by fading — the portfolio manager, the first-run welcome, the collapse pill and three more — now leave the keyboard path too.',
-    icon: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M12 12l4-2.5"/>',
+    status: 'Shipped · v5.14.0',
+    title: 'A dialog holds the keyboard',
+    body: 'All eight dim-the-dashboard dialogs share one containment. 7 of 8 Tab presses used to walk off “Delete portfolio?” onto the live dashboard behind it; none do now.',
+    icon: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M7 14h10"/>',
   },
   {
-    status: 'Shipped · v5.13.0',
-    title: 'A junk symbol is refused',
-    body: 'A stock symbol arriving in a web address is checked against one rule before FolioOrb looks it up, instead of being passed along.',
-    icon: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h4"/>',
+    status: 'Shipped · v5.14.0',
+    title: 'Closing keeps your place',
+    body: 'Each dialog falls back to a landmark that outlives the button you clicked, and checks focus actually landed — instead of dropping it at the top of the page.',
+    icon: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/><circle cx="12" cy="12" r="2.5"/>',
   },
   {
-    status: 'Shipped · v5.13.0',
-    title: 'Undo stays in its own book',
-    body: 'Undoing a DCA buy can only ever change a holding in the portfolio that owns the plan.',
-    icon: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    status: 'Shipped · v5.14.0',
+    title: 'Dialogs stack',
+    body: 'A dialog opened over another is reachable rather than frozen, and hands the keyboard back to the one underneath when it closes.',
+    icon: '<rect x="3.5" y="8.5" width="13" height="11" rx="2"/><path d="M7.5 5.5h11a2 2 0 0 1 2 2v9"/>',
   },
 ];
 ---
@@ -633,14 +633,14 @@ const roadmap = [
 								<span class="up-size">≈ 38 MB · relaunch</span>
 							</div>
 							<div class="up-versions">
-								<span class="up-ver up-ver--now"><small>Installed</small>v5.12.0</span>
+								<span class="up-ver up-ver--now"><small>Installed</small>v5.13.0</span>
 								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
-								<span class="up-ver up-ver--new"><small>Latest</small>v5.13.0</span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v5.14.0</span>
 							</div>
 							<ul class="up-changes">
-								<li>Faded-out panels leave the keyboard path</li>
-								<li>Every ticker in a URL is checked before use</li>
-								<li>DCA undo can only touch its own portfolio's holding</li>
+								<li>Every dialog holds the keyboard until you answer it</li>
+								<li>Closing a dialog puts focus back where you were</li>
+								<li>A dialog opened over another one is usable</li>
 							</ul>
 							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
 							<div class="up-actions">
@@ -685,9 +685,9 @@ const roadmap = [
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Checked at the edges · v5.13.0</span>
+					<span class="kicker">One meaning for “modal” · v5.14.0</span>
 					<h2 class="section-title">The quiet parts are reliable.</h2>
-					<p class="rm-lede">Keyboard closure, symbol validation, and portfolio-scoped undo now have explicit, tested contracts. These cards describe shipped behavior, not future promises.</p>
+					<p class="rm-lede">Containment, focus return, and dialog stacking now come from one shared contract instead of eight private copies. These cards describe shipped behavior, not future promises.</p>
 				</div>
 
 				<div class="rm-grid reveal">
@@ -702,7 +702,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.13 tightens keyboard closure, input checking, and portfolio scoping — not portfolio math. Targets are not recommendations; rehearsals remain read-only; restores still require exact confirmation and a clean restart.</p>
+					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.14 changes how dialogs behave once open — not portfolio math, and not a single number FolioOrb shows you. Targets are not recommendations; rehearsals remain read-only; restores still require exact confirmation and a clean restart.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 				</div>

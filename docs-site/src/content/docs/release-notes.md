@@ -9,6 +9,32 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
+## v5.14.0 — One meaning for "modal"
+
+- **A dialog keeps the keyboard inside it.** FolioOrb's eight dim-the-dashboard
+  panels had each grown their own idea of what "modal" means, and three stopped
+  the mouse but not the Tab key. Walking the real keyboard path: 6 of 8 Tab
+  presses left the rename dialog, **7 of 8 left "Delete portfolio?"** — the first
+  press was already outside — and 2 of 8 left "Record a sale". Both of those are
+  confirmations for things that cannot be undone, and the dashboard behind them
+  stayed fully live. All eight now hold the keyboard until you answer them, and
+  the background is out of reach for a screen reader and the mouse too. Escape
+  still unwinds one step at a time where a dialog has steps inside it.
+- **Closing a dialog no longer loses your place.** The focus return aimed at the
+  control you clicked, and renaming or deleting a portfolio redraws the list that
+  held it — so both flows dropped focus to the top of the page, every time. Each
+  dialog now falls back to a landmark that outlives its trigger, and the return is
+  checked rather than assumed.
+- **A dialog opened on top of another one is usable.** Marking the page
+  unreachable also froze the other dialogs' markup, so a second dialog arrived
+  unfocusable while the first went on answering the keyboard. Dialogs now stack,
+  and the keyboard goes back to the one underneath on close.
+- **A tab strip no longer swallows a keypress.** Review Orbit's parked tabs were
+  counted as stops, putting the wrap one control late, so once per lap a Tab press
+  went nowhere. Only visible once one implementation served all eight dialogs.
+- No schema migration. Installing over v5.13.0 preserves local data, backups,
+  settings and keys.
+
 ## v5.13.0 — Checked at the edges
 
 - **Faded-out panels leave the keyboard path.** v5.12.0 gave five header panels

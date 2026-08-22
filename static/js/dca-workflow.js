@@ -23,6 +23,7 @@
         scheduleFrame: root.requestAnimationFrame.bind(root),
         scheduleIdle: root.scheduleWhenIdle,
         log: root.console,
+        modals: root.FolioModalSurface,
     });
     root.DcaWorkflow = { open: runtime.open };
     root.document.addEventListener("DOMContentLoaded", runtime.init, { once: true });
@@ -37,6 +38,9 @@
     scheduleFrame = callback => callback(),
     scheduleIdle = callback => callback(),
     log = { warn: () => {} },
+    // The shared modal seam, absent in the node harness (which drives the
+    // workflow through a fake document with no layout to contain).
+    modals = null,
     confirmAction = null,
 }) {
     let initialized = false;
@@ -259,14 +263,6 @@
         }
     }
 
-    function dialogFocusable() {
-        const dialog = byId("dca-action-dialog");
-        if (!dialog || dialog.hidden) return [];
-        return Array.from(dialog.querySelectorAll(
-            "button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])",
-        )).filter(element => !element.closest("[hidden]") && element.getClientRects().length > 0);
-    }
-
     function closeDialog(result = null) {
         const dialog = byId("dca-action-dialog");
         const state = dialogState;
@@ -276,6 +272,7 @@
         dialog.setAttribute("aria-hidden", "true");
         document.querySelector("#portfolioModal > .portfolio-manager-panel")?.removeAttribute("inert");
         state.resolve(result);
+        if (state.modal) { state.modal.close(); return; }
         if (state.previousFocus?.focus) scheduleFrame(() => state.previousFocus.focus());
     }
 
@@ -307,7 +304,16 @@
         dialog.hidden = false;
         dialog.setAttribute("aria-hidden", "false");
         return new Promise(resolve => {
-            dialogState = { resolve, previousFocus, hasValue };
+            // The plan row that carried the trigger is re-rendered by the action
+            // this dialog confirms, so the DCA panel's own button is the landmark
+            // that outlives it.
+            const modal = modals?.open(dialog, {
+                document,
+                previousFocus,
+                fallbackFocus: [() => byId("dca-btn")],
+                onEscape: () => { closeDialog(); },
+            }) || null;
+            dialogState = { resolve, previousFocus, hasValue, modal };
             scheduleFrame(() => {
                 const target = hasValue ? input : byId("dca-action-cancel");
                 target?.focus();
@@ -316,28 +322,13 @@
         });
     }
 
+    // Only reached when the shared modal seam is unavailable (the node harness).
     function handleDialogKeydown(event) {
-        if (!dialogState) return;
+        if (!dialogState || dialogState.modal) return;
         if (event.key === "Escape") {
             event.preventDefault();
             event.stopImmediatePropagation();
             closeDialog();
-            return;
-        }
-        if (event.key !== "Tab") return;
-        const focusable = dialogFocusable();
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable.at(-1);
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        } else if (!byId("dca-action-dialog")?.contains(document.activeElement)) {
-            event.preventDefault();
-            first.focus();
         }
     }
 

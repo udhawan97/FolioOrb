@@ -198,16 +198,21 @@ FolioOrb works fully without Claude — Local Intelligence handles verdicts, ana
 
 </details>
 
-## 🛰️ Checked at the Edges, New in v5.13.0
+## 🛰️ One Meaning for "Modal", New in v5.14.0
 
-A small, careful pass over three edges. Panels that were hidden by fading —
-the portfolio manager, the first-run welcome, the collapse pill on an expanded
-holding, and three more — could still catch your Tab key
-and park focus somewhere you couldn't see. They now step out of the keyboard
-path entirely, opening and closing exactly as before. A stock symbol arriving in
-a web address is checked before FolioOrb looks it up, so a malformed one is
-refused rather than handed to a data provider. And undoing a DCA buy only ever
-touches a holding in the portfolio that owns the plan.
+FolioOrb has eight panels that dim the dashboard and ask you something. Each had
+picked up its own idea of what that means, and three of them stopped the mouse
+but not the Tab key — including **Delete portfolio?**, where the very first Tab
+press left the dialog and put the whole live dashboard back under your hands
+while the confirmation still stood open. All eight now hold the keyboard until
+you answer them.
+
+Closing one used to lose your place: it aimed focus at the control you had
+clicked, and renaming or deleting a portfolio redraws the list that held it, so
+focus landed at the top of the page instead. Every dialog now falls back to a
+landmark that outlives its trigger, and checks that focus actually got there.
+Dialogs also stack properly, so one opened over another is reachable rather than
+frozen. Same clicks, same look — the keyboard just stops falling through.
 
 Plan & Protect remains deliberately bounded. FolioOrb does not connect to a
 brokerage or place trades; targets are not recommendations; rehearsals do not

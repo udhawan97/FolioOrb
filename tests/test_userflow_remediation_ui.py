@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX = (ROOT / "templates/index.html").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "static/js/dashboard.js").read_text(encoding="utf-8")
 DCA = (ROOT / "static/js/dca-workflow.js").read_text(encoding="utf-8")
+MODAL = (ROOT / "static/js/modal-surface.js").read_text(encoding="utf-8")
 STYLE = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 REVIEW_STYLE = (ROOT / "static/css/review-orbit.css").read_text(encoding="utf-8")
 
@@ -44,13 +45,17 @@ def test_news_failure_is_retryable_without_a_page_reload():
 
 
 def test_portfolio_manager_focus_return_rejects_hidden_openers():
+    # The staleness rule moved into the shared modal seam (every surface needs
+    # it, not just this one); the manager still names the landmark to fall back
+    # to, and still hands it over on open.
     assert 'aria-label="Manage portfolios"' in INDEX
     assert "function isRestorableFocusTarget" in DASHBOARD
-    assert "[hidden], [aria-hidden='true'], [inert]" in DASHBOARD
+    assert "[hidden], [aria-hidden='true'], [inert]" in MODAL
     assert 'getElementById("portfolio-manager-trigger")' in DASHBOARD
-    close = DASHBOARD.split("function closePortfolioManager", 1)[1][:1200]
-    assert "isRestorableFocusTarget(previousFocus)" in close
-    assert "fallbackFocus" in close
+    assert "function portfolioManagerFallbackFocus" in DASHBOARD
+    opened = DASHBOARD.split("function openPortfolioManager", 1)[1][:900]
+    assert "FolioModalSurface.open(popover" in opened
+    assert "fallbackFocus: [portfolioManagerFallbackFocus]" in opened
 
 
 def test_shared_tip_pattern_names_icon_only_controls_and_dynamic_triggers():
@@ -121,15 +126,17 @@ def test_dca_bulk_and_plan_actions_use_the_in_app_dialog():
 
 
 def test_dca_action_dialog_traps_focus_and_restores_the_manager():
-    assert "function handleDialogKeydown" in DCA
-    assert 'event.key === "Escape"' in _function(
-        "handleDialogKeydown", "initDialog", DCA
-    )
-    assert "event.shiftKey && document.activeElement === first" in DCA
-    assert "!event.shiftKey && document.activeElement === last" in DCA
+    # Containment comes from the shared seam, which the workflow takes by
+    # injection so the node harness can still drive it without a DOM. The
+    # sibling-panel inert stays local: the dialog is a *descendant* of the
+    # manager, so the seam deliberately leaves its own ancestors alone.
+    assert "modals?.open(dialog" in DCA
+    assert "fallbackFocus" in DCA
     assert 'setAttribute("inert", "")' in DCA
     assert 'removeAttribute("inert")' in DCA
-    assert "state.previousFocus.focus()" in DCA
+    assert "state.modal.close()" in DCA
+    assert "event.shiftKey" in MODAL
+    assert "!event.shiftKey" in MODAL
 
 
 def test_dca_delete_explains_and_surfaces_applied_buy_conflicts():

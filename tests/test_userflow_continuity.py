@@ -29,9 +29,9 @@ def test_portfolio_manager_is_modal_and_owns_keyboard_focus():
     manager = html.split('id="portfolioModal"', maxsplit=1)[1][:180]
 
     assert 'aria-modal="true"' in manager
-    assert "handlePortfolioManagerKeydown" in js
-    assert "portfolioManagerFocusableElements" in js
-    assert "_portfolioManagerPreviousFocus" in js
+    assert "FolioModalSurface.open(popover" in js
+    assert "portfolioManagerFallbackFocus" in js
+    assert "_portfolioManagerModal" in js
     assert 'document.body.classList.add("portfolio-manager-open")' in js
     assert "body.portfolio-manager-open" in css
 
