@@ -14,8 +14,11 @@ def test_review_orbit_is_wired_as_one_accessible_workspace():
     assert 'role="tablist"' in markup
     assert "/static/js/review-orbit.js?v=" in markup
     assert "/static/css/review-orbit.css?v=" in markup
-    assert "setBackgroundInert(true)" in script
-    assert 'event.key === "Escape"' in script
+    # Containment now comes from the shared modal seam rather than a private
+    # copy, so the assertion follows it there.
+    assert "FolioModalSurface.open(root" in script
+    assert "onEscape" in script
+    assert "function onEscape()" in script
     assert "prefers-reduced-motion: reduce" in styles
     assert "@media (max-width: 575.98px)" in styles
 

@@ -11133,50 +11133,12 @@ function renderSenpaiWelcomeHoldModes() {
 
 // The guide paints a full-viewport pointer-blocking layer, so it has to be a real
 // modal for the keyboard too: without this the first screen a new user meets is
-// reachable only after tabbing through the whole dashboard behind it. Mirrors the
-// portfolio manager's trap so both overlays behave identically.
-let _senpaiWelcomePreviousFocus = null;
-const _senpaiWelcomeBackgroundState = new Map();
+// reachable only after tabbing through the whole dashboard behind it. It takes
+// that containment from modal-surface.js, the same seam every other dialog uses.
+let _senpaiWelcomeModal = null;
 
 function senpaiWelcomeFocusableElements() {
-    const guide = document.getElementById("senpai-welcome-guide");
-    if (!guide) return [];
-    return Array.from(guide.querySelectorAll(
-        "a[href], button:not([disabled]), input:not([disabled]), " +
-        "select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
-    )).filter(element => element.getClientRects().length > 0);
-}
-
-function handleSenpaiWelcomeKeydown(event) {
-    const guide = document.getElementById("senpai-welcome-guide");
-    if (!guide?.classList.contains("is-visible")) return;
-
-    if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closeSenpaiWelcomeGuide();
-        return;
-    }
-    if (event.key !== "Tab") return;
-
-    const focusable = senpaiWelcomeFocusableElements();
-    if (!focusable.length) {
-        event.preventDefault();
-        guide.focus();
-        return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-    } else if (!guide.contains(document.activeElement)) {
-        event.preventDefault();
-        first.focus();
-    }
+    return FolioModalSurface.focusableWithin(document.getElementById("senpai-welcome-guide"));
 }
 
 // Module-level so the global Escape handler can dismiss the welcome guide too.
@@ -11187,15 +11149,10 @@ function closeSenpaiWelcomeGuide() {
     guide.classList.remove("is-visible");
     guide.setAttribute("aria-hidden", "true");
     guide.setAttribute("aria-modal", "false");
-    document.removeEventListener("keydown", handleSenpaiWelcomeKeydown, true);
-    _senpaiWelcomeBackgroundState.forEach((wasInert, element) => {
-        element.inert = wasInert;
-    });
-    _senpaiWelcomeBackgroundState.clear();
     try { localStorage.setItem(SENPAI_WELCOME_SEEN_KEY, "1"); } catch (_) {}
-    const previousFocus = _senpaiWelcomePreviousFocus;
-    _senpaiWelcomePreviousFocus = null;
-    if (previousFocus?.focus) requestAnimationFrame(() => previousFocus.focus());
+    const modal = _senpaiWelcomeModal;
+    _senpaiWelcomeModal = null;
+    modal?.close();
     return true;
 }
 
@@ -11232,13 +11189,13 @@ function maybeShowSenpaiWelcomeGuide() {
     guide.classList.add("is-visible");
     guide.setAttribute("aria-hidden", "false");
     guide.setAttribute("aria-modal", "true");
-    _senpaiWelcomePreviousFocus = document.activeElement;
-    document.querySelectorAll("body > *").forEach(element => {
-        if (element === guide || element.tagName === "SCRIPT") return;
-        _senpaiWelcomeBackgroundState.set(element, element.inert);
-        element.inert = true;
+    // It opens unprompted at boot, so the "trigger" is whatever the page happened
+    // to focus first — usually nothing. The manager button is the landmark that
+    // matches where the guide's own primary action sends you.
+    _senpaiWelcomeModal = FolioModalSurface.open(guide, {
+        fallbackFocus: [() => document.getElementById("portfolio-manager-trigger")],
+        onEscape: () => { closeSenpaiWelcomeGuide(); },
     });
-    document.addEventListener("keydown", handleSenpaiWelcomeKeydown, true);
     const body = guide.querySelector(".portfolio-manager-body");
     if (body) body.scrollTop = 0;
     requestAnimationFrame(() => {
@@ -11926,8 +11883,7 @@ function manageLucide(name, className = "manage-lucide") {
     return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }
 
-let _portfolioManagerPreviousFocus = null;
-const _portfolioManagerBackgroundState = new Map();
+let _portfolioManagerModal = null;
 
 function portfolioManagerTriggers() {
     return Array.from(document.querySelectorAll("[aria-controls='portfolioModal'], button[onclick*='openPortfolioManager']"));
@@ -11943,61 +11899,14 @@ function setPortfolioManagerTriggerState(open) {
     });
 }
 
-function portfolioManagerFocusableElements() {
-    const popover = document.getElementById("portfolioModal");
-    if (!popover) return [];
-    return Array.from(popover.querySelectorAll(
-        "a[href], button:not([disabled]), input:not([disabled]), " +
-        "select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
-    )).filter(element => element.getClientRects().length > 0);
-}
-
 function isRestorableFocusTarget(element) {
-    if (!(element instanceof HTMLElement) || !element.isConnected || element.disabled) return false;
-    if (element.closest("[hidden], [aria-hidden='true'], [inert]")) return false;
-    return element.getClientRects().length > 0;
+    return FolioModalSurface.isRestorable(element);
 }
 
 function portfolioManagerFallbackFocus() {
     const navTrigger = document.getElementById("portfolio-manager-trigger");
     if (isRestorableFocusTarget(navTrigger)) return navTrigger;
     return portfolioManagerTriggers().find(isRestorableFocusTarget) || null;
-}
-
-function handlePortfolioManagerKeydown(event) {
-    const popover = document.getElementById("portfolioModal");
-    if (!popover?.classList.contains("is-visible")) return;
-    if (
-        document.querySelector("body > .sale-dialog-overlay")
-        || !document.getElementById("dca-action-dialog")?.hidden
-    ) return;
-
-    if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closePortfolioManager();
-        return;
-    }
-    if (event.key !== "Tab") return;
-
-    const focusable = portfolioManagerFocusableElements();
-    if (!focusable.length) {
-        event.preventDefault();
-        popover.focus();
-        return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-    } else if (!popover.contains(document.activeElement)) {
-        event.preventDefault();
-        first.focus();
-    }
 }
 
 function openPortfolioManager() {
@@ -12007,14 +11916,11 @@ function openPortfolioManager() {
     popover.classList.add("is-visible");
     popover.setAttribute("aria-hidden", "false");
     if (!wasOpen) {
-        _portfolioManagerPreviousFocus = document.activeElement;
         document.body.classList.add("portfolio-manager-open");
-        document.querySelectorAll("body > *").forEach(element => {
-            if (element === popover || element.tagName === "SCRIPT") return;
-            _portfolioManagerBackgroundState.set(element, element.inert);
-            element.inert = true;
+        _portfolioManagerModal = FolioModalSurface.open(popover, {
+            fallbackFocus: [portfolioManagerFallbackFocus],
+            onEscape: () => { closePortfolioManager(); },
         });
-        document.addEventListener("keydown", handlePortfolioManagerKeydown, true);
         const body = popover.querySelector(".portfolio-manager-body");
         if (body) body.scrollTop = 0;
         const search = document.getElementById("manage-holdings-search");
@@ -12031,21 +11937,12 @@ function closePortfolioManager() {
     popover.classList.remove("is-visible");
     popover.setAttribute("aria-hidden", "true");
     document.body.classList.remove("portfolio-manager-open");
-    document.removeEventListener("keydown", handlePortfolioManagerKeydown, true);
-    _portfolioManagerBackgroundState.forEach((wasInert, element) => {
-        element.inert = wasInert;
-    });
-    _portfolioManagerBackgroundState.clear();
+    const modal = _portfolioManagerModal;
+    _portfolioManagerModal = null;
     setPortfolioManagerTriggerState(false);
-    const previousFocus = _portfolioManagerPreviousFocus;
-    _portfolioManagerPreviousFocus = null;
-    requestAnimationFrame(() => {
-        const fallbackFocus = portfolioManagerFallbackFocus();
-        const focusTarget = isRestorableFocusTarget(previousFocus)
-            ? previousFocus
-            : fallbackFocus;
-        focusTarget?.focus();
-    });
+    // close() clears the background's `inert` before it looks for a focus target,
+    // so the nav trigger it lands on is reachable by the time it is focused.
+    modal?.close();
     return true;
 }
 
@@ -12146,6 +12043,14 @@ function switchPortfolio(id) {
 let _portfolioNameDialogState = null;
 let _portfolioDeleteDialogState = null;
 
+// Both flows re-render the switcher row that owned the trigger before the dialog
+// resolves — `closeSwitcherMenu()` hides it on the way in, `loadPortfolios()`
+// replaces it on the way out — so the captured trigger is reliably gone by the
+// time focus goes back. The switcher button is the landmark that survives.
+function portfolioSwitcherTrigger() {
+    return document.getElementById("portfolio-switcher-trigger");
+}
+
 function closePortfolioNameDialog(result = null) {
     const dialog = document.getElementById("portfolio-name-dialog");
     const state = _portfolioNameDialogState;
@@ -12154,9 +12059,7 @@ function closePortfolioNameDialog(result = null) {
     dialog.hidden = true;
     dialog.setAttribute("aria-hidden", "true");
     state.resolve(result);
-    if (state.previousFocus?.focus) {
-        try { state.previousFocus.focus(); } catch (_) { /* ignore */ }
-    }
+    state.modal?.close();
 }
 
 function openPortfolioNameDialog({ title, copy, value, submitLabel }) {
@@ -12173,7 +12076,11 @@ function openPortfolioNameDialog({ title, copy, value, submitLabel }) {
     dialog.hidden = false;
     dialog.setAttribute("aria-hidden", "false");
     return new Promise((resolve) => {
-        _portfolioNameDialogState = { resolve, previousFocus: document.activeElement };
+        const modal = FolioModalSurface.open(dialog, {
+            fallbackFocus: [portfolioSwitcherTrigger],
+            onEscape: () => closePortfolioNameDialog(),
+        });
+        _portfolioNameDialogState = { resolve, modal };
         requestAnimationFrame(() => { input.focus(); input.select(); });
     });
 }
@@ -12186,9 +12093,7 @@ function closePortfolioDeleteDialog(confirmed = false) {
     dialog.hidden = true;
     dialog.setAttribute("aria-hidden", "true");
     state.resolve(confirmed);
-    if (state.previousFocus?.focus) {
-        try { state.previousFocus.focus(); } catch (_) { /* ignore */ }
-    }
+    state.modal?.close();
 }
 
 function openPortfolioDeleteDialog(portfolio) {
@@ -12198,7 +12103,11 @@ function openPortfolioDeleteDialog(portfolio) {
     dialog.hidden = false;
     dialog.setAttribute("aria-hidden", "false");
     return new Promise((resolve) => {
-        _portfolioDeleteDialogState = { resolve, previousFocus: document.activeElement };
+        const modal = FolioModalSurface.open(dialog, {
+            fallbackFocus: [portfolioSwitcherTrigger],
+            onEscape: () => closePortfolioDeleteDialog(),
+        });
+        _portfolioDeleteDialogState = { resolve, modal };
         requestAnimationFrame(() => document.getElementById("portfolio-delete-cancel")?.focus());
     });
 }
@@ -12234,18 +12143,9 @@ function initPortfolioActionDialogs() {
     deleteDialog?.addEventListener("mousedown", (event) => {
         if (event.target === deleteDialog) closePortfolioDeleteDialog();
     });
-
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-            if (_portfolioNameDialogState) {
-                event.stopPropagation();
-                closePortfolioNameDialog();
-            } else if (_portfolioDeleteDialogState) {
-                event.stopPropagation();
-                closePortfolioDeleteDialog();
-            }
-        }
-    }, true);
+    // Escape belongs to the modal surface each dialog opens with, so that the
+    // innermost open surface answers the key rather than whichever listener
+    // happened to be registered first.
 }
 
 async function createNewPortfolio() {
@@ -12590,16 +12490,18 @@ function promptSaleDetails({ ticker, soldQty, fromShares, toShares, defaultPrice
         document.body.appendChild(overlay);
         const priceInput = overlay.querySelector("#sale-price-input");
         const dateInput = overlay.querySelector("#sale-date-input");
-        const prevFocus = document.activeElement;
+        // Opened from a blur on the shares field, so the trigger is the input the
+        // user just left; if the manage list has re-rendered under it, its search
+        // box is the nearest landmark still on screen.
+        const modal = FolioModalSurface.open(overlay, {
+            fallbackFocus: [() => document.getElementById("manage-holdings-search")],
+            onEscape: () => cleanup(null),
+        });
 
         function cleanup(result) {
             overlay.remove();
-            document.removeEventListener("keydown", onKey, true);
-            if (prevFocus && prevFocus.focus) { try { prevFocus.focus(); } catch (_) { /* ignore */ } }
+            modal?.close();
             resolve(result);
-        }
-        function onKey(e) {
-            if (e.key === "Escape") { e.stopPropagation(); cleanup(null); }
         }
         function onConfirm() {
             const rawPrice = priceInput.value.trim();
@@ -12614,7 +12516,6 @@ function promptSaleDetails({ ticker, soldQty, fromShares, toShares, defaultPrice
         overlay.querySelector(".sale-dialog-confirm").addEventListener("click", onConfirm);
         overlay.querySelector(".sale-dialog-cancel").addEventListener("click", () => cleanup(null));
         overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) cleanup(null); });
-        document.addEventListener("keydown", onKey, true);
         setTimeout(() => priceInput.focus(), 30);
     });
 }

@@ -35,7 +35,7 @@
     var rollbackMode = false;  // showing the rollback-confirm view
     var pollTimer = null;
     var sheetOpen = false;
-    var lastFocus = null;
+    var modal = null;
 
     function $(id) { return document.getElementById(id); }
 
@@ -493,7 +493,6 @@
     function open() {
         if (sheetOpen) { return; }
         sheetOpen = true;
-        lastFocus = document.activeElement;
         el.updateBackdrop.hidden = false;
         el.updateSheet.hidden = false;
         el.updateSheet.setAttribute("aria-hidden", "false");
@@ -501,7 +500,13 @@
         void el.updateSheet.offsetWidth;
         el.updateBackdrop.classList.add("is-open");
         el.updateSheet.classList.add("is-open");
-        document.addEventListener("keydown", onKeydown, true);
+        // The sheet opens from three places (nav pill, overflow menu, update
+        // toast) and two of them are dismissed on the way in, so the trigger is
+        // often already gone; the nav pill is the one that always comes back.
+        modal = window.FolioModalSurface.open(el.updateSheet, {
+            fallbackFocus: [function () { return document.getElementById("update-trigger"); }],
+            onEscape: function () { close(); return true; }
+        });
         if (el.updateClose) { el.updateClose.focus(); }
 
         // Refresh settings, then check unless we already have a fresh result.
@@ -538,36 +543,15 @@
         el.updateBackdrop.classList.remove("is-open");
         el.updateSheet.classList.remove("is-open");
         el.updateSheet.setAttribute("aria-hidden", "true");
-        document.removeEventListener("keydown", onKeydown, true);
         window.setTimeout(function () {
             if (!sheetOpen) {
                 el.updateBackdrop.hidden = true;
                 el.updateSheet.hidden = true;
             }
         }, 200);
-        if (lastFocus && lastFocus.focus) { lastFocus.focus(); }
-    }
-
-    function onKeydown(e) {
-        if (e.key === "Escape") { e.preventDefault(); close(); return; }
-        if (e.key === "Tab") { trapFocus(e); }
-    }
-
-    function trapFocus(e) {
-        var focusable = el.updateSheet.querySelectorAll(
-            'button:not([hidden]):not([disabled]), a[href]:not([hidden]), [tabindex="0"]'
-        );
-        var list = Array.prototype.filter.call(focusable, function (n) {
-            return n.offsetParent !== null;
-        });
-        if (!list.length) { return; }
-        var first = list[0];
-        var last = list[list.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-            e.preventDefault(); last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-            e.preventDefault(); first.focus();
-        }
+        var closing = modal;
+        modal = null;
+        if (closing) { closing.close(); }
     }
 
     /* ---------------------------------------------------------------- init */

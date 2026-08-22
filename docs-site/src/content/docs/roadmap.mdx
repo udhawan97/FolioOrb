@@ -12,11 +12,29 @@ ideas shipped together in **v5.11.0** as a deliberately bounded Plan & Protect w
 **v5.13.0** extended the same keyboard treatment to the panels that were still hidden by
 fading alone, checked every symbol that arrives in a web address before it is looked up,
 and scoped DCA undo to the portfolio that owns the plan.
+**v5.14.0** finished that thread by giving all eight dim-the-dashboard dialogs one
+definition of "modal" instead of eight.
 This page records outcomes instead of leaving shipped work labelled as future work.
 
 ## Recently shipped
 
 <CardGrid>
+	<Card title="A dialog holds the keyboard" icon="approve-check-circle">
+		All eight dim-the-dashboard dialogs share one containment. Before, 7 of 8 Tab
+		presses walked off "Delete portfolio?" onto the live dashboard behind it; now
+		none do.
+		<br /><br />**Status:** shipped in v5.14.0
+	</Card>
+	<Card title="Closing keeps your place" icon="seti:plan">
+		Each dialog falls back to a landmark that outlives the button you clicked, and
+		checks that focus actually landed — instead of dropping it at the top of the page.
+		<br /><br />**Status:** shipped in v5.14.0
+	</Card>
+	<Card title="Dialogs stack" icon="document">
+		A dialog opened over another is reachable rather than frozen, and hands the
+		keyboard back to the one underneath when it closes.
+		<br /><br />**Status:** shipped in v5.14.0
+	</Card>
 	<Card title="Closed means closed — everywhere" icon="check-circle">
 		The panels that hid by fading out now leave the keyboard path too — the portfolio
 		manager, the first-run welcome, the collapse pill, a hidden Senpai orb, the

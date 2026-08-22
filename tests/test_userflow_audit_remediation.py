@@ -108,10 +108,13 @@ def test_mobile_plan_contains_its_minimum_width_inside_the_table_scroller():
 
 
 def test_escape_cancels_restore_confirmation_before_closing_review_orbit():
-    keydown = REVIEW[REVIEW.index("function onKeydown"):REVIEW.index("function setBackgroundInert")]
+    # The shared modal seam calls onEscape and keeps the surface open when it
+    # returns false, so the unwind order lives in that one function now.
+    keydown = REVIEW[REVIEW.index("function onEscape()"):REVIEW.index("async function open(")]
     assert keydown.index("restoreConfirmation.selection") < keydown.index("close();")
     assert keydown.index("restoreConfirmation.pending") < keydown.index("cancelRestore();")
     assert "cancelRestore();" in keydown
+    assert "return false;" in keydown, "an unwound step must not also close the workspace"
     close = REVIEW[REVIEW.index("function close()"):REVIEW.index("function activateTab")]
     assert "clearRestoreConfirmation({ restoreFocus: false })" in close
 

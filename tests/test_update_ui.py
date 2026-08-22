@@ -40,6 +40,10 @@ def test_updates_js_exposes_api_and_states():
     js = (ROOT / "static/js/updates.js").read_text(encoding="utf-8")
 
     assert "window.FolioUpdates" in js
+    # The sheet is a modal: it takes containment from the shared seam instead
+    # of trapping Tab while leaving the dashboard behind it reachable.
+    assert "window.FolioModalSurface.open(el.updateSheet" in js
+    assert "fallbackFocus" in js
     for fn in ("function open(", "function openAndCheck(", "function close("):
         assert fn in js, fn
 
@@ -69,9 +73,11 @@ def test_updates_js_exposes_api_and_states():
     # quotes too, since the link rule inserts the captured URL into href="$2".
     assert 'replace(/&/g, "&amp;")' in js
     assert 'replace(/"/g, "&quot;")' in js
-    # Accessibility: focus trap + Escape handling.
-    assert "trapFocus" in js
-    assert 'e.key === "Escape"' in js
+    # Accessibility: focus trap + Escape handling, both delegated to the shared
+    # modal seam (asserted on the open() call above) so the sheet also gets the
+    # inert background its own trap never had.
+    assert "onEscape" in js
+    assert "close(); return true;" in js
     # Post-update confirmation.
     assert "showUpdatedToast" in js
     assert "just_updated" in js

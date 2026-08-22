@@ -1,7 +1,7 @@
 ; Inno Setup script for FolioOrb (per-user Windows installer).
 ;
 ; Compile in CI after PyInstaller has produced dist\FolioOrb\:
-;   iscc /DMyAppVersion=5.13.0 /DMyOutputName=FolioOrb-Windows-x64-v5.13.0-Setup packaging\windows\installer.iss
+;   iscc /DMyAppVersion=5.14.0 /DMyOutputName=FolioOrb-Windows-x64-v5.14.0-Setup packaging\windows\installer.iss
 ;
 ; MyAppVersion is always the numeric app version (used for the file's version
 ; metadata, which must be numeric). MyOutputName is the full installer filename

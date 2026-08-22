@@ -61,35 +61,39 @@ def test_ticker_input_points_at_its_error_message():
 # It paints a full-viewport pointer-blocking layer. Without a focus trap the
 # first screen a new user sees is reachable only after tabbing through every
 # control on the dashboard behind it.
+#
+# The trap itself now lives in static/js/modal-surface.js, shared by every
+# dialog — tests/test_modal_surface_contract.py holds it to the full contract,
+# and tests/js/modal-surface.test.cjs exercises the behaviour. What is left to
+# assert here is that the guide actually *opts in*.
 
 
 def test_welcome_guide_marks_the_background_inert_on_open():
     show = DASHBOARD[DASHBOARD.index("function maybeShowSenpaiWelcomeGuide"):]
     show = show[:show.index("\n}\n")]
-    assert "element.inert = true" in show
-    assert '_senpaiWelcomePreviousFocus = document.activeElement' in show
+    assert "FolioModalSurface.open(guide" in show
     assert 'guide.setAttribute("aria-modal", "true")' in show
-    assert "handleSenpaiWelcomeKeydown" in show
+    assert "fallbackFocus" in show
+    assert "onEscape" in show
 
 
 def test_welcome_guide_restores_focus_and_clears_inert_on_close():
     close = DASHBOARD[DASHBOARD.index("function closeSenpaiWelcomeGuide"):]
     close = close[:close.index("\n}\n")]
-    assert "_senpaiWelcomeBackgroundState.forEach" in close
-    assert "_senpaiWelcomeBackgroundState.clear()" in close
-    assert "previousFocus?.focus" in close
+    assert "modal?.close()" in close
+    assert "_senpaiWelcomeModal = null" in close
     assert 'guide.setAttribute("aria-modal", "false")' in close
 
 
 def test_welcome_guide_traps_tab_and_escape():
-    assert "function handleSenpaiWelcomeKeydown" in DASHBOARD
-    trap = DASHBOARD[DASHBOARD.index("function handleSenpaiWelcomeKeydown"):]
-    trap = trap[:trap.index("\n}\n")]
-    assert 'event.key === "Escape"' in trap
-    assert 'event.key !== "Tab"' in trap
-    # wraps in both directions
-    assert "event.shiftKey && document.activeElement === first" in trap
-    assert "!event.shiftKey && document.activeElement === last" in trap
+    modal = (ROOT / "static/js/modal-surface.js").read_text(encoding="utf-8")
+    assert "function containTab" in modal
+    assert 'event.key !== "Tab"' in modal
+    assert 'event.key === "Escape"' in modal
+    # wraps in both directions, and pulls focus back when it starts outside
+    assert "event.shiftKey && active === first" in modal
+    assert "!event.shiftKey && active === last" in modal
+    assert "if (!inside) {" in modal
 
 
 # ── Senpai bubble stops covering the panel underneath ─────────────────────────

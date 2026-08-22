@@ -1,3 +1,123 @@
+# FolioOrb v5.14.0 Release Notes
+
+**Release date:** August 22, 2026
+
+## Headline
+
+Eight dialogs, one meaning for the word "modal". Every panel that dims the
+dashboard behind it now keeps the keyboard inside itself, and gives focus back to
+something real when it closes. Two of the dialogs that leaked were the ones asking
+you to confirm something you cannot undo.
+
+## Fixed
+
+### A dialog now keeps the keyboard inside it
+
+FolioOrb has eight panels that dim the dashboard and ask you for something: rename
+a portfolio, delete one, record a sale, confirm a DCA action, the first-run
+welcome, Manage Portfolio, Review Orbit, and Software Update. Each had been given
+its own answer to what "modal" means, and the answers had drifted apart. Three of
+them stopped the mouse and nothing else, so pressing Tab walked straight out onto
+the dashboard behind — which was still fully live.
+
+Measured by walking the real keyboard path on the running dashboard, before and
+after:
+
+| Dialog | Tab presses that left the dialog — before | after |
+|---|---|---|
+| Rename portfolio | 6 of 8 | 0 |
+| **Delete portfolio?** | **7 of 8** | 0 |
+| **Record a sale** | **2 of 8** | 0 |
+| Review Orbit | 1 of 8 | 0 |
+| Software Update | 0 of 10, but the dashboard behind it stayed reachable | 0 |
+| Manage Portfolio | 0 of 12 | 0 |
+
+- The two in bold are confirmations for things that cannot be undone. On
+  **Delete portfolio?** the very first Tab press left the dialog: you could drive
+  the whole dashboard — switch portfolio, edit a holding — while a delete
+  confirmation still stood open in front of you, and the two could then disagree
+  about which portfolio you meant.
+- All eight now hold the keyboard until you answer them, and the dashboard behind
+  is properly out of reach — for a screen reader and the mouse as well, not just
+  for Tab.
+- Escape closes any of them, as before. Where a dialog has a step inside it,
+  Escape still unwinds one step at a time: in Review Orbit it clears an armed
+  restore first, and a restore already running still refuses to be interrupted.
+
+### Closing a dialog no longer loses your place
+
+When a dialog closed, FolioOrb tried to put the keyboard back on the control that
+opened it. If that control was gone, nothing happened at all and focus fell to the
+very top of the page — so the next Tab press started the whole dashboard again.
+
+- This was not a rare case. Renaming or deleting a portfolio redraws the list that
+  held the button you clicked, so by the time the dialog closed the button had
+  reliably gone. Both flows lost your place every time; measured, focus landed
+  nowhere at all.
+- Every dialog now names a landmark to fall back on — the portfolio switcher, the
+  Manage Portfolio button, the Review Orbit button — and the return is checked
+  rather than assumed, so a dialog can no longer hand focus to something that
+  quietly refuses it.
+- If you use a mouse you will not notice any of this. If you use the keyboard,
+  closing a dialog now puts you next to where you were instead of at the top of
+  the page.
+
+### A dialog opened on top of another one is usable
+
+Opening a panel marked everything else on the page as unreachable — correctly, but
+that "everything else" included the other dialogs' own markup. A second dialog
+opened over the first therefore arrived unreachable: on the first-run welcome
+panel, a dialog opened on top could not be focused or typed into at all, while the
+panel underneath went on answering the keyboard.
+
+- Dialogs now stack. Opening one on top of another makes the new one reachable,
+  hands it the keyboard, and gives the keyboard back to the one underneath when it
+  closes.
+- The paths that reach two at once are unchanged in every other respect: recording
+  a sale from inside Manage Portfolio, and confirming a DCA action, both behave as
+  they did.
+
+### A tab strip no longer swallows a keypress
+
+Review Orbit's tab strip keeps one tab reachable at a time, which is normal for a
+tab strip — but the containment counted the parked tabs as stops. Its idea of the
+last control sat behind the real one, so once per lap around the dialog a Tab
+press went nowhere at all: no focus ring anywhere on screen, and a second press
+needed to get back in.
+
+- Parked tabs are no longer counted, so the wrap happens on the last control you
+  can actually reach and every Tab press lands somewhere visible.
+- This one only became visible once a single implementation served all eight
+  dialogs; each private copy had the same flaw, and each had only one surface to
+  be wrong about.
+
+## Under the hood
+
+- The five behaviours a modal dialog owes the keyboard — containment, an
+  unreachable background, Escape, a checked focus return, and stacking — moved out
+  of eight private copies into one shared module, `static/js/modal-surface.js`.
+  Around 140 lines of duplicated interaction code came out of `dashboard.js`,
+  `review-orbit.js`, `updates.js` and `dca-workflow.js`.
+- Two of the bugs above were only findable this way. A parked tab counted as a tab
+  stop, and `document.body` — which is present, visible, and accepts a focus
+  request without doing anything — passed every staleness check the old focus
+  return could make. Both were in all eight copies.
+- New guards: a sweep that fails the build when a new dialog declares itself modal
+  without opting into the shared behaviour, a ban on re-introducing a private
+  focus trap, a script load-order check, and 22 runtime tests driving the module
+  against a fake DOM. Suite 1527 → 1536 Python tests, 22 → 44 frontend runtime
+  tests.
+- A test assertion that a newer Pylint flags was rewritten, so the lint job is
+  clean again at its usual 10.00/10.
+
+## Upgrading
+
+Nothing to do. No database changes, no settings changes, no change to any number
+FolioOrb shows you. This release only changes how dialogs behave once they are
+open.
+
+---
+
 # FolioOrb v5.13.0 Release Notes
 
 **Release date:** August 15, 2026

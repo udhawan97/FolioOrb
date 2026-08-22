@@ -7,8 +7,7 @@ window.ReviewOrbit = (() => {
     const state = {
         open: false,
         tab: "inbox",
-        previousFocus: null,
-        background: new Map(),
+        modal: null,
         loaded: new Set(),
         inbox: null,
         trust: null,
@@ -84,63 +83,17 @@ window.ReviewOrbit = (() => {
             </div>`;
     }
 
-    function focusable() {
-        const root = orbit();
-        if (!root) return [];
-        return Array.from(root.querySelectorAll(
-            "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), " +
-            "textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
-        )).filter(element => !element.hidden && element.getClientRects().length > 0);
-    }
-
-    function onKeydown(event) {
-        if (!state.open) return;
-        if (event.key === "Escape") {
-            event.preventDefault();
-            const restoreConfirm = $("review-restore-confirm");
-            if (restoreConfirmation.selection && restoreConfirm && !restoreConfirm.hidden) {
-                if (restoreConfirmation.pending) {
-                    live(restoreLockedMessage());
-                    return;
-                }
-                cancelRestore();
-                return;
-            }
-            close();
-            return;
+    // Escape unwinds one step at a time: a live restore refuses to be interrupted,
+    // an armed one disarms, and only a workspace with nothing pending closes.
+    function onEscape() {
+        const restoreConfirm = $("review-restore-confirm");
+        if (restoreConfirmation.selection && restoreConfirm && !restoreConfirm.hidden) {
+            if (restoreConfirmation.pending) live(restoreLockedMessage());
+            else cancelRestore();
+            return false;
         }
-        if (event.key !== "Tab") return;
-        const items = focusable();
-        if (!items.length) {
-            event.preventDefault();
-            orbit()?.focus();
-            return;
-        }
-        const first = items[0];
-        const last = items[items.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        } else if (!orbit()?.contains(document.activeElement)) {
-            event.preventDefault();
-            first.focus();
-        }
-    }
-
-    function setBackgroundInert(inert) {
-        if (inert) {
-            document.querySelectorAll("body > *").forEach(element => {
-                if (element === orbit() || element.tagName === "SCRIPT") return;
-                state.background.set(element, element.inert);
-                element.inert = true;
-            });
-            return;
-        }
-        state.background.forEach((wasInert, element) => { element.inert = wasInert; });
-        state.background.clear();
+        close();
+        return true;
     }
 
     async function open(tab = state.tab) {
@@ -148,13 +101,14 @@ window.ReviewOrbit = (() => {
         if (!root) return;
         if (!state.open) {
             state.open = true;
-            state.previousFocus = document.activeElement;
             root.hidden = false;
             root.setAttribute("aria-hidden", "false");
             document.body.classList.add("review-orbit-open");
             $("review-orbit-trigger")?.setAttribute("aria-expanded", "true");
-            setBackgroundInert(true);
-            document.addEventListener("keydown", onKeydown, true);
+            state.modal = FolioModalSurface.open(root, {
+                fallbackFocus: [() => $("review-orbit-trigger")],
+                onEscape,
+            });
             requestAnimationFrame(() => root.querySelector("[data-review-close]")?.focus());
         }
         activateTab(tab);
@@ -177,11 +131,9 @@ window.ReviewOrbit = (() => {
         root.setAttribute("aria-hidden", "true");
         document.body.classList.remove("review-orbit-open");
         $("review-orbit-trigger")?.setAttribute("aria-expanded", "false");
-        document.removeEventListener("keydown", onKeydown, true);
-        setBackgroundInert(false);
-        const previous = state.previousFocus;
-        state.previousFocus = null;
-        if (previous?.focus) requestAnimationFrame(() => previous.focus());
+        const modal = state.modal;
+        state.modal = null;
+        modal?.close();
         return true;
     }
 
