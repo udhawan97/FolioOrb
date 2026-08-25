@@ -17,7 +17,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import DcaContribution, DcaPlan, Holding
-from app.services import holdings_repository, portfolio_valuation
+from app.services import holdings_csv, holdings_repository, portfolio_valuation
 from app.services.dividend_income import compute_portfolio_income
 from app.services.earnings_radar import get_earnings_events
 from app.services.etf_overlap import compute_etf_overlap, overlap_between
@@ -179,7 +179,12 @@ def build_trust_center(
             "covered": valuation.priced_position_count,
             "expected": valuation.expected_position_count,
             "missing": list(valuation.missing_tickers),
+            "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
             "source": "Yahoo Finance via the local market-data cache",
+            "caveat": (
+                "Foreign-priced positions are named separately and excluded from USD totals."
+                if valuation.foreign_currency_tickers else None
+            ),
         },
         {
             "key": "fundamentals",
@@ -252,6 +257,8 @@ def build_trust_center(
         "portfolio_id": portfolio_id,
         "generated_at": _utc_now().isoformat(),
         "overall_quality": overall,
+        "reporting_currency": portfolio_valuation.REPORTING_CURRENCY,
+        "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "areas": areas,
         "snapshot_count": len(history),
         "latest_snapshot": latest_snapshot,
@@ -478,16 +485,113 @@ def report_csv(report: dict) -> str:
     writer = csv.writer(output)
     writer.writerow(["section", "metric", "value"])
     for key, value in report["current"].items():
-        writer.writerow(["current", key, value])
+        _write_safe_csv_row(writer, ["current", key, value])
     for key, value in report["period_activity"].items():
-        writer.writerow(["period_activity", key, value])
-    writer.writerow(["coverage", "valuation", report["data_quality"]["valuation"]])
-    writer.writerow(["coverage", "history", report["data_quality"]["history"]])
-    writer.writerow(["coverage", "observed_start", report["observed_start"]])
+        _write_safe_csv_row(writer, ["period_activity", key, value])
+    _write_safe_csv_row(
+        writer, ["coverage", "valuation", report["data_quality"]["valuation"]]
+    )
+    _write_safe_csv_row(
+        writer, ["coverage", "history", report["data_quality"]["history"]]
+    )
+    _write_safe_csv_row(writer, ["coverage", "observed_start", report["observed_start"]])
     for row in report["movers"]:
-        writer.writerow(["mover", row["ticker"], row["total_return_pct"]])
+        _write_safe_csv_row(writer, ["mover", row["ticker"], row["total_return_pct"]])
     for row in report["thesis_attention"]:
-        writer.writerow(["thesis_attention", row["ticker"], row["status"]])
+        _write_safe_csv_row(writer, ["thesis_attention", row["ticker"], row["status"]])
+    return "\ufeff" + output.getvalue()
+
+
+def _write_safe_csv_row(writer: csv.writer, values: list | tuple) -> None:
+    """Write one spreadsheet-safe row using the shared export neutralizer."""
+    writer.writerow([holdings_csv.escape_csv_cell(value) for value in values])
+
+
+def trust_center_csv(trust: dict) -> str:
+    """Export the Trust Center as a human-readable coverage receipt."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["FolioOrb data health receipt"])
+    _write_safe_csv_row(writer, ["generated_at", trust.get("generated_at")])
+    _write_safe_csv_row(writer, ["portfolio_id", trust.get("portfolio_id")])
+    _write_safe_csv_row(writer, ["overall_quality", trust.get("overall_quality")])
+    _write_safe_csv_row(writer, ["reporting_currency", trust.get("reporting_currency")])
+    _write_safe_csv_row(writer, [
+        "foreign_currency_tickers",
+        " | ".join(trust.get("foreign_currency_tickers", [])),
+    ])
+    _write_safe_csv_row(writer, ["latest_snapshot", trust.get("latest_snapshot")])
+    _write_safe_csv_row(writer, ["snapshot_count", trust.get("snapshot_count")])
+    _write_safe_csv_row(writer, ["principle", trust.get("principle")])
+    writer.writerow([])
+    writer.writerow([
+        "area",
+        "quality",
+        "covered",
+        "expected",
+        "missing",
+        "foreign_currency_exclusions",
+        "source",
+        "caveat",
+    ])
+    for area in trust.get("areas", []):
+        _write_safe_csv_row(writer, [
+            area.get("label") or area.get("key"),
+            area.get("quality"),
+            area.get("covered"),
+            area.get("expected"),
+            " | ".join(str(value) for value in area.get("missing", [])),
+            " | ".join(
+                str(value) for value in area.get("foreign_currency_tickers", [])
+            ),
+            area.get("source"),
+            area.get("caveat") or "",
+        ])
+    return "\ufeff" + output.getvalue()
+
+
+def target_plan_csv(plan: dict, *, generated_at: str | None = None) -> str:
+    """Export saved targets and descriptive drift without changing the plan."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["FolioOrb target plan snapshot"])
+    _write_safe_csv_row(writer, ["generated_at", generated_at or _utc_now().isoformat()])
+    _write_safe_csv_row(writer, ["portfolio_id", plan.get("portfolio_id")])
+    _write_safe_csv_row(writer, ["reporting_currency", plan.get("reporting_currency")])
+    _write_safe_csv_row(writer, ["known_value", plan.get("known_value")])
+    _write_safe_csv_row(writer, ["valuation_quality", plan.get("valuation_quality")])
+    _write_safe_csv_row(writer, ["target_course_complete", plan.get("complete")])
+    _write_safe_csv_row(writer, ["drift_available", plan.get("drift_available")])
+    _write_safe_csv_row(
+        writer,
+        ["missing_tickers", " | ".join(plan.get("missing_tickers", []))],
+    )
+    _write_safe_csv_row(writer, [
+        "foreign_currency_tickers",
+        " | ".join(plan.get("foreign_currency_tickers", [])),
+    ])
+    writer.writerow([])
+    writer.writerow([
+        "ticker",
+        "target_weight_bps",
+        "target_weight_pct",
+        "actual_weight_bps",
+        "actual_weight_pct",
+        "drift_bps",
+        "drift_direction",
+    ])
+    for item in plan.get("items", []):
+        target = item.get("target_weight_bps")
+        actual = item.get("actual_weight_bps")
+        _write_safe_csv_row(writer, [
+            item.get("ticker"),
+            target,
+            (target / 100 if target is not None else None),
+            actual,
+            (actual / 100 if actual is not None else None),
+            item.get("drift_bps"),
+            item.get("drift_direction"),
+        ])
     return "\ufeff" + output.getvalue()
 
 

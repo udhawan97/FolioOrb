@@ -2511,7 +2511,8 @@
                         </div>
                         <p>Prioritised locally. Nothing here places a trade or changes a position.</p>
                     </div>
-                    <div class="review-inbox-summary" id="review-inbox-summary"></div>
+                    <div class="review-inbox-summary" id="review-inbox-summary"
+                         role="group" aria-label="Filter review inbox"></div>
                     <div class="review-list" id="review-inbox-list" aria-live="polite"></div>
                     <form class="review-thesis-editor" id="review-thesis-editor" hidden>
                         <div class="review-thesis-editor-head">
@@ -2551,12 +2552,17 @@
                     </div>
                     <div class="review-trust-principle" id="review-trust-principle"></div>
                     <div class="review-trust-grid" id="review-trust-grid" aria-live="polite"></div>
+                    <div class="review-report-actions">
+                        <button type="button" class="review-secondary-btn" data-review-snapshot-export="trust">
+                            <i class="bi bi-filetype-csv" aria-hidden="true"></i> Save data health CSV
+                        </button>
+                    </div>
                 </section>
 
                 <section class="review-pane" id="review-pane-report" role="tabpanel"
                          aria-labelledby="review-tab-report" data-review-pane="report" hidden>
                     <div class="review-pane-heading">
-                        <div><p class="review-eyebrow">A calm review ritual</p><h3>Monthly review pack</h3></div>
+                        <div><p class="review-eyebrow">A calm review ritual</p><h3 id="review-report-title">Monthly review pack</h3></div>
                         <div class="review-segmented" aria-label="Review period">
                             <button type="button" data-report-period="month" aria-pressed="true">Month</button>
                             <button type="button" data-report-period="quarter" aria-pressed="false">Quarter</button>
@@ -2599,7 +2605,10 @@
                                 <div id="review-target-table"></div>
                                 <div class="review-plan-actions">
                                     <p id="review-target-status" class="review-inline-status" role="status"></p>
-                                    <button class="review-primary-btn" id="review-target-save" type="submit">Save target course</button>
+                                    <div class="review-plan-action-buttons">
+                                        <button class="review-secondary-btn" id="review-plan-export" type="button" data-review-snapshot-export="plan">Save plan CSV</button>
+                                        <button class="review-primary-btn" id="review-target-save" type="submit">Save target course</button>
+                                    </div>
                                 </div>
                             </form>
                         </article>
@@ -2702,6 +2711,7 @@
     <script defer src="/static/js/core.js?v=0"></script>
     <script defer src="/static/js/portfolio-workspace.js?v=0"></script>
     <script defer src="/static/js/local-text-export.js?v=0"></script>
+    <script defer src="/static/js/review-orbit-logic.js?v=0"></script>
     <script defer src="/static/js/analytics-charts.js?v=0"></script>
     <script defer src="/static/js/interaction-state.js?v=0"></script>
     <script defer src="/static/js/modal-surface.js?v=0"></script>

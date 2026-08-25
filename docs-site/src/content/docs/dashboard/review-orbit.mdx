@@ -12,6 +12,9 @@ it. Escape closes the current layer first: an exact restore confirmation is canc
 another Escape closes Review Orbit. At phone widths all seven destination tabs wrap into view;
 Left and Right Arrow still move between them. **Plan**, **Records**, and **Backups** form the
 Plan & Protect part of the same workspace rather than a second dashboard.
+The last tab, Inbox filter, and Month/Quarter Review Pack choice are remembered in local
+browser/app storage. If a stored value is missing or invalid, Review Orbit safely starts at
+Inbox, All, and Month.
 
 <Aside type="note" title="Review, not execution">
 Review Orbit does not connect to a brokerage, place a trade, apply a DCA contribution, or
@@ -29,8 +32,10 @@ The Inbox combines attention that was previously scattered across the dashboard:
 - **Verdict snapshots still collecting calibration history**
 
 Urgent data gaps come first, then items needing a decision, then quiet calendar/calibration
-context. Choose an item to open the relevant Review tab, holding, thesis editor, or DCA
-ledger. The Inbox itself makes no mutations.
+context. Use **All**, **Data gaps**, **Needs review**, or **On the radar** to narrow the visible
+list. The Review badge and header keep the full count; filtering never dismisses, snoozes, or
+changes an item. Choose an item to open the relevant Review tab, holding, thesis editor, or
+DCA ledger. The Inbox itself makes no mutations.
 
 ## Data Trust Center
 
@@ -49,6 +54,12 @@ this view is actually covered?*
 
 **Complete**, **partial**, **unavailable**, and **not applicable** are data states—not grades.
 The most limited relevant area sets the orbit's overall status.
+
+Choose **Save data health CSV** to keep a local coverage receipt with the generation time,
+overall quality, snapshot freshness, area counts, missing tickers, sources, and caveats.
+Saving runs a fresh read-only coverage check, so the receipt can differ from a Trust view
+that has been left open while provider data changes. Foreign-priced positions are named
+separately and remain excluded from USD totals; unavailable values are never filled.
 
 ## Monthly or quarterly Review Pack
 
@@ -100,6 +111,12 @@ Changing shares or prices recomputes actual allocation and drift without erasing
 Adding or removing an eligible holding makes the course incomplete until you save a new full
 set. If any required quote is missing, non-positive, non-finite, or not USD, FolioOrb names
 the gap and withholds all drift values instead of mixing known and unknown positions.
+
+Choose **Save plan CSV** to snapshot the saved target basis points, current weights,
+descriptive drift, known USD value, valuation quality, and missing or foreign-priced tickers.
+Saving runs a fresh read-only valuation. If a target input has an unsaved change, export stays
+disabled until you save the target course or restore the saved value. The snapshot does not
+convert currencies or place a trade.
 
 At 320–575 px the two Plan cards stack and stay inside the sheet. The wide all-Portfolios and
 target tables scroll within their own labelled region; they do not widen the Review workspace

@@ -1,6 +1,6 @@
 ---
 /**
- * FolioOrb landing page — v5.14 "private cockpit".
+ * FolioOrb landing page — v5.15 "review receipts".
  *
  * A single cinematic story told in acts (hero → workflow → features → demo →
  * trust → download → developer), narrated by a Senpai scroll companion. Real
@@ -42,8 +42,8 @@ const steps = [
   },
   {
     n: 3, title: 'You get plain-English answers',
-    body: 'Verdicts, drivers, and themes in language you can act on — then Review Orbit gathers data gaps, targets, a read-only buy rehearsal, records, and backup protection into one calm ritual.',
-    senpai: 'Here’s the read, the target gap, and a verified backup before you touch anything.',
+    body: 'Verdicts, drivers, and themes in language you can question — then Review Orbit filters what needs attention, preserves data-health and target-plan receipts, and returns to the context you left.',
+    senpai: 'Here’s the read, the missing data, and the receipt. Your brokerage remains blissfully uninvolved.',
   },
 ];
 
@@ -78,22 +78,28 @@ const features = [
 // Each icon is a compact stroke SVG (inner markup only) coloured by the act accent.
 const roadmap = [
   {
-    status: 'Shipped · v5.14.0',
-    title: 'A dialog holds the keyboard',
-    body: 'All eight dim-the-dashboard dialogs share one containment. 7 of 8 Tab presses used to walk off “Delete portfolio?” onto the live dashboard behind it; none do now.',
-    icon: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M7 14h10"/>',
+    status: 'Shipped · v5.15.0',
+    title: 'Filter what deserves attention',
+    body: 'All, Data gaps, Needs review, and On the radar keep urgent coverage problems separate from quiet reminders without changing the queue.',
+    icon: '<path d="M4 6h16M7 12h10M10 18h4"/><circle cx="5" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="12" cy="18" r="1"/>',
   },
   {
-    status: 'Shipped · v5.14.0',
-    title: 'Closing keeps your place',
-    body: 'Each dialog falls back to a landmark that outlives the button you clicked, and checks focus actually landed — instead of dropping it at the top of the page.',
-    icon: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/><circle cx="12" cy="12" r="2.5"/>',
+    status: 'Shipped · v5.15.0',
+    title: 'Keep a data-health receipt',
+    body: 'Save coverage, missing tickers, sources, caveats, and snapshot freshness as CSV. Partial stays partial after export.',
+    icon: '<path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5M9 12h6M9 16h6"/>',
   },
   {
-    status: 'Shipped · v5.14.0',
-    title: 'Dialogs stack',
-    body: 'A dialog opened over another is reachable rather than frozen, and hands the keyboard back to the one underneath when it closes.',
-    icon: '<rect x="3.5" y="8.5" width="13" height="11" rx="2"/><path d="M7.5 5.5h11a2 2 0 0 1 2 2v9"/>',
+    status: 'Shipped · v5.15.0',
+    title: 'Save the target snapshot',
+    body: 'Persisted basis points, current weights, descriptive drift, known USD value, and every quote exclusion leave together — no trade attached.',
+    icon: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M22 12h-3"/>',
+  },
+  {
+    status: 'Shipped · v5.15.0',
+    title: 'Return to the same context',
+    body: 'Review Orbit remembers the last tab, Inbox filter, and Month or Quarter choice in local app/browser storage.',
+    icon: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/><path d="M12 8v4l3 2"/>',
   },
 ];
 ---
@@ -107,10 +113,10 @@ const roadmap = [
 
 		{/* System display/body/mono stacks keep the public surface complete
 		    offline and avoid a font-provider request before the user chooses one. */}
-		<meta name="description" content="Local-first portfolio intelligence you run yourself — in your browser as a web app, or as a desktop app for macOS and Windows. FolioOrb turns holdings, risk, news, and market context into plain-English portfolio reads — on your machine, Claude-optional, built for trust." />
+		<meta name="description" content="Local-first portfolio intelligence you run yourself — holdings, risk, news, review queues, data-health receipts, and target-plan snapshots on your machine. Browser, macOS, and Windows; Claude optional." />
 		<link rel="icon" type="image/svg+xml" href={asset('folio-orbit-icon.svg')} />
 		<meta property="og:title" content="FolioOrb — Your portfolio, finally speaks back." />
-		<meta property="og:description" content="Local-first portfolio intelligence you run yourself — in your browser or as a desktop app for macOS and Windows. Plain-English reads on holdings, risk, news, and market context." />
+		<meta property="og:description" content="Local-first portfolio intelligence with explainable reads, a filterable Review Orbit, and portable data-health and target-plan receipts. Browser, macOS, and Windows." />
 		<meta property="og:type" content="website" />
 		<meta property="og:image" content={asset('og-hero.jpg')} />
 		<meta name="twitter:card" content="summary_large_image" />
@@ -170,8 +176,8 @@ const roadmap = [
 						<h1 class="display reveal">Your portfolio, finally <em>speaks&nbsp;back.</em></h1>
 						<p class="lede reveal">
 							FolioOrb turns holdings, risk, news, and market context into
-							plain-English portfolio reads. Your database and settings stay on
-							your machine; Claude is optional, and there is no telemetry.
+							explainable portfolio reads, then keeps the review queue and its
+							receipts on your machine. Claude is optional; there is no telemetry.
 						</p>
 
 						<div class="cta-row reveal">
@@ -432,13 +438,13 @@ const roadmap = [
 					<div class="moment-copy">
 						<span class="kicker">Review Orbit · local workflow</span>
 						<h3>A review ritual, not another wall of cards.</h3>
-						<p>One workspace gathers missing data, targets, a read-only buy rehearsal, human-readable records, and verified local backups alongside the existing review tools. It points at work; it never places a trade.</p>
-						<div class="wf-note"><span class="wf-note-orb"></span><span>Coverage first. Changed input, outdated preview. Backup before bravery.</span></div>
+						<p>One workspace filters missing data and review work, remembers where you left off, and saves data-health or target-plan receipts alongside read-only rehearsals, records, and verified backups. It points at work; it never places a trade.</p>
+						<div class="wf-note"><span class="wf-note-orb"></span><span>Coverage first. Keep the receipt. Backup before bravery.</span></div>
 					</div>
 					<figure class="moment-visual">
 						<div class="window-chrome window-chrome--sm">
-							<img class="moment-img" src={shot('plan-protect-demo.webp')}
-								alt="Review Orbit Plan and Protect showing all-Portfolio known value, target-versus-actual allocation, and buy rehearsal for fictional demo holdings." loading="lazy" decoding="async" />
+							<img class="moment-img" src={shot('review-inbox-demo.webp')}
+								alt="Review Orbit using fictional demo holdings, with local filters for all items, data gaps, work needing review, and quiet reminders." loading="lazy" decoding="async" />
 						</div>
 					</figure>
 				</article>
@@ -635,12 +641,12 @@ const roadmap = [
 							<div class="up-versions">
 								<span class="up-ver up-ver--now"><small>Installed</small>v5.13.0</span>
 								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
-								<span class="up-ver up-ver--new"><small>Latest</small>v5.14.0</span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v5.15.0</span>
 							</div>
 							<ul class="up-changes">
-								<li>Every dialog holds the keyboard until you answer it</li>
-								<li>Closing a dialog puts focus back where you were</li>
-								<li>A dialog opened over another one is usable</li>
+								<li>Filter urgent gaps away from quiet reminders</li>
+								<li>Save data-health and target-plan CSV receipts</li>
+								<li>Return to your last Review Orbit context</li>
 							</ul>
 							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
 							<div class="up-actions">
@@ -685,9 +691,9 @@ const roadmap = [
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">One meaning for “modal” · v5.14.0</span>
-					<h2 class="section-title">The quiet parts are reliable.</h2>
-					<p class="rm-lede">Containment, focus return, and dialog stacking now come from one shared contract instead of eight private copies. These cards describe shipped behavior, not future promises.</p>
+					<span class="kicker">Review receipts · v5.15.0</span>
+					<h2 class="section-title">A review can leave evidence, not residue.</h2>
+					<p class="rm-lede">Filter the queue, save a fresh coverage or persisted-target snapshot when you need it, then return to the same local context. These cards describe behavior in this release, not future promises.</p>
 				</div>
 
 				<div class="rm-grid reveal">
@@ -702,7 +708,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.14 changes how dialogs behave once open — not portfolio math, and not a single number FolioOrb shows you. Targets are not recommendations; rehearsals remain read-only; restores still require exact confirmation and a clean restart.</p>
+					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.15 adds filters, local preferences, and exports around existing facts. It adds no provider or FX path, does not convert foreign quotes, never fills a missing value with zero, and never places a trade.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 				</div>

@@ -1,6 +1,72 @@
-# FolioOrb v5.14.0 Release Notes
+# FolioOrb v5.15.0 Release Notes
 
-**Release date:** August 22, 2026
+**Release date:** August 25, 2026
+
+## Headline
+
+Review what matters, then keep the receipt. Review Orbit can now separate urgent
+data gaps from routine reminders, save a fresh data-health or target-plan
+snapshot when you ask for one, and reopen where you left off.
+
+## Added
+
+### Filter the review inbox without losing the whole picture
+
+- The Inbox now has four live filters: **All**, **Data gaps**, **Needs review**,
+  and **On the radar**. Each shows its count before you choose it.
+- Filtering changes only what is visible. The Review badge and header keep the
+  total count, so a quiet reminder cannot make an urgent gap disappear.
+- The selected filter stays on this device and is restored the next time Review
+  Orbit opens.
+
+### Save a data-health receipt
+
+- The Data Trust Center can now save an Excel-friendly CSV with generation time,
+  overall quality, snapshot coverage, and one row per coverage area.
+- Saving performs a fresh read-only coverage check at that moment. The CSV names
+  foreign-priced positions separately because they stay outside USD totals.
+- Missing tickers, sources, and caveats remain explicit. A partial or unavailable
+  area is never rewritten as complete during export.
+
+### Save a current target-course snapshot
+
+- Plan can save a CSV snapshot of the persisted target basis points, current
+  allocation, descriptive drift, known USD value, and valuation quality.
+- Saving performs a fresh read-only valuation. If target inputs have unsaved
+  changes, FolioOrb asks you to save the course before exporting.
+- If required quotes are missing or foreign-priced, the file names them and
+  leaves drift unavailable. It does not substitute zero, convert currencies, or
+  place a trade.
+
+### Return to the same review context
+
+- Review Orbit remembers the last tab, Inbox filter, and Month/Quarter Review
+  Pack choice in local browser/app storage.
+- Invalid or inaccessible stored values fail back to Inbox, All, and Month.
+  Holdings, financial records, and settings are not changed.
+
+## Public surface
+
+- README and website copy, release examples, Review Orbit documentation, and
+  current demo screenshots now describe the four shipped workflows.
+- The capture pipeline adds a Review Inbox artifact from the repository's
+  isolated fictional demo profile; provider-backed market facts are current at
+  capture time.
+
+## Under the hood
+
+- The new exports reuse Review Orbit's existing USD-only valuation and planning
+  contracts. No provider, FX, brokerage, or portfolio-calculation path was added.
+- No schema migration. Installing over the latest published stable, v5.13.0,
+  preserves local holdings,
+  snapshots, backups, settings, keys, targets, and thesis text.
+
+---
+
+# FolioOrb v5.14.0 Mainline Milestone — Included in v5.15.0
+
+**Mainline milestone:** August 22, 2026 · This version was not published as a
+stable tag; its changes ship publicly in v5.15.0.
 
 ## Headline
 

@@ -109,6 +109,53 @@ def test_plan_overview_and_rehearsal_routes_are_scoped(client, monkeypatch):
     assert client.get("/api/review/overview").status_code == 200
 
 
+def test_trust_and_plan_exports_are_scoped_read_only_csv(client, monkeypatch):
+    monkeypatch.setattr(
+        portfolio_review,
+        "build_trust_center",
+        lambda _db, portfolio_id: {
+            "portfolio_id": portfolio_id,
+            "generated_at": "2026-08-25T12:00:00+00:00",
+            "overall_quality": "partial",
+            "latest_snapshot": None,
+            "snapshot_count": 0,
+            "principle": "Missing stays missing.",
+            "areas": [],
+        },
+    )
+    monkeypatch.setattr(
+        portfolio_planning,
+        "build_target_plan",
+        lambda _db, portfolio_id: {
+            "portfolio_id": portfolio_id,
+            "reporting_currency": "USD",
+            "known_value": 0,
+            "valuation_quality": "partial",
+            "complete": False,
+            "drift_available": False,
+            "missing_tickers": ["AAPL"],
+            "foreign_currency_tickers": [],
+            "items": [],
+        },
+    )
+
+    trust = client.get("/api/review/trust/export")
+    assert trust.status_code == 200
+    assert trust.headers["content-disposition"] == (
+        'attachment; filename="folioorb-data-health-2026-08-25-p1.csv"'
+    )
+    assert "overall_quality,partial" in trust.text
+
+    plan = client.get("/api/review/plan/export")
+    assert plan.status_code == 200
+    assert plan.headers["content-disposition"].startswith(
+        'attachment; filename="folioorb-target-plan-'
+    )
+    assert plan.headers["content-disposition"].endswith('-p1.csv"')
+    assert "valuation_quality,partial" in plan.text
+    assert client.get("/api/review/plan/export?portfolio_id=999").status_code == 404
+
+
 def test_target_payload_requires_integer_basis_points(client):
     response = client.put(
         "/api/review/plan/targets",

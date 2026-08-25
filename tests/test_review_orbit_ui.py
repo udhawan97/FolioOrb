@@ -40,6 +40,8 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
         "Annual average-cost recap",
         "Portable records ZIP",
         "Manual-backup freshness",
+        "Save data health CSV",
+        "Save plan CSV",
     ):
         assert phrase in markup
     assert "/api/review/trust" in script
@@ -48,6 +50,8 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
     assert "/api/review/compare" in script
     assert "/api/review/thesis/" in script
     assert "/api/review/plan" in script
+    assert "/api/review/trust/export" in script
+    assert "/api/review/plan/export" in script
     assert "/api/review/overview" in script
     assert "/api/review/records/realized.csv" in script
     assert "/api/review/records/archive" in script
@@ -59,6 +63,27 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
     assert "Portable records export failed; no complete ZIP was written." in script
     assert 'requestAnimationFrame(() => $("review-auto-switch")?.focus())' in script
     assert 'timeZoneName: "short"' in script
+    assert 'aria-label="Filter review inbox"' in markup
+    assert 'data-inbox-filter="${tone}"' in script
+    assert "No review items match this filter." in script
+    assert 'REVIEW_TAB_KEY = "folioorb-review-tab-v1"' in script
+    assert 'REVIEW_PERIOD_KEY = "folioorb-review-period-v1"' in script
+    assert 'REVIEW_INBOX_FILTER_KEY = "folioorb-review-inbox-filter-v1"' in script
+    assert "rememberChoice(REVIEW_TAB_KEY, tab)" in script
+    assert "rememberChoice(REVIEW_PERIOD_KEY, state.reportPeriod)" in script
+    assert 'id="review-report-title"' in markup
+    assert 'id="review-plan-export"' in markup
+    assert "syncReportPeriodUi()" in script
+    assert "targetCourseDirty()" in script
+    assert "Save the target course before exporting its snapshot." in script
+
+
+def test_review_orbit_loads_executable_continuity_logic_before_the_workspace():
+    markup = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    logic_index = markup.index('/static/js/review-orbit-logic.js?v=0')
+    orbit_index = markup.index('/static/js/review-orbit.js?v=0')
+
+    assert logic_index < orbit_index
 
 
 def test_review_orbit_root_wins_the_global_body_child_stacking_rule():

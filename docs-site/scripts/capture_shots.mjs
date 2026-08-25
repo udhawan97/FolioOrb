@@ -19,6 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'assets', 'shots');
 const README_DASHBOARD_OUT = join(__dirname, '..', '..', 'docs', 'dashboard.webp');
 const README_PLAN_OUT = join(__dirname, '..', '..', 'docs', 'plan-protect.webp');
+const README_REVIEW_OUT = join(__dirname, '..', '..', 'docs', 'review-inbox.webp');
 
 const VIEWPORT = { width: 1512, height: 950 };
 const SCALE = 2;
@@ -28,7 +29,8 @@ const SCALE = 2;
 const SHOTS = [
   { name: 'readme-dashboard', zone: 'overview', mode: 'viewport', outWidth: 1600 },
   { name: 'risk-analytics-demo', zone: 'analytics', analyticsPane: 'risk', selector: '.analytics-sub-pane[data-analytics-pane="risk"]', outWidth: 1600 },
-  { name: 'plan-protect-demo', reviewTab: 'plan', selector: '.review-orbit-shell', outWidth: 1600 },
+  { name: 'review-inbox-demo', reviewTab: 'inbox', selector: '.review-orbit-shell', outWidth: 1600 },
+  { name: 'plan-protect-demo', reviewTab: 'plan', reviewScrollTop: 420, selector: '.review-orbit-shell', outWidth: 1600 },
   { name: 'senpai-mobile-flow', zone: 'overview', mode: 'mobile-flow', outWidth: 750 },
 ];
 const requestedNames = new Set(
@@ -79,6 +81,12 @@ async function toWebp(pngBuffer, name, outWidth) {
       .resize({ width: 1600, withoutEnlargement: true })
       .webp({ quality: 82, effort: 6 })
       .toFile(README_PLAN_OUT);
+  }
+  if (name === 'review-inbox-demo') {
+    await sharp(pngBuffer)
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 82, effort: 6 })
+      .toFile(README_REVIEW_OUT);
   }
   return out;
 }
@@ -144,12 +152,21 @@ async function main() {
       if (shot.zone) await switchZone(page, shot.zone);
       if (shot.analyticsPane) await switchAnalyticsPane(page, shot.analyticsPane);
       if (shot.reviewTab) {
-        await page.locator('#review-orbit-trigger').click();
+        if (await page.locator('#review-orbit').getAttribute('aria-hidden') !== 'false') {
+          await page.locator('#review-orbit-trigger').click();
+        }
         await page.locator(`[data-review-tab="${shot.reviewTab}"]`).click();
         await page.waitForSelector(`[data-review-pane="${shot.reviewTab}"]`, {
           state: 'visible', timeout: 15000,
         });
         await sleep(3000);
+        if (shot.reviewScrollTop) {
+          await page.locator('.review-orbit-body').evaluate(
+            (element, top) => { element.scrollTop = top; },
+            shot.reviewScrollTop,
+          );
+          await sleep(250);
+        }
       }
 
       let png;
