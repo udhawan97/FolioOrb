@@ -9,7 +9,34 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current release below.
 
-## v5.14.0 — One meaning for "modal"
+## v5.15.0 — Review receipts
+
+- **Filter the Review Inbox.** All, Data gaps, Needs review, and On the radar
+  expose their counts and narrow only the visible list. The Review badge and
+  header retain the full total; nothing is dismissed or mutated.
+- **Save a data-health receipt.** The Trust tab exports generation time,
+  overall quality, snapshot coverage, area counts, missing tickers, sources,
+  caveats, and named foreign-currency exclusions as CSV. Saving runs a fresh
+  read-only coverage check; partial remains partial.
+- **Save a current target-course snapshot.** Plan exports persisted basis points,
+  current weights, descriptive drift, known USD value, valuation quality, and
+  missing or foreign-priced tickers from a fresh read-only valuation. Unsaved
+  target edits must be saved first; unavailable drift stays blank, and no trade
+  is placed.
+- **Return to the same Review context.** The last tab, Inbox filter, and
+  Month/Quarter choice are restored from local browser/app storage. Invalid
+  values fail back to Inbox, All, and Month.
+- README, landing page, install examples, Review Orbit docs, and isolated
+  fictional-demo screenshots now reflect the current app. Provider-backed
+  market facts are current at capture time.
+- No schema migration. Installing over the latest published stable, v5.13.0,
+  preserves local holdings,
+  snapshots, backups, settings, keys, targets, and thesis text.
+
+## v5.14.0 mainline milestone — included in v5.15.0
+
+This version was not published as a stable tag. Its dialog safeguards ship
+publicly as part of v5.15.0.
 
 - **A dialog keeps the keyboard inside it.** FolioOrb's eight dim-the-dashboard
   panels had each grown their own idea of what "modal" means, and three stopped

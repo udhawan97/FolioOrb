@@ -711,7 +711,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--page-gutter); }
 
 /* ── ROADMAP (Act 8½) ─────────────────────────────────────────── */
 .rm-lede { max-width: 58ch; margin: 1rem auto 0; color: var(--color-ink-2); font-size: 1.05rem; }
-.rm-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; }
+.rm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; }
 .rm-card { position: relative; border-radius: var(--radius); padding: 1.5rem 1.4rem 1.6rem; display: flex; flex-direction: column;
 	transition: transform var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) ease, border-color var(--dur-micro) ease; }
 .rm-card:hover { transform: translateY(-3px); box-shadow: 0 16px 44px color-mix(in oklch, var(--color-accent) 12%, transparent); }

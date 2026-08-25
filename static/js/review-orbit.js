@@ -4,15 +4,32 @@
  * research comparison, thesis cadence, and verified local backups.
  */
 window.ReviewOrbit = (() => {
+    const Logic = window.ReviewOrbitLogic;
+    const REVIEW_TAB_KEY = "folioorb-review-tab-v1";
+    const REVIEW_PERIOD_KEY = "folioorb-review-period-v1";
+    const REVIEW_INBOX_FILTER_KEY = "folioorb-review-inbox-filter-v1";
+    const REVIEW_TABS = new Set(["inbox", "trust", "report", "compare", "plan", "records", "backups"]);
+    const REVIEW_PERIODS = new Set(["month", "quarter"]);
+    const REVIEW_INBOX_FILTERS = new Set(["all", "urgent", "attention", "quiet"]);
+
+    function savedChoice(key, allowed, fallback) {
+        return Logic.readChoice(localStorage, key, allowed, fallback);
+    }
+
+    function rememberChoice(key, value) {
+        Logic.writeChoice(localStorage, key, value);
+    }
+
     const state = {
         open: false,
-        tab: "inbox",
+        tab: savedChoice(REVIEW_TAB_KEY, REVIEW_TABS, "inbox"),
         modal: null,
         loaded: new Set(),
         inbox: null,
         trust: null,
         report: null,
-        reportPeriod: "month",
+        reportPeriod: savedChoice(REVIEW_PERIOD_KEY, REVIEW_PERIODS, "month"),
+        inboxFilter: savedChoice(REVIEW_INBOX_FILTER_KEY, REVIEW_INBOX_FILTERS, "all"),
         watchlist: null,
         plan: null,
         overview: null,
@@ -142,6 +159,7 @@ window.ReviewOrbit = (() => {
         const pane = document.querySelector(`[data-review-pane="${CSS.escape(tab)}"]`);
         if (!button || !pane) return;
         state.tab = tab;
+        rememberChoice(REVIEW_TAB_KEY, tab);
         document.querySelectorAll("[data-review-tab]").forEach(item => {
             const selected = item === button;
             item.setAttribute("aria-selected", String(selected));
@@ -180,18 +198,29 @@ window.ReviewOrbit = (() => {
         const asof = $("review-orbit-asof");
         if (asof) asof.textContent = `Review as of ${dateTime(data.generated_at)}`;
 
-        $("review-inbox-summary").innerHTML = ["urgent", "attention", "quiet"].map(tone => html`
-            <div class="review-summary-cell" data-tone="${tone}">
-                <strong>${data.counts[tone] || 0}</strong>
-                <span>${tone === "urgent" ? "Data gaps" : tone === "attention" ? "Needs review" : "On the radar"}</span>
-            </div>`).join("");
+        const filters = [
+            ["all", "All", data.count],
+            ["urgent", "Data gaps", data.counts.urgent || 0],
+            ["attention", "Needs review", data.counts.attention || 0],
+            ["quiet", "On the radar", data.counts.quiet || 0],
+        ];
+        $("review-inbox-summary").innerHTML = filters.map(([tone, label, total]) => html`
+            <button type="button" class="review-summary-cell" data-tone="${tone}"
+                    data-inbox-filter="${tone}" aria-pressed="${state.inboxFilter === tone}">
+                <strong>${total}</strong>
+                <span>${label}</span>
+            </button>`).join("");
 
         const target = $("review-inbox-list");
-        if (!data.items.length) {
-            target.innerHTML = html`<div class="review-empty">Nothing needs attention right now. Your review orbit is clear.</div>`;
+        const visible = Logic.filterInbox(data.items, state.inboxFilter);
+        if (!visible.length) {
+            const message = data.items.length
+                ? "No review items match this filter."
+                : "Nothing needs attention right now. Your review orbit is clear.";
+            target.innerHTML = html`<div class="review-empty">${message}</div>`;
             return;
         }
-        target.innerHTML = data.items.map(item => html`
+        target.innerHTML = visible.map(item => html`
             <article class="review-inbox-item" data-tone="${item.tone}">
                 <span class="review-inbox-dot" aria-hidden="true"></span>
                 <div class="review-inbox-copy">
@@ -205,6 +234,18 @@ window.ReviewOrbit = (() => {
                     ${item.action.label}
                 </button>
             </article>`).join("");
+    }
+
+    function setInboxFilter(tone, { restoreFocus = false } = {}) {
+        if (!REVIEW_INBOX_FILTERS.has(tone) || tone === state.inboxFilter) return;
+        state.inboxFilter = tone;
+        rememberChoice(REVIEW_INBOX_FILTER_KEY, tone);
+        renderInbox();
+        if (restoreFocus) {
+            requestAnimationFrame(() => Logic.restoreFilterFocus(document, tone));
+        }
+        const label = Logic.filterAnnouncement(tone);
+        live(`Review inbox filtered to ${label}.`);
     }
 
     async function loadInbox(force = false) {
@@ -229,13 +270,16 @@ window.ReviewOrbit = (() => {
                 ? `${area.covered} local records`
                 : `${area.covered} of ${area.expected} covered`;
             const missing = area.missing?.length ? ` Missing: ${area.missing.join(", ")}.` : "";
+            const foreign = area.foreign_currency_tickers?.length
+                ? ` Foreign-priced and excluded from USD totals: ${area.foreign_currency_tickers.join(", ")}.`
+                : "";
             return html`
                 <article class="review-trust-card">
                     <div class="review-trust-card-head">
                         <h4>${area.label}</h4>
                         <span class="review-quality" data-quality="${area.quality}">${area.quality.replace("_", " ")}</span>
                     </div>
-                    <p>${coverage}.${missing}</p>
+                    <p>${coverage}.${missing}${foreign}</p>
                     <p class="review-trust-source">${area.source}${area.latest ? ` · Latest ${area.latest}` : ""}</p>
                     ${area.caveat ? html`<p class="review-trust-source">${area.caveat}</p>` : ""}
                 </article>`;
@@ -268,6 +312,20 @@ window.ReviewOrbit = (() => {
             <article class="review-report-card"><span>History coverage</span><strong>${data.data_quality.history}</strong></article>
             <article class="review-report-card"><span>Theses needing attention</span><strong>${data.thesis_attention.length}</strong></article>
             <article class="review-report-card"><span>Price coverage</span><strong>${data.data_quality.valuation}</strong></article>`;
+    }
+
+    function syncReportPeriodUi() {
+        const period = REVIEW_PERIODS.has(state.reportPeriod) ? state.reportPeriod : "month";
+        const title = $("review-report-title");
+        if (title) {
+            title.textContent = Logic.reportTitle(period);
+        }
+        document.querySelectorAll("[data-report-period]").forEach(button => {
+            button.setAttribute(
+                "aria-pressed",
+                String(button.dataset.reportPeriod === period),
+            );
+        });
     }
 
     async function loadReport(force = false) {
@@ -309,6 +367,39 @@ window.ReviewOrbit = (() => {
             }
         } catch (error) {
             showToast(apiErrorMessage(error, "Review export failed"), "danger");
+        }
+    }
+
+    async function exportSnapshot(kind) {
+        const exports = {
+            trust: {
+                endpoint: "/api/review/trust/export",
+                fallback: "folioorb-data-health.csv",
+                failure: "Data health export failed",
+            },
+            plan: {
+                endpoint: "/api/review/plan/export",
+                fallback: "folioorb-target-plan.csv",
+                failure: "Target plan export failed",
+            },
+        };
+        const config = exports[kind];
+        if (!config) return;
+        if (kind === "plan" && targetCourseDirty()) {
+            showToast("Save the target course before exporting its snapshot.", "warning");
+            return;
+        }
+        try {
+            const response = await PortfolioWorkspace.response(config.endpoint);
+            const result = await LocalTextExport.saveResponse(response, {
+                fallbackFilename: config.fallback,
+                mediaType: "text/csv;charset=utf-8",
+            });
+            if (result.status === "saved" && result.path) {
+                showToast(`Saved ${result.filename}`, "success");
+            }
+        } catch (error) {
+            showToast(apiErrorMessage(error, config.failure), "danger");
         }
     }
 
@@ -453,6 +544,7 @@ window.ReviewOrbit = (() => {
         const select = $("review-rehearsal-holding");
         const previousSelection = select?.value;
         const save = $("review-target-save");
+        const exportButton = $("review-plan-export");
         const run = $("review-rehearsal-run");
         if (!data.items.length) {
             $("review-course-summary").innerHTML = html`
@@ -460,6 +552,7 @@ window.ReviewOrbit = (() => {
             $("review-target-table").innerHTML = "";
             if (select) select.innerHTML = '<option value="">No eligible positions</option>';
             if (save) save.disabled = true;
+            if (exportButton) exportButton.disabled = true;
             if (run) run.disabled = true;
             return;
         }
@@ -512,6 +605,35 @@ window.ReviewOrbit = (() => {
             if (data.items.some(item => String(item.holding_id) === previousSelection)) {
                 select.value = previousSelection;
             }
+        }
+        syncTargetDraftState();
+    }
+
+    function targetCourseDirty() {
+        if (!state.plan) return false;
+        const inputs = Array.from(document.querySelectorAll(".review-target-input")).map(
+            input => ({ holdingId: input.dataset.holdingId, value: input.value })
+        );
+        return Logic.targetCourseDirty(state.plan.items, inputs);
+    }
+
+    function syncTargetDraftState({ announce = false } = {}) {
+        const dirty = targetCourseDirty();
+        const exportButton = $("review-plan-export");
+        const status = $("review-target-status");
+        if (exportButton) {
+            exportButton.disabled = dirty || !state.plan?.items.length;
+            exportButton.title = dirty
+                ? "Save the target course before exporting this draft."
+                : "Save the persisted target course and a fresh current valuation.";
+        }
+        if (dirty && status) {
+            status.textContent = "Unsaved target changes — save the course before exporting.";
+        } else if (status?.textContent.startsWith("Unsaved target changes")) {
+            status.textContent = "";
+        }
+        if (dirty && announce) {
+            live("Target course changed; save it before exporting the plan snapshot.");
         }
     }
 
@@ -1090,20 +1212,29 @@ window.ReviewOrbit = (() => {
             const button = event.target.closest("[data-review-action]");
             if (button) handleInboxAction(button);
         });
+        $("review-inbox-summary")?.addEventListener("click", event => {
+            const button = event.target.closest("[data-inbox-filter]");
+            if (button) {
+                setInboxFilter(button.dataset.inboxFilter, { restoreFocus: true });
+            }
+        });
         $("review-thesis-editor")?.addEventListener("submit", saveThesis);
         $("review-thesis-cancel")?.addEventListener("click", closeThesisEditor);
         document.querySelectorAll("[data-report-period]").forEach(button => {
             button.addEventListener("click", () => {
                 state.reportPeriod = button.dataset.reportPeriod;
-                document.querySelectorAll("[data-report-period]").forEach(item => {
-                    item.setAttribute("aria-pressed", String(item === button));
-                });
+                rememberChoice(REVIEW_PERIOD_KEY, state.reportPeriod);
+                syncReportPeriodUi();
                 state.loaded.delete("report");
                 loadReport(true);
             });
         });
+        syncReportPeriodUi();
         document.querySelectorAll("[data-report-export]").forEach(button => {
             button.addEventListener("click", () => exportReport(button.dataset.reportExport));
+        });
+        document.querySelectorAll("[data-review-snapshot-export]").forEach(button => {
+            button.addEventListener("click", () => exportSnapshot(button.dataset.reviewSnapshotExport));
         });
         $("review-watchlist-picks")?.addEventListener("change", event => {
             if (!event.target.matches("input[type='checkbox']")) return;
@@ -1116,6 +1247,11 @@ window.ReviewOrbit = (() => {
         });
         $("review-compare-run")?.addEventListener("click", runCompare);
         $("review-target-form")?.addEventListener("submit", saveTargets);
+        $("review-target-form")?.addEventListener("input", event => {
+            if (event.target.matches(".review-target-input")) {
+                syncTargetDraftState({ announce: true });
+            }
+        });
         const rehearsalForm = $("review-rehearsal-form");
         rehearsalForm?.addEventListener("submit", runRehearsal);
         rehearsalForm?.addEventListener("input", invalidateRehearsal);

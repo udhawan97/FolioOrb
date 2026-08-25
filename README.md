@@ -11,8 +11,8 @@
 <p align="center"><em>Your folio, finally making sense.</em></p>
 
 <p align="center">
-  A portfolio dashboard that pulls in your holdings, live market data, risk signals, and news,<br>
-  then gives you plain hold, trim, or exit calls — with the reasoning laid out, not just a verdict.
+  A local-first portfolio review dashboard that brings holdings, market context, risk, news,<br>
+  planning, and records into one explainable workflow — without connecting to a brokerage.
 </p>
 
 <p align="center">
@@ -22,6 +22,12 @@
 
 <p align="center">
   <sub>Market and filing lookups use named public providers, and News can load remote thumbnails. With an Anthropic key configured, credential-only availability checks run periodically; Claude prompts send bounded derived context only for Claude-backed actions. The local database is never uploaded.</sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><strong>Open the latest stable release</strong></a> ·
+  <a href="https://udhawan97.github.io/FolioOrb/download/"><strong>Choose how to install</strong></a> ·
+  <a href="https://udhawan97.github.io/FolioOrb/get-started/introduction/"><strong>Read the docs</strong></a>
 </p>
 
 <p align="center">
@@ -67,8 +73,8 @@ FolioOrb is the same dashboard whichever way you launch it — a local server th
 
 | Platform | Download | Install guide |
 | --- | --- | --- |
-| **macOS** (Apple Silicon) | [**Download .dmg**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on macOS](https://udhawan97.github.io/FolioOrb/install-macos/) |
-| **Windows** (x64) | [**Download .exe**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on Windows](https://udhawan97.github.io/FolioOrb/install-windows/) |
+| **macOS** (Apple Silicon) | [**Open latest release → choose the .dmg**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on macOS](https://udhawan97.github.io/FolioOrb/install-macos/) |
+| **Windows** (x64) | [**Open latest release → choose the .exe**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on Windows](https://udhawan97.github.io/FolioOrb/install-windows/) |
 
 > **Heads up:** early builds aren't code-signed yet, so the first launch shows a warning on both macOS and Windows — expected for an open-source app. The [install guides](https://udhawan97.github.io/FolioOrb/download/) show exactly what you'll see, and every release ships a `SHA256SUMS.txt` so you can [verify your download](https://udhawan97.github.io/FolioOrb/download/#verify-your-download).
 
@@ -99,7 +105,11 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
 | 📥 Import / export CSV | Move holdings in and out — a strict template locally, or let Claude map a messy brokerage export onto it |
 | 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply or undo through an explicit in-app confirmation |
 | 🧭 Open Review Orbit | One calm workspace gathers attention, data trust, reports, comparison, planning, records, and backup protection — prioritised locally, with no automatic trades |
+| 🎛️ Triage the review inbox | Switch between all items, urgent data gaps, work that needs review, and quiet reminders without changing the underlying queue |
+| 🧾 Keep a data-health receipt | Save coverage, missing tickers, sources, caveats, and snapshot freshness as a local CSV — partial stays partial |
 | ⚖️ Set a target course | Assign exact basis-point targets across the holdings you own, then compare target and actual allocation only when every required USD quote is usable |
+| 📐 Save the target snapshot | Export the saved target course, actual weights, descriptive drift, known USD value, and every quote exclusion without placing a trade |
+| ↩️ Continue where you left off | Review Orbit restores the last tab, Inbox filter, and Month/Quarter review choice from local browser/app storage |
 | 🧪 Rehearse a buy | Preview shares, average cost, and projected allocation for an external-cash USD buy in a ticker you already own — read-only, buy-only, never a recommendation, and marked outdated as soon as its inputs change |
 | 🗂️ See every Portfolio | Compare known USD value and quote completeness across separate books without inventing an aggregate performance number |
 | 🧾 Export annual realized sales | Download a calendar-year average-cost recap from stored sale facts; it is a record, not tax-lot or tax-filing software |
@@ -119,6 +129,12 @@ FolioOrb closes that gap: holdings, live prices, risk math, market regime, news,
   <img src="docs/dashboard.webp" alt="The FolioOrb dashboard showing a demo portfolio: total value, today's P&amp;L, sector map, and today's impact" width="820">
   <br>
   <sub><em>The real dashboard, running a demo portfolio. Local market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
+</p>
+
+<p align="center">
+  <img src="docs/review-inbox.webp" alt="Review Orbit using fictional demo holdings, with local filters for all items, data gaps, work needing review, and quiet reminders" width="820">
+  <br>
+  <sub><em>The Review Inbox uses fictional demo data. Filters change the view, not the queue, and the total remains visible.</em></sub>
 </p>
 
 <p align="center">
@@ -198,21 +214,23 @@ FolioOrb works fully without Claude — Local Intelligence handles verdicts, ana
 
 </details>
 
-## 🛰️ One Meaning for "Modal", New in v5.14.0
+## 🧾 Review, Filter, Keep the Receipt — New in v5.15.0
 
-FolioOrb has eight panels that dim the dashboard and ask you something. Each had
-picked up its own idea of what that means, and three of them stopped the mouse
-but not the Tab key — including **Delete portfolio?**, where the very first Tab
-press left the dialog and put the whole live dashboard back under your hands
-while the confirmation still stood open. All eight now hold the keyboard until
-you answer them.
+Review Orbit now separates **Data gaps**, **Needs review**, and **On the radar**
+without hiding the total queue. It also remembers the last Review tab, Inbox
+filter, and Month/Quarter Review Pack choice on this device, so reopening the
+workspace returns to the same context instead of starting over.
 
-Closing one used to lose your place: it aimed focus at the control you had
-clicked, and renaming or deleting a portfolio redraws the list that held it, so
-focus landed at the top of the page instead. Every dialog now falls back to a
-landmark that outlives its trigger, and checks that focus actually got there.
-Dialogs also stack properly, so one opened over another is reachable rather than
-frozen. Same clicks, same look — the keyboard just stops falling through.
+Two new CSV receipts make a review portable without creating another source of
+portfolio math. **Save data health CSV** records coverage, missing tickers,
+sources, caveats, and snapshot freshness. **Save plan CSV** records persisted
+target basis points, current allocation, descriptive drift, known USD value,
+and quote exclusions. When valuation is partial, both files say so and leave
+unavailable values unavailable.
+
+The v5.14 dialog safeguards remain underneath the workflow: all eight modal
+surfaces contain the keyboard, restore focus to a durable landmark, and stack
+correctly.
 
 Plan & Protect remains deliberately bounded. FolioOrb does not connect to a
 brokerage or place trades; targets are not recommendations; rehearsals do not

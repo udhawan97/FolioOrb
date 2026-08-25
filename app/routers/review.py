@@ -65,6 +65,19 @@ def trust_center(portfolio_id: int = 1, db: Session = Depends(get_db)):
     return portfolio_review.build_trust_center(db, portfolio_id)
 
 
+@router.get("/trust/export")
+def export_trust_center(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    _require_portfolio(portfolio_id, db)
+    trust = portfolio_review.build_trust_center(db, portfolio_id)
+    stamp = str(trust["generated_at"])[:10]
+    filename = f"folioorb-data-health-{stamp}-p{portfolio_id}.csv"
+    return Response(
+        content=portfolio_review.trust_center_csv(trust),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/inbox")
 def review_inbox(portfolio_id: int = 1, db: Session = Depends(get_db)):
     _require_portfolio(portfolio_id, db)
@@ -118,6 +131,20 @@ def review_watchlist(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def plan_portfolio(portfolio_id: int = 1, db: Session = Depends(get_db)):
     _require_portfolio(portfolio_id, db)
     return _domain_call(portfolio_planning.build_target_plan, db, portfolio_id)
+
+
+@router.get("/plan/export")
+def export_plan(portfolio_id: int = 1, db: Session = Depends(get_db)):
+    _require_portfolio(portfolio_id, db)
+    plan = _domain_call(portfolio_planning.build_target_plan, db, portfolio_id)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    stamp = generated_at[:10]
+    filename = f"folioorb-target-plan-{stamp}-p{portfolio_id}.csv"
+    return Response(
+        content=portfolio_review.target_plan_csv(plan, generated_at=generated_at),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.put("/plan/targets")
