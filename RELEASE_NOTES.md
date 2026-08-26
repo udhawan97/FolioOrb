@@ -1,3 +1,49 @@
+# FolioOrb v5.16.0 Mainline Milestone — Not Yet a Stable Release
+
+**Mainline milestone:** August 25, 2026 · The latest published stable remains
+v5.15.0 until a separate release gate is requested and completed.
+
+## Headline
+
+Carry the whole review, not four loose downloads. Review Orbit can now save one
+local ZIP containing the selected Review Pack, its data-health receipt, the
+saved target-plan snapshot, and a checksummed manifest.
+
+## Added
+
+### Save a Review Bundle with a manifest
+
+- **Save review bundle** creates `review-pack.html`, `review-pack.csv`,
+  `data-health.csv`, `target-plan.csv`, and `manifest.json` for the active
+  Portfolio and selected Month/Quarter period.
+- The review, trust, and target files reuse one in-memory quote response set.
+  No daily snapshot, target, holding, trade, DCA, setting, or backup row is
+  written while the bundle is assembled.
+- The manifest records app and format versions, UTC generation time, period,
+  per-area trust quality and gaps, missing and foreign-priced tickers, and the
+  byte length and SHA-256 digest of every non-manifest member.
+- The hashes can detect member corruption. They do not authenticate the archive
+  or its origin.
+- Foreign-priced positions remain named and excluded from USD totals. Missing
+  values stay missing; no FX conversion or new return calculation was added.
+- An unsaved target-course draft blocks the bundle in the UI so the ZIP cannot
+  silently carry an older persisted plan than the one visible on screen.
+- Browser downloads retain the binary ZIP. The desktop app uses its native Save
+  dialog and atomic binary writer, so the archive is never decoded as text.
+- The export is bounded at 8 MiB and writes no partial destination on a failed
+  native atomic swap. It is sensitive review material, not a restore file, tax
+  form, trade instruction, or recommendation.
+
+## Compatibility
+
+- No schema migration and no new external provider. Local holdings, sales,
+  snapshots, targets, theses, settings, keys, and backups keep their existing
+  formats.
+- This milestone advances the mainline app version to 5.16.0 for rolling
+  `latest-main` packages. It does not create a `v5.16.0` tag or stable release.
+
+---
+
 # FolioOrb v5.15.0 Release Notes
 
 **Release date:** August 25, 2026

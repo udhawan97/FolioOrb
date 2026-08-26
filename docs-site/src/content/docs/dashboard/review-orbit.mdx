@@ -77,6 +77,36 @@ that number; it is not mislabeled as a time-weighted investment return. The exac
 opening-snapshot date appears beside the comparison, and history is marked partial when that
 snapshot is more than three days from the requested month or quarter boundary.
 
+### Review Bundle with a manifest
+
+<Aside type="caution" title="Available in latest-main only">
+This control is part of the v5.16.0 mainline milestone. It is not present in the
+v5.15.0 stable app.
+</Aside>
+
+Choose **Save review bundle** to carry the active Month/Quarter review as one
+local ZIP instead of four loose files. It contains:
+
+- `review-pack.html` and `review-pack.csv`
+- `data-health.csv`
+- `target-plan.csv`
+- `manifest.json` with app/format versions, UTC generation time, data-quality
+  context, per-area trust gaps, missing and foreign-priced tickers, byte
+  lengths, and SHA-256 hashes for the four non-manifest review artifacts
+
+The hashes help detect member corruption. They do not authenticate the ZIP or
+prove who created it.
+
+The four review artifacts reuse one in-memory quote response set. Assembly is
+read-only: it does not record a daily snapshot or change holdings, trades,
+targets, DCA rows, settings, or backups. If target inputs differ from the saved
+course, the bundle stays blocked until you save or restore the draft.
+
+Foreign-priced positions remain named and excluded from USD totals; there is no
+FX conversion. The 8 MiB cap bounds both the uncompressed member set and final
+ZIP. Treat the archive as sensitive review material. It is not a FolioOrb
+restore file, tax form, recommendation, or trade instruction.
+
 ## Thesis review cadence
 
 From a thesis item in the Inbox:

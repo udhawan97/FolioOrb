@@ -370,6 +370,56 @@ window.ReviewOrbit = (() => {
         }
     }
 
+    async function saveReviewBundle() {
+        const button = $("review-bundle-export");
+        const status = $("review-bundle-status");
+        if (!button || !status) return;
+        if (targetCourseDirty()) {
+            showToast("Save the target course before bundling its snapshot.", "warning");
+            return;
+        }
+        button.disabled = true;
+        status.textContent = "Freezing one quote set and hashing the review receipts…";
+        try {
+            const api = window.pywebview && window.pywebview.api;
+            if (api && typeof api.export_review_bundle === "function") {
+                const result = await api.export_review_bundle(
+                    PortfolioWorkspace.id,
+                    state.reportPeriod,
+                );
+                status.textContent = result?.saved
+                    ? "Review Bundle saved. Keep it somewhere private."
+                    : result?.error
+                        ? "Review bundle export failed; no complete ZIP was written."
+                        : "Save cancelled; no file was written.";
+                live(status.textContent);
+                return;
+            }
+            const response = await PortfolioWorkspace.response(
+                `/api/review/bundle?period=${encodeURIComponent(state.reportPeriod)}`,
+            );
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const filename = Logic.reviewBundleFilename(
+                state.reportPeriod,
+                state.report?.period_end,
+                PortfolioWorkspace.id,
+            );
+            browserSaveBinary(filename, await response.arrayBuffer(), "application/zip");
+            status.textContent = (
+                "Review Bundle download requested. "
+                + "Your browser controls the destination."
+            );
+            live(status.textContent);
+        } catch (error) {
+            status.textContent = apiErrorMessage(
+                error,
+                "Review bundle export failed; no complete ZIP was written.",
+            );
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     async function exportSnapshot(kind) {
         const exports = {
             trust: {
@@ -1233,6 +1283,7 @@ window.ReviewOrbit = (() => {
         document.querySelectorAll("[data-report-export]").forEach(button => {
             button.addEventListener("click", () => exportReport(button.dataset.reportExport));
         });
+        $("review-bundle-export")?.addEventListener("click", saveReviewBundle);
         document.querySelectorAll("[data-review-snapshot-export]").forEach(button => {
             button.addEventListener("click", () => exportSnapshot(button.dataset.reviewSnapshotExport));
         });

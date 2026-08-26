@@ -51,6 +51,16 @@
         return period === "quarter" ? "Quarterly review pack" : "Monthly review pack";
     }
 
+    function reviewBundleFilename(period, periodEnd, portfolioId) {
+        const safePeriod = period === "quarter" ? "quarter" : "month";
+        const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(String(periodEnd || ""))
+            ? periodEnd
+            : "current";
+        const numericId = Number(portfolioId);
+        const safeId = Number.isInteger(numericId) && numericId > 0 ? numericId : 1;
+        return `folioorb-${safePeriod}-review-bundle-${safeDate}-p${safeId}.zip`;
+    }
+
     function targetCourseDirty(savedItems, currentInputs) {
         const saved = new Map((savedItems || []).map(item => [
             String(item.holding_id),
@@ -71,6 +81,7 @@
         filterAnnouncement,
         restoreFilterFocus,
         reportTitle,
+        reviewBundleFilename,
         targetCourseDirty,
     };
 });

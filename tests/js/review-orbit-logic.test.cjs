@@ -65,6 +65,17 @@ test("review period labels match restored month and quarter state", () => {
     assert.equal(logic.reportTitle("invalid"), "Monthly review pack");
 });
 
+test("review bundle filenames are fixed to allowed period date and portfolio values", () => {
+    assert.equal(
+        logic.reviewBundleFilename("quarter", "2026-08-25", 7),
+        "folioorb-quarter-review-bundle-2026-08-25-p7.zip",
+    );
+    assert.equal(
+        logic.reviewBundleFilename("year", "../../unsafe", "nope"),
+        "folioorb-month-review-bundle-current-p1.zip",
+    );
+});
+
 test("plan export detects a visible draft and clears when values match saved targets", () => {
     const saved = [
         { holding_id: 1, target_weight_bps: 6000 },

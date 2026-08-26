@@ -131,10 +131,13 @@ def build_trust_center(
     portfolio_id: int,
     *,
     quote_loader: QuoteListLoader = get_all_quotes,
+    valuation_quote_loader: QuoteListLoader | None = None,
 ) -> dict:
     """Unify freshness and coverage for the app's major financial surfaces."""
     holdings = _active_holdings(db, portfolio_id)
-    valuation = portfolio_valuation.evaluate(db, portfolio_id)
+    valuation = portfolio_valuation.evaluate(
+        db, portfolio_id, quote_loader=valuation_quote_loader
+    )
     merged, quoted_tickers = _merged_quotes(
         holdings, valuation.holdings, quote_loader=quote_loader
     )
@@ -378,13 +381,21 @@ def build_review_inbox(
     }
 
 
-def build_review_report(db: Session, portfolio_id: int, period: str) -> dict:
+def build_review_report(
+    db: Session,
+    portfolio_id: int,
+    period: str,
+    *,
+    quote_loader: QuoteListLoader | None = None,
+) -> dict:
     """Create a period review pack from stored history plus one current valuation."""
     if period not in _PERIOD_DAYS:
         raise ValueError("period must be month or quarter")
     today = date.today()
     cutoff = today - timedelta(days=_PERIOD_DAYS[period])
-    valuation = portfolio_valuation.evaluate(db, portfolio_id)
+    valuation = portfolio_valuation.evaluate(
+        db, portfolio_id, quote_loader=quote_loader
+    )
     performance = portfolio_valuation.load_performance(db, portfolio_id)
     within = [
         row for row in performance.history

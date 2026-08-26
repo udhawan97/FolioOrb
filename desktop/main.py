@@ -194,7 +194,13 @@ def _write_binary_file(path: str, payload: bytes) -> str:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temp_name, target)
-        _fsync_parent(target)
+        try:
+            _fsync_parent(target)
+        except OSError:
+            # The complete, file-fsynced replacement is already visible. A
+            # directory-fsync failure weakens crash durability but must not be
+            # reported as "nothing was written" and invite a risky retry.
+            pass
     finally:
         if os.path.exists(temp_name):
             os.unlink(temp_name)
@@ -290,6 +296,36 @@ class _NativeBridge:  # pylint: disable=too-few-public-methods
             result = window.create_file_dialog(
                 webview.SAVE_DIALOG,
                 save_filename="folioorb-portable-export.zip",
+            )
+            path = result[0] if isinstance(result, (list, tuple)) else result
+            if not path:
+                return {"saved": False, "path": None}
+            _write_binary_file(path, payload)
+            return {"saved": True, "path": path}
+        except Exception as exc:  # pylint: disable=broad-except
+            return {"saved": False, "path": None, "error": type(exc).__name__}
+
+    def export_review_bundle(self, portfolio_id: int, period: str) -> dict:
+        """Build and save one Review Bundle without decoding its ZIP."""
+        try:
+            import webview
+
+            from app.database import SessionLocal
+            from app.services import review_bundle
+
+            numeric_id = int(portfolio_id)
+            selected_period = str(period)
+            with SessionLocal() as db:
+                payload = review_bundle.build_review_bundle(
+                    db, numeric_id, selected_period
+                )
+            filename = review_bundle.bundle_filename(numeric_id, selected_period)
+            window = webview.active_window()
+            if window is None:
+                return {"saved": False, "path": None}
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=filename,
             )
             path = result[0] if isinstance(result, (list, tuple)) else result
             if not path:

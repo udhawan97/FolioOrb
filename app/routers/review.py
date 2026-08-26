@@ -19,6 +19,7 @@ from app.services import (
     portfolio_planning,
     portfolio_records,
     portfolio_review,
+    review_bundle,
     update_installer,
 )
 
@@ -115,6 +116,28 @@ def export_review_report(
         content=content,
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/bundle")
+def export_review_bundle(
+    period: str = Query("month", pattern="^(month|quarter)$"),
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
+    _require_portfolio(portfolio_id, db)
+    content = _domain_call(
+        review_bundle.build_review_bundle, db, portfolio_id, period
+    )
+    filename = review_bundle.bundle_filename(portfolio_id, period)
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "Pragma": "no-cache",
+        },
     )
 
 

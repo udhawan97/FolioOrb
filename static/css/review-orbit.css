@@ -465,7 +465,7 @@ body.review-orbit-open > .dashboard-senpai {
 .review-report-card { padding: 0.9rem; }
 .review-report-card span { color: var(--text-tertiary); font-size: 0.65rem; }
 .review-report-card strong { display: block; margin-top: 0.25rem; font-size: 1rem; }
-.review-report-actions { display: flex; gap: 0.55rem; margin: 1rem 0; }
+.review-report-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; margin: 1rem 0; }
 
 .review-watchlist-picks { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem; }
 .review-watchlist-pick {
