@@ -7,7 +7,36 @@ import { Aside } from '@astrojs/starlight/components';
 
 The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
-in the repository. Highlights of the current release below.
+in the repository. Highlights of the current stable and the next mainline
+milestone are below.
+
+## v5.16.0 mainline milestone — Review Bundle with manifest
+
+<Aside type="caution" title="Not a stable release">
+This phase is built for the rolling `latest-main` channel. The latest published
+stable remains v5.15.0 until a separate release gate is requested and completed.
+</Aside>
+
+- **Save one review handoff.** The active Month/Quarter Review Pack,
+  data-health receipt, and saved target-plan snapshot leave together as one
+  local ZIP with a JSON manifest.
+- **One quote boundary.** All included review, trust, and planning files reuse
+  one in-memory quote response set; assembly writes no holdings, trades, daily
+  snapshots, targets, settings, DCA rows, or backups.
+- **Check every review artifact.** The manifest carries app/format versions,
+  UTC generation time, period and per-area quality context, missing and
+  foreign-priced tickers, byte lengths, and SHA-256 digests for the four
+  non-manifest review artifacts.
+- **Integrity, not authenticity.** The hashes help detect member corruption;
+  they do not authenticate the ZIP or prove who created it.
+- **Keep financial gaps honest.** Foreign positions stay outside USD totals,
+  missing values stay missing, and no FX conversion or new performance math is
+  introduced. An unsaved target draft blocks the bundle.
+- **Save real ZIP bytes.** Browsers download the response; packaged apps use a
+  native Save dialog and atomic binary writer. The bundle is capped at 8 MiB
+  and is review material—not a restore file, tax form, recommendation, or trade
+  instruction.
+- No schema migration or new external provider.
 
 ## v5.15.0 — Review receipts
 

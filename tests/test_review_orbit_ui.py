@@ -42,6 +42,7 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
         "Manual-backup freshness",
         "Save data health CSV",
         "Save plan CSV",
+        "Save review bundle",
     ):
         assert phrase in markup
     assert "/api/review/trust" in script
@@ -52,6 +53,7 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
     assert "/api/review/plan" in script
     assert "/api/review/trust/export" in script
     assert "/api/review/plan/export" in script
+    assert "/api/review/bundle" in script
     assert "/api/review/overview" in script
     assert "/api/review/records/realized.csv" in script
     assert "/api/review/records/archive" in script
@@ -76,6 +78,10 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
     assert "syncReportPeriodUi()" in script
     assert "targetCourseDirty()" in script
     assert "Save the target course before exporting its snapshot." in script
+    assert "Save the target course before bundling its snapshot." in script
+    assert "Review bundle export failed; no complete ZIP was written." in script
+    assert "Review Bundle download requested." in script
+    assert "sensitive portfolio and target-plan data" in markup
 
 
 def test_review_orbit_loads_executable_continuity_logic_before_the_workspace():

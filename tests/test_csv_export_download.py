@@ -10,9 +10,14 @@ asserted at the source level (the pattern used by tests/test_desktop_exit.py).
 """
 import importlib.util
 import os
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from app import database as app_database
+from app.services import review_bundle
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -82,6 +87,21 @@ def test_binary_write_is_atomic_and_preserves_existing_file_on_swap_failure(
     assert not list(tmp_path.glob(".records.zip-*.tmp"))
 
 
+def test_binary_write_reports_success_after_parent_fsync_failure(tmp_path, monkeypatch):
+    dest = tmp_path / "records.zip"
+    dest.write_bytes(b"existing-complete-file")
+    monkeypatch.setattr(
+        desktop_main,
+        "_fsync_parent",
+        lambda _path: (_ for _ in ()).throw(OSError("directory fsync failed")),
+    )
+
+    result = desktop_main._write_binary_file(str(dest), b"replacement-complete-file")
+
+    assert result == str(dest)
+    assert dest.read_bytes() == b"replacement-complete-file"
+
+
 def test_smoke_environment_uses_an_isolated_data_root(tmp_path, monkeypatch):
     smoke_root = tmp_path / "smoke-root"
     monkeypatch.setenv("DATABASE_URL", "sqlite:////real/user/portfolio.db")
@@ -106,9 +126,121 @@ def test_desktop_exposes_save_bridge():
     assert "def save_file(" in src
     assert "def export_backup(" in src
     assert "def export_portable_records(" in src
+    assert "def export_review_bundle(" in src
     assert "SAVE_DIALOG" in src
     # The bridge is useless unless it's actually handed to the window.
     assert "js_api=_NativeBridge()" in src
+
+
+class _FakeSessionContext:
+    def __init__(self, session):
+        self.session = session
+
+    def __enter__(self):
+        return self.session
+
+    def __exit__(self, _exc_type, _exc, _traceback):
+        return False
+
+
+def _install_bundle_bridge_fakes(monkeypatch, window, builder):
+    session = object()
+    monkeypatch.setattr(
+        app_database,
+        "SessionLocal",
+        lambda: _FakeSessionContext(session),
+    )
+    monkeypatch.setattr(review_bundle, "build_review_bundle", builder)
+    monkeypatch.setattr(
+        review_bundle,
+        "bundle_filename",
+        lambda portfolio_id, period: f"bundle-{portfolio_id}-{period}.zip",
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "webview",
+        SimpleNamespace(
+            SAVE_DIALOG="save",
+            active_window=lambda: window,
+        ),
+    )
+    return session
+
+
+def test_desktop_review_bundle_saves_exact_binary_bytes(tmp_path, monkeypatch):
+    destination = tmp_path / "chosen.zip"
+    calls = []
+
+    class Window:
+        @staticmethod
+        def create_file_dialog(dialog_type, *, save_filename):
+            calls.append((dialog_type, save_filename))
+            return str(destination)
+
+    def build(session, portfolio_id, period):
+        calls.append((session, portfolio_id, period))
+        return b"PK\x03\x04exact-zip-bytes"
+
+    session = _install_bundle_bridge_fakes(monkeypatch, Window(), build)
+    result = desktop_main._NativeBridge().export_review_bundle(7, "quarter")
+
+    assert result == {"saved": True, "path": str(destination)}
+    assert destination.read_bytes() == b"PK\x03\x04exact-zip-bytes"
+    assert calls == [
+        (session, 7, "quarter"),
+        ("save", "bundle-7-quarter.zip"),
+    ]
+
+
+def test_desktop_review_bundle_cancel_writes_nothing(tmp_path, monkeypatch):
+    def build(_session, _portfolio_id, _period):
+        return b"complete-zip"
+
+    class Window:
+        @staticmethod
+        def create_file_dialog(_dialog_type, *, save_filename):
+            assert save_filename == "bundle-1-month.zip"
+
+    _install_bundle_bridge_fakes(monkeypatch, Window(), build)
+    result = desktop_main._NativeBridge().export_review_bundle(1, "month")
+
+    assert result == {"saved": False, "path": None}
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("failure_stage", ["build", "write"])
+def test_desktop_review_bundle_failure_reports_no_success(
+    tmp_path,
+    monkeypatch,
+    failure_stage,
+):
+    destination = tmp_path / "existing.zip"
+    destination.write_bytes(b"existing-complete-file")
+
+    class Window:
+        @staticmethod
+        def create_file_dialog(_dialog_type, *, save_filename):
+            assert save_filename == "bundle-1-month.zip"
+            return str(destination)
+
+    def build(_session, _portfolio_id, _period):
+        if failure_stage == "build":
+            raise RuntimeError("simulated build failure")
+        return b"replacement"
+
+    _install_bundle_bridge_fakes(monkeypatch, Window(), build)
+    if failure_stage == "write":
+        monkeypatch.setattr(
+            desktop_main,
+            "_write_binary_file",
+            lambda _path, _payload: (_ for _ in ()).throw(OSError("write failure")),
+        )
+
+    result = desktop_main._NativeBridge().export_review_bundle(1, "month")
+
+    expected_error = "RuntimeError" if failure_stage == "build" else "OSError"
+    assert result == {"saved": False, "path": None, "error": expected_error}
+    assert destination.read_bytes() == b"existing-complete-file"
 
 
 # ── Frontend wiring: every text export routes through the shared adapter ──────

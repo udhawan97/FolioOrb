@@ -2,7 +2,7 @@
 
 Consumed by the FastAPI app metadata, the desktop entry point, the PyInstaller
 spec, the Windows installer script, and the release workflow's tag/version guard.
-Bump this one line when cutting a release.
+Main may carry the intended next version before a stable tag is cut.
 """
 
-__version__ = "5.15.0"
+__version__ = "5.16.0"

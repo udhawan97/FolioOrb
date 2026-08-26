@@ -10,7 +10,12 @@ from sqlalchemy.pool import StaticPool
 from app.database import get_db
 from app.models import Base, Holding, Portfolio
 from app.routers import review as review_router
-from app.services import backup_service, portfolio_planning, portfolio_review
+from app.services import (
+    backup_service,
+    portfolio_planning,
+    portfolio_review,
+    review_bundle,
+)
 
 
 @pytest.fixture
@@ -154,6 +159,29 @@ def test_trust_and_plan_exports_are_scoped_read_only_csv(client, monkeypatch):
     assert plan.headers["content-disposition"].endswith('-p1.csv"')
     assert "valuation_quality,partial" in plan.text
     assert client.get("/api/review/plan/export?portfolio_id=999").status_code == 404
+
+
+def test_review_bundle_is_scoped_validated_and_downloaded_as_zip(client, monkeypatch):
+    monkeypatch.setattr(
+        review_bundle,
+        "build_review_bundle",
+        lambda _db, portfolio_id, period: f"bundle:{portfolio_id}:{period}".encode(),
+    )
+
+    bundle = client.get("/api/review/bundle?period=quarter")
+    assert bundle.status_code == 200
+    assert bundle.content == b"bundle:1:quarter"
+    assert bundle.headers["content-type"] == "application/zip"
+    assert bundle.headers["content-disposition"].startswith(
+        'attachment; filename="folioorb-quarter-review-bundle-'
+    )
+    assert bundle.headers["content-disposition"].endswith('-p1.zip"')
+    assert bundle.headers["cache-control"] == "no-store"
+    assert bundle.headers["pragma"] == "no-cache"
+    assert client.get("/api/review/bundle?period=year").status_code == 422
+    assert client.get(
+        "/api/review/bundle?period=month&portfolio_id=999"
+    ).status_code == 404
 
 
 def test_target_payload_requires_integer_basis_points(client):

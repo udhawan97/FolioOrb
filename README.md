@@ -214,6 +214,21 @@ FolioOrb works fully without Claude — Local Intelligence handles verdicts, ana
 
 </details>
 
+## 📦 Review Bundle with manifest — In latest-main after v5.15.0
+
+The next mainline phase adds **Save review bundle** to the Month/Quarter Review
+Pack. One local ZIP carries the print-ready report, spreadsheet report,
+data-health receipt, saved target-plan snapshot, and a JSON manifest with
+quality context and SHA-256 hashes for every non-manifest review artifact.
+
+Those hashes help detect member corruption; they do not authenticate the ZIP or
+prove who created it.
+
+Bundle assembly reuses one in-memory quote response set and writes no portfolio
+state. Foreign-priced positions stay outside USD totals, missing values remain
+missing, and an unsaved target draft blocks export. The latest published stable
+remains v5.15.0; this phase is not a `v5.16.0` release yet.
+
 ## 🧾 Review, Filter, Keep the Receipt — New in v5.15.0
 
 Review Orbit now separates **Data gaps**, **Needs review**, and **On the radar**
