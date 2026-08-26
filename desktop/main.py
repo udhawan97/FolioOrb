@@ -6,10 +6,12 @@ Closing the window shuts the server down. This is the target frozen by
 PyInstaller — the browser-launching ``run.py`` remains the source/dev entry.
 
 Run with ``--smoke`` to boot the server, confirm ``/health``, print the version,
-and exit 0. CI uses this on the frozen binary to prove the bundle actually
-starts before an installer is ever published.
+and exit 0. ``--smoke-duplicate-recovery`` exercises the bundled recovery
+backend against a disposable conflicting database. CI runs both on frozen
+binaries before an installer is ever published.
 """
 
+import html
 import os
 import shutil
 import socket
@@ -45,6 +47,282 @@ HEALTH_TIMEOUT_SECONDS = 40.0
 # module-level name rebound via `global`) so _run_server can record into it
 # without a global statement.
 _STARTUP_STATE: dict = {"error": None}
+
+
+def _startup_error_document(title: str, detail: str, recovery: str) -> str:
+    """Build a self-contained, escaped startup explanation for the native shell."""
+    safe_title = html.escape(title)
+    safe_detail = html.escape(detail)
+    safe_recovery = html.escape(recovery)
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>{safe_title}</title><style>
+:root {{ color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
+body {{ margin: 0; padding: 36px; background: Canvas; color: CanvasText; }}
+main {{ max-width: 620px; margin: auto; }}
+h1 {{ margin: 0 0 16px; font-size: 24px; letter-spacing: -.02em; }}
+p {{ line-height: 1.55; }}
+.detail {{ padding: 14px 16px; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  border-radius: 10px; background: color-mix(in srgb, CanvasText 5%, Canvas); }}
+.recovery {{ font-weight: 600; }}
+.close {{ opacity: .72; font-size: 13px; margin-top: 24px; }}
+</style></head><body><main><h1>{safe_title}</h1>
+<p class="detail">{safe_detail}</p><p class="recovery">{safe_recovery}</p>
+<p class="close">Close this window after noting the recovery steps.</p>
+</main></body></html>"""
+
+
+def _surface_startup_error(title: str, detail: str, recovery: str) -> None:
+    """Print a startup failure and show it in windowed frozen applications."""
+    print(f"{title}: {detail} Recovery: {recovery}", file=sys.stderr)
+    if not getattr(sys, "frozen", False):
+        return
+    try:
+        import webview
+
+        webview.create_window(
+            title,
+            html=_startup_error_document(title, detail, recovery),
+            width=720,
+            height=480,
+            min_size=(560, 380),
+            resizable=True,
+        )
+        webview.start()
+    except Exception as exc:  # pylint: disable=broad-except
+        # Keep the original startup error as the primary failure. This fallback
+        # remains useful in console-enabled diagnostic builds.
+        print(
+            f"FolioOrb could not display its startup explanation: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+
+
+def _display_value(value) -> str:
+    if value is None or value == "":
+        return "Not recorded"
+    return str(value)
+
+
+def _duplicate_recovery_document(groups: list[dict]) -> str:
+    """Build the local-only explicit-choice UI for legacy active duplicates."""
+    fieldsets = []
+    for group_index, group in enumerate(groups):
+        choices = []
+        for row in group["rows"]:
+            holding_id = int(row["id"])
+            notes = str(row.get("notes") or "").strip()
+            details = [
+                f"Company: {_display_value(row.get('company_name'))}",
+                f"Shares: {_display_value(row.get('shares'))}",
+                f"Average cost: {_display_value(row.get('avg_cost'))}",
+                f"Class: {_display_value(row.get('hold_class'))}",
+                f"Watchlist: {_display_value(row.get('is_watchlist'))}",
+                f"Target weight (basis points): "
+                f"{_display_value(row.get('target_weight_bps'))}",
+                f"Thesis reviewed: {_display_value(row.get('thesis_reviewed_at'))}",
+                f"Thesis review interval (days): "
+                f"{_display_value(row.get('thesis_review_interval_days'))}",
+                f"Added: {_display_value(row.get('added_at'))}",
+            ]
+            if notes:
+                details.append(f"Notes: {notes}")
+            detail = " · ".join(details)
+            choices.append(
+                f'<label class="choice"><input type="radio" '
+                f'name="choice-{group_index}" value="{holding_id}"> '
+                f'<span><strong>Row {holding_id} · '
+                f'{html.escape(str(row.get("stored_ticker") or ""))}</strong>'
+                f'<small>{html.escape(detail)}</small></span></label>'
+            )
+        fieldsets.append(
+            f'<fieldset data-portfolio="{int(group["portfolio_id"])}" '
+            f'data-ticker="{html.escape(str(group["ticker"]))}">'
+            f'<legend>Portfolio {int(group["portfolio_id"])} · '
+            f'{html.escape(str(group["ticker"]))}</legend>{"".join(choices)}</fieldset>'
+        )
+
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval'">
+<title>Resolve duplicate holdings safely</title><style>
+:root {{ color-scheme: light dark;
+font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
+body {{ margin: 0; padding: 32px; background: Canvas; color: CanvasText; }}
+main {{ max-width: 760px; margin: auto; }} h1 {{ margin: 0 0 10px; font-size: 25px; }}
+p {{ line-height: 1.5; }} fieldset {{
+border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+border-radius: 12px; margin: 20px 0; padding: 12px; }}
+legend {{ font-weight: 700; padding: 0 8px; }}
+.choice {{ display: flex; gap: 10px; padding: 11px; border-radius: 9px; cursor: pointer; }}
+.choice:has(input:checked) {{ background: color-mix(in srgb, Highlight 18%, Canvas); }}
+.choice small {{ display: block; opacity: .76; margin-top: 4px; line-height: 1.4; }}
+button {{ border: 0; border-radius: 9px; background: Highlight; color: HighlightText;
+font: inherit; font-weight: 700; padding: 11px 16px; cursor: pointer; }}
+button:disabled {{ opacity: .55; cursor: wait; }} #status {{ min-height: 24px; font-weight: 600; }}
+.safety {{ padding: 13px 15px; border-radius: 10px;
+background: color-mix(in srgb, Highlight 11%, Canvas); }}
+</style></head><body><main><h1>Resolve duplicate holdings safely</h1>
+<p>FolioOrb found active rows that normalize to the same ticker. Choose the one row
+to keep active in each group.</p><p class="safety">After you confirm, FolioOrb first
+creates a verified Backup Vault copy. It then archives the other rows without
+recording a sale or changing their shares, cost basis, notes, or history.</p>
+{"".join(fieldsets)}
+<button id="resolve" type="button" disabled>Create backup and apply choices</button>
+<p id="status" role="status" aria-live="polite">Preparing secure resolver…</p>
+<script>
+const button = document.getElementById('resolve');
+const status = document.getElementById('status');
+let bridgeReady = false;
+const everyGroupChosen = () => Array.from(document.querySelectorAll('fieldset'))
+  .every(group => group.querySelector('input:checked'));
+const refreshAction = () => {{
+  button.disabled = !(bridgeReady && everyGroupChosen());
+  if (bridgeReady && !everyGroupChosen()) {{
+    status.textContent = 'Choose one row to keep in every group.';
+  }} else if (bridgeReady) {{
+    status.textContent = '';
+  }}
+}};
+const markReady = () => {{
+  if (window.pywebview && window.pywebview.api &&
+      typeof window.pywebview.api.resolve_duplicates === 'function') {{
+    bridgeReady = true;
+    refreshAction();
+  }}
+}};
+window.addEventListener('pywebviewready', markReady);
+document.querySelectorAll('input[type="radio"]').forEach(input =>
+  input.addEventListener('change', refreshAction));
+markReady();
+button.addEventListener('click', async () => {{
+  if (!everyGroupChosen()) {{ refreshAction(); return; }}
+  const decisions = Array.from(document.querySelectorAll('fieldset')).map(group => ({{
+    portfolio_id: Number(group.dataset.portfolio),
+    ticker: group.dataset.ticker,
+    keep_id: Number(group.querySelector('input:checked').value)
+  }}));
+  button.disabled = true; status.textContent = 'Creating a verified backup…';
+  try {{
+    const result = await window.pywebview.api.resolve_duplicates(decisions);
+    if (!result.ok) {{
+      status.textContent = result.backup
+        ? `No holdings were changed. Verified Backup Vault copy: ${{result.backup}}. ` +
+          `${{result.error || 'Close and retry.'}}`
+        : `No holdings were changed. ${{result.error || 'Resolution failed.'}}`;
+      button.disabled = !(bridgeReady && everyGroupChosen());
+      return;
+    }}
+    status.textContent = `Done. ${{result.archived}} row(s) archived. ` +
+      `Backup Vault copy: ${{result.backup}}. Close this window and reopen FolioOrb.`;
+    button.hidden = true;
+  }} catch (error) {{
+    status.textContent = 'The resolver could not confirm completion. Reopen FolioOrb, ' +
+      `inspect Backup Vault, and retry. ${{error.message}}`;
+    button.disabled = !(bridgeReady && everyGroupChosen());
+  }}
+}});
+</script></main></body></html>"""
+
+
+class _DuplicateRecoveryBridge:  # pylint: disable=too-few-public-methods
+    """Narrow native bridge: one explicit, backup-first duplicate decision."""
+
+    def __init__(self, database_path, data_root, displayed_groups):
+        self.database_path = database_path
+        self.data_root = data_root
+        self.displayed_groups = displayed_groups
+
+    def resolve_duplicates(self, decisions: list[dict]) -> dict:
+        try:
+            from app.services import holding_conflict_recovery
+
+            result = holding_conflict_recovery.resolve_duplicates(
+                self.database_path,
+                self.data_root,
+                list(decisions or []),
+                displayed_groups=self.displayed_groups,
+            )
+            return {"ok": True, **result}
+        except Exception as exc:  # pylint: disable=broad-except
+            return {
+                "ok": False,
+                "error": str(exc) or type(exc).__name__,
+                "backup": getattr(exc, "backup_name", None),
+            }
+
+
+def _surface_duplicate_recovery(detail: str) -> bool:
+    """Show explicit duplicate choices; return whether a native UI was shown."""
+    print(f"FolioOrb needs a holdings decision: {detail}", file=sys.stderr)
+    if not getattr(sys, "frozen", False):
+        return False
+    try:
+        import webview
+
+        from app.paths import resolve_runtime_profile
+        from app.services import holding_conflict_recovery
+
+        profile = resolve_runtime_profile()
+        if profile.database_path is None:
+            return False
+        groups = holding_conflict_recovery.list_duplicate_groups(profile.database_path)
+        if not groups:
+            return False
+        bridge = _DuplicateRecoveryBridge(
+            profile.database_path, profile.data_root, groups
+        )
+        window = webview.create_window(
+            "Resolve duplicate holdings safely",
+            html=_duplicate_recovery_document(groups),
+            width=860,
+            height=720,
+            min_size=(680, 520),
+            resizable=True,
+            js_api=bridge,
+        )
+        # Keep an explicit exposed-function registration alongside js_api. It
+        # makes the recovery action available in frozen WKWebView builds where
+        # object introspection can otherwise initialize an empty api object.
+        window.expose(bridge.resolve_duplicates)
+        webview.start()
+        return True
+    except Exception as exc:  # pylint: disable=broad-except
+        print(
+            f"FolioOrb could not display duplicate recovery: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return False
+
+
+def _surface_server_startup_error(error: str | None) -> None:
+    """Translate captured server failures into a user-visible recovery path."""
+    if error and error.startswith("DuplicateActiveHoldingsError:"):
+        detail = error.removeprefix("DuplicateActiveHoldingsError:").strip()
+        if _surface_duplicate_recovery(detail):
+            return
+        _surface_startup_error(
+            "FolioOrb needs a holdings decision",
+            detail,
+            (
+                "No portfolio rows or schema metadata were changed. Reopen FolioOrb "
+                "from a packaged build to use its backup-first duplicate resolver, or "
+                "follow the v5.16.0 recovery documentation. Do not use Remove as a "
+                "substitute, because that action records a sale."
+            ),
+        )
+        return
+    _surface_startup_error(
+        "FolioOrb could not start",
+        error or "The local service did not become healthy within the startup timeout.",
+        (
+            "No automatic repair was attempted. Close this window, verify the profile "
+            "and database are accessible, then retry."
+        ),
+    )
 
 
 def _find_free_port(preferred: int) -> int:
@@ -100,16 +378,127 @@ def _configure_smoke_environment() -> str:
     return smoke_root
 
 
-def main() -> int:
+def _run_duplicate_recovery_smoke() -> int:
+    """Exercise the bundled resolver against disposable financial workflow data."""
+    import sqlite3
+
+    from app.paths import resolve_runtime_profile
+    from app.services import backup_service, holding_conflict_recovery
+
+    profile = resolve_runtime_profile()
+    database = profile.database_path
+    if database is None:
+        print("Duplicate recovery smoke requires a file SQLite database", file=sys.stderr)
+        return 1
+
+    try:
+        connection = sqlite3.connect(database)
+        try:
+            connection.executescript(
+                "CREATE TABLE holdings ("
+                "id INTEGER PRIMARY KEY, portfolio_id INTEGER NOT NULL, "
+                "ticker VARCHAR(10) NOT NULL, company_name VARCHAR(200), "
+                "shares FLOAT, avg_cost FLOAT, is_active BOOLEAN, "
+                "is_watchlist BOOLEAN, hold_class VARCHAR(20), notes TEXT, "
+                "thesis_reviewed_at DATETIME, thesis_review_interval_days INTEGER, "
+                "target_weight_bps INTEGER, added_at DATETIME);"
+                "CREATE TABLE realized_trades (id INTEGER PRIMARY KEY);"
+                "INSERT INTO holdings VALUES "
+                "(1, 1, 'AAPL', 'Apple old', 2, 100, 1, 0, 'anchor', "
+                "'keep history', '2026-01-02', 90, 6000, '2025-01-01');"
+                "INSERT INTO holdings VALUES "
+                "(2, 1, ' aapl ', 'Apple current', 3, 120, 1, 0, 'trade', "
+                "'current thesis', '2026-07-08', 30, 4000, '2025-02-02');"
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        displayed = holding_conflict_recovery.list_duplicate_groups(database)
+        result = holding_conflict_recovery.resolve_duplicates(
+            database,
+            profile.data_root,
+            [{"portfolio_id": 1, "ticker": "AAPL", "keep_id": 2}],
+            displayed_groups=displayed,
+        )
+        backup = profile.data_root / backup_service.BACKUP_DIRNAME / result["backup"]
+        connection = sqlite3.connect(database)
+        try:
+            rows = connection.execute(
+                "SELECT id, shares, avg_cost, is_active, target_weight_bps, notes "
+                "FROM holdings ORDER BY id"
+            ).fetchall()
+            realized = connection.execute("SELECT COUNT(*) FROM realized_trades").fetchone()[0]
+        finally:
+            connection.close()
+
+        expected = [
+            (1, 2.0, 100.0, 0, 6000, "keep history"),
+            (2, 3.0, 120.0, 1, 4000, "current thesis"),
+        ]
+        if (
+            result["archived"] != 1
+            or rows != expected
+            or realized != 0
+            or not backup_service.verify_vault_backup(backup)
+            or holding_conflict_recovery.list_duplicate_groups(database)
+        ):
+            raise RuntimeError("duplicate recovery smoke verification failed")
+        print("Packaged duplicate recovery smoke passed")
+        return 0
+    except Exception as exc:  # pylint: disable=broad-except
+        print(
+            f"Packaged duplicate recovery smoke failed: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        shutil.rmtree(profile.data_root, ignore_errors=True)
+
+
+def main() -> int:  # pylint: disable=too-many-return-statements
     smoke = "--smoke" in sys.argv
+    duplicate_recovery_smoke = "--smoke-duplicate-recovery" in sys.argv
 
     # A package smoke test must never open, migrate, restore, or record launch
     # state against the user's real FolioOrb data. CI normally starts from a
     # clean runner, but local release verification runs the same frozen binary
     # on a developer machine. Force a throwaway database and let app.main
     # suppress every nonessential startup side effect.
-    if smoke:
+    if smoke or duplicate_recovery_smoke:
         _configure_smoke_environment()
+
+    # Resolve database ownership before pending restore, settings, launch-health,
+    # migration, or the server import can create any writable state.
+    try:
+        from app.paths import ProfileConfigurationError, prepare_runtime_profile
+
+        prepare_runtime_profile()
+    except ProfileConfigurationError as exc:
+        _surface_startup_error(
+            "FolioOrb profile configuration is invalid",
+            str(exc),
+            (
+                "No FolioOrb files were changed. Make DATABASE_URL point to a SQLite "
+                "file inside FOLIOORB_DATA_DIR, or unset both variables to use the "
+                "default profile, then relaunch."
+            ),
+        )
+        return 1
+    except OSError as exc:
+        _surface_startup_error(
+            "FolioOrb profile could not be prepared",
+            f"{type(exc).__name__}: {exc}",
+            (
+                "Close FolioOrb, check that the profile location is writable and has "
+                "free space, then retry. No portfolio migration was started; profile "
+                "preparation may have created an empty directory or partial legacy copy."
+            ),
+        )
+        return 1
+
+    if duplicate_recovery_smoke:
+        return _run_duplicate_recovery_smoke()
 
     # Apply an explicitly queued vault restore before the server thread imports
     # app.main and opens SQLAlchemy connections to the live database.
@@ -117,6 +506,24 @@ def main() -> int:
         from app.services import backup_service
 
         backup_service.apply_pending_restore()
+
+        # Uvicorn logs lifespan exceptions and returns normally instead of
+        # propagating them to the server thread. Run the duplicate-only,
+        # read-only schema guard here as well so a windowed app can present the
+        # explicit resolver instead of timing out with no captured exception.
+        from app.database import engine
+        from app.schema_meta import (
+            DuplicateActiveHoldingsError,
+            preflight_active_holding_uniqueness,
+        )
+
+        try:
+            preflight_active_holding_uniqueness(engine)
+        except DuplicateActiveHoldingsError as exc:
+            _surface_server_startup_error(
+                f"DuplicateActiveHoldingsError: {exc}"
+            )
+            return 1
 
     port = _find_free_port(PREFERRED_PORT)
     base_url = f"http://{HOST}:{port}"
@@ -139,10 +546,7 @@ def main() -> int:
     threading.Thread(target=_run_server, args=(port,), daemon=True).start()
 
     if not _wait_for_health(base_url, HEALTH_TIMEOUT_SECONDS):
-        if _STARTUP_STATE["error"]:
-            print(f"FolioOrb failed to start: {_STARTUP_STATE['error']}", file=sys.stderr)
-        else:
-            print("FolioOrb failed to start within the timeout.", file=sys.stderr)
+        _surface_server_startup_error(_STARTUP_STATE["error"])
         return 1
 
     if smoke:

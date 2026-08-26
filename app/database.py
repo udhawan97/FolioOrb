@@ -1,5 +1,6 @@
 import os
 from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import settings
 
@@ -9,10 +10,10 @@ _IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
 # derived from DATABASE_URL so this works for a source checkout (./database),
 # a frozen desktop app (per-user data dir), and any custom override alike.
 if _IS_SQLITE:
-    _db_file = settings.DATABASE_URL.replace("sqlite:///", "", 1)
-    _db_parent = os.path.dirname(_db_file)
-    if _db_parent:
-        os.makedirs(_db_parent, exist_ok=True)
+    _DB_FILE = settings.DATABASE_URL.replace("sqlite:///", "", 1)
+    _DB_PARENT = os.path.dirname(_DB_FILE)
+    if _DB_PARENT:
+        os.makedirs(_DB_PARENT, exist_ok=True)
 
 # Create the database engine — this is the single connection to our SQLite file.
 # check_same_thread=False is required by SQLite when used with FastAPI's async workers.
@@ -98,98 +99,107 @@ def ensure_startup_migrations(target_engine=None):
     the migrations would hit an unrelated database that has no ``holdings``
     table yet and fail on ``CREATE INDEX ... ON holdings``.
     """
-    active_engine = target_engine if target_engine is not None else engine
-    if not str(active_engine.url).startswith("sqlite"):
+    target = target_engine if target_engine is not None else engine
+    target_url = target.engine.url if isinstance(target, Connection) else target.url
+    if not str(target_url).startswith("sqlite"):
         return
-    with active_engine.begin() as conn:
-        columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info(holdings)")).fetchall()
-        }
-        if "hold_class" not in columns:
-            conn.execute(
-                text(
-                    "ALTER TABLE holdings "
-                    "ADD COLUMN hold_class VARCHAR(20) NOT NULL DEFAULT 'auto'"
-                )
-            )
-        if "thesis_reviewed_at" not in columns:
-            conn.execute(
-                text("ALTER TABLE holdings ADD COLUMN thesis_reviewed_at DATETIME")
-            )
-        if "thesis_review_interval_days" not in columns:
-            conn.execute(
-                text(
-                    "ALTER TABLE holdings "
-                    "ADD COLUMN thesis_review_interval_days INTEGER"
-                )
-            )
-        if "target_weight_bps" not in columns:
-            conn.execute(
-                text("ALTER TABLE holdings ADD COLUMN target_weight_bps INTEGER")
-            )
-        tables = {
-            row[0]
-            for row in conn.execute(
-                text("SELECT name FROM sqlite_master WHERE type='table'")
-            ).fetchall()
-        }
-        # v3: additive column on dca_plans (the table itself is created by
-        # create_all; PRAGMA returns no rows when the table doesn't exist yet).
-        dca_plan_cols = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info(dca_plans)")).fetchall()
-        }
-        if dca_plan_cols and "catchup_floor" not in dca_plan_cols:
-            conn.execute(
-                text("ALTER TABLE dca_plans ADD COLUMN catchup_floor VARCHAR(10)")
-            )
+    if isinstance(target, Connection):
+        _ensure_startup_migrations_on_connection(target)
+        return
+    with target.begin() as conn:
+        _ensure_startup_migrations_on_connection(conn)
 
-        # v4: per-portfolio verdict history. Add the column, then backfill any
-        # pre-scoping rows to the default portfolio so their history isn't lost.
-        verdict_cols = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info(verdict_snapshots)")).fetchall()
-        }
-        if verdict_cols and "portfolio_id" not in verdict_cols:
-            conn.execute(
-                text("ALTER TABLE verdict_snapshots ADD COLUMN portfolio_id INTEGER")
-            )
-            conn.execute(
-                text("UPDATE verdict_snapshots SET portfolio_id = 1 WHERE portfolio_id IS NULL")
-            )
-            conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_verdict_snapshots_portfolio "
-                    "ON verdict_snapshots (portfolio_id, generated_at)"
-                )
-            )
-        if "verdict_snapshots" not in tables:
-            conn.execute(
-                text(
-                    "CREATE TABLE verdict_snapshots ("
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                    "ticker VARCHAR(10) NOT NULL, "
-                    "action VARCHAR(20) NOT NULL, "
-                    "confidence INTEGER NOT NULL DEFAULT 0, "
-                    "local_score INTEGER, "
-                    "ai_score INTEGER, "
-                    "price_at_scan FLOAT, "
-                    "hold_class VARCHAR(20) NOT NULL DEFAULT 'auto', "
-                    "generated_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
-                )
-            )
-            conn.execute(
-                text("CREATE INDEX ix_verdict_snapshots_ticker ON verdict_snapshots (ticker)")
-            )
-            conn.execute(
-                text(
-                    "CREATE INDEX ix_verdict_snapshots_generated_at "
-                    "ON verdict_snapshots (generated_at)"
-                )
-            )
 
-        _ensure_performance_indexes(conn, tables)
+def _ensure_startup_migrations_on_connection(conn: Connection) -> None:
+    """Apply the idempotent migration SQL inside the caller's transaction."""
+    columns = {
+        row[1]
+        for row in conn.execute(text("PRAGMA table_info(holdings)")).fetchall()
+    }
+    if "hold_class" not in columns:
+        conn.execute(
+            text(
+                "ALTER TABLE holdings "
+                "ADD COLUMN hold_class VARCHAR(20) NOT NULL DEFAULT 'auto'"
+            )
+        )
+    if "thesis_reviewed_at" not in columns:
+        conn.execute(
+            text("ALTER TABLE holdings ADD COLUMN thesis_reviewed_at DATETIME")
+        )
+    if "thesis_review_interval_days" not in columns:
+        conn.execute(
+            text(
+                "ALTER TABLE holdings "
+                "ADD COLUMN thesis_review_interval_days INTEGER"
+            )
+        )
+    if "target_weight_bps" not in columns:
+        conn.execute(
+            text("ALTER TABLE holdings ADD COLUMN target_weight_bps INTEGER")
+        )
+    tables = {
+        row[0]
+        for row in conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table'")
+        ).fetchall()
+    }
+    # v3: additive column on dca_plans (the table itself is created by
+    # create_all; PRAGMA returns no rows when the table doesn't exist yet).
+    dca_plan_cols = {
+        row[1]
+        for row in conn.execute(text("PRAGMA table_info(dca_plans)")).fetchall()
+    }
+    if dca_plan_cols and "catchup_floor" not in dca_plan_cols:
+        conn.execute(
+            text("ALTER TABLE dca_plans ADD COLUMN catchup_floor VARCHAR(10)")
+        )
+
+    # v4: per-portfolio verdict history. Add the column, then backfill any
+    # pre-scoping rows to the default portfolio so their history isn't lost.
+    verdict_cols = {
+        row[1]
+        for row in conn.execute(text("PRAGMA table_info(verdict_snapshots)")).fetchall()
+    }
+    if verdict_cols and "portfolio_id" not in verdict_cols:
+        conn.execute(
+            text("ALTER TABLE verdict_snapshots ADD COLUMN portfolio_id INTEGER")
+        )
+        conn.execute(
+            text("UPDATE verdict_snapshots SET portfolio_id = 1 WHERE portfolio_id IS NULL")
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_verdict_snapshots_portfolio "
+                "ON verdict_snapshots (portfolio_id, generated_at)"
+            )
+        )
+    if "verdict_snapshots" not in tables:
+        conn.execute(
+            text(
+                "CREATE TABLE verdict_snapshots ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "ticker VARCHAR(10) NOT NULL, "
+                "action VARCHAR(20) NOT NULL, "
+                "confidence INTEGER NOT NULL DEFAULT 0, "
+                "local_score INTEGER, "
+                "ai_score INTEGER, "
+                "price_at_scan FLOAT, "
+                "hold_class VARCHAR(20) NOT NULL DEFAULT 'auto', "
+                "generated_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+            )
+        )
+        conn.execute(
+            text("CREATE INDEX ix_verdict_snapshots_ticker ON verdict_snapshots (ticker)")
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX ix_verdict_snapshots_generated_at "
+                "ON verdict_snapshots (generated_at)"
+            )
+        )
+
+    _ensure_performance_indexes(conn, tables)
 
 
 def _ensure_performance_indexes(conn, tables: set) -> None:
@@ -208,6 +218,16 @@ def _ensure_performance_indexes(conn, tables: set) -> None:
             "ON holdings (portfolio_id, is_active)"
         )
     )
+    holding_columns = {
+        row[1] for row in conn.execute(text("PRAGMA table_info(holdings)")).fetchall()
+    }
+    if "ticker" in holding_columns:
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_holdings_active_portfolio_ticker "
+                "ON holdings (portfolio_id, UPPER(TRIM(ticker))) WHERE is_active = 1"
+            )
+        )
 
     # Realized trades: filtered by portfolio_id (and grouped by ticker).
     if "realized_trades" in tables:

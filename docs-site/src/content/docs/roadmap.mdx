@@ -111,21 +111,21 @@ This page records outcomes instead of leaving shipped work labelled as future wo
 	records ZIP, manual-backup freshness, and opt-in daily automatic backup.
 </SenpaiTip>
 
-## In latest-main after v5.15.0
+## Shipped in v5.16.0
 
 <CardGrid>
 	<Card title="Carry one review bundle" icon="document">
 		The selected Month/Quarter Review Pack, data-health receipt, and saved
 		target-plan snapshot leave together in one local ZIP. A manifest records
 		quality context and SHA-256 hashes for every non-manifest review artifact.
-		<br /><br />**Status:** built for the rolling latest-main channel; not yet a
-		stable release
+		<br /><br />**Status:** shipped in v5.16.0
 	</Card>
 </CardGrid>
 
 The bundle reuses one in-memory quote response set and writes no portfolio state.
 Foreign-priced positions stay named and outside USD totals, and unsaved target
-drafts block export.
+drafts block export. The same release keeps imports responsive during provider
+work and makes split runtime profiles fail before any filesystem write.
 
 ## What comes next
 

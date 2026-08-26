@@ -33,6 +33,14 @@ The setup script creates a virtual environment, installs dependencies, writes a 
 `.env`, prepares the `database/` folder, and starts the app at `http://localhost:8000`.
 For day-to-day use afterwards, run `./scripts/start.sh` (or `.\scripts\start.ps1`).
 
+<Aside type="note" title="Keep custom data in one profile">
+The default `.env` needs no changes. If you set `FOLIOORB_DATA_DIR`, FolioOrb derives
+`database/portfolio.db` beneath that root. If you also set a custom `DATABASE_URL`, set both
+values in the process environment and keep the SQLite file beneath `FOLIOORB_DATA_DIR`.
+Split or out-of-profile paths fail before FolioOrb writes a database, backup, setting,
+restore marker, update file, or migration copy.
+</Aside>
+
 ### Manual setup
 
 ```bash
@@ -99,7 +107,7 @@ python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
 	```powershell
 	choco install innosetup -y
 	& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
-	  /DMyAppVersion=5.15.0 `
+	  /DMyAppVersion=5.16.0 `
 	  /DMyOutputName=FolioOrb-Windows-x64-local-Setup `
 	  packaging\windows\installer.iss
 	```

@@ -1,11 +1,13 @@
 """Seed a throwaway SQLite database with a safe demo portfolio for screenshots.
 
-Run against a TEMP database only (set DATABASE_URL to a temp path before calling).
+Run against one TEMP profile only (set both FOLIOORB_DATA_DIR and DATABASE_URL).
 The data here is deliberately fictional — public tickers with invented share counts
 and cost bases — so nothing personal is ever captured in a landing-page screenshot.
 
 Usage:
-    DATABASE_URL="sqlite:///./_shots/demo.db" python docs-site/scripts/seed_demo.py
+    FOLIOORB_DATA_DIR="$TMP_DIR/data" \
+      DATABASE_URL="sqlite:///$TMP_DIR/data/demo.db" \
+      python docs-site/scripts/seed_demo.py
 """
 
 import os

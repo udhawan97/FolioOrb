@@ -41,19 +41,23 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest
 
+      - name: Prepare isolated FolioOrb profile
+        run: |
+          PROFILE_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-ci-${{ matrix.python-version }}.XXXXXX")"
+          echo "FOLIOORB_DATA_DIR=$PROFILE_ROOT" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=sqlite:///$PROFILE_ROOT/database/portfolio.db" >> "$GITHUB_ENV"
+
       - name: Compile Python sources
         run: python -m compileall -q app run.py tests
 
       - name: Import FastAPI app
         env:
           ANTHROPIC_API_KEY: ""
-          DATABASE_URL: sqlite:///./database/ci-portfolio.db
         run: python -c "from app.main import app; print(app.title)"
 
       - name: Run tests
         env:
           ANTHROPIC_API_KEY: ""
-          DATABASE_URL: sqlite:///./database/test-portfolio.db
         run: python -m pytest -q
 
       - name: Run frontend runtime contracts

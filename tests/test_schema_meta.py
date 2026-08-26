@@ -6,9 +6,13 @@ live database file) are exercised end to end. The configured DATABASE_URL and th
 backup service's data directory are redirected to a temp location per test.
 """
 import sqlite3
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 
 from app import paths, schema_meta
 from app.config import settings
@@ -99,7 +103,7 @@ def test_v5_to_v6_adds_nullable_targets_idempotently_and_preserves_rows(file_db)
     second = schema_meta.apply_migrations_safely(engine)
 
     assert first.previous_schema_version == 5
-    assert first.schema_version == 6
+    assert first.schema_version == schema_meta.SCHEMA_VERSION
     assert first.backed_up is True
     assert second.ran_migration is False
     with engine.begin() as conn:
@@ -190,12 +194,9 @@ def test_failed_migration_restores_backup(file_db, monkeypatch):
         schema_meta._ensure_app_meta(conn)
         schema_meta._write_meta(conn, "schema_version", "0")
 
-    def _boom(target_engine=None):  # noqa: ARG001 (matches ensure_startup_migrations signature)
+    def _boom(target_engine=None):
         # Corrupt the live DB, then fail — the restore must undo this.
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("DELETE FROM holdings")
-        conn.commit()
-        conn.close()
+        target_engine.execute(text("DELETE FROM holdings"))
         raise RuntimeError("migration exploded")
 
     monkeypatch.setattr("app.database.ensure_startup_migrations", _boom)
@@ -212,3 +213,214 @@ def test_failed_migration_restores_backup(file_db, monkeypatch):
         check.dispose()
     assert tickers == ["MSFT"]
     assert list(db_path.parent.glob("portfolio.db.failed-*"))
+
+
+def test_migration_writer_lock_covers_backup_schema_index_and_stamp(
+    tmp_path, monkeypatch
+):
+    """A separate older process cannot write inside the v6-to-v7 window."""
+    db_path = tmp_path / "portfolio.db"
+    connection = sqlite3.connect(db_path)
+    connection.executescript(
+        "CREATE TABLE holdings ("
+        "id INTEGER PRIMARY KEY, portfolio_id INTEGER NOT NULL, "
+        "ticker VARCHAR(10) NOT NULL, is_active BOOLEAN);"
+        "CREATE TABLE app_meta (key VARCHAR PRIMARY KEY, value VARCHAR);"
+        "INSERT INTO app_meta(key, value) VALUES('schema_version', '6');"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, 'AAPL', 1);"
+    )
+    connection.commit()
+    connection.close()
+    url = f"sqlite:///{db_path.as_posix()}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+    real_backup = backup_service.create_verified_backup
+    writer_result = {}
+
+    def backup_with_competing_process(*args, **kwargs):
+        script = (
+            "import sqlite3,sys\n"
+            "db=sqlite3.connect(sys.argv[1], timeout=0.1)\n"
+            "db.execute(\"INSERT INTO holdings "
+            "(portfolio_id,ticker,is_active) VALUES (1,'MSFT',1)\")\n"
+            "db.commit()\n"
+        )
+        attempt = subprocess.run(
+            [sys.executable, "-c", script, str(db_path)],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        writer_result["returncode"] = attempt.returncode
+        writer_result["stderr"] = attempt.stderr
+        return real_backup(*args, **kwargs)
+
+    monkeypatch.setattr(
+        backup_service, "create_verified_backup", backup_with_competing_process
+    )
+    try:
+        result = schema_meta.apply_migrations_safely(engine)
+        assert result.schema_version == 7
+        assert writer_result["returncode"] != 0
+        assert "locked" in writer_result["stderr"].lower()
+        with engine.connect() as check:
+            assert check.execute(text("SELECT COUNT(*) FROM holdings")).scalar_one() == 1
+            assert check.execute(
+                text(
+                    "SELECT 1 FROM sqlite_master WHERE type='index' "
+                    "AND name='ux_holdings_active_portfolio_ticker'"
+                )
+            ).scalar_one() == 1
+    finally:
+        engine.dispose()
+
+
+def test_active_duplicate_preflight_is_read_only_and_stops_migration(tmp_path, monkeypatch):
+    """Legacy duplicates require a user decision before any migration side effect."""
+    db_path = tmp_path / "portfolio.db"
+    connection = sqlite3.connect(db_path)
+    connection.executescript(
+        "CREATE TABLE holdings ("
+        "id INTEGER PRIMARY KEY, portfolio_id INTEGER NOT NULL, "
+        "ticker VARCHAR(10) NOT NULL, is_active BOOLEAN);"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, 'AAPL', 1);"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, 'aapl', 1);"
+    )
+    connection.commit()
+    connection.close()
+    baseline = db_path.read_bytes()
+    url = f"sqlite:///{db_path.as_posix()}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+
+    try:
+        with pytest.raises(
+            schema_meta.DuplicateActiveHoldingsError, match="explicit data decision"
+        ):
+            schema_meta.apply_migrations_safely(engine)
+    finally:
+        engine.dispose()
+
+    assert db_path.read_bytes() == baseline
+    assert not (tmp_path / "backups").exists()
+    check = sqlite3.connect(db_path)
+    try:
+        objects = {
+            row[0]
+            for row in check.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'index')"
+            )
+        }
+        rows = check.execute(
+            "SELECT ticker, is_active FROM holdings ORDER BY id"
+        ).fetchall()
+    finally:
+        check.close()
+    assert "app_meta" not in objects
+    assert "ux_holdings_active_portfolio_ticker" not in objects
+    assert rows == [("AAPL", 1), ("aapl", 1)]
+
+
+def test_active_duplicate_preflight_preserves_wal_database_payload(tmp_path, monkeypatch):
+    """SQLite may touch SHM bookkeeping, but DB/WAL payload and schema stay intact."""
+    db_path = tmp_path / "portfolio.db"
+    writer = sqlite3.connect(db_path)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("PRAGMA wal_autocheckpoint=0")
+    writer.executescript(
+        "CREATE TABLE holdings ("
+        "id INTEGER PRIMARY KEY, portfolio_id INTEGER NOT NULL, "
+        "ticker VARCHAR(10) NOT NULL, is_active BOOLEAN);"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, 'MSFT', 1);"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, ' msft ', 1);"
+    )
+    writer.commit()
+    wal_path = Path(f"{db_path}-wal")
+    assert wal_path.exists()
+    primary_before = db_path.read_bytes()
+    wal_before = wal_path.read_bytes()
+    url = f"sqlite:///{db_path.as_posix()}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+
+    try:
+        with pytest.raises(schema_meta.DuplicateActiveHoldingsError):
+            schema_meta.apply_migrations_safely(engine)
+
+        assert db_path.read_bytes() == primary_before
+        assert wal_path.read_bytes() == wal_before
+        objects = {
+            row[0]
+            for row in writer.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'index')"
+            )
+        }
+        rows = writer.execute(
+            "SELECT ticker, is_active FROM holdings ORDER BY id"
+        ).fetchall()
+        assert "app_meta" not in objects
+        assert "ux_holdings_active_portfolio_ticker" not in objects
+        assert rows == [("MSFT", 1), (" msft ", 1)]
+    finally:
+        engine.dispose()
+        writer.close()
+
+
+def test_v6_to_v7_adds_active_holding_uniqueness_without_deduping(tmp_path, monkeypatch):
+    db_path = tmp_path / "portfolio.db"
+    connection = sqlite3.connect(db_path)
+    connection.executescript(
+        "CREATE TABLE holdings ("
+        "id INTEGER PRIMARY KEY, portfolio_id INTEGER NOT NULL, "
+        "ticker VARCHAR(10) NOT NULL, is_active BOOLEAN);"
+        "CREATE TABLE app_meta (key VARCHAR PRIMARY KEY, value VARCHAR);"
+        "INSERT INTO app_meta(key, value) VALUES('schema_version', '6');"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, 'AAPL', 1);"
+        "INSERT INTO holdings(portfolio_id, ticker, is_active) VALUES (1, 'AAPL', 0);"
+    )
+    connection.commit()
+    connection.close()
+    url = f"sqlite:///{db_path.as_posix()}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+
+    try:
+        result = schema_meta.apply_migrations_safely(engine)
+        assert result.previous_schema_version == 6
+        assert result.schema_version == 7
+        with engine.begin() as connection:
+            index_sql = connection.execute(
+                text(
+                    "SELECT sql FROM sqlite_master WHERE type='index' "
+                    "AND name='ux_holdings_active_portfolio_ticker'"
+                )
+            ).scalar_one()
+            assert "WHERE is_active = 1" in index_sql
+            assert "UPPER(TRIM(ticker))" in index_sql
+            connection.execute(
+                text(
+                    "INSERT INTO holdings(portfolio_id, ticker, is_active) "
+                    "VALUES (1, 'AAPL', 0)"
+                )
+            )
+            with pytest.raises(IntegrityError, match="UNIQUE constraint failed"):
+                connection.execute(
+                    text(
+                        "INSERT INTO holdings(portfolio_id, ticker, is_active) "
+                        "VALUES (1, 'AAPL', 1)"
+                    )
+                )
+            with pytest.raises(IntegrityError, match="UNIQUE constraint failed"):
+                connection.execute(
+                    text(
+                        "INSERT INTO holdings(portfolio_id, ticker, is_active) "
+                        "VALUES (1, ' aapl ', 1)"
+                    )
+                )
+    finally:
+        engine.dispose()

@@ -21,24 +21,59 @@ payoff.
 Ordering guarantee
 ------------------
 Every function returns rows in ascending `Holding.id` — insertion order, oldest
-first.  The queries this module replaces carried no ORDER BY and leaned on
-SQLite handing back rows in rowid order; stating it turns that accident into a
-promise, so callers may depend on it.  Two active rows may share a ticker (the
-add-holding endpoint forbids it, nothing in the schema does), and when they do
-the oldest wins consistently: it is the row `active_by_ticker()` returns, the
-one `active_tickers()` keeps, and the one `meta_map()` describes.
+first. The queries this module replaces carried no ORDER BY and leaned on SQLite
+handing back rows in rowid order; stating it turns that accident into a promise,
+so callers may depend on it. Before schema v7, two active rows could share a
+ticker. Startup now rejects that legacy state for explicit resolution and
+installs a database constraint; `add_active()` translates the remaining request
+race into a normal conflict.
 
-This module reads; it never writes.  It is also deliberately not a query
-factory — handing back a `Query` would let callers bolt extra filters onto the
-rule this module exists to own, which is exactly the shallowness it replaces.
+This module is deliberately not a query factory — handing back a `Query` would
+let callers bolt extra filters onto the rule this module exists to own, which is
+exactly the shallowness it replaces.
 """
 
 from __future__ import annotations
 
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Holding
 from app.services.stock_service import DEFAULT_HOLDINGS, normalize_ticker
+
+
+def is_active_ticker_conflict(exc: IntegrityError) -> bool:
+    """Whether an integrity failure is the active Portfolio/ticker invariant."""
+    message = str(getattr(exc, "orig", exc)).lower()
+    return (
+        "unique constraint failed" in message
+        and (
+            "ux_holdings_active_portfolio_ticker" in message
+            or (
+                "holdings.portfolio_id" in message
+                and "holdings.ticker" in message
+            )
+        )
+    )
+
+
+def add_active(db: Session, holding: Holding) -> Holding | None:
+    """Stage one active Holding atomically; return None when another path won.
+
+    A nested transaction contains the expected partial-unique-index conflict so
+    multi-row imports can keep their other valid rows. Any unrelated integrity
+    failure is re-raised rather than mislabeled as a duplicate.
+    """
+    try:
+        with db.begin_nested():
+            db.add(holding)
+            db.flush()
+    except IntegrityError as exc:
+        if is_active_ticker_conflict(exc):
+            return None
+        raise
+    return holding
 
 
 def active(db: Session, portfolio_id: int) -> list[Holding]:
@@ -54,15 +89,15 @@ def active(db: Session, portfolio_id: int) -> list[Holding]:
 def active_by_ticker(db: Session, portfolio_id: int, ticker: str) -> Holding | None:
     """Return the portfolio's oldest active holding for `ticker`, else None.
 
-    The supplied symbol is normalised before matching.  Stored tickers are
-    already normalised on every write path, so this stays an exact-column
-    comparison and keeps the (portfolio_id, is_active) index usable.
+    The supplied symbol and stored value use the same ``UPPER(TRIM())`` identity
+    as schema v7's unique index. Current writers normalise before storage, while
+    this expression keeps one valid pre-v7 legacy row discoverable after upgrade.
     """
     return (
         db.query(Holding)
         .filter(
             Holding.portfolio_id == portfolio_id,
-            Holding.ticker == normalize_ticker(ticker),
+            func.upper(func.trim(Holding.ticker)) == normalize_ticker(ticker),
             Holding.is_active.is_(True),
         )
         .order_by(Holding.id.asc())

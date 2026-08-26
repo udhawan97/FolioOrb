@@ -350,15 +350,20 @@ class DcaLedger:
             self.db, plan.portfolio_id, plan.ticker
         )
         if holding is None:
-            holding = Holding(
+            candidate = Holding(
                 portfolio_id=plan.portfolio_id,
                 ticker=plan.ticker,
                 shares=0.0,
                 avg_cost=0.0,
                 is_watchlist=False,
             )
-            self.db.add(holding)
-            self.db.flush()
+            holding = holdings_repository.add_active(self.db, candidate)
+            if holding is None:
+                holding = holdings_repository.active_by_ticker(
+                    self.db, plan.portfolio_id, plan.ticker
+                )
+            if holding is None:
+                raise DcaConflictError("The holding changed while applying this buy")
         holding.shares, holding.avg_cost = dca_service.apply_to_holding(
             holding.shares or 0.0,
             holding.avg_cost or 0.0,

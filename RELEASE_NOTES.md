@@ -1,7 +1,6 @@
-# FolioOrb v5.16.0 Mainline Milestone — Not Yet a Stable Release
+# FolioOrb v5.16.0 Release Notes
 
-**Mainline milestone:** August 25, 2026 · The latest published stable remains
-v5.15.0 until a separate release gate is requested and completed.
+**Release date:** August 26, 2026
 
 ## Headline
 
@@ -34,13 +33,51 @@ saved target-plan snapshot, and a checksummed manifest.
   native atomic swap. It is sensitive review material, not a restore file, tax
   form, trade instruction, or recommendation.
 
+## Improved
+
+### Imports stay responsive and deterministic
+
+- Quote warming, provider validation, search fallback, Claude column remapping,
+  and Claude narration now run away from the request thread. Health checks and
+  other local requests can continue while a slow provider call is in flight.
+- Database reads and writes remain on the request thread. After external work
+  finishes, FolioOrb reconciles against fresh file-backed state before adding
+  any holding.
+- Concurrent CSV imports, manual adds, DCA buys, and soft-delete reactivations
+  now share one active-holding invariant: a Portfolio can have at most one
+  active row for a ticker. A race loser is reported as skipped or already in
+  the Portfolio instead of creating a duplicate.
+
+### One fail-closed runtime profile
+
+- Source, packaged, CI, release, demo, backup, restore, update, and settings
+  paths now resolve from one runtime profile contract.
+- Setting only `FOLIOORB_DATA_DIR` derives the canonical database beneath that
+  root. A custom `DATABASE_URL` must be paired with `FOLIOORB_DATA_DIR`, and the
+  database must remain inside that profile.
+- Invalid or split profiles stop before creating directories, SQLite files,
+  journals, settings, backups, restore markers, update state, or legacy copies.
+- The historical canonical source profile and packaged legacy migration remain
+  supported. Process environment values continue to take precedence over
+  `.env` values.
+
 ## Compatibility
 
-- No schema migration and no new external provider. Local holdings, sales,
-  snapshots, targets, theses, settings, keys, and backups keep their existing
-  formats.
-- This milestone advances the mainline app version to 5.16.0 for rolling
-  `latest-main` packages. It does not create a `v5.16.0` tag or stable release.
+- Schema metadata advances to version 7. The existing migration flow attempts a
+  verified backup for a data-bearing database before installing a partial
+  unique index for active `(portfolio_id, ticker)` rows.
+- A read-only duplicate preflight runs before migration. If active duplicates
+  already exist, the desktop app shows a recovery path and FolioOrb never
+  guesses which financial row to keep. Portfolio rows, schema metadata, and the
+  primary database/WAL payload stay unchanged; SQLite may refresh only its
+  transient shared-memory bookkeeping while inspecting a live WAL database.
+- The packaged recovery window shows each conflicting row and requires one
+  explicit keep choice per ticker. After confirmation it creates a verified
+  Backup Vault copy, then archives only the rejected rows without recording a
+  sale or changing shares, cost basis, notes, or history. Close and relaunch to
+  complete the v7 migration.
+- No new external provider or FX path. Local holdings, sales, snapshots,
+  targets, theses, settings, keys, and backups otherwise retain their formats.
 
 ---
 

@@ -508,6 +508,36 @@ def process_import_rows(
     return report, to_insert
 
 
+def reconcile_existing(
+    report_rows: list[dict],
+    candidates: list[HoldingCreate],
+    existing_tickers: set[str],
+) -> tuple[list[dict], list[HoldingCreate]]:
+    """Reconcile externally validated rows with fresh request-thread DB state."""
+    existing = {str(ticker).strip().upper() for ticker in existing_tickers}
+    if not existing:
+        return report_rows, candidates
+
+    accepted = {candidate.ticker: candidate for candidate in candidates}
+    for row in report_rows:
+        ticker = str(row.get("ticker") or "").upper()
+        if row.get("status") == "added" and ticker in existing:
+            row["status"] = "skipped"
+            row["reason"] = "already in portfolio"
+            accepted.pop(ticker, None)
+    return report_rows, list(accepted.values())
+
+
+def mark_concurrent_duplicate(report_rows: list[dict], ticker: str) -> None:
+    """Turn the one accepted row for ticker into a stable concurrent skip."""
+    normalized = str(ticker).strip().upper()
+    for row in report_rows:
+        if row.get("status") == "added" and row.get("ticker") == normalized:
+            row["status"] = "skipped"
+            row["reason"] = "already in portfolio"
+            return
+
+
 def _ticker_error_reason(ticker: str, validation: dict) -> str:
     """Build a row-error reason, with an Excel hint for date-mangled tickers."""
     reason = str(validation.get("message") or f"Couldn't validate ticker {ticker}")

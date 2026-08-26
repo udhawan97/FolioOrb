@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -108,6 +109,42 @@ def test_applied_contributions_block_plan_deletion_until_undone():
     assert ledger.list_contributions(1, "applied")[0]["id"] == contribution_id
     ledger.undo_contribution(contribution_id)
     assert "deleted" in ledger.delete_plan(created["plan"]["id"])
+
+
+def test_apply_reuses_one_legacy_formatted_active_holding():
+    db = make_db()
+    original = db.query(Holding).filter_by(portfolio_id=1, ticker="VOO").one()
+    db.execute(
+        text("UPDATE holdings SET ticker = ' voo ' WHERE id = :holding_id"),
+        {"holding_id": original.id},
+    )
+    db.commit()
+    ledger = DcaLedger(
+        db,
+        ticker_validator=lambda ticker: {
+            "valid": True,
+            "ticker": ticker,
+            "suggestions": [],
+        },
+        price_history_loader=closes,
+        today=lambda: TODAY,
+    )
+    ledger.create_plan(
+        portfolio_id=1,
+        ticker="VOO",
+        amount=50,
+        frequency="weekly",
+        start_date=TODAY.isoformat(),
+    )
+    contribution = ledger.list_contributions(1)[0]
+
+    result = ledger.apply_contribution(contribution["id"])
+
+    holdings = db.query(Holding).filter_by(portfolio_id=1, is_active=True).all()
+    assert len(holdings) == 1
+    assert holdings[0].id == original.id
+    assert holdings[0].shares == pytest.approx(10.5)
+    assert result["contribution"]["status"] == "applied"
 
 
 # ── Catch-up cost ─────────────────────────────────────────────────────────────

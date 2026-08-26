@@ -17,14 +17,35 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 PORT="${SHOT_PORT:-8177}"
-TMP_DIR="$REPO_ROOT/docs-site/_demos"
-DB_PATH="$TMP_DIR/demo.db"
+TMP_PARENT="${TMPDIR:-/tmp}"
+TMP_PARENT="${TMP_PARENT%/}"
+TMP_DIR="$(mktemp -d "$TMP_PARENT/folioorb-demos.XXXXXX")"
+RAW_DIR="$REPO_ROOT/docs-site/_demos/raw"
+APP_PID=""
+# Install cleanup before seeding: set -e may exit on any later command.
+cleanup() {
+  if [[ -n "$APP_PID" ]]; then
+    kill "$APP_PID" 2>/dev/null || true
+  fi
+  case "$TMP_DIR" in
+    "$TMP_PARENT"/folioorb-demos.*) rm -rf -- "$TMP_DIR" ;;
+    *) echo "Refusing to remove unexpected demo path: $TMP_DIR" >&2 ;;
+  esac
+  case "$RAW_DIR" in
+    "$REPO_ROOT"/docs-site/_demos/raw) rm -rf -- "$RAW_DIR" ;;
+    *) echo "Refusing to remove unexpected raw-demo path: $RAW_DIR" >&2 ;;
+  esac
+}
+trap cleanup EXIT
+
+export FOLIOORB_DATA_DIR="$TMP_DIR/data"
+mkdir -p "$FOLIOORB_DATA_DIR"
+chmod 700 "$FOLIOORB_DATA_DIR"
+DB_PATH="$FOLIOORB_DATA_DIR/demo.db"
 export DATABASE_URL="sqlite:///$DB_PATH"
 export ANTHROPIC_API_KEY=""
 export DEFAULT_HOLDINGS=""
 export DEBUG="False"
-
-mkdir -p "$TMP_DIR"
 
 PY="python"
 [[ -x "$REPO_ROOT/venv/bin/python" ]] && PY="$REPO_ROOT/venv/bin/python"
@@ -35,8 +56,6 @@ echo "→ Seeding demo portfolio…"
 echo "→ Booting app on port $PORT…"
 "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT" --log-level warning &
 APP_PID=$!
-# Keep the raw dir until encode runs; clean the temp DB + raw on exit.
-trap 'kill "$APP_PID" 2>/dev/null || true; rm -rf "$TMP_DIR"' EXIT
 
 echo "→ Waiting for health…"
 for _ in $(seq 1 30); do

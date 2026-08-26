@@ -107,6 +107,22 @@ def test_active_by_ticker_normalises_the_argument(db):
     assert repo.active_by_ticker(db, 1, "  aapl ") is not None
 
 
+def test_active_by_ticker_finds_one_legacy_formatted_stored_symbol(db):
+    holding = _add(db, "AAPL")
+    db.execute(
+        text("UPDATE holdings SET ticker = ' aapl ' WHERE id = :holding_id"),
+        {"holding_id": holding.id},
+    )
+    db.commit()
+    db.expire_all()
+
+    found = repo.active_by_ticker(db, 1, "AAPL")
+
+    assert found is not None
+    assert found.id == holding.id
+    assert found.ticker == " aapl "
+
+
 def test_active_by_ticker_misses_are_none(db):
     _add(db, "AAPL")
     assert repo.active_by_ticker(db, 1, "MSFT") is None
@@ -120,11 +136,20 @@ def test_active_by_ticker_ignores_inactive_and_other_portfolios(db):
     assert repo.active_by_ticker(db, 1, "MSFT") is None
 
 
-def test_active_by_ticker_returns_the_oldest_duplicate(db):
+def test_add_active_rejects_a_duplicate_and_keeps_the_original(db):
     first = _add(db, "AAPL")
-    _add(db, "AAPL")
+    duplicate = Holding(portfolio_id=1, ticker="AAPL", shares=99, avg_cost=100)
+    assert repo.add_active(db, duplicate) is None
     found = repo.active_by_ticker(db, 1, "AAPL")
     assert found is not None and found.id == first.id
+
+
+def test_add_active_enforces_normalized_ticker_identity(db):
+    first = _add(db, "AAPL")
+    duplicate = Holding(portfolio_id=1, ticker=" aapl ", shares=99, avg_cost=100)
+
+    assert repo.add_active(db, duplicate) is None
+    assert repo.active_by_ticker(db, 1, "AAPL").id == first.id
 
 
 # ── active_tickers() ───────────────────────────────────────────────────────────
@@ -137,6 +162,9 @@ def test_active_tickers_normalises_case_and_whitespace(db):
 
 
 def test_active_tickers_dedupes_keeping_first_seen(db):
+    # Defensive read behavior for a pre-v7 or externally edited database. A
+    # migrated production database prevents this state at the write boundary.
+    db.execute(text("DROP INDEX ux_holdings_active_portfolio_ticker"))
     _add(db, "AAPL")
     _add(db, "MSFT")
     _add(db, "aapl")
@@ -242,13 +270,17 @@ def test_meta_map_scopes_and_filters_like_active(db):
     assert list(repo.meta_map(db, 1)) == ["AAPL"]
 
 
-def test_meta_map_dedupes_to_the_oldest_row(db):
+def test_meta_map_keeps_the_original_after_duplicate_conflict(db):
     _add(db, "AAPL", shares=1.0)
-    _add(db, "AAPL", shares=99.0)
+    duplicate = Holding(portfolio_id=1, ticker="AAPL", shares=99.0, avg_cost=100)
+    assert repo.add_active(db, duplicate) is None
     assert repo.meta_map(db, 1)["AAPL"]["shares"] == 1.0
 
 
 def test_meta_map_keys_match_active_tickers_exactly(db):
+    # Exercise the defensive legacy-state contract without weakening the v7
+    # write invariant used by every normal database.
+    db.execute(text("DROP INDEX ux_holdings_active_portfolio_ticker"))
     for ticker in ("ZZZ", "aapl", "MMM", "AAPL"):
         _add(db, ticker)
     _add(db, "GONE", is_active=False)

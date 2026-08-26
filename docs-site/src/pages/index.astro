@@ -1,6 +1,6 @@
 ---
 /**
- * FolioOrb landing page — v5.15 "review receipts".
+ * FolioOrb landing page — v5.16 "review handoff".
  *
  * A single cinematic story told in acts (hero → workflow → features → demo →
  * trust → download → developer), narrated by a Senpai scroll companion. Real
@@ -100,6 +100,12 @@ const roadmap = [
     title: 'Return to the same context',
     body: 'Review Orbit remembers the last tab, Inbox filter, and Month or Quarter choice in local app/browser storage.',
     icon: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/><path d="M12 8v4l3 2"/>',
+  },
+  {
+    status: 'Shipped · v5.16.0',
+    title: 'Carry one review bundle',
+    body: 'Save the report, data-health receipt, target snapshot, and a checksummed manifest together in one local ZIP.',
+    icon: '<path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5M9 12h6M9 16h6"/><path d="m9 19 1.5 1.5L14 17"/>',
   },
 ];
 ---
@@ -639,14 +645,14 @@ const roadmap = [
 								<span class="up-size">≈ 38 MB · relaunch</span>
 							</div>
 							<div class="up-versions">
-								<span class="up-ver up-ver--now"><small>Installed</small>v5.13.0</span>
+								<span class="up-ver up-ver--now"><small>Installed</small>v5.15.0</span>
 								<span class="up-track" aria-hidden="true"><span class="up-track-fill"></span></span>
-								<span class="up-ver up-ver--new"><small>Latest</small>v5.15.0</span>
+								<span class="up-ver up-ver--new"><small>Latest</small>v5.16.0</span>
 							</div>
 							<ul class="up-changes">
-								<li>Filter urgent gaps away from quiet reminders</li>
-								<li>Save data-health and target-plan CSV receipts</li>
-								<li>Return to your last Review Orbit context</li>
+								<li>Carry a complete review in one checksummed ZIP</li>
+								<li>Keep the app responsive during CSV provider work</li>
+								<li>Fail closed when custom data paths split apart</li>
 							</ul>
 							<div class="up-reassure"><span class="up-shield" aria-hidden="true"></span>Your holdings and settings are backed up before anything installs.</div>
 							<div class="up-actions">
@@ -691,9 +697,9 @@ const roadmap = [
 
 				<div class="act-body">
 				<div class="act-head reveal">
-					<span class="kicker">Review receipts · v5.15.0</span>
-					<h2 class="section-title">A review can leave evidence, not residue.</h2>
-					<p class="rm-lede">Filter the queue, save a fresh coverage or persisted-target snapshot when you need it, then return to the same local context. These cards describe behavior in this release, not future promises.</p>
+					<span class="kicker">Review handoff · v5.16.0</span>
+					<h2 class="section-title">A review can leave as one verified handoff.</h2>
+					<p class="rm-lede">Filter the queue, save fresh receipts, then carry the selected review, data health, target snapshot, and manifest together. These cards describe shipped behavior, not future promises.</p>
 				</div>
 
 				<div class="rm-grid reveal">
@@ -708,7 +714,7 @@ const roadmap = [
 				</div>
 
 				<div class="rm-outro reveal">
-					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.15 adds filters, local preferences, and exports around existing facts. It adds no provider or FX path, does not convert foreign quotes, never fills a missing value with zero, and never places a trade.</p>
+					<p class="rm-oath"><strong>Bounded on purpose:</strong> v5.16 adds one review bundle, responsive imports, and a fail-closed runtime profile. It adds no provider or FX path, does not convert foreign quotes, never fills a missing value with zero, never guesses between duplicate financial rows, and never places a trade.</p>
 					<a class="rm-cta" href={`${GITHUB}/issues/new`}>Got a feature you’d fight for? Open an issue →</a>
 				</div>
 				</div>

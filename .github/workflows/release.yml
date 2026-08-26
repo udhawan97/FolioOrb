@@ -72,10 +72,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest
+      - name: Prepare isolated FolioOrb profile
+        run: |
+          PROFILE_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-release.XXXXXX")"
+          echo "FOLIOORB_DATA_DIR=$PROFILE_ROOT" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=sqlite:///$PROFILE_ROOT/database/portfolio.db" >> "$GITHUB_ENV"
       - name: Run tests
         env:
           ANTHROPIC_API_KEY: ""
-          DATABASE_URL: sqlite:///./database/release-test.db
         run: python -m pytest -q
 
   build-macos:
@@ -102,6 +106,7 @@ jobs:
       - name: Smoke test the frozen bundle
         run: |
           dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
+          dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke-duplicate-recovery
       - name: Build DMG
         env:
           ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
@@ -170,17 +175,21 @@ jobs:
           # this shell, so failures show up as a bare exit code with no
           # message. Redirect to files and print them so a failure is
           # actually diagnosable from the workflow log.
-          $outFile = "smoke-stdout.log"
-          $errFile = "smoke-stderr.log"
-          $proc = Start-Process -FilePath "dist\FolioOrb\FolioOrb.exe" -ArgumentList "--smoke" `
-            -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru
-          Write-Host "--- stdout ---"
-          if (Test-Path $outFile) { Get-Content $outFile }
-          Write-Host "--- stderr ---"
-          if (Test-Path $errFile) { Get-Content $errFile }
-          if ($proc.ExitCode -ne 0) {
-            Write-Error "Smoke test failed with exit code $($proc.ExitCode)"
-            exit 1
+          foreach ($argument in @("--smoke", "--smoke-duplicate-recovery")) {
+            $stem = $argument.TrimStart("-")
+            $outFile = "$stem-stdout.log"
+            $errFile = "$stem-stderr.log"
+            $proc = Start-Process -FilePath "dist\FolioOrb\FolioOrb.exe" `
+              -ArgumentList $argument -RedirectStandardOutput $outFile `
+              -RedirectStandardError $errFile -Wait -PassThru
+            Write-Host "--- $argument stdout ---"
+            if (Test-Path $outFile) { Get-Content $outFile }
+            Write-Host "--- $argument stderr ---"
+            if (Test-Path $errFile) { Get-Content $errFile }
+            if ($proc.ExitCode -ne 0) {
+              Write-Error "$argument failed with exit code $($proc.ExitCode)"
+              exit 1
+            }
           }
       - name: Build installer
         shell: pwsh

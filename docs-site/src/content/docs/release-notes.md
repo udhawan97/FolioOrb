@@ -7,15 +7,9 @@ import { Aside } from '@astrojs/starlight/components';
 
 The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
-in the repository. Highlights of the current stable and the next mainline
-milestone are below.
+in the repository. Highlights of the current stable are below.
 
-## v5.16.0 mainline milestone — Review Bundle with manifest
-
-<Aside type="caution" title="Not a stable release">
-This phase is built for the rolling `latest-main` channel. The latest published
-stable remains v5.15.0 until a separate release gate is requested and completed.
-</Aside>
+## v5.16.0 — Review Bundle with manifest
 
 - **Save one review handoff.** The active Month/Quarter Review Pack,
   data-health receipt, and saved target-plan snapshot leave together as one
@@ -36,7 +30,25 @@ stable remains v5.15.0 until a separate release gate is requested and completed.
   native Save dialog and atomic binary writer. The bundle is capped at 8 MiB
   and is review material—not a restore file, tax form, recommendation, or trade
   instruction.
-- No schema migration or new external provider.
+- **Keep imports responsive.** Quote warming, provider validation, search
+  fallback, Claude remapping, and narration run away from the request thread.
+  Fresh file-backed state is reconciled before writes, and concurrent imports,
+  manual adds, DCA buys, and reactivations cannot create two active rows for the
+  same Portfolio and ticker.
+- **Keep one runtime profile.** A custom database must be paired with its data
+  root and remain beneath it. Invalid split profiles fail before any directory,
+  database, journal, setting, backup, restore, update, or legacy-copy write.
+- **Migrate without guessing.** Schema v7 adds the active-holding uniqueness
+  index through the existing verified-backup migration flow. A read-only
+  preflight stops on existing active duplicates, shows packaged-app recovery
+  steps, and leaves portfolio rows, schema metadata, and the primary database/WAL
+  payload unchanged. SQLite may refresh only transient shared-memory bookkeeping
+  while inspecting a live WAL database; no financial row is deleted or merged.
+- **Resolve duplicates without inventing a sale.** The packaged recovery window
+  shows every conflicting row and requires one keep choice per ticker. It creates
+  a verified Backup Vault copy before archiving rejected rows, preserving their
+  shares, cost basis, notes, and history without adding realized-trade activity.
+- No new external provider or FX path.
 
 ## v5.15.0 — Review receipts
 

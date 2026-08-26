@@ -24,13 +24,16 @@ def test_resource_dir_is_repo_root():
     assert paths.resource_dir() == REPO_ROOT
 
 
-def test_data_dir_is_repo_root():
+def test_data_dir_is_repo_root(monkeypatch):
+    monkeypatch.delenv("FOLIOORB_DATA_DIR", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     assert paths.data_dir() == REPO_ROOT
 
 
 def test_data_dir_override_bypasses_frozen_legacy_migration(tmp_path, monkeypatch):
     isolated = tmp_path / "isolated-smoke"
     monkeypatch.setenv("FOLIOORB_DATA_DIR", str(isolated))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setattr(paths, "is_frozen", lambda: True)
 
     def forbidden_migration(_directory):

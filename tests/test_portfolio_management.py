@@ -4,6 +4,9 @@ Endpoints are plain async funcs, so they're called directly with an in-memory
 SQLite DB (fixture style from tests/test_portfolio_total_pct.py).
 """
 # pylint: disable=protected-access
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
@@ -15,7 +18,7 @@ from app.models import (
     DcaPlan, DcaContribution, AISummary,
 )
 from app.routers import portfolio as pr
-from app.schemas import PortfolioCreate
+from app.schemas import HoldingUpdate, PortfolioCreate
 
 
 def _db():
@@ -102,3 +105,84 @@ def test_delete_missing_portfolio_404():
     with pytest.raises(HTTPException) as exc:
         pr.delete_portfolio(999, db)
     assert exc.value.status_code == 404
+
+
+def test_reactivating_a_duplicate_holding_is_a_user_safe_conflict():
+    db = _db()
+    active = Holding(portfolio_id=1, ticker="AAPL", shares=1, avg_cost=100)
+    archived = Holding(
+        portfolio_id=1,
+        ticker="AAPL",
+        shares=2,
+        avg_cost=90,
+        is_active=False,
+    )
+    db.add_all([active, archived])
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        pr.update_holding(
+            archived.id,
+            HoldingUpdate(is_active=True),
+            db,
+            portfolio_id=1,
+        )
+
+    assert exc.value.status_code == 400
+    assert "already in portfolio" in str(exc.value.detail)
+    db.refresh(archived)
+    assert archived.is_active is False
+
+
+def test_concurrent_reactivations_commit_one_active_holding(tmp_path, monkeypatch):
+    engine = create_engine(
+        f"sqlite:///{(tmp_path / 'portfolio.db').as_posix()}",
+        connect_args={"check_same_thread": False, "timeout": 5},
+    )
+    Base.metadata.create_all(bind=engine)
+    sessions = sessionmaker(bind=engine, autoflush=False)
+    with sessions() as db:
+        db.add(Portfolio(id=1, name="My Portfolio"))
+        first = Holding(portfolio_id=1, ticker="RACE", shares=1, is_active=False)
+        second = Holding(portfolio_id=1, ticker="RACE", shares=2, is_active=False)
+        db.add_all([first, second])
+        db.commit()
+        holding_ids = (first.id, second.id)
+
+    commit_barrier = threading.Barrier(2)
+    original_commit = pr._commit_holding_update
+
+    def synchronized_commit(db, holding):
+        commit_barrier.wait(timeout=10)
+        return original_commit(db, holding)
+
+    monkeypatch.setattr(pr, "_commit_holding_update", synchronized_commit)
+
+    def reactivate(holding_id):
+        with sessions() as db:
+            try:
+                pr.update_holding(
+                    holding_id,
+                    HoldingUpdate(is_active=True),
+                    db,
+                    portfolio_id=1,
+                )
+                return 200
+            except HTTPException as exc:
+                assert exc.detail == "RACE already in portfolio"
+                return exc.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = list(pool.map(reactivate, holding_ids))
+
+    with sessions() as db:
+        active = (
+            db.query(Holding)
+            .filter(Holding.portfolio_id == 1, Holding.is_active.is_(True))
+            .all()
+        )
+    engine.dispose()
+
+    assert sorted(statuses) == [200, 400]
+    assert len(active) == 1
+    assert active[0].ticker == "RACE"

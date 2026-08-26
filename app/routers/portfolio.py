@@ -2,7 +2,9 @@
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from app.database import get_db
 from app.models import Holding, RealizedTrade
 from app.routers.deps import require_portfolio
@@ -218,7 +220,10 @@ def add_holding(
         is_watchlist=data.is_watchlist or False,
         hold_class=data.hold_class or "auto",
     )
-    db.add(holding)
+    if holdings_repository.add_active(db, holding) is None:
+        raise HTTPException(
+            status_code=400, detail=f"{data.ticker} already in portfolio"
+        )
     db.commit()
     db.refresh(holding)
     return {
@@ -309,6 +314,27 @@ def _resolve_import_mode(header, data_rows, force_local):
         ) from None
 
 
+def _prepare_import_external(header, data_rows, force_local, existing_tickers):
+    """Run the complete synchronous provider/Claude segment with no DB session."""
+    template_rows, mode, column_mapping = _resolve_import_mode(
+        header, data_rows, force_local
+    )
+    existing = {str(ticker).strip().upper() for ticker in existing_tickers}
+    candidate_tickers = sorted(
+        ticker
+        for ticker in {
+            (row.get("ticker") or "").strip().upper() for row in template_rows
+        }
+        if ticker and ticker not in existing and ticker_shape_is_safe(ticker)
+    )
+    if candidate_tickers:
+        get_all_quotes(candidate_tickers)
+    report_rows, to_insert = holdings_csv.process_import_rows(
+        template_rows, existing, validate_ticker_symbol
+    )
+    return report_rows, to_insert, mode, column_mapping
+
+
 @router.post("/holdings/import")
 async def import_holdings(
     file: UploadFile = File(...),
@@ -325,8 +351,6 @@ async def import_holdings(
 
     Returns a per-row report (added/skipped/error). Bad rows never block good rows.
     """
-    _require_portfolio(portfolio_id, db)
-
     # Content-type allowlist; the ambiguous types only pass with a .csv filename.
     content_type = (file.content_type or "").split(";")[0].strip().lower()
     filename = (file.filename or "").lower()
@@ -366,31 +390,34 @@ async def import_holdings(
             ),
         )
 
-    template_rows, mode, column_mapping = _resolve_import_mode(header, data_rows, force_local)
+    # Preserve the established import contract: reject a missing Portfolio and
+    # skip symbols it already owns before doing provider or Claude work. Close
+    # the short read transaction before awaiting the worker so no SQLAlchemy
+    # session or database lock crosses the external-work boundary.
+    _require_portfolio(portfolio_id, db)
+    existing_before = set(holdings_repository.active_tickers(db, portfolio_id))
+    db.rollback()
 
-    # process_import_rows requires an upper-cased set; active_tickers already
-    # normalizes, dedupes, and drops blanks.
+    report_rows, to_insert, mode, column_mapping = await run_in_threadpool(
+        _prepare_import_external,
+        header,
+        data_rows,
+        force_local,
+        existing_before,
+    )
+
+    # Re-read after the await so another writer cannot slip between the initial
+    # snapshot and mutation. The partial unique index remains the final arbiter
+    # for a writer that races this fresh read.
+    _require_portfolio(portfolio_id, db)
     existing_tickers = set(holdings_repository.active_tickers(db, portfolio_id))
-
-    # Warm the quote cache once so per-row validation reads cache, not the network.
-    # Shape-check first: an unsafe symbol must never reach yfinance (it's rejected in
-    # process_import_rows anyway), so only shape-safe candidates get a network warm.
-    candidate_tickers = sorted(
-        t for t in (
-            {(r.get("ticker") or "").strip().upper() for r in template_rows}
-            - existing_tickers - {""}
-        )
-        if ticker_shape_is_safe(t)
-    )
-    if candidate_tickers:
-        get_all_quotes(candidate_tickers)
-
-    report_rows, to_insert = holdings_csv.process_import_rows(
-        template_rows, existing_tickers, validate_ticker_symbol
+    report_rows, to_insert = holdings_csv.reconcile_existing(
+        report_rows, to_insert, existing_tickers
     )
 
+    inserted = False
     for create in to_insert:
-        db.add(Holding(
+        holding = Holding(
             portfolio_id=portfolio_id,
             ticker=create.ticker,
             shares=create.shares or 0.0,
@@ -399,9 +426,18 @@ async def import_holdings(
             thesis_review_interval_days=create.thesis_review_interval_days,
             is_watchlist=create.is_watchlist or False,
             hold_class=create.hold_class or "auto",
-        ))
-    if to_insert:
+        )
+        if holdings_repository.add_active(db, holding) is None:
+            holdings_csv.mark_concurrent_duplicate(report_rows, create.ticker)
+        else:
+            inserted = True
+    if inserted:
         db.commit()
+    # The post-provider reconciliation reads open a transaction even when every
+    # row is skipped. End it before Claude narration so no database transaction
+    # spans another external await. rollback() is harmless after commit and is
+    # intentional here because there are no uncommitted mutations left.
+    db.rollback()
 
     counts = holdings_csv.summarize(report_rows)
     holdings_csv.log_import(portfolio_id, mode, counts)
@@ -415,13 +451,45 @@ async def import_holdings(
         "column_mapping": column_mapping,
     }
     if mode == "claude":
-        result["summary"] = holdings_csv.narrate_import_summary({
+        narration_input = {
             **result, "unmapped_columns": [
                 target for target, source in (column_mapping or {}).items()
                 if source is None
             ],
-        })
+        }
+        result["summary"] = await run_in_threadpool(
+            holdings_csv.narrate_import_summary, narration_input
+        )
     return result
+
+
+def _ensure_reactivation_available(
+    db: Session, portfolio_id: int, holding: Holding, requested_active: bool | None
+) -> None:
+    """Reject a soft-delete reactivation when its active ticker already exists."""
+    if requested_active is not True or holding.is_active:
+        return
+    active_match = holdings_repository.active_by_ticker(
+        db, portfolio_id, holding.ticker
+    )
+    if active_match is not None and active_match.id != holding.id:
+        raise HTTPException(
+            status_code=400, detail=f"{holding.ticker} already in portfolio"
+        )
+
+
+def _commit_holding_update(db: Session, holding: Holding) -> None:
+    """Commit an edit and translate a concurrent reactivation race."""
+    ticker = holding.ticker
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        if holdings_repository.is_active_ticker_conflict(exc):
+            db.rollback()
+            raise HTTPException(
+                status_code=400, detail=f"{ticker} already in portfolio"
+            ) from exc
+        raise
 
 
 @router.put("/holdings/{holding_id}")
@@ -435,6 +503,8 @@ def update_holding(
     holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
+
+    _ensure_reactivation_available(db, portfolio_id, holding, data.is_active)
 
     # A drop in share count is a sale → record the realized gain/loss first,
     # while we still know the old share count and avg cost. Watchlist (research
@@ -466,7 +536,7 @@ def update_holding(
     if data.hold_class is not None:
         holding.hold_class = data.hold_class
 
-    db.commit()
+    _commit_holding_update(db, holding)
     db.refresh(holding)
     return {
         "ticker": holding.ticker,

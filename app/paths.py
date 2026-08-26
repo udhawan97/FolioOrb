@@ -15,6 +15,7 @@ without creating an import cycle.
 import os
 import shutil
 import sys
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 APP_NAME = "FolioOrb"
@@ -26,11 +27,44 @@ APP_NAME = "FolioOrb"
 # written under this name.
 LEGACY_APP_NAME = "FolioSenseAI"
 _MIGRATION_MARKER = ".migrated-from-foliosenseai"
+_CANONICAL_RELATIVE_DATABASE = Path("database/portfolio.db")
+
+
+class ProfileConfigurationError(RuntimeError):
+    """The configured database and writable data root do not form one profile."""
+
+
+@dataclass(frozen=True)
+class RuntimeProfile:
+    """Validated ownership of every writable FolioOrb runtime artifact."""
+
+    data_root: Path
+    database_url: str
+    database_path: Path | None
+    env_source: Path
+    frozen: bool
+    explicit_data_root: bool
 
 
 def is_frozen() -> bool:
     """True when running inside a PyInstaller bundle."""
     return bool(getattr(sys, "frozen", False))
+
+
+def _source_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def _frozen_data_root() -> Path:
+    from platformdirs import user_data_dir
+
+    return Path(user_data_dir(APP_NAME, APP_NAME)).expanduser().resolve()
+
+
+def _legacy_data_root() -> Path:
+    from platformdirs import user_data_dir
+
+    return Path(user_data_dir(LEGACY_APP_NAME, LEGACY_APP_NAME)).expanduser().resolve()
 
 
 def resource_dir() -> Path:
@@ -41,7 +75,7 @@ def resource_dir() -> Path:
     """
     if is_frozen():
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-    return Path(__file__).resolve().parent.parent
+    return _source_root()
 
 
 def _migrate_legacy_data(new_dir: Path) -> None:
@@ -66,9 +100,7 @@ def _migrate_legacy_data(new_dir: Path) -> None:
             pass
         return
     try:
-        from platformdirs import user_data_dir
-
-        legacy_dir = Path(user_data_dir(LEGACY_APP_NAME, LEGACY_APP_NAME))
+        legacy_dir = _legacy_data_root()
     except Exception:  # pylint: disable=broad-except
         return
     if not legacy_dir.is_dir() or legacy_dir.resolve() == new_dir.resolve():
@@ -88,29 +120,151 @@ def _migrate_legacy_data(new_dir: Path) -> None:
         pass
 
 
-def data_dir() -> Path:
-    """Writable directory for the database and ``.env``.
+def _prospective_env_source(data_root: Path, frozen: bool, explicit: bool) -> Path:
+    """Choose the dotenv file that phase two would make active, without writing."""
+    current = data_root / ".env"
+    if current.exists() or not frozen or explicit:
+        return current
 
-    Frozen: the OS per-user data directory (created on first run), with any
-    pre-rename FolioSenseAI data migrated in once.
-    Source: the repo root, so source runs keep writing ``./database`` and
-    ``./.env`` exactly as they always have.
-    """
-    override = os.getenv("FOLIOORB_DATA_DIR")
-    if override:
-        # Release smoke tests set this before importing any app module. Bypass
-        # the normal frozen location *and* legacy migration so a package check
-        # cannot create or copy real per-user FolioOrb state.
-        directory = Path(override).resolve()
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory
-    if is_frozen():
-        from platformdirs import user_data_dir
+    # A default frozen launch migrates the legacy tree only when FolioOrb has no
+    # database or .env of its own. Inspect that source now so its DATABASE_URL is
+    # validated before the first migration marker, directory, or copied byte.
+    if (data_root / "database" / "portfolio.db").exists():
+        return current
+    legacy = _legacy_data_root() / ".env"
+    return legacy if legacy.exists() else current
 
-        directory = Path(user_data_dir(APP_NAME, APP_NAME))
-        directory.mkdir(parents=True, exist_ok=True)
-        _migrate_legacy_data(directory)
+
+def _dotenv_database_url(env_path: Path) -> str | None:
+    if not env_path.is_file():
+        return None
+    from dotenv import dotenv_values
+
+    value = dotenv_values(env_path).get("DATABASE_URL")
+    return str(value).strip() if value else None
+
+
+def _sqlite_profile_database(
+    raw_url: str,
+    data_root: Path,
+    *,
+    explicit_data_root: bool,
+) -> tuple[str, Path | None]:
+    """Normalize one supported SQLite URL and enforce profile containment."""
+    prefix = "sqlite:///"
+    if not raw_url.startswith(prefix):
+        raise ProfileConfigurationError(
+            "FolioOrb supports a local SQLite DATABASE_URL; configure a sqlite:/// URL."
+        )
+
+    database_value = raw_url[len(prefix) :]
+    if database_value == ":memory:":
+        return raw_url, None
+    if not database_value or "?" in database_value or "#" in database_value:
+        raise ProfileConfigurationError("DATABASE_URL must identify one local SQLite file.")
+
+    configured = Path(database_value).expanduser()
+    if configured.is_absolute():
+        database_path = configured.resolve()
     else:
-        directory = Path(__file__).resolve().parent.parent
-        directory.mkdir(parents=True, exist_ok=True)
-    return directory
+        relative = Path(os.path.normpath(database_value))
+        if not explicit_data_root and relative != _CANONICAL_RELATIVE_DATABASE:
+            raise ProfileConfigurationError(
+                "A non-default database needs an explicit FOLIOORB_DATA_DIR so "
+                "backups, settings, updates, and the database share the same profile."
+            )
+        database_path = (data_root / relative).resolve()
+
+    if (
+        not explicit_data_root
+        and database_path != (data_root / _CANONICAL_RELATIVE_DATABASE).resolve()
+    ):
+        raise ProfileConfigurationError(
+            "A non-default database needs an explicit FOLIOORB_DATA_DIR so "
+            "backups, settings, updates, and the database share the same profile."
+        )
+
+    if database_path == data_root or database_path.is_dir():
+        raise ProfileConfigurationError(
+            "DATABASE_URL must identify a SQLite file inside FOLIOORB_DATA_DIR, "
+            "not the profile directory itself."
+        )
+
+    try:
+        database_path.relative_to(data_root)
+    except ValueError as exc:
+        raise ProfileConfigurationError(
+            "DATABASE_URL must stay inside FOLIOORB_DATA_DIR so every writable "
+            "artifact belongs to the same profile."
+        ) from exc
+
+    return f"sqlite:///{database_path.as_posix()}", database_path
+
+
+def resolve_runtime_profile() -> RuntimeProfile:
+    """Resolve and validate the effective writable profile without side effects.
+
+    Process environment values retain dotenv precedence. A data-root override by
+    itself derives the canonical database inside that root. The historical source
+    ``sqlite:///./database/portfolio.db`` remains valid and is normalized against
+    the source root rather than the caller's working directory.
+    """
+    override = os.getenv("FOLIOORB_DATA_DIR", "").strip()
+    explicit = bool(override)
+    frozen = is_frozen()
+    if explicit:
+        root = Path(override).expanduser().resolve()
+    else:
+        root = _frozen_data_root() if frozen else _source_root().resolve()
+
+    env_source = _prospective_env_source(root, frozen, explicit)
+    if "DATABASE_URL" in os.environ:
+        configured_url = os.environ.get("DATABASE_URL", "").strip() or None
+    else:
+        configured_url = _dotenv_database_url(env_source)
+
+    if configured_url is None:
+        database_path = root / _CANONICAL_RELATIVE_DATABASE
+        database_url = f"sqlite:///{database_path.as_posix()}"
+    else:
+        database_url, database_path = _sqlite_profile_database(
+            configured_url,
+            root,
+            explicit_data_root=explicit,
+        )
+
+    return RuntimeProfile(
+        data_root=root,
+        database_url=database_url,
+        database_path=database_path,
+        env_source=env_source,
+        frozen=frozen,
+        explicit_data_root=explicit,
+    )
+
+
+def prepare_runtime_profile() -> RuntimeProfile:
+    """Validate first, then create/migrate the one owned writable profile."""
+    profile = resolve_runtime_profile()
+    existed = profile.data_root.exists()
+    profile.data_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if not existed:
+        try:
+            profile.data_root.chmod(0o700)
+        except OSError:
+            pass
+
+    if profile.frozen and not profile.explicit_data_root:
+        _migrate_legacy_data(profile.data_root)
+
+    active_env = profile.data_root / ".env"
+    if profile.env_source != active_env and not active_env.is_file():
+        raise ProfileConfigurationError(
+            "The legacy FolioOrb profile was valid but its .env could not be copied."
+        )
+    return replace(profile, env_source=active_env)
+
+
+def data_dir() -> Path:
+    """Writable root after the database and data ownership contract is validated."""
+    return prepare_runtime_profile().data_root

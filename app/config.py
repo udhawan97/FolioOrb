@@ -2,16 +2,24 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from app.paths import data_dir, is_frozen
+from app.paths import prepare_runtime_profile
 from app.services.ticker import ticker_shape_is_safe
 
 logger = logging.getLogger(__name__)
 
-# Load variables from the .env file into the process environment.
-# This must run before we call os.getenv() below. In a source checkout
-# data_dir() is the repo root, so this loads ./.env exactly as before; in a
-# frozen app it loads the .env from the per-user data directory.
-load_dotenv(data_dir() / ".env")
+# Resolve the database and writable data root as one profile before any launcher
+# can create a database/WAL, backup lock, settings file, update marker, or legacy
+# migration. Only after the read-only validation passes is the root prepared and
+# its dotenv loaded (process values still win because override=False).
+_RUNTIME_PROFILE = prepare_runtime_profile()
+load_dotenv(_RUNTIME_PROFILE.env_source, override=False)
+# Dotenv may contain stale ownership keys from an older development setup. The
+# profile was already selected and validated before dotenv loading, so freeze
+# both ownership values to that exact result. This prevents later ``data_dir``
+# callers from recomputing a different root while SQLAlchemy keeps the original
+# database URL.
+os.environ["FOLIOORB_DATA_DIR"] = str(_RUNTIME_PROFILE.data_root)
+os.environ["DATABASE_URL"] = _RUNTIME_PROFILE.database_url
 
 
 def _csv_env(name: str, default: str = "", uppercase: bool = False) -> list[str]:
@@ -40,18 +48,6 @@ def _seed_tickers(name: str) -> list[str]:
     return kept
 
 
-def _default_database_url() -> str:
-    """SQLite location used when DATABASE_URL is not set explicitly.
-
-    Source runs keep the historical relative path so the working directory
-    stays clean; frozen apps store the database under the per-user data dir.
-    """
-    if is_frozen():
-        db_path = data_dir() / "database" / "portfolio.db"
-        return f"sqlite:///{db_path.as_posix()}"
-    return "sqlite:///./database/portfolio.db"
-
-
 class Settings:
     """
     Central place for all app configuration.
@@ -59,7 +55,7 @@ class Settings:
     In production, set these variables in your environment instead of the .env file.
     """
     # Path to the SQLite database file
-    DATABASE_URL: str = os.getenv("DATABASE_URL") or _default_database_url()
+    DATABASE_URL: str = _RUNTIME_PROFILE.database_url
     # Anthropic API key for AI features (leave blank to disable AI endpoints)
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     # When DEBUG=True, SQLAlchemy prints every SQL query to the console.

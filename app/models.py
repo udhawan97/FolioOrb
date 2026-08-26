@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Index,
+    Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Index, text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -37,6 +37,13 @@ class Holding(Base):
     # Every dashboard read filters on (portfolio_id, is_active).
     __table_args__ = (
         Index("ix_holdings_portfolio_active", "portfolio_id", "is_active"),
+        Index(
+            "ux_holdings_active_portfolio_ticker",
+            "portfolio_id",
+            text("UPPER(TRIM(ticker))"),
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
