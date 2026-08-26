@@ -17,7 +17,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
-import time
+from contextlib import closing
 from pathlib import Path
 
 
@@ -148,10 +148,12 @@ def _backup_database(live_database: Path, migrated_database: Path) -> None:
     """Create a transactionally consistent copy, including committed WAL data."""
     migrated_database.parent.mkdir(parents=True, exist_ok=True)
     uri = f"{live_database.resolve().as_uri()}?mode=ro"
-    with sqlite3.connect(uri, uri=True, timeout=10) as source_connection:
-        with sqlite3.connect(migrated_database) as destination_connection:
-            source_connection.backup(destination_connection)
-            result = destination_connection.execute("PRAGMA quick_check").fetchone()
+    with (
+        closing(sqlite3.connect(uri, uri=True, timeout=10)) as source_connection,
+        closing(sqlite3.connect(migrated_database)) as destination_connection,
+    ):
+        source_connection.backup(destination_connection)
+        result = destination_connection.execute("PRAGMA quick_check").fetchone()
     if result != ("ok",):
         raise RuntimeError("migrated portfolio database failed SQLite quick_check")
 
@@ -196,51 +198,6 @@ def _existing_destination_status(
         marker.write_text("adopted existing external profile\n", encoding="utf-8")
         return "READY"
     return None
-
-
-def _harden_staging_directory(staging: Path) -> None:
-    """Apply private POSIX permissions without mutating Windows attributes."""
-    if os.name == "nt":
-        return
-    try:
-        staging.chmod(0o700)
-    except OSError:
-        pass
-
-
-def _copy_directory_contents(source: Path, destination: Path) -> None:
-    """Copy and verify a staging tree, publishing its completion marker last."""
-    entries = sorted(
-        source.iterdir(), key=lambda entry: (entry.name == PROFILE_MARKER, entry.name)
-    )
-    for entry in entries:
-        _copy_regular_entry(entry, destination / entry.name)
-
-
-def _publish_staging_directory(staging: Path, destination: Path) -> None:
-    """Publish a profile atomically, with a verified Windows copy fallback."""
-    attempts = 6 if os.name == "nt" else 1
-    for attempt in range(attempts):
-        try:
-            os.rename(staging, destination)
-            return
-        except PermissionError:
-            if destination.exists() or attempt == attempts - 1:
-                break
-            time.sleep(0.05 * (2**attempt))
-
-    if os.name != "nt" or destination.exists():
-        raise PermissionError(f"could not publish profile at {destination}")
-    destination_owned = False
-    try:
-        destination.mkdir(mode=0o700)
-        destination_owned = True
-        _copy_directory_contents(staging, destination)
-        shutil.rmtree(staging)
-    except Exception:
-        if destination_owned:
-            shutil.rmtree(destination, ignore_errors=True)
-        raise
 
 
 def migrate(source: Path, destination: Path) -> str:
@@ -291,15 +248,16 @@ def migrate(source: Path, destination: Path) -> str:
             "migrated legacy source profile\n" if has_legacy_profile else "fresh profile\n"
         )
         (staging / PROFILE_MARKER).write_text(marker_text, encoding="utf-8")
-        # POSIX mode bits harden the newly created profile before publication.
-        # Windows inherits ACLs from the parent and chmod cannot enforce 0700,
-        # so leave Windows attributes unchanged before the atomic rename.
-        _harden_staging_directory(staging)
+        try:
+            staging.chmod(0o700)
+        except OSError:
+            pass
 
         if destination.exists():
             destination.rmdir()
-        # The paths share one parent, so publication remains atomic.
-        _publish_staging_directory(staging, destination)
+        # The paths share one parent, so rename publishes the verified profile
+        # atomically after both SQLite handles have been explicitly closed.
+        os.rename(staging, destination)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise

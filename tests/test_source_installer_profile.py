@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import os
-import runpy
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -211,94 +209,6 @@ def test_migrator_fails_closed_when_configured_database_is_missing(tmp_path):
     assert "configured legacy database is missing" in result.stderr
     assert (source / ".env").is_file()
     assert not destination.exists()
-
-
-def test_windows_publication_skips_posix_mode_and_handles_directory_locks():
-    namespace = runpy.run_path(str(MIGRATOR))
-    harden = namespace["_harden_staging_directory"]
-    publish = namespace["_publish_staging_directory"]
-    rename_attempts: list[tuple[Path, Path]] = []
-    delays: list[float] = []
-
-    class StagingPath:
-        @staticmethod
-        def chmod(_mode: int) -> None:
-            raise AssertionError("Windows publication must not apply POSIX mode bits")
-
-    def rename(source: Path, destination: Path) -> None:
-        rename_attempts.append((source, destination))
-        if len(rename_attempts) < 3:
-            raise PermissionError("transient Windows directory lock")
-
-    windows_os = SimpleNamespace(name="nt", rename=rename)
-    harden.__globals__["os"] = windows_os
-    publish.__globals__["os"] = windows_os
-    publish.__globals__["time"] = SimpleNamespace(sleep=delays.append)
-
-    harden(StagingPath())
-    publish(Path("staging"), Path("profile"))
-
-    assert rename_attempts == [
-        (Path("staging"), Path("profile")),
-        (Path("staging"), Path("profile")),
-        (Path("staging"), Path("profile")),
-    ]
-    assert delays == [0.05, 0.1]
-
-    rename_attempts.clear()
-    delays.clear()
-    verified_copies: list[tuple[Path, object]] = []
-    removals: list[object] = []
-    claims: list[int] = []
-
-    class DestinationPath:
-        def __init__(self, *, claim_succeeds: bool):
-            self.claim_succeeds = claim_succeeds
-
-        @staticmethod
-        def exists() -> bool:
-            return False
-
-        def mkdir(self, *, mode: int) -> None:
-            claims.append(mode)
-            if not self.claim_succeeds:
-                raise FileExistsError("destination was claimed concurrently")
-
-        def __str__(self) -> str:
-            return "profile-copy"
-
-    def locked_rename(source: Path, destination: Path) -> None:
-        rename_attempts.append((source, destination))
-        raise PermissionError("persistent Windows directory rename restriction")
-
-    publish.__globals__["os"] = SimpleNamespace(name="nt", rename=locked_rename)
-    publish.__globals__["_copy_directory_contents"] = (
-        lambda source, destination: verified_copies.append((source, destination))
-    )
-    publish.__globals__["shutil"] = SimpleNamespace(
-        rmtree=lambda path, **_kwargs: removals.append(path)
-    )
-
-    destination = DestinationPath(claim_succeeds=True)
-    publish(Path("staging-copy"), destination)
-
-    assert len(rename_attempts) == 6
-    assert delays == [0.05, 0.1, 0.2, 0.4, 0.8]
-    assert claims == [0o700]
-    assert verified_copies == [(Path("staging-copy"), destination)]
-    assert removals == [Path("staging-copy")]
-
-    racing_destination = DestinationPath(claim_succeeds=False)
-    try:
-        publish(Path("racing-staging"), racing_destination)
-    except FileExistsError:
-        pass
-    else:
-        raise AssertionError("a concurrently claimed destination must fail closed")
-
-    assert claims == [0o700, 0o700]
-    assert verified_copies == [(Path("staging-copy"), destination)]
-    assert removals == [Path("staging-copy")]
 
 
 def test_installers_and_launchers_share_the_external_profile_contract():
