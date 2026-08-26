@@ -2,6 +2,9 @@
 title FolioOrb
 cd /d "%~dp0"
 
+:: One-line installs keep writable state outside the replaceable source tree.
+if not defined FOLIOORB_DATA_DIR if exist ".source-profile-path" set /p FOLIOORB_DATA_DIR=<".source-profile-path"
+
 :: Check for Python
 python --version >nul 2>&1
 if errorlevel 1 (

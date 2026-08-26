@@ -27,7 +27,7 @@ import SenpaiTip from '../../components/SenpaiTip.astro';
 | macOS: *"Apple cannot check it for malicious software"* | Expected for unsigned builds. Open **System Settings → Privacy &amp; Security → Open Anyway**. Full steps: [Install on macOS](/FolioOrb/install-macos/#first-launch-the-gatekeeper-warning) |
 | Windows: *"Windows protected your PC"* (SmartScreen) | Click **More info → Run anyway**. Full steps: [Install on Windows](/FolioOrb/install-windows/#first-launch-the-smartscreen-warning) |
 | Windows: app window is blank or won't open | Install the [Microsoft WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) and relaunch |
-| Not sure a download is genuine | [Verify it](/FolioOrb/download/#verify-your-download) against the release's `SHA256SUMS.txt`, and only download from [GitHub Releases](https://github.com/udhawan97/FolioOrb/releases) |
+| A download may be incomplete or changed | [Check its integrity](/FolioOrb/download/#verify-your-download) against `SHA256SUMS.txt` from the same [GitHub Release](https://github.com/udhawan97/FolioOrb/releases). This detects mismatch; current releases do not provide Minisign authenticity. |
 | Where did my portfolio go after updating? | It didn't — data lives outside the app. See [macOS](/FolioOrb/install-macos/#where-your-data-lives) / [Windows](/FolioOrb/install-windows/#where-your-data-lives) locations |
 | Scrolling feels laggy or sluggish | Update to **v4.3.2 or newer** — it adds a lighter desktop-app rendering profile and, for larger portfolios especially, fixes the Holdings table making every tab's scrolling expensive. [Get the latest release](https://github.com/udhawan97/FolioOrb/releases/latest) |
 
@@ -49,9 +49,11 @@ No. Local Intelligence covers verdicts, scenarios, exposure, and fallback summar
 without one. A key unlocks narration, action plan thesis text, and news themes on top.
 
 **Where is my data stored?**
-Locally, in SQLite under `database/`, and in a local `.env` file. Neither leaves your
-machine except for the explicit Yahoo Finance and (optional) Anthropic calls described in
-[Privacy & Data Handling](../privacy/).
+Locally, in one writable profile containing SQLite, `.env`, settings, backups, and update
+state. Manual clones default to the repository; desktop and one-line installs use a
+per-user directory outside replaceable app code. Those profile files remain local.
+Bounded request inputs can go to the named market, Treasury, SEC, news, GitHub, and
+optional Anthropic providers listed in [Privacy & Data Handling](../privacy/).
 
 **Does a Backup Vault file contain my Claude API key?**
 No. Manual vault snapshots contain only the SQLite portfolio database. `.env`, API keys,

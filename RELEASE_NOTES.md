@@ -1,3 +1,54 @@
+# FolioOrb v5.16.1 Release Notes
+
+**Release date:** August 26, 2026
+
+## Documentation
+
+- **One public review loop.** The README and website now explain FolioOrb through
+  the same four checkpoints: holdings, local read, attention, and portable
+  record. First-time visitors reach a supported run path without crossing the
+  full feature inventory first.
+- **Real proof stays beside the claim.** Current isolated-demo captures now sit
+  beside Review Inbox, Plan & Protect, and risk explanations, with explicit
+  fictional-data and partial-provider caveats.
+- **Downloads name the tradeoffs.** macOS architecture and minimum version,
+  Windows architecture, source prerequisites, unsigned first-launch behavior,
+  SHA-256 verification, and the absence of Minisign authenticity are visible
+  before download.
+- **Trust boundaries agree.** README, landing page, introduction, download,
+  privacy, installation, and release guidance now use one account/brokerage,
+  provider, Claude, data-location, and update vocabulary.
+
+## Fixed
+
+- **Source updates preserve the whole profile.** One-line installs now keep
+  SQLite, `.env`, Backup Vault, policy, settings, logs, and update/restore state
+  in a durable per-user profile outside the replaceable source tree. The first
+  legacy migration uses SQLite's backup API, fails closed on conflicting profile
+  roots or non-portable database paths, and retains the complete prior install
+  as a recovery copy. Later replacements are transactional and restore the old
+  source tree if environment setup fails.
+- **Every source launch resolves the same profile.** The installed source tree
+  carries one absolute profile pointer that `python run.py`, shell launchers,
+  and desktop shortcuts all honor. Custom relative SQLite databases and live
+  WAL commits migrate together, and a process-selected database URL is persisted
+  for the next launch; supported pinned installs start at `v5.16.0`.
+- **Windows source updates run in the release gate.** Native PowerShell parsing,
+  first migration, retained recovery, a second update, exact profile paths, and
+  the preserved SQLite row are checked before the Windows installer is built.
+- **Checksum steps match one-platform downloads.** macOS verification filters
+  the two-platform manifest to the downloaded DMG, and every public surface now
+  distinguishes same-release integrity from unavailable Minisign authenticity.
+
+## Release scope
+
+- This patch changes public presentation, documentation, current screenshots,
+  version metadata, and source-installer profile migration. It does not change
+  portfolio calculations, providers, database schema, trade boundaries, or the
+  v5.16.0 duplicate-recovery workflow.
+
+---
+
 # FolioOrb v5.16.0 Release Notes
 
 **Release date:** August 26, 2026
@@ -1888,7 +1939,7 @@ The native app (macOS DMG / Windows EXE) renders inside a system WebView — WKW
 
 Until now, running FolioOrb meant having Python on your machine and a comfortable relationship with a terminal. v4.3 removes that entirely. There are now real installers — a **`.dmg`** for macOS (Apple Silicon) and a clean per-user **`.exe`** for Windows — that drop a native app on your machine and open the dashboard in its own window. The FastAPI server still runs locally; it just runs *inside* the app now instead of a terminal tab you have to keep alive.
 
-**One-click installers.** Download the [macOS DMG](https://github.com/udhawan97/FolioOrb/releases/latest) or [Windows installer](https://github.com/udhawan97/FolioOrb/releases/latest), launch it, and you're in. Your database and `.env` live in the per-user data directory (`~/Library/Application Support/FolioOrb` on macOS, `%APPDATA%\FolioOrb` on Windows) — never inside the app bundle — so updates and uninstalls leave your portfolio untouched.
+**One-click installers.** Download the [macOS DMG](https://github.com/udhawan97/FolioOrb/releases/latest) or [Windows installer](https://github.com/udhawan97/FolioOrb/releases/latest), launch it, and you're in. Your database and `.env` live in the per-user data directory (`~/Library/Application Support/FolioOrb` on macOS, `%LOCALAPPDATA%\FolioOrb\FolioOrb` on Windows) — never inside the app bundle — so updates and uninstalls leave your portfolio untouched.
 
 **An automated, honest release pipeline.** Every version tag builds both platforms in GitHub Actions, smoke-tests that the frozen app actually boots, and only *then* publishes the installers plus a `SHA256SUMS.txt` to GitHub Releases. A broken build can never replace a good download. Every merge to `main` also refreshes a rolling `latest-main` prerelease for early testers, kept clearly separate from stable.
 

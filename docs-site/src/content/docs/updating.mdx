@@ -62,12 +62,21 @@ lives for [macOS](/FolioOrb/install-macos/#where-your-data-lives) and
 
 ## Installed from source or a script?
 
+For a manual clone, update the checkout and restart it through the repository
+launcher so the same runtime-profile checks apply:
+
 ```bash
 cd FolioOrb
 git pull
 python -m pip install -r requirements.txt
-python run.py
+./scripts/start.sh
 ```
 
-Re-running the [install scripts](/FolioOrb/build-from-source/#one-line-install-scripts)
-is also safe — they preserve your existing `.env` and `database/` files.
+On Windows, use `.\scripts\start.ps1` after `git pull` and dependency installation.
+
+For a one-line install, re-run the same
+[install script](/FolioOrb/build-from-source/#one-line-install-scripts). It stages the replacement,
+keeps SQLite, `.env`, Backup Vault, settings, policy, logs, and update state in the
+external source profile, and restores the prior code tree if environment setup fails.
+Afterward, launch from the generated Desktop shortcut (or the installed root launcher),
+which carries the exact absolute profile path.

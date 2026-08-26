@@ -10,7 +10,7 @@ installs without administrator rights and registers a clean uninstaller.
 
 <Steps>
 
-1. Download `FolioOrb-Windows-x64-v5.16.0-Setup.exe` from the
+1. Download `FolioOrb-Windows-x64-v5.16.1-Setup.exe` from the
    [latest release](https://github.com/udhawan97/FolioOrb/releases/latest).
 
 2. Run it. If prompted about the WebView2 runtime, let it install — it's a small Microsoft
@@ -45,12 +45,14 @@ against the published `SHA256SUMS.txt`. Windows code signing is on the
 | What | Location |
 | --- | --- |
 | Program files | `%LOCALAPPDATA%\Programs\FolioOrb` |
-| Portfolio database | `%APPDATA%\FolioOrb\database\` |
-| Config (`.env`) | `%APPDATA%\FolioOrb\.env` |
+| Portfolio database | `%LOCALAPPDATA%\FolioOrb\FolioOrb\database\` |
+| Config (`.env`) | `%LOCALAPPDATA%\FolioOrb\FolioOrb\.env` |
+| One-line source install profile | `%LOCALAPPDATA%\FolioOrb-source` |
 
 Your data sits outside the program folder, so updating or reinstalling never touches it.
 
 ## Uninstall
 
 Open **Settings → Apps → Installed apps**, find **FolioOrb**, and choose **Uninstall**.
-To also remove your data, delete `%APPDATA%\FolioOrb`.
+To also remove packaged-app data, delete `%LOCALAPPDATA%\FolioOrb\FolioOrb`. If you used
+the one-line source installer, its separate profile is `%LOCALAPPDATA%\FolioOrb-source`.

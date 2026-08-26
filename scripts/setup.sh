@@ -3,6 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+if [[ -z "${FOLIOORB_DATA_DIR:-}" && -f .source-profile-path ]]; then
+  IFS= read -r FOLIOORB_DATA_DIR < .source-profile-path
+  export FOLIOORB_DATA_DIR
+fi
+PROFILE_DIR="${FOLIOORB_DATA_DIR:-.}"
+
 NO_START=0
 if [[ "${1:-}" == "--no-start" ]]; then
   NO_START=1
@@ -43,9 +49,9 @@ echo "Installing dependencies..."
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
-mkdir -p database
+mkdir -p "$PROFILE_DIR/database"
 
-if [[ ! -f .env ]]; then
+if [[ ! -f "$PROFILE_DIR/.env" ]]; then
   SECRET_KEY="$(python - <<'PY'
 import secrets
 print(secrets.token_hex(32))
@@ -58,7 +64,7 @@ PY
     read -r ANTHROPIC_API_KEY
   fi
 
-  cat > .env <<EOF
+  cat > "$PROFILE_DIR/.env" <<EOF
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 SECRET_KEY=${SECRET_KEY}
 DEBUG=True
@@ -68,7 +74,7 @@ DEFAULT_HOLDINGS=
 EOF
   echo "Created .env with local defaults."
 else
-  echo "Using existing .env."
+  echo "Using existing $PROFILE_DIR/.env."
 fi
 
 if [[ "$NO_START" -eq 1 ]]; then

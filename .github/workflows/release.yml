@@ -166,6 +166,78 @@ jobs:
           python -m pytest -q
           tests/test_backup_policy.py
           tests/test_backup_service.py
+      - name: Exercise Windows source installer and parser gate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($script in @("scripts/install-win.ps1", "scripts/setup.ps1", "scripts/start.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script), [ref]$tokens, [ref]$errors
+            ) | Out-Null
+            if ($errors.Count) { throw "$script failed PowerShell parsing: $errors" }
+          }
+
+          $sandbox = Join-Path $env:RUNNER_TEMP "folioorb-source-installer"
+          $env:FOLIOORB_INSTALL_DIR = Join-Path $sandbox "install"
+          $env:FOLIOORB_DATA_DIR = Join-Path $sandbox "profile with spaces"
+          $env:FOLIOORB_SHORTCUT = Join-Path $sandbox "Desktop\FolioOrb.lnk"
+          $env:FOLIOORB_INSTALL_NO_START = "1"
+          $env:FOLIO_REF = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "main" }
+
+          New-Item -ItemType Directory -Force -Path "$env:FOLIOORB_INSTALL_DIR\database" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:FOLIOORB_INSTALL_DIR\backups" | Out-Null
+          @'
+          import os
+          import sqlite3
+          from pathlib import Path
+
+          install = Path(os.environ["FOLIOORB_INSTALL_DIR"])
+          with sqlite3.connect(install / "database" / "portfolio.db") as connection:
+              connection.execute("CREATE TABLE proof (value TEXT NOT NULL)")
+              connection.execute("INSERT INTO proof VALUES ('preserved')")
+              connection.commit()
+          '@ | python -
+          Set-Content "$env:FOLIOORB_INSTALL_DIR\.env" "DATABASE_URL=sqlite:///./database/portfolio.db"
+          Set-Content "$env:FOLIOORB_INSTALL_DIR\settings.json" '{"notify_updates":false}'
+          Set-Content "$env:FOLIOORB_INSTALL_DIR\backups\manual.db" "backup-fixture"
+
+          & .\scripts\install-win.ps1
+          if ($LASTEXITCODE -ne 0) { throw "First source install failed." }
+          if (-not (Test-Path "$env:FOLIOORB_DATA_DIR\settings.json")) { throw "Settings were not migrated." }
+          if (-not (Test-Path "$env:FOLIOORB_DATA_DIR\backups\manual.db")) { throw "Backup Vault was not migrated." }
+          if (-not (Test-Path $env:FOLIOORB_SHORTCUT)) { throw "Source shortcut was not created." }
+          $pointer = (Get-Content "$env:FOLIOORB_INSTALL_DIR\.source-profile-path" -Raw).Trim()
+          if ($pointer -ne $env:FOLIOORB_DATA_DIR) { throw "Persisted profile path is not exact and absolute." }
+          @'
+          import os
+          import sqlite3
+          from pathlib import Path
+
+          database = Path(os.environ["FOLIOORB_DATA_DIR"]) / "database" / "portfolio.db"
+          with sqlite3.connect(database) as connection:
+              assert connection.execute("SELECT value FROM proof").fetchone() == ("preserved",)
+          '@ | python -
+
+          $parent = Split-Path $env:FOLIOORB_INSTALL_DIR
+          $leaf = Split-Path $env:FOLIOORB_INSTALL_DIR -Leaf
+          $recoveries = @(Get-ChildItem $parent -Directory -Filter "$leaf-profile-recovery-*")
+          if ($recoveries.Count -ne 1) { throw "Expected exactly one first-migration recovery copy." }
+
+          & .\scripts\install-win.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Routine source update failed." }
+          $after = @(Get-ChildItem $parent -Directory -Filter "$leaf-profile-recovery-*")
+          if ($after.Count -ne 1) { throw "Routine update created or removed a recovery copy." }
+          @'
+          import os
+          import sqlite3
+          from pathlib import Path
+
+          database = Path(os.environ["FOLIOORB_DATA_DIR"]) / "database" / "portfolio.db"
+          with sqlite3.connect(database) as connection:
+              assert connection.execute("SELECT value FROM proof").fetchone() == ("preserved",)
+          '@ | python -
       - name: Build app bundle
         run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
       - name: Smoke test the frozen bundle

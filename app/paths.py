@@ -55,6 +55,25 @@ def _source_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _source_profile_override() -> Path | None:
+    """Read the source installer's durable-profile pointer without writing."""
+    pointer = _source_root() / ".source-profile-path"
+    if not pointer.exists():
+        return None
+    if not pointer.is_file() or pointer.is_symlink():
+        raise ProfileConfigurationError(".source-profile-path must be a regular file.")
+    try:
+        value = pointer.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise ProfileConfigurationError(".source-profile-path could not be read.") from exc
+    configured = Path(value).expanduser() if value else Path()
+    if not value or not configured.is_absolute():
+        raise ProfileConfigurationError(
+            ".source-profile-path must contain one absolute writable profile path."
+        )
+    return configured.resolve()
+
+
 def _frozen_data_root() -> Path:
     from platformdirs import user_data_dir
 
@@ -209,11 +228,14 @@ def resolve_runtime_profile() -> RuntimeProfile:
     ``sqlite:///./database/portfolio.db`` remains valid and is normalized against
     the source root rather than the caller's working directory.
     """
-    override = os.getenv("FOLIOORB_DATA_DIR", "").strip()
-    explicit = bool(override)
+    environment_override = os.getenv("FOLIOORB_DATA_DIR", "").strip()
     frozen = is_frozen()
-    if explicit:
-        root = Path(override).expanduser().resolve()
+    pointer_override = None if frozen or environment_override else _source_profile_override()
+    explicit = bool(environment_override or pointer_override)
+    if environment_override:
+        root = Path(environment_override).expanduser().resolve()
+    elif pointer_override:
+        root = pointer_override
     else:
         root = _frozen_data_root() if frozen else _source_root().resolve()
 

@@ -66,7 +66,7 @@ async function toWebp(pngBuffer, name, outWidth) {
   if (name === 'readme-dashboard') {
     await sharp(pngBuffer)
       .resize({ width: outWidth, withoutEnlargement: true })
-      .webp({ quality: 82, effort: 6 })
+      .webp({ quality: 92, smartSubsample: true, effort: 6 })
       .toFile(README_DASHBOARD_OUT);
     return README_DASHBOARD_OUT;
   }
@@ -74,18 +74,18 @@ async function toWebp(pngBuffer, name, outWidth) {
   const out = join(OUT_DIR, `${name}.webp`);
   await sharp(pngBuffer)
     .resize({ width: outWidth, withoutEnlargement: true })
-    .webp({ quality: 82, effort: 6 })
+    .webp({ quality: 92, smartSubsample: true, effort: 6 })
     .toFile(out);
   if (name === 'plan-protect-demo') {
     await sharp(pngBuffer)
       .resize({ width: 1600, withoutEnlargement: true })
-      .webp({ quality: 82, effort: 6 })
+      .webp({ quality: 92, smartSubsample: true, effort: 6 })
       .toFile(README_PLAN_OUT);
   }
   if (name === 'review-inbox-demo') {
     await sharp(pngBuffer)
       .resize({ width: 1600, withoutEnlargement: true })
-      .webp({ quality: 82, effort: 6 })
+      .webp({ quality: 92, smartSubsample: true, effort: 6 })
       .toFile(README_REVIEW_OUT);
   }
   return out;
@@ -104,6 +104,7 @@ async function main() {
 
   console.log(`Loading ${BASE_URL} ...`);
   await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 45000 });
+  await page.evaluate(() => document.fonts?.ready);
   // Dismiss any first-run modal / tooltip and the onboarding banners so the
   // hero shows the dashboard itself, not setup chrome.
   await page.keyboard.press('Escape').catch(() => {});
@@ -159,6 +160,7 @@ async function main() {
         await page.waitForSelector(`[data-review-pane="${shot.reviewTab}"]`, {
           state: 'visible', timeout: 15000,
         });
+        await page.evaluate(() => document.fonts?.ready);
         await sleep(3000);
         if (shot.reviewScrollTop) {
           await page.locator('.review-orbit-body').evaluate(

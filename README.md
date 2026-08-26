@@ -2,196 +2,150 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/img/brand/folio-orbit-mark-light-animated.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/img/brand/folio-orbit-mark-dark-animated.svg">
-    <img src="static/img/brand/folio-orbit-mark-dark-animated.svg" alt="FolioOrb" width="285">
+    <img src="static/img/brand/folio-orbit-mark-dark-animated.svg" alt="FolioOrb" width="260">
   </picture>
 </p>
 
 <h1 align="center">FolioOrb</h1>
 
-<p align="center"><em>Your folio, finally making sense.</em></p>
+<p align="center"><strong>See what changed. Decide what deserves attention. Keep the record.</strong></p>
 
 <p align="center">
-  A local-first portfolio review dashboard that brings holdings, market context, risk, news,<br>
-  planning, and records into one explainable workflow — without connecting to a brokerage.
+  FolioOrb is a local-first portfolio review dashboard for people who want the reasoning behind
+  the number. It turns holdings, public market context, risk, news, and optional Claude narration
+  into an explainable review loop—without a FolioOrb account, cloud sync, telemetry, brokerage
+  connection, or automatic trades.
 </p>
 
 <p align="center">
-  <strong>Runs on your machine</strong> — use it in your browser as a local web app, or install it as a
-  <br>desktop app on macOS or Windows. No FolioOrb account, cloud sync, telemetry, or brokerage connection.
+  <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><strong>Download the latest stable release</strong></a>
+  · <a href="https://udhawan97.github.io/FolioOrb/"><strong>Explore FolioOrb</strong></a>
+  · <a href="https://udhawan97.github.io/FolioOrb/get-started/introduction/"><strong>Read the docs</strong></a>
 </p>
 
 <p align="center">
-  <sub>Market and filing lookups use named public providers, and News can load remote thumbnails. With an Anthropic key configured, credential-only availability checks run periodically; Claude prompts send bounded derived context only for Claude-backed actions. The local database is never uploaded.</sub>
-</p>
-
-<p align="center">
-  <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><strong>Open the latest stable release</strong></a> ·
-  <a href="https://udhawan97.github.io/FolioOrb/download/"><strong>Choose how to install</strong></a> ·
-  <a href="https://udhawan97.github.io/FolioOrb/get-started/introduction/"><strong>Read the docs</strong></a>
-</p>
-
-<p align="center">
-  <a href="https://udhawan97.github.io/FolioOrb/">
-    <img src="static/img/brand/visit-website.svg" alt="Explore the live website — real product demos, downloads, and docs" width="440">
-  </a>
-</p>
-
-<p align="center">
-  <sub><a href="https://udhawan97.github.io/FolioOrb/"><strong>udhawan97.github.io/FolioOrb</strong></a> — watch the dashboard work, then run it yourself.</sub>
-</p>
-
-<p align="center">
-  <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><img src="https://img.shields.io/github/v/release/udhawan97/FolioOrb?style=flat-square&color=brightgreen" alt="Latest release"></a>
-  <a href="https://github.com/udhawan97/FolioOrb/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/udhawan97/FolioOrb/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/udhawan97/FolioOrb/releases"><img src="https://img.shields.io/github/downloads/udhawan97/FolioOrb/total?style=flat-square&color=blue" alt="Downloads"></a>
-  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-555?style=flat-square" alt="macOS, Windows, Linux">
+  <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><img src="https://img.shields.io/github/v/release/udhawan97/FolioOrb?style=flat-square&color=6fd6f0" alt="Latest stable release"></a>
+  <a href="https://github.com/udhawan97/FolioOrb/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/udhawan97/FolioOrb/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square" alt="Apache 2.0 License"></a>
-</p>
-
-<p align="center">
-  <a href="#run-it-your-way">🚀 Run it</a> ·
-  <a href="#what-it-does">🧠 Features</a> ·
-  <a href="https://udhawan97.github.io/FolioOrb/">🌐 Website &amp; Docs</a> ·
-  <a href="#for-developers">🛠️ Developers</a>
 </p>
 
 ---
 
-## Run It Your Way
+## Run it your way
 
-FolioOrb is the same dashboard whichever way you launch it — a local server that renders in a browser view. Pick what fits you:
+The desktop and browser paths run the same FastAPI + SQLite dashboard on your machine.
 
-| | 🌐 Web app | 🖥️ Desktop app |
-| --- | --- | --- |
-| **What you get** | Run it from source; use it in your browser at `localhost:8000` | A ready-to-run installer that opens the dashboard in its own window |
-| **You need** | Python 3.11+ | Nothing — it's fully self-contained |
-| **Platforms** | macOS · Windows · Linux | macOS (Apple Silicon) · Windows (x64) |
-| **Get started** | [Setup ↓](#setup) | Download below |
+| Path | Supported systems | What you need | Start here |
+| --- | --- | --- | --- |
+| **macOS desktop** | Apple Silicon · macOS 11+ | Nothing else | [Latest `.dmg`](https://github.com/udhawan97/FolioOrb/releases/latest) · [Install guide](https://udhawan97.github.io/FolioOrb/install-macos/) |
+| **Windows desktop** | x64 · Windows 10/11 | WebView2 if Windows asks for it | [Latest `.exe`](https://github.com/udhawan97/FolioOrb/releases/latest) · [Install guide](https://udhawan97.github.io/FolioOrb/install-windows/) |
+| **Local browser app** | macOS · Windows · Linux | Python 3.11+ | [Build from source](https://udhawan97.github.io/FolioOrb/build-from-source/) |
 
-**Desktop downloads** — no Python, no terminal:
+> [!IMPORTANT]
+> Desktop builds are not Developer ID/notarization or Authenticode signed yet. macOS and Windows
+> show a first-launch warning. Download only from the official release page and compare the file
+> with the included `SHA256SUMS.txt`; current releases provide checksum integrity, not a Minisign
+> authenticity signature.
 
-| Platform | Download | Install guide |
-| --- | --- | --- |
-| **macOS** (Apple Silicon) | [**Open latest release → choose the .dmg**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on macOS](https://udhawan97.github.io/FolioOrb/install-macos/) |
-| **Windows** (x64) | [**Open latest release → choose the .exe**](https://github.com/udhawan97/FolioOrb/releases/latest) | [Install on Windows](https://udhawan97.github.io/FolioOrb/install-windows/) |
+## One review loop
 
-> **Heads up:** early builds aren't code-signed yet, so the first launch shows a warning on both macOS and Windows — expected for an open-source app. The [install guides](https://udhawan97.github.io/FolioOrb/download/) show exactly what you'll see, and every release ships a `SHA256SUMS.txt` so you can [verify your download](https://udhawan97.github.io/FolioOrb/download/#verify-your-download).
+1. **Add holdings or research ideas.** Type them in, use the strict local CSV template, or ask
+   Claude to map a bounded sample from a messy export. Research-only rows stay outside portfolio
+   math until shares are added.
+2. **Read the whole picture.** FolioOrb combines usable USD quotes, cost basis, allocation,
+   concentration, risk, filings, dividends, and news. Missing, stale, foreign-currency, or partial
+   inputs stay visible instead of turning into confident zeroes.
+3. **Review what needs attention.** Review Orbit separates data gaps, thesis work, reminders,
+   comparison, target planning, and read-only buy rehearsal. Nothing in the workspace places a
+   trade or changes a position by itself.
+4. **Keep the evidence.** Save review HTML/CSV, a data-health receipt, target snapshot, annual
+   realized-sales recap, readable records ZIP, verified SQLite backup, or one checksummed review
+   bundle.
 
-## What It Does
+<p align="center">
+  <img src="docs/dashboard.webp" alt="FolioOrb overview for a fictional demo portfolio, showing known USD value, today's impact, sector exposure, and a local briefing" width="900">
+  <br>
+  <sub>The current dashboard with fictional demo holdings. Values are illustrative; missing data remains explicit.</sub>
+</p>
 
-Most portfolio trackers stop at the number. Green means good, red means bad — and if you want to know *why*, that's a separate tab, a separate app, or a group chat with someone who read the news this morning and you didn't.
+## What FolioOrb helps you answer
 
-FolioOrb closes that gap: holdings, live prices, risk math, market regime, news, SEC filings, and optional Claude-written narration, all in one place that runs on your own machine without a FolioOrb account, telemetry, or cloud sync. It doesn't connect to a brokerage and it doesn't place trades — but it will tell you, with a straight face, whether your "diversified" portfolio is actually just four tech stocks in a trench coat.
-
-| Do this | Get this |
+| Question | FolioOrb surface |
 | --- | --- |
-| 📊 Add invested holdings | Live value, cost basis, daily change, unrealized gain, and allocation |
-| 🔬 Track research ideas | Keep watchlist tickers in Holdings and News without letting them enter P&L, allocation, briefings, action plans, or projections until you add shares |
-| ✂️ Record a sale | Reduce a holding and it logs the realized gain/loss — at the *actual* sale price and date you choose, not just today's |
-| 🗂️ Keep separate portfolios | Give your taxable, IRA, and fun-money accounts their own scoreboards — the whole dashboard re-scopes to the one you pick |
-| 🧭 Open a ticker | A Hold / Add / Trim / Exit verdict with confidence, horizon, and scenario context |
-| ✅ Check the action plan | Bucketed portfolio moves with thesis text, priorities, and regime context |
-| 📈 Open Analytics | Performance, risk, exposure, beta, drawdown, volatility, sector tilt, and signals |
-| 💸 Check what your funds cost | Each fund's expense ratio as real dollars per year — and what it compounds to over a decade. "Fee unknown" stays unknown; it never quietly becomes $0 |
-| 🧬 Compare your ETFs | Whether the funds you own are quietly the same bet — pairwise overlap across their top-10 holdings, labelled for exactly what it measures |
-| 💵 See what pays you | Annual dividend income at your position size, blended yield, and an ex-dividend heads-up. Non-payers are named, never counted as $0 |
-| 🗓️ See *when* it pays you | A twelve-month calendar of dividend income, built from each payer's real ex-dates — a monthly REIT and a quarterly stock land in their own months, never an assumed rhythm |
-| 📓 Write your thesis | The reason you own each holding, in your own words, on the holding itself — write it when conviction is easy to explain, read it back when it isn't. Claude never reads or writes it |
-| 🕵️ Watch the insiders | Recent open-market buys and sells by a company's own officers and directors (SEC Form 4) — grants and tax withholding shown but never counted as conviction |
-| 📊 Read the financials | Revenue, margin, and EPS by year from what a company actually filed (SEC XBRL) — missing numbers stay blank, never a fabricated zero |
-| 🗞️ Open News | Grouped headlines for everything you hold or watch, plus optional Claude themes |
-| 🗂️ Read the filings | What your companies actually told the SEC — 8-K, 10-Q, 10-K — pulled straight from EDGAR and linked to the source. Public record, no key, no middleman |
-| 📥 Import / export CSV | Move holdings in and out — a strict template locally, or let Claude map a messy brokerage export onto it |
-| 🔁 Set up a DCA plan | Mirror a recurring auto-invest locally: each interval's buy is priced at that day's *real* close and waits in a review bucket you apply or undo through an explicit in-app confirmation |
-| 🧭 Open Review Orbit | One calm workspace gathers attention, data trust, reports, comparison, planning, records, and backup protection — prioritised locally, with no automatic trades |
-| 🎛️ Triage the review inbox | Switch between all items, urgent data gaps, work that needs review, and quiet reminders without changing the underlying queue |
-| 🧾 Keep a data-health receipt | Save coverage, missing tickers, sources, caveats, and snapshot freshness as a local CSV — partial stays partial |
-| ⚖️ Set a target course | Assign exact basis-point targets across the holdings you own, then compare target and actual allocation only when every required USD quote is usable |
-| 📐 Save the target snapshot | Export the saved target course, actual weights, descriptive drift, known USD value, and every quote exclusion without placing a trade |
-| ↩️ Continue where you left off | Review Orbit restores the last tab, Inbox filter, and Month/Quarter review choice from local browser/app storage |
-| 🧪 Rehearse a buy | Preview shares, average cost, and projected allocation for an external-cash USD buy in a ticker you already own — read-only, buy-only, never a recommendation, and marked outdated as soon as its inputs change |
-| 🗂️ See every Portfolio | Compare known USD value and quote completeness across separate books without inventing an aggregate performance number |
-| 🧾 Export annual realized sales | Download a calendar-year average-cost recap from stored sale facts; it is a record, not tax-lot or tax-filing software |
-| 📦 Carry readable records | Export a checksummed ZIP of human-readable Portfolio, holding, sale, snapshot, and DCA CSVs; secrets and app internals stay out |
-| 🛡️ Check data trust | See price, quote, fund-fee, dividend, ETF-overlap, thesis, and stored-history coverage before treating a read as complete. Missing stays missing |
-| 💾 Back up locally | See manual-backup freshness, create/verify/export/restore standalone SQLite snapshots, or opt into one verified automatic snapshot per local day. Every vault copy stays on this device |
-| 📝 Run a monthly review | Build a monthly or quarterly pack from current valuation, stored snapshots, realized trades, movers, and thesis attention; save it as print-ready HTML or CSV |
-| ⏱️ Put theses on a cadence | Mark a holding thesis reviewed and choose when it should return to the inbox — or keep it uncadenced |
-| ⚖️ Compare research ideas | Compare two or three research-mode stocks by stock fundamentals, or ETFs by fund-specific data and published-holdings overlap |
-| 🔐 Paste a Claude key | The dashboard validates its format, saves it locally, then checks Anthropic; it shows connected only when the live check succeeds — no restart (disconnect any time) |
-
-> **Local Intelligence is not a downgraded mode.** It's the deterministic engine that runs the dashboard by default. Claude adds narration *on top* — it never gates the core experience, and everything it generates is cached in SQLite so refreshing doesn't mean paying again.
-
-> **Honest when the network isn't.** If market data can't be reached, FolioOrb keeps your last-known values and says so — it never flashes a scary $0 or writes a bogus day into your performance history.
+| **What changed today?** | Known USD value, daily contribution, movers, portfolio briefing, and source freshness |
+| **What am I actually exposed to?** | Allocation, sector tilt, overlap, concentration, beta, drawdown, volatility, and benchmark context |
+| **What deserves attention?** | Filterable Review Inbox, thesis cadence, data-health coverage, verdict calibration, and upcoming events |
+| **What course did I choose?** | Exact basis-point targets, target-versus-actual drift, quote exclusions, and read-only buy rehearsal |
+| **What can I carry forward?** | Review packs, receipts, snapshots, readable records, sale recaps, verified backups, and review bundles |
 
 <p align="center">
-  <img src="docs/dashboard.webp" alt="The FolioOrb dashboard showing a demo portfolio: total value, today's P&amp;L, sector map, and today's impact" width="820">
+  <img src="docs/review-inbox.webp" alt="Review Orbit Inbox for fictional demo holdings, separating thesis work, calibration, and an upcoming event" width="900">
   <br>
-  <sub><em>The real dashboard, running a demo portfolio. Local market context, optional Claude explanations. Still not financial advice. Very much a dashboard.</em></sub>
+  <sub>Filters change the view, not the underlying queue. The total stays visible.</sub>
 </p>
 
 <p align="center">
-  <img src="docs/review-inbox.webp" alt="Review Orbit using fictional demo holdings, with local filters for all items, data gaps, work needing review, and quiet reminders" width="820">
+  <img src="docs/plan-protect.webp" alt="Review Orbit Plan and Protect for fictional demo holdings, showing target allocation and a read-only buy rehearsal" width="900">
   <br>
-  <sub><em>The Review Inbox uses fictional demo data. Filters change the view, not the queue, and the total remains visible.</em></sub>
+  <sub>Planning is descriptive and local. Missing quotes remain exclusions; rehearsals never place orders.</sub>
 </p>
 
-<p align="center">
-  <img src="docs/plan-protect.webp" alt="Review Orbit Plan and Protect showing all-Portfolio known value, target-versus-actual allocation, and a buy rehearsal for fictional demo holdings" width="820">
-  <br>
-  <sub><em>Plan &amp; Protect uses demo data here. Missing quotes stay visible, rehearsals are read-only, and records exports remain local.</em></sub>
-</p>
+## Local-first, with exact boundaries
 
-## Meet Senpai
+| Stays on your machine | Leaves only for a named job | FolioOrb never does |
+| --- | --- | --- |
+| Holdings, shares, costs, notes, thesis text, snapshots, backups, settings, generated receipts, and cached summaries | Tickers/date ranges to public market and filing providers; release checks to GitHub; bounded derived context to Claude only for Claude-backed actions | Connect to a brokerage, place a trade, upload the SQLite database, add telemetry, convert foreign quotes into USD, or hide missing data behind zero |
 
-<img src="static/img/brand/folio-orbit-icon.svg" alt="Senpai" width="54" align="left">
+Claude is optional. Local Intelligence owns deterministic verdicts, portfolio math, scenarios, and
+review prioritization. When a key is configured, FolioOrb performs credential-only availability
+checks and can send bounded derived context for the Claude actions you invoke. The precise provider
+and prompt boundaries are documented in [Privacy & Data Handling](https://udhawan97.github.io/FolioOrb/privacy/).
 
-**Senpai** is the small orbiting mark beside the dashboard — it watches your portfolio so you don't have to stare at it alone. It reads the room: sharp when Claude is narrating, dry on Local Intelligence, quietly sympathetic when Claude is offline. Tap it for a new line; on a phone it stays in its own row below the financial content and expands only when you ask. Senpai doesn't manage your portfolio. Senpai has *opinions* about your portfolio. [Say hello →](https://udhawan97.github.io/FolioOrb/meet-senpai/)
-
-<br clear="left">
-
-## Setup
-
-Two ways to run FolioOrb — the same app either way. Your holdings and `.env` are always kept out of the app itself, so updates and reinstalls never touch your data.
+## Install
 
 <details open>
-<summary><strong>🌐 Run as a web app — from source (macOS · Windows · Linux)</strong></summary>
+<summary><strong>Run from source in your browser</strong></summary>
 
-<br>
-
-Needs **Python 3.11+**. Clone, run the setup script once, and the dashboard opens in your browser:
+Requires Python 3.11+:
 
 ```bash
 git clone https://github.com/udhawan97/FolioOrb.git
 cd FolioOrb
-./scripts/setup.sh          # Windows (PowerShell): .\scripts\setup.ps1
+./scripts/setup.sh
 ```
 
-The setup script creates a virtual environment, installs dependencies, writes a local `.env`, prepares `database/`, and starts the app at <http://localhost:8000>. After the first run, start it any time with `./scripts/start.sh` (or `.\scripts\start.ps1`) and open that URL in any browser.
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/udhawan97/FolioOrb.git
+cd FolioOrb
+.\scripts\setup.ps1
+```
+
+The setup script creates a virtual environment, installs dependencies, prepares a local profile,
+and starts FolioOrb at <http://localhost:8000>. Later launches use `./scripts/start.sh` or
+`.\scripts\start.ps1`.
 
 </details>
 
 <details>
-<summary><strong>🖥️ Install the desktop app (macOS · Windows)</strong></summary>
+<summary><strong>Install the desktop app</strong></summary>
 
-<br>
+- **macOS Apple Silicon:** open the latest `.dmg`, drag FolioOrb to Applications, then follow the
+  [Gatekeeper steps](https://udhawan97.github.io/FolioOrb/install-macos/).
+- **Windows x64:** run the latest setup `.exe`, allow WebView2 if requested, then follow the
+  [SmartScreen steps](https://udhawan97.github.io/FolioOrb/install-windows/).
 
-No Python required — the installer bundles everything and runs the same dashboard in its own window:
-
-- **macOS (Apple Silicon):** download the [`.dmg`](https://github.com/udhawan97/FolioOrb/releases/latest), open it, and drag **FolioOrb** to Applications. [Full guide](https://udhawan97.github.io/FolioOrb/install-macos/)
-- **Windows (x64):** download the [`.exe`](https://github.com/udhawan97/FolioOrb/releases/latest) and run the installer. [Full guide](https://udhawan97.github.io/FolioOrb/install-windows/)
-
-The app checks for updates in the background and installs them only with your go-ahead. Your database and `.env` live in your per-user data directory, never inside the app.
+The app stores its writable profile outside the installed bundle, so reinstalling or updating the
+program does not intentionally replace the portfolio database or `.env`.
 
 </details>
 
 <details>
-<summary><strong>⚡ One-line install (web app, from source)</strong></summary>
+<summary><strong>Use the one-line source installer</strong></summary>
 
-<br>
-
-Downloads the latest release and sets up a local Python environment for you. Read the scripts first — they're short: [mac](scripts/install-mac.sh) · [win](scripts/install-win.ps1).
+Read the scripts first: [macOS/Linux](scripts/install-mac.sh) · [Windows](scripts/install-win.ps1).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-mac.sh | bash
@@ -201,207 +155,75 @@ curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/ins
 irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-win.ps1 | iex
 ```
 
-Set `FOLIO_REF` (e.g. `latest-main`) to install a specific tag or the dev channel.
+Set `FOLIO_REF` to pin a stable tag from `v5.16.0` onward or use the `latest-main`
+development channel.
+One-line installs keep SQLite, `.env`, backups, settings, and update state in a durable per-user
+profile outside the replaceable source tree. The first upgrade from an older layout performs a
+verified migration and retains the prior install as a recovery copy.
 
 </details>
 
-<details>
-<summary><strong>🔐 Optional: connect Claude</strong></summary>
+## Updates, backups, and recovery
 
-<br>
+- The desktop app checks GitHub for updates and installs only after you approve.
+- A verified safety backup is required before an update, migration, restore, or duplicate-row
+  recovery changes the active database.
+- Custom profiles must keep `DATABASE_URL` inside `FOLIOORB_DATA_DIR`; split profiles fail before
+  FolioOrb creates writable state.
+- Automatic backups are opt-in. Manual, update, restore, and automatic snapshots remain local.
+- Duplicate active ticker rows are never guessed between. The recovery window shows every stored
+  field, requires one explicit keeper per group, archives the other active rows, and records no sale.
 
-FolioOrb works fully without Claude — Local Intelligence handles verdicts, analytics, and summaries on its own. To add Claude-backed narration and CSV assistance, provide an Anthropic key either in the dashboard (click the **key icon beside the brand**, paste an `sk-ant-*` key) or in `.env` (`ANTHROPIC_API_KEY=...`, then restart). The key format is validated before it's saved. While a key remains configured, a credential-only Anthropic availability check runs periodically even in Local mode; it sends no prompt or portfolio context.
+See [Updating](https://udhawan97.github.io/FolioOrb/updating/),
+[Review Orbit](https://udhawan97.github.io/FolioOrb/dashboard/review-orbit/), and
+[Troubleshooting](https://udhawan97.github.io/FolioOrb/troubleshooting/) for the complete workflows.
 
-</details>
+## Limitations worth knowing
 
-## 📦 Review Bundle with manifest — New in v5.16.0
+- Desktop installers are currently unsigned; checksum verification is available on every release.
+- The packaged macOS build is Apple Silicon only. Intel macOS and Linux use the source path.
+- Portfolio totals are USD-only. Foreign-currency quotes are named and excluded; FolioOrb has no
+  FX conversion path.
+- Realized sales use stored average cost. FolioOrb is not tax-lot or tax-filing software.
+- Provider data can be delayed, partial, revised, or unavailable. FolioOrb labels those conditions
+  and keeps last-known values when appropriate.
+- FolioOrb is an analysis and record-keeping tool, not financial advice or an execution platform.
 
-FolioOrb v5.16.0 adds **Save review bundle** to the Month/Quarter Review
-Pack. One local ZIP carries the print-ready report, spreadsheet report,
-data-health receipt, saved target-plan snapshot, and a JSON manifest with
-quality context and SHA-256 hashes for every non-manifest review artifact.
-
-Those hashes help detect member corruption; they do not authenticate the ZIP or
-prove who created it.
-
-Bundle assembly reuses one in-memory quote response set and writes no portfolio
-state. Foreign-priced positions stay outside USD totals, missing values remain
-missing, and an unsaved target draft blocks export.
-
-v5.16 also keeps CSV imports responsive while provider or Claude work is in
-flight, enforces one active row per Portfolio/ticker under concurrent writers,
-and fails closed before any filesystem write when a custom database and data
-root do not describe one coherent runtime profile.
-
-## 🧾 Review, Filter, Keep the Receipt — New in v5.15.0
-
-Review Orbit now separates **Data gaps**, **Needs review**, and **On the radar**
-without hiding the total queue. It also remembers the last Review tab, Inbox
-filter, and Month/Quarter Review Pack choice on this device, so reopening the
-workspace returns to the same context instead of starting over.
-
-Two new CSV receipts make a review portable without creating another source of
-portfolio math. **Save data health CSV** records coverage, missing tickers,
-sources, caveats, and snapshot freshness. **Save plan CSV** records persisted
-target basis points, current allocation, descriptive drift, known USD value,
-and quote exclusions. When valuation is partial, both files say so and leave
-unavailable values unavailable.
-
-The v5.14 dialog safeguards remain underneath the workflow: all eight modal
-surfaces contain the keyboard, restore focus to a durable landmark, and stack
-correctly.
-
-Plan & Protect remains deliberately bounded. FolioOrb does not connect to a
-brokerage or place trades; targets are not recommendations; rehearsals do not
-forecast prices or model taxes; annual realized recaps are not tax filings; and a
-portable ZIP is sensitive human-readable data, not a restore package.
-
-Got a feature you'd fight for? [Open an issue](https://github.com/udhawan97/FolioOrb/issues/new) — Senpai reads every one and has opinions about most.
-
-## For Developers
-
-A compact FastAPI + SQLite + vanilla-JS app with no frontend build step — easy to run and pull apart one service at a time. It's a plain web app at heart; the desktop builds just wrap that same app in a native window.
-
-<details>
-<summary><strong>Setup, run, and quality checks</strong></summary>
-
-<br>
+## For developers
 
 ```bash
-python3 -m venv venv && source venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-cp .env.example .env
-python run.py                       # http://localhost:8000
-
-# Quality checks
+source venv/bin/activate
 python -m compileall -q app run.py tests
-python -m pytest -q
+ANTHROPIC_API_KEY= python -m pytest -q
 python -m pylint $(git ls-files '*.py')
 ```
 
-| URL | Purpose |
-| --- | --- |
-| `http://localhost:8000` | Dashboard |
-| `http://localhost:8000/docs` | Interactive Swagger API docs |
-| `http://localhost:8000/health` | Health check |
-
-</details>
-
-<details>
-<summary><strong>Architecture &amp; project layout</strong></summary>
-
-<br>
-
-```mermaid
-flowchart LR
-    browser["Browser dashboard<br>HTML, CSS, vanilla JS, Chart.js"]
-    api["FastAPI app<br>routers, middleware, static serving"]
-    services["Domain modules<br>lifecycle, valuation, DCA, signals, AI cache"]
-    db["SQLite<br>holdings, snapshots, AI cache, verdict history"]
-    yahoo["Yahoo Finance<br>prices, history, headlines"]
-    claude["Anthropic Claude<br>optional narration and plans"]
-
-    browser <--> api
-    api <--> services
-    services <--> db
-    services <--> yahoo
-    services -. optional .-> claude
-```
-
-The browser view is identical whether you open `localhost:8000` yourself or launch the desktop app — the desktop build (PyInstaller + pywebview) runs the same FastAPI server in-process behind a native window.
-
-Portfolio lifecycle, valuation, recurring-investment state, planning, records export,
-Portfolio-scoped AI narratives, and the Review Orbit each have one service interface.
-That keeps deletion cascades, watchlist exclusions, realized/unrealized return math,
-quote-quality handling, target eligibility, DCA apply/undo, review provenance, and
-`BOOK:<portfolio_id>` cache isolation consistent across every route. See the
-[architecture guide](https://udhawan97.github.io/FolioOrb/architecture/) for the module
-map and invariants.
-
-| Layer | Stack |
-| --- | --- |
-| Backend | Python 3.11+, FastAPI, Uvicorn |
-| Data | SQLite, SQLAlchemy 2, Pydantic 2 |
-| Market data | `yfinance` / Yahoo Finance |
-| AI | Anthropic SDK (optional), local deterministic fallback |
-| Frontend | Single HTML shell, Bootstrap 5, Chart.js, vanilla JS |
-| Desktop | PyInstaller + pywebview → DMG (create-dmg) / EXE (Inno Setup) |
-| Quality | pytest, Pylint, pip-audit, CodeQL, Dependency Review |
-
-```text
-app/            FastAPI app, config, DB, models, schemas, routers/, services/
-desktop/        Desktop entry point (uvicorn + native window)
-templates/      Dashboard HTML shell
-static/         CSS, JS, brand assets
-packaging/      PyInstaller spec, Inno Setup script, app icons
-scripts/        Setup, start, install, and icon-generation scripts
-tests/          Offline-focused pytest suite with mocked external services
-docs-site/      Astro + Starlight docs + landing page
-```
-
-</details>
-
-<details>
-<summary><strong>Build the desktop installers</strong></summary>
-
-<br>
+Frontend behavior is plain JavaScript and its runtime contracts run with Node:
 
 ```bash
-python -m pip install -r requirements.txt -r requirements-desktop.txt
-python -m PyInstaller packaging/pyinstaller/FolioOrb.spec
-python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist   # macOS only
-# Smoke-test the frozen bundle:
-#   macOS:   dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
-#   Windows: dist\FolioOrb\FolioOrb.exe --smoke
+node --test tests/js/*.test.cjs
 ```
 
-Then `create-dmg` (macOS) or `iscc` (Windows) wrap it into an installer. Full commands: [Build from source](https://udhawan97.github.io/FolioOrb/build-from-source/#build-the-desktop-installers).
-
-</details>
-
-## Release Workflow
-
-Version lives in one place — `app/version.py`. Pushing a `v*` tag builds both desktop installers on native GitHub runners, smoke-tests each frozen bundle, and only then publishes the DMG, EXE, and `SHA256SUMS.txt` to a GitHub Release. A red build never replaces a good release. Every merge to `main` also refreshes a rolling `latest-main` prerelease for testing.
-
-```
-main merge / v* tag → tests → build macOS + Windows → smoke test → GitHub Release → website buttons
-```
-
-Details and the code-signing roadmap: [Releases &amp; versioning](https://udhawan97.github.io/FolioOrb/releases-and-versioning/).
-
-## Troubleshooting
-
-<details>
-<summary><strong>Common first-launch issues (desktop app)</strong></summary>
-
-<br>
-
-| Symptom | Fix |
+| Area | Owner |
 | --- | --- |
-| macOS: *"Apple cannot check it for malicious software"* | Expected (unsigned). **System Settings → Privacy &amp; Security → Open Anyway**. [Steps](https://udhawan97.github.io/FolioOrb/install-macos/#first-launch-the-gatekeeper-warning) |
-| Windows: *"Windows protected your PC"* (SmartScreen) | Click **More info → Run anyway**. [Steps](https://udhawan97.github.io/FolioOrb/install-windows/#first-launch-the-smartscreen-warning) |
-| Windows: blank window | Install the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) and relaunch |
-| Is my download genuine? | [Verify](https://udhawan97.github.io/FolioOrb/download/#verify-your-download) against the release's `SHA256SUMS.txt` |
-| Data missing after update | It isn't — data lives outside the app, in your user data directory |
+| `app/routers/` | FastAPI request boundaries |
+| `app/services/` | Portfolio, provider, review, backup, and update behavior |
+| `static/` + `templates/` | Dashboard UI |
+| `desktop/` + `packaging/` | Frozen desktop entry points and installers |
+| `docs-site/` | Astro/Starlight website and docs |
 
-More setup and runtime help: [Troubleshooting &amp; FAQ](https://udhawan97.github.io/FolioOrb/troubleshooting/).
+Start with [CLAUDE.md](CLAUDE.md) for repository contracts and
+[Architecture](https://udhawan97.github.io/FolioOrb/architecture/) for the system map.
 
-</details>
+## Release channels
 
-## Privacy
+- **Stable:** versioned tags such as `v5.16.1`; used by the latest stable release link.
+- **latest-main:** rolling prerelease built from current `main`; useful for testing, never promoted
+  as the stable download automatically. [Open the development build](https://github.com/udhawan97/FolioOrb/releases/tag/latest-main).
 
-FolioOrb is local-first, not cloud-hosted. Holdings and snapshots live in local SQLite; config and API keys live in a local `.env` that's excluded from git. Yahoo Finance, SEC EDGAR, the US Treasury, and GitHub receive only the bounded requests needed for market context, filings, yield-curve data, or updates; article thumbnails can load directly from publisher/CDN hosts without a referrer. With a key configured, Anthropic receives periodic credential-only availability checks even in Local mode. Claude-backed actions can send compact derived portfolio or security context—and, for messy CSV mapping, at most five sanitized sample rows. Thesis text, the SQLite database, backups, settings, and `.env` are not included in those prompts. Generated summaries are cached locally. Full detail: [Privacy &amp; data handling](https://udhawan97.github.io/FolioOrb/privacy/).
-
-## Contributing
-
-Issues and pull requests are welcome. For a feature, a short issue describing the use case before the PR saves a round trip. Keep changes scoped, run the quality checks above, and don't be surprised if Senpai has opinions about your diff.
+Every channel builds macOS and Windows artifacts on native hosted runners, exercises frozen smoke
+tests, and publishes `SHA256SUMS.txt` only after both platform builds pass.
 
 ## License
 
-Released under the [Apache License 2.0](LICENSE). This project is for education, analysis, and portfolio exploration. It is **not financial advice**, does not place trades, and is not a substitute for professional judgment.
-
-<p align="center">
-  <sub>Built to make portfolio context easier to read, easier to question, and slightly less spreadsheet-haunted.<br>
-  If FolioOrb talked you out of panic-selling on a red Tuesday, a star costs nothing and Senpai will absolutely take credit for it.</sub>
-</p>
+Apache License 2.0. See [LICENSE](LICENSE).

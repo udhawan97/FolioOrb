@@ -22,24 +22,24 @@ previous release stays exactly as it was.
 
 ## Two channels
 
-<Image src={channels} alt="Stable releases come from version tags and are the default download; a rolling latest-main prerelease is refreshed on every merge and offered behind a development-builds dropdown." />
+<Image src={channels} alt="Stable releases come from version tags and are the default download; a rolling latest-main prerelease is refreshed on every merge and linked as a development build." />
 
-- **Stable** — cut by pushing a version tag like `v5.16.0`. This is what the website, README,
+- **Stable** — cut by pushing a version tag like `v5.16.1`. This is what the website, README,
   and download buttons point to by default. A tag whose number doesn't match
   `app/version.py` fails the build on purpose, so assets can never be mislabeled.
 - **latest-main** — a single rolling prerelease, refreshed on every merge to `main`. Always
   marked prerelease, so it never becomes the "latest" download by accident. Offered under
-  **Development builds** for anyone who wants to test the newest changes.
+  a direct **Development build** link for anyone who wants to test the newest changes.
 
-## Assets in every release
+## Assets in current v5 releases
 
 | Asset | Description |
 | --- | --- |
-| `FolioOrb-macOS-arm64-v5.16.0.dmg` | macOS Apple Silicon installer |
-| `FolioOrb-Windows-x64-v5.16.0-Setup.exe` | Windows per-user installer |
+| `FolioOrb-macOS-arm64-v5.16.1.dmg` | macOS Apple Silicon installer |
+| `FolioOrb-Windows-x64-v5.16.1-Setup.exe` | Windows per-user installer |
 | `SHA256SUMS.txt` | Checksums for every asset — see [verifying downloads](/FolioOrb/download/#verify-your-download) |
 
-Development builds use the same names with `v5.16.0` replaced by `main-<short-sha>`.
+Development builds use the same names with `v5.16.1` replaced by `main-<short-sha>`.
 
 ## Code-signing roadmap
 
@@ -55,7 +55,7 @@ forward, in order:
 | 4 · Windows code signing | Planned | SmartScreen warnings fade as reputation builds |
 
 <Aside type="note">
-Until signing lands, verifying the `SHA256SUMS.txt` and downloading only from the official
-[GitHub Releases](https://github.com/udhawan97/FolioOrb/releases) is the strongest
-guarantee that a build is genuine.
+Until signing lands, download both the asset and `SHA256SUMS.txt` from the same official
+[GitHub Release](https://github.com/udhawan97/FolioOrb/releases) and verify the match. This
+detects mismatch against that manifest; it does not independently authenticate its origin.
 </Aside>

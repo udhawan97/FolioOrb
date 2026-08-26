@@ -22,10 +22,10 @@ The buttons above always resolve to the newest **stable** release. You can also 
 
 | Channel | Where it comes from | Who it's for |
 | --- | --- | --- |
-| **Stable** | A version tag (`v5.16.0`), cut manually | Everyone. This is the default download. |
+| **Stable** | A version tag (`v5.16.1`), cut manually | Everyone. This is the default download. |
 | **latest-main** | Refreshed automatically on every merge to `main` | Testing the newest changes; may be unstable. |
 
-The `latest-main` prerelease is offered under **Development builds** on the website and in
+The `latest-main` prerelease has a direct **Development build** link on the website and in
 the [releases list](https://github.com/udhawan97/FolioOrb/releases). It always holds a
 single, newest build straight from `main`.
 
@@ -40,22 +40,26 @@ signing roadmap.
 
 ## Verify your download
 
-Every release includes a `SHA256SUMS.txt`. After downloading, confirm your file matches:
+Current v5 releases include `SHA256SUMS.txt`. After downloading one platform asset and the
+manifest from the same release, confirm that asset matches:
 
 ```bash
-# macOS / Linux — run in the folder holding the download + SHA256SUMS.txt
-shasum -a 256 -c SHA256SUMS.txt
+# macOS — verify only the DMG you downloaded, not the absent Windows asset
+grep 'FolioOrb-macOS-arm64-v5.16.1.dmg$' SHA256SUMS.txt | shasum -a 256 -c -
 ```
 
 ```powershell
 # Windows PowerShell — compare against the line in SHA256SUMS.txt
-Get-FileHash .\FolioOrb-Windows-x64-v5.16.0-Setup.exe -Algorithm SHA256
+Get-FileHash .\FolioOrb-Windows-x64-v5.16.1-Setup.exe -Algorithm SHA256
 ```
 
-A match confirms the file is byte-for-byte what CI published to GitHub Releases.
+A match detects whether the asset differs from `SHA256SUMS.txt` in that same GitHub
+release. Because FolioOrb does not yet publish a configured Minisign signature, this is an
+integrity check—not independent proof of who published the manifest.
 
 ## Prefer to run from source?
 
 The [install scripts](/FolioOrb/build-from-source/#one-line-install-scripts) and the
-[build-from-source](/FolioOrb/build-from-source/) guide still work on any platform with
-Python 3.11+ — including Intel Macs and Linux.
+[build-from-source](/FolioOrb/build-from-source/) guide support macOS, Windows, and Linux
+with Python 3.11+. One-line installs keep their writable profile outside the replaceable
+source tree and retain a recovery copy when migrating an older install.

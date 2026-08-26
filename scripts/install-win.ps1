@@ -1,18 +1,37 @@
 # One-command Windows installer (runs FolioOrb from source).
 # Usage (PowerShell): irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-win.ps1 | iex
 #
-# Installs the latest stable release by default. Set $env:FOLIO_REF to pin a tag
-# or track the dev channel before running, e.g.:
-#   $env:FOLIO_REF = "v5.16.0"      # a specific release
-#   $env:FOLIO_REF = "latest-main"  # newest main build
-#   $env:FOLIO_REF = "main"         # current main branch
-#
+# Installs the latest stable release by default. Set $env:FOLIO_REF to a
+# supported tag (v5.16.0+) or the dev channel: v5.16.1, latest-main, or main.
 # Prefer the .exe for a no-Python install: https://github.com/udhawan97/FolioOrb/releases/latest
 $ErrorActionPreference = "Stop"
 
-$repo        = "udhawan97/FolioOrb"
-$installDir  = "$HOME\FolioOrb"
-$shortcut    = "$HOME\Desktop\FolioOrb.lnk"
+$repo = "udhawan97/FolioOrb"
+$defaultInstall = Join-Path $HOME "FolioOrb"
+$defaultShortcut = Join-Path $HOME "Desktop\FolioOrb.lnk"
+$defaultData = Join-Path $env:LOCALAPPDATA "FolioOrb-source"
+$installDir = if ($env:FOLIOORB_INSTALL_DIR) { $env:FOLIOORB_INSTALL_DIR } else { $defaultInstall }
+$shortcut = if ($env:FOLIOORB_SHORTCUT) { $env:FOLIOORB_SHORTCUT } else { $defaultShortcut }
+$dataDir = if ($env:FOLIOORB_DATA_DIR) { $env:FOLIOORB_DATA_DIR } else { $defaultData }
+$noStart = $env:FOLIOORB_INSTALL_NO_START -eq "1"
+
+function Resolve-UserPath([string] $Value) {
+    if ($Value -eq "~") { $Value = $HOME }
+    elseif ($Value.StartsWith("~\") -or $Value.StartsWith("~/")) {
+        $Value = Join-Path $HOME $Value.Substring(2)
+    }
+    return [System.IO.Path]::GetFullPath($Value)
+}
+
+$installDir = Resolve-UserPath $installDir
+$shortcut = Resolve-UserPath $shortcut
+$dataDir = Resolve-UserPath $dataDir
+$migrationComplete = Join-Path $dataDir ".source-install-migration-complete"
+$originalLocation = Get-Location
+$tmp = $null
+$rollbackDir = $null
+$keepRecovery = $false
+$installReady = $false
 
 Write-Host ""
 Write-Host "  FolioOrb Installer"
@@ -31,30 +50,35 @@ if (-not $ref) {
     Write-Host "  Could not resolve the latest release - falling back to 'main'."
     $ref = "main"
 }
+if ($ref -ne "main" -and $ref -ne "latest-main") {
+    if ($ref -notmatch '^v(\d+)\.(\d+)\.(\d+)$' -or
+        [version]::new([int]$Matches[1], [int]$Matches[2], [int]$Matches[3]) -lt [version]"5.16.0") {
+        throw "Source installs support stable tags v5.16.0 or newer; choose a supported tag, latest-main, or main."
+    }
+}
 Write-Host "  Installing ref: $ref"
 
-if ($ref -eq "main") {
-    $releaseUrl = "https://github.com/$repo/archive/refs/heads/main.zip"
+$releaseUrl = if ($ref -eq "main") {
+    "https://github.com/$repo/archive/refs/heads/main.zip"
 } else {
-    $releaseUrl = "https://github.com/$repo/archive/refs/tags/$ref.zip"
+    "https://github.com/$repo/archive/refs/tags/$ref.zip"
 }
 
-# ── Python ────────────────────────────────────────────────────────────────────
+# -- Python -------------------------------------------------------------------
 function Find-Python {
     foreach ($cmd in @("py", "python", "python3")) {
         if (Get-Command $cmd -ErrorAction SilentlyContinue) {
-            $ok = & $cmd -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)" 2>$null
+            & $cmd -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)" 2>$null
             if ($LASTEXITCODE -eq 0) { return $cmd }
         }
     }
-    # Try winget auto-install
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         Write-Host "  Python not found. Installing via winget..."
         winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements --silent
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
-                    [System.Environment]::GetEnvironmentVariable("Path","User")
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("Path", "User")
         if (Get-Command python -ErrorAction SilentlyContinue) {
-            $ok = & python -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)" 2>$null
+            & python -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)" 2>$null
             if ($LASTEXITCODE -eq 0) { return "python" }
         }
     }
@@ -64,95 +88,136 @@ function Find-Python {
 $pythonCmd = Find-Python
 if (-not $pythonCmd) {
     Write-Host "  Python 3.11+ is required."
-    Write-Host "  Opening the download page — install it (check 'Add Python to PATH'), then run this command again."
     Start-Process "https://www.python.org/downloads/"
-    Read-Host "Press Enter to exit"
-    exit 1
+    throw "Python 3.11+ is required"
 }
-$pyVer = & $pythonCmd --version
-Write-Host "  OK $pyVer"
+Write-Host "  OK $(& $pythonCmd --version)"
 
-# ── Download ──────────────────────────────────────────────────────────────────
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
-New-Item -ItemType Directory -Path $tmp | Out-Null
+try {
+    # -- Download --------------------------------------------------------------
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    Write-Host "  Downloading FolioOrb ($ref)..."
+    Invoke-WebRequest $releaseUrl -OutFile (Join-Path $tmp "folio.zip") -UseBasicParsing
+    Write-Host "  Extracting..."
+    Expand-Archive (Join-Path $tmp "folio.zip") -DestinationPath $tmp
+    $extracted = Get-ChildItem -Path $tmp -Directory -Filter "FolioOrb-*" | Select-Object -First 1
+    if (-not $extracted) { throw "Download did not contain the expected FolioOrb folder." }
 
-Write-Host "  Downloading FolioOrb ($ref)..."
-Invoke-WebRequest $releaseUrl -OutFile "$tmp\folio.zip" -UseBasicParsing
+    # v5.16.0 predates the helper but already honors FOLIOORB_DATA_DIR.
+    $migrationTool = Join-Path $extracted.FullName "scripts\migrate_source_profile.py"
+    if (-not (Test-Path $migrationTool)) {
+        $migrationTool = Join-Path $tmp "migrate_source_profile.py"
+        Invoke-WebRequest "https://raw.githubusercontent.com/$repo/main/scripts/migrate_source_profile.py" `
+            -OutFile $migrationTool -UseBasicParsing
+    }
 
-Write-Host "  Extracting..."
-Expand-Archive "$tmp\folio.zip" -DestinationPath $tmp
+    # -- Preserve the complete writable profile -------------------------------
+    $migrationOutput = & $pythonCmd $migrationTool --source $installDir --destination $dataDir
+    if ($LASTEXITCODE -ne 0) { throw "Profile migration failed safely." }
+    $migrationStatus = $migrationOutput | Select-Object -Last 1
+    $keepRecovery = $migrationStatus -eq "MIGRATED"
+    if ($keepRecovery) {
+        Write-Host "  OK Portfolio, backups, settings, and update state migrated"
+    }
 
-# GitHub names the extracted folder after the ref (and strips a leading "v" on
-# version tags), so locate it instead of guessing the name.
-$extracted = Get-ChildItem -Path $tmp -Directory -Filter "FolioOrb-*" | Select-Object -First 1
-if (-not $extracted) {
-    Write-Host "  Download did not contain the expected FolioOrb folder."
-    exit 1
-}
+    # -- Install transaction ---------------------------------------------------
+    New-Item -ItemType Directory -Force -Path (Split-Path $installDir) | Out-Null
+    if (Test-Path $installDir) {
+        $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ") + "-$PID"
+        $suffix = if ($keepRecovery) { "profile-recovery" } else { "update-rollback" }
+        $rollbackDir = "$installDir-$suffix-$stamp"
+        Move-Item $installDir $rollbackDir
+    }
+    Move-Item $extracted.FullName $installDir
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText(
+        (Join-Path $installDir ".source-profile-path"), "$dataDir`n", $utf8NoBom
+    )
+    $env:FOLIOORB_DATA_DIR = $dataDir
 
-# ── Preserve existing data ────────────────────────────────────────────────────
-if (Test-Path "$installDir\database") {
-    Write-Host "  Existing portfolio found - preserving your data..."
-    Copy-Item "$installDir\database" "$tmp\db_backup" -Recurse
-}
-if (Test-Path "$installDir\.env") {
-    Copy-Item "$installDir\.env" "$tmp\env_backup"
-}
+    Write-Host "  Installing dependencies (one-time, ~60 s)..."
+    Set-Location $installDir
+    & $pythonCmd -m venv venv
+    if ($LASTEXITCODE -ne 0) { throw "Could not create the virtual environment." }
+    $venvPy = Join-Path $installDir "venv\Scripts\python.exe"
+    & $venvPy -m pip install --upgrade pip -q
+    if ($LASTEXITCODE -ne 0) { throw "Could not upgrade pip." }
+    & $venvPy -m pip install -r requirements.txt -q
+    if ($LASTEXITCODE -ne 0) { throw "Could not install FolioOrb dependencies." }
 
-# ── Install ───────────────────────────────────────────────────────────────────
-if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
-Move-Item $extracted.FullName $installDir
-
-if (Test-Path "$tmp\env_backup") {
-    Copy-Item "$tmp\env_backup" "$installDir\.env"
-    Write-Host "  OK Settings restored"
-}
-
-# Restore database before pip so data is safe even if dependency install fails.
-if (Test-Path "$tmp\db_backup") {
-    if (Test-Path "$installDir\database") { Remove-Item "$installDir\database" -Recurse -Force }
-    Copy-Item "$tmp\db_backup" "$installDir\database" -Recurse
-    Write-Host "  OK Portfolio data restored"
-} else {
-    New-Item -ItemType Directory -Force -Path "$installDir\database" | Out-Null
-}
-
-# ── Dependencies ──────────────────────────────────────────────────────────────
-Write-Host "  Installing dependencies (one-time, ~60 s)..."
-Set-Location $installDir
-& $pythonCmd -m venv venv
-$venvPy = "$installDir\venv\Scripts\python.exe"
-& $venvPy -m pip install --upgrade pip -q
-& $venvPy -m pip install -r requirements.txt -q
-
-Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-
-if (-not (Test-Path ".env")) {
-    $secret = & $venvPy -c "import secrets; print(secrets.token_hex(32))"
-    @"
+    if (-not (Test-Path (Join-Path $dataDir ".env"))) {
+        $secret = & $venvPy -c "import secrets; print(secrets.token_hex(32))"
+        $environment = @"
 ANTHROPIC_API_KEY=
 SECRET_KEY=$secret
 DEBUG=True
 DATABASE_URL=sqlite:///./database/portfolio.db
 CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
 DEFAULT_HOLDINGS=
-"@ | Set-Content -Path ".env" -Encoding UTF8
-}
+"@
+        [System.IO.File]::WriteAllText((Join-Path $dataDir ".env"), $environment, $utf8NoBom)
+    } elseif (-not (Select-String -Path (Join-Path $dataDir ".env") -Pattern '^\s*(export\s+)?SECRET_KEY\s*=' -Quiet)) {
+        $secret = & $venvPy -c "import secrets; print(secrets.token_hex(32))"
+        [System.IO.File]::AppendAllText(
+            (Join-Path $dataDir ".env"), "SECRET_KEY=$secret`n", $utf8NoBom
+        )
+    }
+    [System.IO.File]::WriteAllText(
+        $migrationComplete, "source installer profile ready`n", $utf8NoBom
+    )
 
-# ── Desktop shortcut ─────────────────────────────────────────────────────────
-New-Item -ItemType Directory -Force -Path (Split-Path $shortcut) | Out-Null  # never assume ~\Desktop exists
-$wsh = New-Object -ComObject WScript.Shell
-$sc  = $wsh.CreateShortcut($shortcut)
-$sc.TargetPath       = "$installDir\FolioOrb.bat"
-$sc.WorkingDirectory = $installDir
-$sc.Description      = "FolioOrb — Your folio, finally making sense."
-$sc.Save()
+    # A wrapper carries the external profile even when the selected tag predates
+    # .source-profile-path support (notably v5.16.0).
+    $cmdDataDir = $dataDir.Replace("%", "%%")
+    $cmdInstallDir = $installDir.Replace("%", "%%")
+    $launcher = Join-Path $installDir "FolioOrb-source.cmd"
+    $launcherBody = "@echo off`r`nset `"FOLIOORB_DATA_DIR=$cmdDataDir`"`r`ncd /d `"$cmdInstallDir`"`r`ncall FolioOrb.bat`r`n"
+    [System.IO.File]::WriteAllText($launcher, $launcherBody, $utf8NoBom)
+
+    New-Item -ItemType Directory -Force -Path (Split-Path $shortcut) | Out-Null
+    $wsh = New-Object -ComObject WScript.Shell
+    $sc = $wsh.CreateShortcut($shortcut)
+    $sc.TargetPath = $launcher
+    $sc.WorkingDirectory = $installDir
+    $sc.Description = "FolioOrb - Your folio, finally making sense."
+    $sc.Save()
+
+    if ($rollbackDir -and -not $keepRecovery) {
+        Remove-Item $rollbackDir -Recurse -Force
+        $rollbackDir = $null
+    }
+    $installReady = $true
+} catch {
+    if (-not $installReady -and $rollbackDir -and (Test-Path $rollbackDir)) {
+        if (Test-Path $installDir) {
+            Move-Item $installDir (Join-Path $tmp "failed-install-$PID") -Force -ErrorAction SilentlyContinue
+        }
+        if (-not (Test-Path $installDir)) {
+            Move-Item $rollbackDir $installDir
+        }
+        Write-Error "Installation failed; the prior source install was restored. $($_.Exception.Message)"
+    }
+    throw
+} finally {
+    Set-Location $originalLocation
+    if ($tmp -and (Test-Path $tmp)) {
+        Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 Write-Host ""
 Write-Host "  OK Installed to $installDir"
-Write-Host "  OK Desktop shortcut created — double-click it anytime to open the app"
+Write-Host "  OK Writable profile: $dataDir"
+if ($rollbackDir) { Write-Host "  OK Prior source install retained at $rollbackDir" }
+Write-Host "  OK Desktop shortcut created at $shortcut"
 Write-Host ""
-Write-Host "  Starting FolioOrb — your browser will open in a moment..."
+if ($noStart) {
+    Write-Host "  Start skipped for installer verification."
+    exit 0
+}
+Write-Host "  Starting FolioOrb - your browser will open in a moment..."
 Write-Host "  (Press Ctrl+C to stop)"
 Write-Host ""
+Set-Location $installDir
 & $venvPy run.py

@@ -67,8 +67,16 @@ curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/ins
 irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-win.ps1 | iex
 ```
 
-Set `FOLIO_REF` to install a specific tag or the dev channel, e.g.
-`FOLIO_REF=latest-main`.
+Set `FOLIO_REF` to install a specific `v5.16.0` or newer tag, or the dev channel, e.g.
+`curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-mac.sh | FOLIO_REF=latest-main bash`
+on macOS/Linux, or `$env:FOLIO_REF = "latest-main"` before the Windows command.
+
+Unlike a manual clone, a one-line install stores its entire writable profile outside the
+replaceable source directory. When upgrading an older source install, the installer uses
+SQLite's backup API to migrate the database together with `.env`, Backup Vault, settings,
+backup policy, update state, and logs. It also retains the prior install as a recovery copy;
+if both old and new profile locations already contain data, it stops without choosing or
+overwriting either one.
 
 ## Build the desktop installers
 
@@ -107,7 +115,7 @@ python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
 	```powershell
 	choco install innosetup -y
 	& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
-	  /DMyAppVersion=5.16.0 `
+	  /DMyAppVersion=5.16.1 `
 	  /DMyOutputName=FolioOrb-Windows-x64-local-Setup `
 	  packaging\windows\installer.iss
 	```
@@ -115,8 +123,9 @@ python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
 </Tabs>
 
 <Aside type="note">
-CI runs exactly these steps on GitHub-hosted macOS and Windows runners for every release —
-see [Releases &amp; versioning](/FolioOrb/releases-and-versioning/). Icons are
+CI uses these platform toolchains and adds backup-safety checks, both frozen smoke modes,
+the macOS compatibility symlink, and release assembly on GitHub-hosted runners — see
+[Releases &amp; versioning](/FolioOrb/releases-and-versioning/). Icons are
 regenerated from the brand PNG with `scripts/make-icons.sh` (macOS only) and committed, so a
 build never needs cross-platform icon tooling.
 </Aside>

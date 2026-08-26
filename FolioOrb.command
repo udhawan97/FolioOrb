@@ -5,6 +5,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+if [[ -z "${FOLIOORB_DATA_DIR:-}" && -f .source-profile-path ]]; then
+    IFS= read -r FOLIOORB_DATA_DIR < .source-profile-path
+    export FOLIOORB_DATA_DIR
+fi
+
 if ! command -v python3 >/dev/null 2>&1; then
     osascript -e 'display alert "Python not found" message "Install Python 3.11+ from python.org, then double-click this file again." buttons {"OK"} default button "OK"'
     exit 1

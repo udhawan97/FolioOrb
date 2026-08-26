@@ -5,6 +5,11 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
+if (-not $env:FOLIOORB_DATA_DIR -and (Test-Path ".source-profile-path")) {
+    $env:FOLIOORB_DATA_DIR = (Get-Content ".source-profile-path" -Raw).Trim()
+}
+$profileDir = if ($env:FOLIOORB_DATA_DIR) { $env:FOLIOORB_DATA_DIR } else { "." }
+
 function Get-PythonCommand {
     $candidates = @(
         @{ Command = "py"; Args = @("-3.12") },
@@ -49,9 +54,9 @@ Write-Host "Installing dependencies..."
 & $venvPython -m pip install --upgrade pip
 & $venvPython -m pip install -r requirements.txt
 
-New-Item -ItemType Directory -Force -Path "database" | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $profileDir "database") | Out-Null
 
-if (-not (Test-Path ".env")) {
+if (-not (Test-Path (Join-Path $profileDir ".env"))) {
     $secretKey = & $venvPython -c "import secrets; print(secrets.token_hex(32))"
     $anthropicKey = Read-Host "Anthropic API key for AI features (optional, press Enter to skip)"
 
@@ -62,11 +67,11 @@ DEBUG=True
 DATABASE_URL=sqlite:///./database/portfolio.db
 CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
 DEFAULT_HOLDINGS=
-"@ | Set-Content -Path ".env" -Encoding UTF8
+"@ | Set-Content -Path (Join-Path $profileDir ".env") -Encoding UTF8
 
     Write-Host "Created .env with local defaults."
 } else {
-    Write-Host "Using existing .env."
+    Write-Host "Using existing $profileDir\.env."
 }
 
 if ($NoStart) {

@@ -1,40 +1,65 @@
 ---
 title: Introduction
-description: What FolioOrb is and why it exists.
+description: What FolioOrb is, who it is for, and the review loop it keeps local.
 ---
 
 import SenpaiTip from '../../../components/SenpaiTip.astro';
 
-Most portfolio trackers stop at the number. Green means good, red means bad, and if you
-want to know *why*, that's a separate tab, a separate app, or a group chat with someone
-who read the news this morning and you didn't.
+FolioOrb is a local-first portfolio review dashboard for people who want the
+reasoning behind the number. It brings holdings, public market context, risk,
+news, planning, and records into one explainable workflow without connecting to
+a brokerage or placing a trade.
 
-FolioOrb closes that gap. It's a self-hosted dashboard that combines:
+Use it as a packaged desktop app on macOS or Windows, or run the same FastAPI +
+SQLite dashboard in your browser from source. Either way, the portfolio database,
+settings, receipts, and backups live on your machine. There is no FolioOrb
+account, cloud sync, or telemetry.
 
-- **Live portfolio math** — value, cost basis, daily change, unrealized gain, allocation
-- **A verdict engine** — Hold / Add / Trim / Exit signals with confidence and scenario context
-- **Analytics** — performance, risk, exposure, regime, signals, benchmark comparison
-- **News** — grouped headlines for everything you hold or watch
-- **DCA auto-invest, simulated locally** — mirror a recurring buy at real historical closes into a review bucket you apply or undo
-- **Review Orbit** — one place for attention, data coverage, monthly/quarterly reports,
-  thesis cadence, watchlist comparison, target-versus-actual planning, read-only buy
-  rehearsal, portable records, and verified local backup protection
-- **Optional Claude narration** — action plans, portfolio briefings, and news themes when you bring a key
+## The four-checkpoint review
 
-It runs entirely on your own computer — use it in your browser as a local web app, or install
-it as a desktop app for macOS or Windows. Either way it keeps its database in local SQLite and
-does not connect to a brokerage or place trades. It's for understanding what your portfolio is
-doing and why — not for pulling the trigger on anything.
+1. **Holdings** — add invested positions, research-only tickers, or a CSV.
+   Research rows stay outside P&L and allocation until shares are added.
+2. **Local read** — see known USD value, daily contribution, exposure, risk,
+   filings, dividends, and news with stale, partial, foreign-currency, and
+   missing inputs named explicitly.
+3. **Attention** — use Review Orbit to separate data gaps, thesis work,
+   reminders, comparison, target planning, and read-only buy rehearsal.
+4. **Record** — save review packs, data-health receipts, target snapshots,
+   readable records, sale recaps, verified backups, or one checksummed review
+   bundle.
+
+Nothing in that loop silently changes a holding. Recording a sale, applying a
+DCA item, restoring a backup, or resolving duplicate active rows requires an
+explicit action and the relevant confirmation or safety backup.
 
 <SenpaiTip>
-	No Anthropic key, no problem. Local Intelligence runs every verdict, scenario, and
-	analytic for free — Claude only adds narration on top, it never gates the core experience.
+	No Anthropic key, no problem. Local Intelligence owns deterministic portfolio
+	math, verdicts, scenarios, and review priority. Claude adds optional narration
+	and bounded mapping help; it never gates the core workflow.
 </SenpaiTip>
 
-## Where to go next
+## Network and AI boundary
 
-- [Build from source](../../build-from-source/) to run it in your browser as a local web app on macOS, Windows, or Linux (Python 3.11+)
-- [Download](../../download/) the desktop app for macOS or Windows, then follow [Install on macOS](../../install-macos/) or [Windows](../../install-windows/)
-- [Overview & Holdings](../../dashboard/overview-holdings/) for a tour of the core workflow
-- [Review Orbit](../../dashboard/review-orbit/) for the local review and recovery workflow
-- [Meet Senpai](../../meet-senpai/) to find out who's been watching your portfolio this whole time
+Local-first does not mean offline-only. FolioOrb makes named outbound requests
+for named jobs: market data through Yahoo Finance, filings through SEC EDGAR,
+the yield curve through the US Treasury, update metadata through GitHub, and
+remote news thumbnails from publisher/CDN hosts. If you configure an Anthropic
+key, FolioOrb also performs credential-only availability checks and sends
+bounded derived context when you invoke a Claude-backed action.
+
+The SQLite database, `.env`, backups, settings, and stored thesis text are not
+uploaded as part of normal provider or Claude requests. Read the exact payload
+boundaries in [Privacy & Data Handling](../../privacy/).
+
+## Choose the next step
+
+- [Download](../../download/) the packaged app for macOS Apple Silicon or
+  Windows x64.
+- [Build from source](../../build-from-source/) on macOS, Windows, or Linux with
+  Python 3.11+.
+- [Overview & Holdings](../../dashboard/overview-holdings/) for the main
+  dashboard vocabulary.
+- [Review Orbit](../../dashboard/review-orbit/) for attention, planning,
+  records, backups, and duplicate-row recovery.
+- [Troubleshooting](../../troubleshooting/) when the documented path does not
+  match what you see.

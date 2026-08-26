@@ -54,6 +54,7 @@ logs/
 /settings.json
 /backups/
 /updates/
+/.source-profile-path
 
 # === Session memory (local only, not versioned) ===
 .remember/

@@ -106,7 +106,7 @@ def test_bundle_reuses_one_quote_snapshot_and_hashes_every_receipt(db):
         ]
         assert all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist())
         manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["app_version"] == "5.16.0"
+        assert manifest["app_version"] == "5.16.1"
         assert manifest["generated_at_utc"] == "2026-08-25T21:30:00Z"
         assert manifest["reporting_currency"] == "USD"
         assert manifest["foreign_currency_tickers"] == ["VOD.L"]

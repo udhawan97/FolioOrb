@@ -9,6 +9,37 @@ The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
 in the repository. Highlights of the current stable are below.
 
+## v5.16.1 — One public review loop
+
+### Documentation
+
+- **README and website tell the same story.** Holdings, local read, attention,
+  and portable record now form one short path from first impression to install.
+- **Product proof is current and explicit.** Review Inbox, Plan & Protect, and
+  risk claims sit beside captures from an isolated fictional profile.
+- **Download decisions are complete before the click.** Platform,
+  architecture, prerequisites, unsigned first-launch behavior, SHA-256
+  verification, and the lack of Minisign authenticity are named together.
+- **Trust wording is synchronized.** Local storage, provider lookups, optional
+  Claude context, update behavior, and the no-brokerage/no-trade boundary now
+  agree across the README, landing page, and detailed guides.
+- **Source upgrades keep the complete profile.** One-line installs move writable
+  state outside replaceable source code, migrate canonical or custom relative
+  SQLite databases safely, stop on conflicts and non-portable paths, and retain
+  the prior install as a recovery copy. Every launcher honors the same absolute
+  profile pointer; a process-selected database remains selected on relaunch, and
+  later code replacements roll back if setup fails.
+- **Windows proves the source update journey before packaging.** The release gate
+  parses PowerShell, migrates a fictional profile, repeats the install, and checks
+  the SQLite row, profile path, settings, backups, shortcut, and recovery count.
+- **Verification matches the download journey.** macOS filters the shared
+  manifest to its DMG, and the docs distinguish integrity from unavailable
+  Minisign authenticity.
+
+This patch changes documentation, public assets, version metadata, and source
+installer profile migration. It does not change portfolio calculations,
+providers, schema, trade boundaries, or the v5.16.0 duplicate-recovery workflow.
+
 ## v5.16.0 — Review Bundle with manifest
 
 - **Save one review handoff.** The active Month/Quarter Review Pack,
@@ -664,7 +695,7 @@ No migration or `.env` change required.
   expected macOS Gatekeeper / Windows SmartScreen warnings and how to verify your download
 - **Local data stays put** — the installed app keeps your database and `.env` in the
   per-user data directory (`~/Library/Application Support/FolioOrb` on macOS,
-  `%APPDATA%\FolioOrb` on Windows), never inside the app bundle
+  `%LOCALAPPDATA%\FolioOrb\FolioOrb` on Windows), never inside the app bundle
 
 ## v4.2 — Meet Senpai, and Never Get Lost on Day One
 

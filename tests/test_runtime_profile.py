@@ -60,6 +60,45 @@ def test_data_root_alone_derives_database_without_writing(tmp_path, monkeypatch)
     assert source_root.exists()
 
 
+def test_source_profile_pointer_is_used_from_any_working_directory(tmp_path, monkeypatch):
+    source_root, _outside = _source_profile(tmp_path, monkeypatch)
+    durable = tmp_path / "profile with spaces"
+    (source_root / ".source-profile-path").write_text(f"{durable}\n", encoding="utf-8")
+    working_directory = tmp_path / "outside"
+    working_directory.mkdir()
+    monkeypatch.chdir(working_directory)
+
+    profile = paths.resolve_runtime_profile()
+
+    assert profile.data_root == durable
+    assert profile.database_path == durable / "database" / "portfolio.db"
+    assert not durable.exists()
+
+
+def test_environment_override_precedes_source_profile_pointer(tmp_path, monkeypatch):
+    source_root, _outside = _source_profile(tmp_path, monkeypatch)
+    pointer_target = tmp_path / "pointer"
+    environment_target = tmp_path / "environment"
+    (source_root / ".source-profile-path").write_text(
+        f"{pointer_target}\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("FOLIOORB_DATA_DIR", str(environment_target))
+
+    assert paths.resolve_runtime_profile().data_root == environment_target
+
+
+def test_relative_source_profile_pointer_fails_without_writing(tmp_path, monkeypatch):
+    source_root, _outside = _source_profile(tmp_path, monkeypatch)
+    pointer = source_root / ".source-profile-path"
+    pointer.write_text("../relative-profile\n", encoding="utf-8")
+    baseline = _tree(tmp_path)
+
+    with pytest.raises(paths.ProfileConfigurationError, match="absolute"):
+        paths.resolve_runtime_profile()
+
+    assert _tree(tmp_path) == baseline
+
+
 def test_database_only_outside_default_root_fails_without_writing(tmp_path, monkeypatch):
     _source_root, outside = _source_profile(tmp_path, monkeypatch)
     database = outside / "portfolio.db"

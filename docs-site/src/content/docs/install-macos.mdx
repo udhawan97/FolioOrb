@@ -10,7 +10,7 @@ macOS 11 Big Sur and later.
 
 <Steps>
 
-1. Download `FolioOrb-macOS-arm64-v5.16.0.dmg` from the
+1. Download `FolioOrb-macOS-arm64-v5.16.1.dmg` from the
    [latest release](https://github.com/udhawan97/FolioOrb/releases/latest).
 
 2. Open the `.dmg` and drag **FolioOrb** into **Applications**.
@@ -50,6 +50,7 @@ the [roadmap](/FolioOrb/releases-and-versioning/#code-signing-roadmap).
 | --- | --- |
 | Portfolio database | `~/Library/Application Support/FolioOrb/database/` |
 | Config (`.env`) | `~/Library/Application Support/FolioOrb/.env` |
+| One-line source install profile | `~/Library/Application Support/FolioOrb-source` |
 
 The app never writes inside `/Applications`, so updates and reinstalls leave your data
 untouched. See [Updating](/FolioOrb/updating/).
@@ -57,7 +58,8 @@ untouched. See [Updating](/FolioOrb/updating/).
 ## Uninstall
 
 Drag **FolioOrb** from Applications to the Trash. To also remove your data, delete
-`~/Library/Application Support/FolioOrb`.
+`~/Library/Application Support/FolioOrb`. If you used the one-line source installer,
+its separate profile is `~/Library/Application Support/FolioOrb-source`.
 
 ## Intel Macs
 
