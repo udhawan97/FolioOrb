@@ -208,8 +208,17 @@ def _harden_staging_directory(staging: Path) -> None:
         pass
 
 
+def _copy_directory_contents(source: Path, destination: Path) -> None:
+    """Copy and verify a staging tree, publishing its completion marker last."""
+    entries = sorted(
+        source.iterdir(), key=lambda entry: (entry.name == PROFILE_MARKER, entry.name)
+    )
+    for entry in entries:
+        _copy_regular_entry(entry, destination / entry.name)
+
+
 def _publish_staging_directory(staging: Path, destination: Path) -> None:
-    """Atomically publish a profile, tolerating transient Windows file locks."""
+    """Publish a profile atomically, with a verified Windows copy fallback."""
     attempts = 6 if os.name == "nt" else 1
     for attempt in range(attempts):
         try:
@@ -217,8 +226,21 @@ def _publish_staging_directory(staging: Path, destination: Path) -> None:
             return
         except PermissionError:
             if destination.exists() or attempt == attempts - 1:
-                raise
+                break
             time.sleep(0.05 * (2**attempt))
+
+    if os.name != "nt" or destination.exists():
+        raise PermissionError(f"could not publish profile at {destination}")
+    destination_owned = False
+    try:
+        destination.mkdir(mode=0o700)
+        destination_owned = True
+        _copy_directory_contents(staging, destination)
+        shutil.rmtree(staging)
+    except Exception:
+        if destination_owned:
+            shutil.rmtree(destination, ignore_errors=True)
+        raise
 
 
 def migrate(source: Path, destination: Path) -> str:
