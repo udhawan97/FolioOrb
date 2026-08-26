@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import runpy
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -209,6 +211,39 @@ def test_migrator_fails_closed_when_configured_database_is_missing(tmp_path):
     assert "configured legacy database is missing" in result.stderr
     assert (source / ".env").is_file()
     assert not destination.exists()
+
+
+def test_windows_publication_skips_posix_mode_and_retries_transient_locks():
+    namespace = runpy.run_path(str(MIGRATOR))
+    harden = namespace["_harden_staging_directory"]
+    publish = namespace["_publish_staging_directory"]
+    rename_attempts: list[tuple[Path, Path]] = []
+    delays: list[float] = []
+
+    class StagingPath:
+        @staticmethod
+        def chmod(_mode: int) -> None:
+            raise AssertionError("Windows publication must not apply POSIX mode bits")
+
+    def rename(source: Path, destination: Path) -> None:
+        rename_attempts.append((source, destination))
+        if len(rename_attempts) < 3:
+            raise PermissionError("transient Windows directory lock")
+
+    windows_os = SimpleNamespace(name="nt", rename=rename)
+    harden.__globals__["os"] = windows_os
+    publish.__globals__["os"] = windows_os
+    publish.__globals__["time"] = SimpleNamespace(sleep=delays.append)
+
+    harden(StagingPath())
+    publish(Path("staging"), Path("profile"))
+
+    assert rename_attempts == [
+        (Path("staging"), Path("profile")),
+        (Path("staging"), Path("profile")),
+        (Path("staging"), Path("profile")),
+    ]
+    assert delays == [0.05, 0.1]
 
 
 def test_installers_and_launchers_share_the_external_profile_contract():

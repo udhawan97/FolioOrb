@@ -17,6 +17,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -197,6 +198,29 @@ def _existing_destination_status(
     return None
 
 
+def _harden_staging_directory(staging: Path) -> None:
+    """Apply private POSIX permissions without mutating Windows attributes."""
+    if os.name == "nt":
+        return
+    try:
+        staging.chmod(0o700)
+    except OSError:
+        pass
+
+
+def _publish_staging_directory(staging: Path, destination: Path) -> None:
+    """Atomically publish a profile, tolerating transient Windows file locks."""
+    attempts = 6 if os.name == "nt" else 1
+    for attempt in range(attempts):
+        try:
+            os.rename(staging, destination)
+            return
+        except PermissionError:
+            if destination.exists() or attempt == attempts - 1:
+                raise
+            time.sleep(0.05 * (2**attempt))
+
+
 def migrate(source: Path, destination: Path) -> str:
     """Migrate a legacy profile and return ``MIGRATED`` or ``READY``."""
     source = source.expanduser().resolve()
@@ -245,17 +269,15 @@ def migrate(source: Path, destination: Path) -> str:
             "migrated legacy source profile\n" if has_legacy_profile else "fresh profile\n"
         )
         (staging / PROFILE_MARKER).write_text(marker_text, encoding="utf-8")
-        try:
-            staging.chmod(0o700)
-        except OSError:
-            pass
+        # POSIX mode bits harden the newly created profile before publication.
+        # Windows inherits ACLs from the parent and chmod cannot enforce 0700,
+        # so leave Windows attributes unchanged before the atomic rename.
+        _harden_staging_directory(staging)
 
         if destination.exists():
             destination.rmdir()
-        # The paths share one parent, so rename is atomic. Unlike os.replace,
-        # it also supports directory moves on Windows (MoveFileEx with
-        # REPLACE_EXISTING returns WinError 5 even when the target is absent).
-        os.rename(staging, destination)
+        # The paths share one parent, so publication remains atomic.
+        _publish_staging_directory(staging, destination)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
