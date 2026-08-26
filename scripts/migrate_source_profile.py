@@ -252,7 +252,10 @@ def migrate(source: Path, destination: Path) -> str:
 
         if destination.exists():
             destination.rmdir()
-        os.replace(staging, destination)
+        # The paths share one parent, so rename is atomic. Unlike os.replace,
+        # it also supports directory moves on Windows (MoveFileEx with
+        # REPLACE_EXISTING returns WinError 5 even when the target is absent).
+        os.rename(staging, destination)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
