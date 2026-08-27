@@ -23010,12 +23010,89 @@ body.portfolio-manager-open { overflow: hidden; }
         max-width: 100%;
     }
 
-    .dashboard-zone-tabs-wrap { overflow: hidden; }
-    .dashboard-zone-tabs { display: flex; }
+    .dashboard-zone-tabs-wrap {
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+        overscroll-behavior-inline: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    .dashboard-zone-tabs-wrap::-webkit-scrollbar { display: none; }
+    .dashboard-zone-tabs {
+        display: flex;
+        flex: 0 0 auto;
+        width: max-content;
+        min-width: 100%;
+    }
     .dzt-tab {
-        min-width: 0;
+        flex: 1 0 auto;
+        min-width: max-content;
+        min-height: 44px;
         gap: 4px;
-        padding-inline: 5px;
+        padding-inline: 0.55rem;
         font-size: 0.74rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .navbar .container-fluid {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+
+    .navbar .container-fluid > .d-flex {
+        flex: 0 0 100%;
+        flex-basis: 100%;
+        width: 100%;
+        gap: 4px !important;
+    }
+
+    .brand-lockup {
+        width: 44px;
+        min-width: 44px;
+        justify-content: center;
+    }
+
+    .portfolio-switcher {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .portfolio-switcher-label {
+        min-width: 3.5rem;
+        font-size: 0.72rem;
+    }
+
+    .portfolio-switcher-trigger {
+        min-height: 44px;
+    }
+
+    .portfolio-switcher-trigger > .manage-lucide,
+    .portfolio-switcher-caret {
+        display: none;
+    }
+
+    #portfolio-manager-trigger,
+    .review-nav-trigger,
+    .nav-overflow-trigger,
+    .api-key-trigger {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .portfolio-switcher-menu {
+        position: absolute;
+        top: calc(100% + 0.4rem);
+        left: 0;
+        right: auto;
+        width: min(15rem, calc(100vw - 1.5rem));
+    }
+
+    .api-key-panel,
+    .hud-popover {
+        top: calc(108px + env(safe-area-inset-top)) !important;
     }
 }

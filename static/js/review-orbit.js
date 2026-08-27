@@ -98,6 +98,44 @@ window.ReviewOrbit = (() => {
             <div class="review-empty">
                 ${apiErrorMessage(error, "This review surface is temporarily unavailable.")}
             </div>`;
+        target.classList.remove("review-refreshing", "review-stale");
+        target.removeAttribute("aria-busy");
+    }
+
+    function clearRefreshState(id) {
+        const target = $(id);
+        if (!target) return;
+        target.querySelectorAll(":scope > .review-refresh-notice").forEach(notice => notice.remove());
+        target.classList.remove("review-refreshing", "review-stale");
+        target.removeAttribute("aria-busy");
+    }
+
+    function beginLoad(id, label, retainLastSuccess) {
+        clearRefreshState(id);
+        const target = $(id);
+        if (!target) return;
+        if (!retainLastSuccess) {
+            setLoading(id, label);
+            return;
+        }
+        target.classList.add("review-refreshing");
+        target.setAttribute("aria-busy", "true");
+    }
+
+    function markStale(id, error, detail = "Showing the last successful data.") {
+        const target = $(id);
+        if (!target) return;
+        clearRefreshState(id);
+        target.classList.add("review-stale");
+        target.insertAdjacentHTML("afterbegin", html`
+            <div class="review-refresh-notice" role="status">
+                ${apiErrorMessage(error, "Could not refresh this section.")} ${detail}
+            </div>`);
+    }
+
+    function markPlanStale(error, options = {}) {
+        clearRefreshState("review-course-summary");
+        markStale("review-course-card", error, Logic.planStaleDetail(options));
     }
 
     // Escape unwinds one step at a time: a live restore refuses to be interrupted,
@@ -249,14 +287,20 @@ window.ReviewOrbit = (() => {
     }
 
     async function loadInbox(force = false) {
-        if (!force && state.loaded.has("inbox")) return;
-        setLoading("review-inbox-list");
+        if (!force && state.loaded.has("inbox")) return Logic.refreshOutcome("inbox", 1);
+        const hadData = Boolean(state.inbox);
+        beginLoad("review-inbox-list", "Loading local review data…", hadData);
         try {
             state.inbox = await PortfolioWorkspace.json("/api/review/inbox");
             state.loaded.add("inbox");
             renderInbox();
+            clearRefreshState("review-inbox-list");
+            return Logic.refreshOutcome("inbox", 1);
         } catch (error) {
-            setError("review-inbox-list", error);
+            state.loaded.delete("inbox");
+            if (hadData) markStale("review-inbox-list", error);
+            else setError("review-inbox-list", error);
+            return Logic.refreshOutcome("inbox", 0);
         }
     }
 
@@ -287,14 +331,20 @@ window.ReviewOrbit = (() => {
     }
 
     async function loadTrust(force = false) {
-        if (!force && state.loaded.has("trust")) return;
-        setLoading("review-trust-grid", "Checking coverage and source freshness…");
+        if (!force && state.loaded.has("trust")) return Logic.refreshOutcome("trust", 1);
+        const hadData = Boolean(state.trust);
+        beginLoad("review-trust-grid", "Checking coverage and source freshness…", hadData);
         try {
             state.trust = await PortfolioWorkspace.json("/api/review/trust");
             state.loaded.add("trust");
             renderTrust();
+            clearRefreshState("review-trust-grid");
+            return Logic.refreshOutcome("trust", 1);
         } catch (error) {
-            setError("review-trust-grid", error);
+            state.loaded.delete("trust");
+            if (hadData) markStale("review-trust-grid", error);
+            else setError("review-trust-grid", error);
+            return Logic.refreshOutcome("trust", 0);
         }
     }
 
@@ -329,14 +379,20 @@ window.ReviewOrbit = (() => {
     }
 
     async function loadReport(force = false) {
-        if (!force && state.loaded.has("report")) return;
-        setLoading("review-report-summary", "Building the review pack from stored history…");
+        if (!force && state.loaded.has("report")) return Logic.refreshOutcome("report", 1);
+        const hadData = Boolean(state.report);
+        beginLoad("review-report-summary", "Building the review pack from stored history…", hadData);
         try {
             state.report = await PortfolioWorkspace.json(`/api/review/report?period=${encodeURIComponent(state.reportPeriod)}`);
             state.loaded.add("report");
             renderReport();
+            clearRefreshState("review-report-summary");
+            return Logic.refreshOutcome("report", 1);
         } catch (error) {
-            setError("review-report-summary", error);
+            state.loaded.delete("report");
+            if (hadData) markStale("review-report-summary", error);
+            else setError("review-report-summary", error);
+            return Logic.refreshOutcome("report", 0);
         }
     }
 
@@ -481,14 +537,20 @@ window.ReviewOrbit = (() => {
     }
 
     async function loadWatchlist(force = false) {
-        if (!force && state.loaded.has("compare")) return;
-        setLoading("review-watchlist-picks", "Loading research-mode holdings…");
+        if (!force && state.loaded.has("compare")) return Logic.refreshOutcome("compare", 1);
+        const hadData = Boolean(state.watchlist);
+        beginLoad("review-watchlist-picks", "Loading research-mode holdings…", hadData);
         try {
             state.watchlist = await PortfolioWorkspace.json("/api/review/watchlist");
             state.loaded.add("compare");
             renderWatchlist();
+            clearRefreshState("review-watchlist-picks");
+            return Logic.refreshOutcome("compare", 1);
         } catch (error) {
-            setError("review-watchlist-picks", error);
+            state.loaded.delete("compare");
+            if (hadData) markStale("review-watchlist-picks", error);
+            else setError("review-watchlist-picks", error);
+            return Logic.refreshOutcome("compare", 0);
         }
     }
 
@@ -687,29 +749,77 @@ window.ReviewOrbit = (() => {
         }
     }
 
-    async function loadPlan(force = false) {
-        if (!force && state.loaded.has("plan")) return;
+    function captureTargetDraft() {
+        return Array.from(document.querySelectorAll(".review-target-input")).map(input => ({
+            holdingId: input.dataset.holdingId,
+            value: input.value,
+        }));
+    }
+
+    function restoreTargetDraft(snapshot) {
+        const values = new Map((snapshot || []).map(item => [String(item.holdingId), item.value]));
+        document.querySelectorAll(".review-target-input").forEach(input => {
+            if (values.has(String(input.dataset.holdingId))) {
+                input.value = values.get(String(input.dataset.holdingId));
+            }
+        });
+        syncTargetDraftState();
+    }
+
+    async function loadPlan(force = false, { savedDraftAwaitingRefresh = false } = {}) {
+        if (!force && state.loaded.has("plan")) return Logic.refreshOutcome("plan", 2, 2);
         if (force) resetRehearsal();
-        setLoading("review-book-pulse", "Valuing each saved portfolio independently…");
-        setLoading("review-course-summary", "Loading target course and available USD quotes…");
-        $("review-target-table").innerHTML = "";
+        const hadPlan = Boolean(state.plan);
+        const hadOverview = Boolean(state.overview);
+        const hadUnsavedDraft = hadPlan && targetCourseDirty();
+        const draftSnapshot = hadUnsavedDraft ? captureTargetDraft() : null;
+        beginLoad(
+            "review-book-pulse",
+            "Valuing each saved portfolio independently…",
+            hadOverview,
+        );
+        if (hadPlan) {
+            beginLoad("review-course-card", "Loading target course and available USD quotes…", true);
+        } else {
+            beginLoad("review-course-summary", "Loading target course and available USD quotes…", false);
+        }
+        if (!hadPlan) $("review-target-table").innerHTML = "";
         const [planResult, overviewResult] = await Promise.allSettled([
             PortfolioWorkspace.json("/api/review/plan"),
             PortfolioWorkspace.json("/api/review/overview"),
         ]);
+        let succeeded = 0;
         if (planResult.status === "fulfilled") {
             state.plan = planResult.value;
             renderTargetPlan();
+            if (draftSnapshot && !savedDraftAwaitingRefresh) restoreTargetDraft(draftSnapshot);
+            clearRefreshState("review-course-summary");
+            clearRefreshState("review-course-card");
+            succeeded += 1;
         } else {
-            setError("review-course-summary", planResult.reason);
+            if (hadPlan) markPlanStale(planResult.reason, {
+                hadUnsavedDraft,
+                savedDraftAwaitingRefresh,
+            });
+            else setError("review-course-summary", planResult.reason);
         }
         if (overviewResult.status === "fulfilled") {
             state.overview = overviewResult.value;
             renderBookPulse();
+            clearRefreshState("review-book-pulse");
+            succeeded += 1;
         } else {
-            setError("review-book-pulse", overviewResult.reason);
+            if (hadOverview) markStale("review-book-pulse", overviewResult.reason);
+            else setError("review-book-pulse", overviewResult.reason);
         }
-        state.loaded.add("plan");
+        const outcome = {
+            ...Logic.refreshOutcome("plan", succeeded, 2),
+            planSucceeded: planResult.status === "fulfilled",
+            overviewSucceeded: overviewResult.status === "fulfilled",
+        };
+        if (outcome.status === "complete" || hadPlan) state.loaded.add("plan");
+        else state.loaded.delete("plan");
+        return outcome;
     }
 
     async function saveTargets(event) {
@@ -726,12 +836,30 @@ window.ReviewOrbit = (() => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ items }),
             });
-            state.loaded.delete("plan");
-            await loadPlan(true);
+        } catch (error) {
+            status.textContent = apiErrorMessage(error, "Could not save target weights.");
+            return;
+        }
+
+        state.loaded.delete("plan");
+        try {
+            const outcome = await loadPlan(true, { savedDraftAwaitingRefresh: true });
+            if (!outcome.planSucceeded) {
+                status.textContent = "Target course saved locally, but the saved Plan could not be read back. No trade was placed.";
+                live("Target course saved locally; Plan readback is unavailable and no trade was placed.");
+                return;
+            }
+            if (!outcome.overviewSucceeded) {
+                status.textContent = "Target course saved. Portfolio overview refresh is still retryable. No trade was placed.";
+                live("Target course saved locally; portfolio overview refresh remains retryable and no trade was placed.");
+                return;
+            }
             status.textContent = "Target course saved. No trade was placed.";
             live("Target course saved locally; no trade was placed.");
         } catch (error) {
-            status.textContent = apiErrorMessage(error, "Could not save target weights.");
+            markPlanStale(error, { savedDraftAwaitingRefresh: true });
+            status.textContent = "Target course saved locally, but the saved Plan could not be read back. No trade was placed.";
+            live("Target course saved locally; Plan readback is unavailable and no trade was placed.");
         }
     }
 
@@ -958,14 +1086,20 @@ window.ReviewOrbit = (() => {
     }
 
     async function loadBackups(force = false) {
-        if (!force && state.loaded.has("backups")) return;
-        setLoading("review-backup-list", "Verifying the local vault…");
+        if (!force && state.loaded.has("backups")) return Logic.refreshOutcome("backups", 1);
+        const hadData = Boolean(state.backups);
+        beginLoad("review-backup-list", "Verifying the local vault…", hadData);
         try {
             state.backups = await PortfolioWorkspace.json("/api/review/backups");
             state.loaded.add("backups");
             renderBackups();
+            clearRefreshState("review-backup-list");
+            return Logic.refreshOutcome("backups", 1);
         } catch (error) {
-            setError("review-backup-list", error);
+            state.loaded.delete("backups");
+            if (hadData) markStale("review-backup-list", error);
+            else setError("review-backup-list", error);
+            return Logic.refreshOutcome("backups", 0);
         }
     }
 
@@ -1231,14 +1365,36 @@ window.ReviewOrbit = (() => {
     }
 
     async function refresh() {
+        const button = $("review-orbit-refresh");
+        if (button?.disabled) return;
+        if (button) {
+            button.disabled = true;
+            button.setAttribute("aria-busy", "true");
+        }
         state.loaded.clear();
-        const jobs = [loadInbox(true), loadTrust(true)];
-        if (state.tab === "report") jobs.push(loadReport(true));
-        if (state.tab === "compare") jobs.push(loadWatchlist(true));
-        if (state.tab === "plan") jobs.push(loadPlan(true));
-        if (state.tab === "backups") jobs.push(loadBackups(true));
-        await Promise.allSettled(jobs);
-        live("Review Orbit refreshed.");
+        const jobs = [
+            ["inbox", loadInbox(true)],
+            ["trust", loadTrust(true)],
+        ];
+        if (state.tab === "report") jobs.push(["report", loadReport(true)]);
+        if (state.tab === "compare") jobs.push(["compare", loadWatchlist(true)]);
+        if (state.tab === "plan") jobs.push(["plan", loadPlan(true)]);
+        if (state.tab === "backups") jobs.push(["backups", loadBackups(true)]);
+        try {
+            const settled = await Promise.allSettled(jobs.map(([, job]) => job));
+            const outcomes = settled.map((result, index) => (
+                result.status === "fulfilled" && result.value
+                    ? result.value
+                    : Logic.refreshOutcome(jobs[index][0], 0)
+            ));
+            const summary = Logic.summarizeRefresh(outcomes);
+            live(summary.message);
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.removeAttribute("aria-busy");
+            }
+        }
     }
 
     function bind() {

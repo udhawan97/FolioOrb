@@ -747,6 +747,23 @@ body.review-orbit-open > .dashboard-senpai {
     text-align: center;
 }
 
+.review-refreshing {
+    opacity: 0.72;
+    transition: opacity 160ms ease;
+}
+
+.review-refresh-notice {
+    grid-column: 1 / -1;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--accent-yellow) 38%, var(--hairline));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent-yellow) 9%, var(--surface));
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
 .review-orbit-live {
     position: absolute;
     width: 1px;

@@ -56,4 +56,27 @@ def test_narrow_layout_contains_nav_and_zone_controls():
     assert "min-width: 0" in mobile
     assert ".hud-status-pill" in mobile
     assert ".portfolio-switcher-menu" in mobile
-    assert ".dashboard-zone-tabs-wrap { overflow: hidden; }" in mobile
+    zone_wrap = mobile[mobile.index(".dashboard-zone-tabs-wrap {"):]
+    zone_wrap = zone_wrap[:zone_wrap.index("}")]
+    assert "overflow-x: auto" in zone_wrap
+    assert "overflow: hidden" not in zone_wrap
+    zone_tabs = mobile[mobile.index(".dashboard-zone-tabs {"):]
+    assert "min-width: 100%" in zone_tabs[:zone_tabs.index("}")]
+    zone_tab = mobile[mobile.index(".dzt-tab {"):]
+    assert "flex: 1 0 auto" in zone_tab[:zone_tab.index("}")]
+    assert "min-height: 44px" in zone_tab[:zone_tab.index("}")]
+    very_narrow = css[css.index("@media (max-width: 360px)"):]
+    assert "flex-wrap: wrap" in very_narrow
+    assert "flex-basis: 100%" in very_narrow
+    assert "gap: 4px !important" in very_narrow
+    brand_target = very_narrow[very_narrow.index(".brand-lockup {"):]
+    brand_target = brand_target[:brand_target.index("}")]
+    assert "width: 44px" in brand_target
+    assert "min-width: 44px" in brand_target
+    assert ".portfolio-switcher-trigger > .manage-lucide" in very_narrow
+    assert "display: none" in very_narrow
+    narrow_targets = very_narrow[very_narrow.index("#portfolio-manager-trigger,"):]
+    narrow_targets = narrow_targets[:narrow_targets.index("}")]
+    assert ".api-key-trigger" in narrow_targets
+    assert "width: 44px" in narrow_targets
+    assert "height: 44px" in narrow_targets

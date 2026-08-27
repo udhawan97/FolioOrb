@@ -8081,7 +8081,7 @@ function _renderVerdictContextChips(verdict, ticker) {
 
 function _renderPeerRelativeLine(verdict) {
     const peer = verdict?.peer_relative;
-    if (!peer?.vs_own_range && peer?.peer_comparison === "unavailable") return "";
+    if (!peer || (!peer.vs_own_range && peer.peer_comparison === "unavailable")) return "";
     const comparison = {
         cheaper_than_peers: { label: "Cheaper than peers", icon: "bi-arrow-down-circle-fill", cls: "is-cheaper" },
         richer_than_peers: { label: "Richer than peers", icon: "bi-arrow-up-circle-fill", cls: "is-richer" },
@@ -8339,7 +8339,7 @@ function _renderDeepRangeRow(label, pct) {
 }
 
 function _renderDeepPeerBlock(peer) {
-    if (!peer?.vs_own_range && peer?.peer_comparison === "unavailable") return "";
+    if (!peer || (!peer.vs_own_range && peer.peer_comparison === "unavailable")) return "";
     const peerTickers = (peer.peer_tickers || []).slice(0, 3);
     const peerNote = peerTickers.length
         ? `Peers: ${peerTickers.join(", ")}`
@@ -12879,8 +12879,60 @@ function setAddHoldingBusy(form, busy, ticker = "") {
         : button.dataset.idleHtml;
 }
 
+async function reconcileUncertainHoldingAdd(ticker) {
+    try {
+        const data = await PortfolioWorkspace.json("/api/portfolio/holdings");
+        const holding = (data.holdings || []).find(item => item.ticker === ticker);
+        return holding
+            ? { status: "confirmed", holding }
+            : { status: "absent", holding: null };
+    } catch (error) {
+        return { status: "unknown", holding: null };
+    }
+}
 
-document.getElementById("add-holding-form")?.addEventListener("submit", async (e) => {
+function rememberUncertainHoldingAdd(form, payload) {
+    form.dataset.unresolvedAddTicker = payload.ticker;
+    form.dataset.unresolvedAddPayload = JSON.stringify(payload);
+}
+
+function clearUncertainHoldingAdd(form) {
+    delete form.dataset.unresolvedAddTicker;
+    delete form.dataset.unresolvedAddPayload;
+}
+
+function finishHoldingAdd(form, msg, ticker, isWatchlist, { reconciled = false } = {}) {
+    clearUncertainHoldingAdd(form);
+    msg.className = "small text-success";
+    msg.textContent = reconciled
+        ? `${ticker} is present with the requested details. No retry was sent.`
+        : isWatchlist ? `${ticker} added in research mode!` : `${ticker} added!`;
+    form.reset();
+    document.getElementById("new-ticker")?.classList.remove("is-invalid");
+    syncAddHoldingSharesRequirement();
+    loadManageHoldings({ preserveExisting: true });
+    refreshPortfolioMutationInBackground();
+    if (intelligenceLoaded) {
+        msg.className = "small text-info";
+        msg.textContent = reconciled
+            ? `${ticker} is present. Loading intel for the row...`
+            : `${ticker} added. Loading intel for the new row...`;
+        loadHoldingIntelligence({ targetTicker: ticker })
+            .then(() => {
+                msg.className = "small text-success";
+                msg.textContent = `${ticker} intel ready.`;
+            })
+            .catch(() => {
+                msg.className = "small text-warning";
+                msg.textContent = reconciled
+                    ? `${ticker} is present. Intel can be retried from Holding Intel.`
+                    : `${ticker} added. Intel can be retried from Holding Intel.`;
+            });
+    }
+}
+
+
+async function submitAddHolding(e) {
     e.preventDefault();
     const msg = document.getElementById("add-msg");
     const tickerInput = document.getElementById("new-ticker");
@@ -12931,13 +12983,88 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
     setAddHoldingBusy(e.target, true, ticker);
 
     try {
-        const res = await PortfolioWorkspace.response("/api/portfolio/holdings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-            const data = await res.json();
+        let preflightAbsent = false;
+        const unresolvedTicker = e.target.dataset.unresolvedAddTicker;
+        if (unresolvedTicker) {
+            let guardedPayload = null;
+            try {
+                guardedPayload = JSON.parse(e.target.dataset.unresolvedAddPayload || "null");
+            } catch (error) {
+                guardedPayload = null;
+            }
+            const resolution = await reconcileUncertainHoldingAdd(unresolvedTicker);
+            const reconciliation = HoldingAddLogic.resolveReconciliation(resolution, guardedPayload);
+            if (reconciliation.status === "unknown") {
+                msg.className = "small text-warning";
+                msg.textContent = `Could not confirm whether ${unresolvedTicker} was added. FolioOrb will check holdings again before any retry.`;
+                return;
+            }
+            if (reconciliation.status === "matching") {
+                finishHoldingAdd(
+                    e.target,
+                    msg,
+                    unresolvedTicker,
+                    Boolean(guardedPayload?.is_watchlist),
+                    { reconciled: true },
+                );
+                return;
+            }
+            if (reconciliation.status === "mismatch") {
+                msg.className = "small text-warning";
+                msg.textContent = `${unresolvedTicker} is present, but its saved details differ from this request. Review the holding; no retry was sent.`;
+                return;
+            }
+            clearUncertainHoldingAdd(e.target);
+            preflightAbsent = true;
+        }
+
+        if (!preflightAbsent) {
+            const beforePost = await reconcileUncertainHoldingAdd(ticker);
+            if (beforePost.status === "unknown") {
+                msg.className = "small text-warning";
+                msg.textContent = `Could not check whether ${ticker} already exists. No add request was sent.`;
+                return;
+            }
+            if (beforePost.status === "confirmed") {
+                renderAddHoldingError({ detail: `${ticker} already in portfolio` }, "Holding already exists");
+                return;
+            }
+        }
+
+        let response;
+        try {
+            response = await PortfolioWorkspace.response("/api/portfolio/holdings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+        } catch (error) {
+            const resolution = await reconcileUncertainHoldingAdd(ticker);
+            const reconciliation = HoldingAddLogic.resolveReconciliation(resolution, payload);
+            if (reconciliation.status === "matching") {
+                finishHoldingAdd(e.target, msg, ticker, isWatchlist, { reconciled: true });
+                return;
+            }
+            rememberUncertainHoldingAdd(e.target, payload);
+            msg.className = "small text-warning";
+            if (reconciliation.status === "mismatch") {
+                msg.textContent = `${ticker} is present, but its saved details differ from this request. Review the holding; no retry was sent.`;
+                return;
+            }
+            msg.textContent = `Could not confirm whether ${ticker} was added. FolioOrb will check holdings again before any retry.`;
+            return;
+        }
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            renderAddHoldingError(err, "Error adding holding");
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        finishHoldingAdd(e.target, msg, ticker, isWatchlist);
+
+        if (data.id !== undefined && data.id !== null) try {
             const optimisticShares = Number.isFinite(shares) ? shares : 0;
             const optimisticPrice = avgCost || 0;
             latestHoldings = latestHoldings
@@ -12963,38 +13090,15 @@ document.getElementById("add-holding-form")?.addEventListener("submit", async (e
                 }]);
             updateHoldingsFilterCounts();
             renderHoldings();
-
-            msg.className = "small text-success";
-            msg.textContent = isWatchlist ? `${ticker} added in research mode!` : `${ticker} added!`;
-            e.target.reset();
-            tickerInput.classList.remove("is-invalid");
-            syncAddHoldingSharesRequirement();
-            loadManageHoldings({ preserveExisting: true });
-            refreshPortfolioMutationInBackground();
-            if (intelligenceLoaded) {
-                msg.className = "small text-info";
-                msg.textContent = `${ticker} added. Loading intel for the new row...`;
-                loadHoldingIntelligence({ targetTicker: ticker })
-                    .then(() => {
-                        msg.className = "small text-success";
-                        msg.textContent = `${ticker} intel ready.`;
-                    })
-                    .catch(() => {
-                        msg.className = "small text-warning";
-                        msg.textContent = `${ticker} added. Intel can be retried from Holding Intel.`;
-                    });
-            }
-        } else {
-            const err = await res.json().catch(() => ({}));
-            renderAddHoldingError(err, "Error adding holding");
+        } catch (error) {
+            console.warn("Holding was added, but its new row could not render:", error);
         }
-    } catch (err) {
-        msg.className = "small text-danger";
-        msg.textContent = "Unable to check ticker. Try again.";
     } finally {
         setAddHoldingBusy(e.target, false);
     }
-});
+}
+
+document.getElementById("add-holding-form")?.addEventListener("submit", submitAddHolding);
 
 
 // ── CSV import / export ─────────────────────────────────────────────────────

@@ -90,3 +90,46 @@ test("plan export detects a visible draft and clears when values match saved tar
         { holdingId: "2", value: "" },
     ]), true);
 });
+
+test("refresh outcomes distinguish complete partial and failed loads", () => {
+    assert.deepEqual(logic.refreshOutcome("plan", 2, 2), {
+        name: "plan",
+        status: "complete",
+        succeeded: 2,
+        total: 2,
+    });
+    assert.equal(logic.refreshOutcome("plan", 1, 2).status, "partial");
+    assert.equal(logic.refreshOutcome("plan", 0, 2).status, "failed");
+});
+
+test("refresh summaries reserve complete language for complete success", () => {
+    assert.deepEqual(logic.summarizeRefresh([
+        logic.refreshOutcome("inbox", 1, 1),
+        logic.refreshOutcome("trust", 1, 1),
+    ]), {
+        status: "complete",
+        message: "Review Orbit refresh complete.",
+    });
+    assert.deepEqual(logic.summarizeRefresh([
+        logic.refreshOutcome("inbox", 1, 1),
+        logic.refreshOutcome("plan", 1, 2),
+    ]), {
+        status: "partial",
+        message: "Review Orbit refresh partially complete. Unavailable updates remain retryable.",
+    });
+    assert.deepEqual(logic.summarizeRefresh([
+        logic.refreshOutcome("inbox", 0, 1),
+        logic.refreshOutcome("plan", 0, 2),
+    ]), {
+        status: "failed",
+        message: "Review Orbit refresh failed. Last successful data is marked stale where available.",
+    });
+});
+
+test("plan stale wording distinguishes unsaved drafts from saved readback failures", () => {
+    assert.equal(logic.planStaleDetail({ hadUnsavedDraft: true }),
+        "The last saved Plan remains visible. Unsaved target edits are still local and have not been saved or refreshed.");
+    assert.equal(logic.planStaleDetail({ savedDraftAwaitingRefresh: true }),
+        "Target edits were saved locally, but the saved Plan could not be read back. The visible edits are saved but unrefreshed.");
+    assert.equal(logic.planStaleDetail({}), "Showing the last saved Plan snapshot.");
+});

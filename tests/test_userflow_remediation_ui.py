@@ -9,6 +9,7 @@ DCA = (ROOT / "static/js/dca-workflow.js").read_text(encoding="utf-8")
 MODAL = (ROOT / "static/js/modal-surface.js").read_text(encoding="utf-8")
 STYLE = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 REVIEW_STYLE = (ROOT / "static/css/review-orbit.css").read_text(encoding="utf-8")
+REVIEW = (ROOT / "static/js/review-orbit.js").read_text(encoding="utf-8")
 
 
 def _function(name: str, next_name: str, source: str = DASHBOARD) -> str:
@@ -94,6 +95,49 @@ def test_mobile_review_tabs_wrap_so_every_destination_is_visible():
     tabs = tabs[:tabs.index("}")]
     assert "flex-wrap: wrap" in tabs
     assert "overflow-x: visible" in tabs
+
+
+def test_optional_peer_context_can_be_absent_without_breaking_holding_render():
+    for name, next_name in (
+        ("_renderPeerRelativeLine", "_renderConfidenceRange"),
+        ("_renderDeepPeerBlock", "_renderDeepFundRow"),
+    ):
+        body = _function(name, next_name)
+        assert "if (!peer ||" in body
+
+
+def test_successful_holding_add_is_not_relabelled_by_optional_rendering():
+    body = _function("submitAddHolding", "updateImportPanelMode")
+    assert body.count("PortfolioWorkspace.response(") == 1
+    assert "reconcileUncertainHoldingAdd" in body
+    assert "unresolvedAddTicker" in body
+    assert "HoldingAddLogic.resolveReconciliation" in body
+    assert "beforePost.status" in body
+    assert "response.json().catch(() => ({}))" in body
+    assert "let response;" in body
+    assert "Could not confirm whether" in body
+    assert "Holding was added, but its new row could not render" in body
+    assert "Unable to check ticker. Try again." not in body
+    assert "could not read completion details" not in body
+
+
+def test_review_refresh_preserves_stale_plan_and_reports_real_outcome():
+    plan = REVIEW[
+        REVIEW.index("async function loadPlan"):REVIEW.index("async function saveTargets")
+    ]
+    assert "const hadPlan = Boolean(state.plan)" in plan
+    assert "const hadOverview = Boolean(state.overview)" in plan
+    assert "const hadUnsavedDraft = hadPlan && targetCourseDirty()" in plan
+    assert "captureTargetDraft" in plan
+    assert "restoreTargetDraft" in plan
+    assert "savedDraftAwaitingRefresh" in plan
+    assert 'if (outcome.status === "complete" || hadPlan)' in plan
+    assert 'return Logic.refreshOutcome("plan"' in plan
+    assert 'id="review-course-card"' in INDEX
+    refresh = REVIEW[REVIEW.index("async function refresh()"):REVIEW.index("function bind()")]
+    assert "Logic.summarizeRefresh" in refresh
+    assert "live(summary.message)" in refresh
+    assert 'live("Review Orbit refreshed.")' not in refresh
 
 
 def test_welcome_guide_opens_at_the_top_with_close_focused():

@@ -74,6 +74,47 @@
         ));
     }
 
+    function refreshOutcome(name, succeeded, total = 1) {
+        const safeTotal = Math.max(1, Number(total) || 1);
+        const safeSucceeded = Math.max(0, Math.min(safeTotal, Number(succeeded) || 0));
+        const status = safeSucceeded === safeTotal
+            ? "complete"
+            : safeSucceeded > 0 ? "partial" : "failed";
+        return { name, status, succeeded: safeSucceeded, total: safeTotal };
+    }
+
+    function summarizeRefresh(outcomes) {
+        const results = Array.isArray(outcomes) ? outcomes : [];
+        const total = results.reduce((sum, outcome) => sum + (Number(outcome?.total) || 0), 0);
+        const succeeded = results.reduce(
+            (sum, outcome) => sum + (Number(outcome?.succeeded) || 0),
+            0,
+        );
+        if (total > 0 && succeeded === total) {
+            return { status: "complete", message: "Review Orbit refresh complete." };
+        }
+        if (succeeded > 0) {
+            return {
+                status: "partial",
+                message: "Review Orbit refresh partially complete. Unavailable updates remain retryable.",
+            };
+        }
+        return {
+            status: "failed",
+            message: "Review Orbit refresh failed. Last successful data is marked stale where available.",
+        };
+    }
+
+    function planStaleDetail({ hadUnsavedDraft = false, savedDraftAwaitingRefresh = false } = {}) {
+        if (savedDraftAwaitingRefresh) {
+            return "Target edits were saved locally, but the saved Plan could not be read back. The visible edits are saved but unrefreshed.";
+        }
+        if (hadUnsavedDraft) {
+            return "The last saved Plan remains visible. Unsaved target edits are still local and have not been saved or refreshed.";
+        }
+        return "Showing the last saved Plan snapshot.";
+    }
+
     return {
         readChoice,
         writeChoice,
@@ -83,5 +124,8 @@
         reportTitle,
         reviewBundleFilename,
         targetCourseDirty,
+        refreshOutcome,
+        summarizeRefresh,
+        planStaleDetail,
     };
 });
