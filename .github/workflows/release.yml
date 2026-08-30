@@ -11,6 +11,17 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      sign_macos:
+        description: Build a credentialed macOS signing rehearsal
+        required: true
+        type: boolean
+        default: false
+      publish:
+        description: Publish from main after exact-artifact acceptance
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,11 +39,20 @@ jobs:
       app_version: ${{ steps.vars.outputs.app_version }}
       asset_token: ${{ steps.vars.outputs.asset_token }}
       release_tag: ${{ steps.vars.outputs.release_tag }}
+      macos_signing: ${{ steps.vars.outputs.macos_signing }}
+      macos_signing_public: ${{ steps.vars.outputs.macos_signing_public }}
+      publish: ${{ steps.vars.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Resolve build variables
         id: vars
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_PUBLISH: ${{ inputs.publish }}
+          MANUAL_SIGN_MACOS: ${{ inputs.sign_macos }}
+          MACOS_SIGNING_ENABLED: ${{ vars.MACOS_SIGNING_ENABLED }}
+          MACOS_SIGNING_PUBLICLY_VERIFIED: ${{ vars.MACOS_SIGNING_PUBLICLY_VERIFIED }}
         run: |
           set -euo pipefail
           APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' app/version.py)"
@@ -40,24 +60,47 @@ jobs:
             echo "Could not read __version__ from app/version.py" >&2
             exit 1
           fi
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            TAG_VERSION="${GITHUB_REF_NAME#v}"
-            if [[ "$TAG_VERSION" != "$APP_VERSION" ]]; then
-              echo "Tag ${GITHUB_REF_NAME} does not match app/version.py (${APP_VERSION})." >&2
-              echo "Bump app/version.py before tagging, or fix the tag." >&2
-              exit 1
+          {
+            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+              TAG_VERSION="${GITHUB_REF_NAME#v}"
+              if [[ "$TAG_VERSION" != "$APP_VERSION" ]]; then
+                echo "Tag ${GITHUB_REF_NAME} does not match app/version.py (${APP_VERSION})." >&2
+                echo "Bump app/version.py before tagging, or fix the tag." >&2
+                exit 1
+              fi
+              echo "channel=stable"
+              echo "app_version=$APP_VERSION"
+              echo "asset_token=v$APP_VERSION"
+              echo "release_tag=${GITHUB_REF_NAME}"
+            else
+              SHORT="$(git rev-parse --short HEAD)"
+              echo "channel=dev"
+              echo "app_version=$APP_VERSION"
+              echo "asset_token=main-$SHORT"
+              echo "release_tag=latest-main"
             fi
-            echo "channel=stable"            >> "$GITHUB_OUTPUT"
-            echo "app_version=$APP_VERSION"  >> "$GITHUB_OUTPUT"
-            echo "asset_token=v$APP_VERSION" >> "$GITHUB_OUTPUT"
-            echo "release_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            SHORT="$(git rev-parse --short HEAD)"
-            echo "channel=dev"                    >> "$GITHUB_OUTPUT"
-            echo "app_version=$APP_VERSION"       >> "$GITHUB_OUTPUT"
-            echo "asset_token=main-$SHORT"        >> "$GITHUB_OUTPUT"
-            echo "release_tag=latest-main"        >> "$GITHUB_OUTPUT"
-          fi
+            if [[ "${MACOS_SIGNING_ENABLED:-}" == "true" || ( "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_SIGN_MACOS" == "true" ) ]]; then
+              echo "macos_signing=true"
+            else
+              echo "macos_signing=false"
+            fi
+            if [[ "${MACOS_SIGNING_ENABLED:-}" == "true" && "${MACOS_SIGNING_PUBLICLY_VERIFIED:-}" == "true" ]]; then
+              echo "macos_signing_public=true"
+            else
+              echo "macos_signing_public=false"
+            fi
+            if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+              echo "publish=true"
+            elif [[ "$MANUAL_PUBLISH" == "true" ]]; then
+              if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+                echo "Manual publication is restricted to refs/heads/main." >&2
+                exit 1
+              fi
+              echo "publish=true"
+            else
+              echo "publish=false"
+            fi
+          } >> "$GITHUB_OUTPUT"
 
   test:
     name: Test gate
@@ -96,6 +139,85 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-desktop.txt
+      - name: Prepare Developer ID keychain
+        if: needs.prepare.outputs.macos_signing == 'true'
+        env:
+          MACOS_DEVELOPER_ID_CERTIFICATE: ${{ secrets.MACOS_DEVELOPER_ID_CERTIFICATE }}
+          MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
+          EXPECTED_TEAM_ID: ${{ vars.MACOS_DEVELOPER_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${MACOS_DEVELOPER_ID_CERTIFICATE:-}" || -z "${MACOS_DEVELOPER_ID_PASSWORD:-}" ]]; then
+            echo "MACOS_SIGNING_ENABLED=true requires both Developer ID secrets." >&2
+            exit 1
+          fi
+          if [[ ! "${EXPECTED_TEAM_ID:-}" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "MACOS_DEVELOPER_TEAM_ID must be the expected 10-character Apple Team ID." >&2
+            exit 1
+          fi
+
+          umask 077
+          KEYCHAIN_PATH="${RUNNER_TEMP}/folioorb-developer-id.keychain-db"
+          CERTIFICATE_PATH="${RUNNER_TEMP}/folioorb-developer-id.p12"
+          export CERTIFICATE_PATH
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::${KEYCHAIN_PASSWORD}"
+          SIGNING_KEYCHAIN_READY=false
+          cleanup_signing_setup() {
+            rm -f "$CERTIFICATE_PATH"
+            if [[ "$SIGNING_KEYCHAIN_READY" != "true" && -f "$KEYCHAIN_PATH" ]]; then
+              security delete-keychain "$KEYCHAIN_PATH" || true
+            fi
+          }
+          trap cleanup_signing_setup EXIT
+
+          python - <<'PY'
+          import base64
+          import binascii
+          import os
+          from pathlib import Path
+
+          try:
+              certificate = base64.b64decode(
+                  os.environ["MACOS_DEVELOPER_ID_CERTIFICATE"], validate=True
+              )
+          except (KeyError, ValueError, binascii.Error) as exc:
+              raise SystemExit("MACOS_DEVELOPER_ID_CERTIFICATE is not valid base64") from exc
+          if not certificate:
+              raise SystemExit("MACOS_DEVELOPER_ID_CERTIFICATE decoded to an empty file")
+          Path(os.environ["CERTIFICATE_PATH"]).write_bytes(certificate)
+          PY
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$MACOS_DEVELOPER_ID_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          IDENTITIES="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+              | awk -F'"' -v suffix="(${EXPECTED_TEAM_ID})" \
+                  '/Developer ID Application:/ && index($2, suffix) == length($2) - length(suffix) + 1 {print $2}'
+          )"
+          IDENTITY_COUNT="$(printf '%s\n' "$IDENTITIES" | sed '/^$/d' | wc -l | tr -d ' ')"
+          if [[ "$IDENTITY_COUNT" != "1" ]]; then
+            echo "Expected exactly one valid Developer ID Application identity for team ${EXPECTED_TEAM_ID}; found ${IDENTITY_COUNT}." >&2
+            exit 1
+          fi
+          IDENTITY="$(printf '%s\n' "$IDENTITIES" | sed -n '1p')"
+          {
+            echo "FOLIOORB_CODESIGN_IDENTITY=$IDENTITY"
+            echo "FOLIOORB_SIGNING_KEYCHAIN=$KEYCHAIN_PATH"
+          } >> "$GITHUB_ENV"
+          SIGNING_KEYCHAIN_READY=true
       - name: Build app bundle
         run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
       - name: Repair macOS bundle data symlinks
@@ -103,6 +225,29 @@ jobs:
         # symlinks for pure-data package trees (observed with static/, templates/,
         # and pytz's zoneinfo data). See the script for the full explanation.
         run: python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
+      - name: Seal and verify Developer ID app bundle
+        if: needs.prepare.outputs.macos_signing == 'true'
+        run: |
+          set -euo pipefail
+          codesign \
+            --force \
+            --all-architectures \
+            --timestamp \
+            --options runtime \
+            --entitlements packaging/macos/FolioOrb.entitlements \
+            --sign "$FOLIOORB_CODESIGN_IDENTITY" \
+            dist/FolioOrb.app
+          codesign --verify --deep --strict --verbose=2 dist/FolioOrb.app
+          codesign --display --verbose=4 dist/FolioOrb.app 2>&1 \
+            | grep -F "Authority=Developer ID Application:"
+          ACTUAL_TEAM_ID="$(
+            codesign --display --verbose=4 dist/FolioOrb.app 2>&1 \
+              | sed -n 's/^TeamIdentifier=//p'
+          )"
+          if [[ "$ACTUAL_TEAM_ID" != "${{ vars.MACOS_DEVELOPER_TEAM_ID }}" ]]; then
+            echo "Signed app team ${ACTUAL_TEAM_ID:-missing} does not match the expected Team ID." >&2
+            exit 1
+          fi
       - name: Smoke test the frozen bundle
         run: |
           dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
@@ -140,6 +285,65 @@ jobs:
             exit 1
           fi
           echo "Built $DMG"
+      - name: Sign and verify Developer ID DMG
+        if: needs.prepare.outputs.macos_signing == 'true'
+        run: |
+          set -euo pipefail
+          DMG="$(find dist/out -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          if [[ -z "$DMG" ]]; then
+            echo "No DMG exists to sign." >&2
+            exit 1
+          fi
+          codesign \
+            --force \
+            --timestamp \
+            --sign "$FOLIOORB_CODESIGN_IDENTITY" \
+            "$DMG"
+          codesign --verify --strict --verbose=2 "$DMG"
+          codesign --display --verbose=4 "$DMG" 2>&1 \
+            | grep -F "Authority=Developer ID Application:"
+          ACTUAL_TEAM_ID="$(
+            codesign --display --verbose=4 "$DMG" 2>&1 \
+              | sed -n 's/^TeamIdentifier=//p'
+          )"
+          if [[ "$ACTUAL_TEAM_ID" != "${{ vars.MACOS_DEVELOPER_TEAM_ID }}" ]]; then
+            echo "Signed DMG team ${ACTUAL_TEAM_ID:-missing} does not match the expected Team ID." >&2
+            exit 1
+          fi
+
+          hdiutil verify "$DMG"
+          MOUNT_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-dmg-check.XXXXXX")"
+          MOUNT_POINT="${MOUNT_ROOT}/mounted"
+          mkdir "$MOUNT_POINT"
+          DMG_MOUNTED=false
+          cleanup_dmg_check() {
+            if [[ "$DMG_MOUNTED" == "true" ]]; then
+              hdiutil detach "$MOUNT_POINT" -quiet || true
+            fi
+            rmdir "$MOUNT_POINT" "$MOUNT_ROOT" 2>/dev/null || true
+          }
+          trap cleanup_dmg_check EXIT
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_POINT" "$DMG" >/dev/null
+          DMG_MOUNTED=true
+          codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/FolioOrb.app"
+          EMBEDDED_TEAM_ID="$(
+            codesign --display --verbose=4 "$MOUNT_POINT/FolioOrb.app" 2>&1 \
+              | sed -n 's/^TeamIdentifier=//p'
+          )"
+          if [[ "$EMBEDDED_TEAM_ID" != "${{ vars.MACOS_DEVELOPER_TEAM_ID }}" ]]; then
+            echo "DMG app team ${EMBEDDED_TEAM_ID:-missing} does not match the expected Team ID." >&2
+            exit 1
+          fi
+          hdiutil detach "$MOUNT_POINT" -quiet
+          DMG_MOUNTED=false
+          rmdir "$MOUNT_POINT" "$MOUNT_ROOT"
+          trap - EXIT
+      - name: Cleanup Developer ID keychain
+        if: ${{ always() && needs.prepare.outputs.macos_signing == 'true' }}
+        run: |
+          if [[ -n "${FOLIOORB_SIGNING_KEYCHAIN:-}" && -f "$FOLIOORB_SIGNING_KEYCHAIN" ]]; then
+            security delete-keychain "$FOLIOORB_SIGNING_KEYCHAIN"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
@@ -285,6 +489,7 @@ jobs:
   publish:
     name: Publish release
     needs: [prepare, build-macos, build-windows]
+    if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -293,6 +498,8 @@ jobs:
       # step `if:` (using it there makes the whole workflow invalid). `env` IS
       # allowed in a step `if:`, so the signing step gates on this instead.
       MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+      MACOS_SIGNING_ACTIVE: ${{ needs.prepare.outputs.macos_signing }}
+      MACOS_SIGNED: ${{ needs.prepare.outputs.macos_signing_public }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -303,7 +510,7 @@ jobs:
           mkdir -p release
           find artifacts -type f \( -name '*.dmg' -o -name '*.exe' \) -exec cp {} release/ \;
           cd release
-          shasum -a 256 * > SHA256SUMS.txt
+          shasum -a 256 -- * > SHA256SUMS.txt
           echo "Assets:"; ls -la
 
       - name: Sign checksums (minisign)
@@ -344,6 +551,13 @@ jobs:
         run: |
           set -euo pipefail
           BUILT="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          if [[ "$MACOS_SIGNED" == "true" ]]; then
+            SECURITY_NOTE="The macOS app and DMG are Developer ID signed but not yet notarized; Windows remains unsigned."
+          elif [[ "$MACOS_SIGNING_ACTIVE" == "true" ]]; then
+            SECURITY_NOTE="macOS signing is in credentialed pilot validation and is not yet an accepted public guarantee; Windows remains unsigned."
+          else
+            SECURITY_NOTE="Builds are not yet code-signed."
+          fi
           NOTES=$(cat <<EOF
           **Rolling development build from \`main\`.**
 
@@ -354,8 +568,8 @@ jobs:
           > ⚠️ These builds come straight from the latest \`main\` merge and may be
           > unstable. For everyday use, grab the [latest stable release](https://github.com/${GITHUB_REPOSITORY}/releases/latest).
           >
-          > Builds are not yet code-signed — see the install docs for the expected
-          > macOS/Windows warnings and how to verify your download with SHA256SUMS.txt.
+          > ${SECURITY_NOTE} See the install docs for the expected platform warnings
+          > and how to verify your download with SHA256SUMS.txt.
           EOF
           )
           (cd release && shasum -a 256 --check SHA256SUMS.txt)

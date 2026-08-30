@@ -5,6 +5,7 @@
 # Onedir (not onefile): faster startup, no temp self-extraction, fewer antivirus
 # false positives. The DMG / Inno installer wraps the resulting folder so users
 # never see it. Entry point is desktop/main.py (uvicorn + pywebview window).
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +17,18 @@ from app.version import __version__  # noqa: E402
 
 ICON_ICNS = str(ROOT / "packaging" / "icons" / "FolioOrb.icns")
 ICON_ICO = str(ROOT / "packaging" / "icons" / "FolioOrb.ico")
+
+# CI leaves this unset for today's unsigned builds. Once the Developer ID
+# activation gate is enabled, release.yml imports exactly one certificate into
+# an ephemeral keychain and passes its public identity here. PyInstaller then
+# signs every collected Mach-O binary with the hardened runtime before the
+# repaired outer bundle is sealed and verified by the workflow.
+CODESIGN_IDENTITY = os.getenv("FOLIOORB_CODESIGN_IDENTITY") or None
+ENTITLEMENTS_FILE = (
+    str(ROOT / "packaging" / "macos" / "FolioOrb.entitlements")
+    if CODESIGN_IDENTITY
+    else None
+)
 
 # Bundled read-only resources (unpacked under sys._MEIPASS at runtime).
 datas = [
@@ -91,8 +104,8 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
+    codesign_identity=CODESIGN_IDENTITY,
+    entitlements_file=ENTITLEMENTS_FILE,
     icon=(ICON_ICO if sys.platform == "win32" else ICON_ICNS),
 )
 

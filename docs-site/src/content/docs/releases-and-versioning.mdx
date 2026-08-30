@@ -50,7 +50,7 @@ forward, in order:
 | Phase | Status | Effect |
 | --- | --- | --- |
 | 1 · Unsigned + checksums | **Now** | Works everywhere; system warnings on first launch |
-| 2 · Apple Developer ID signing | Planned | Removes the macOS "cannot verify developer" block |
+| 2 · Apple Developer ID signing | Activation pending | Establishes publisher identity; Gatekeeper can still warn before notarization |
 | 3 · macOS notarization | Planned | No Gatekeeper warning on macOS |
 | 4 · Windows code signing | Planned | SmartScreen warnings fade as reputation builds |
 
@@ -59,3 +59,9 @@ Until signing lands, download both the asset and `SHA256SUMS.txt` from the same 
 [GitHub Release](https://github.com/udhawan97/FolioOrb/releases) and verify the match. This
 detects mismatch against that manifest; it does not independently authenticate its origin.
 </Aside>
+
+Phase 2's fail-closed workflow support is checked in, but no public release is described as
+Developer ID signed until the certificate is configured and the exact downloaded app and DMG
+pass signature verification. The documented rehearsal keeps `publish=false`; a manual run can
+publish only when `publish=true` is explicitly selected from `main`.
+Notarization remains a separate later gate.
