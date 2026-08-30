@@ -51,7 +51,7 @@ forward, in order:
 | --- | --- | --- |
 | 1 · Unsigned + checksums | **Now** | Works everywhere; system warnings on first launch |
 | 2 · Apple Developer ID signing | Activation pending | Establishes publisher identity; Gatekeeper can still warn before notarization |
-| 3 · macOS notarization | Planned | No Gatekeeper warning on macOS |
+| 3 · macOS notarization | Readiness checked in; activation pending | Clears the unidentified-developer block after acceptance; the normal first-open confirmation remains |
 | 4 · Windows code signing | Planned | SmartScreen warnings fade as reputation builds |
 
 <Aside type="note">
@@ -64,4 +64,9 @@ Phase 2's fail-closed workflow support is checked in, but no public release is d
 Developer ID signed until the certificate is configured and the exact downloaded app and DMG
 pass signature verification. The documented rehearsal keeps `publish=false`; a manual run can
 publish only when `publish=true` is explicitly selected from `main`.
-Notarization remains a separate later gate.
+Phase 3's build-only rehearsal support is also checked in, but remains dormant until
+Developer ID signing is active in the same run and an App Store Connect API credential is
+configured. It submits and staples the app before assembling the DMG, then separately
+submits and staples the signed DMG. Both artifacts must receive Apple's `Accepted` result
+and pass Gatekeeper assessment. Notarization remains a separate later gate until that exact
+downloaded DMG is independently accepted and the public-verification switch is enabled.

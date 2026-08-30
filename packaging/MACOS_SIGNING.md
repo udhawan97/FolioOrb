@@ -51,8 +51,10 @@ not contain exactly one valid `Developer ID Application` identity for that Team 
   `codesign --verify --deep --strict` before its frozen smoke tests run.
 - The generated `.dmg` is separately signed, passes `hdiutil verify`, and is
   mounted so its embedded app signature and Team ID are rechecked before upload.
-- The pipeline still says **not notarized**. Notarization is a separate Phase 3
-  gate and must not be inferred from a valid Developer ID signature.
+- Developer ID signing alone still says **not notarized**. Notarization is a separate Phase 3
+  gate and must not be inferred from a valid signature. The
+  dormant [Phase 3 rehearsal](MACOS_NOTARIZATION.md) starts only after this
+  signed-build gate passes.
 
 ## First signed-build gate
 
@@ -61,7 +63,7 @@ uploads ordinary workflow artifacts, but it cannot move `latest-main`:
 
 ```bash
 gh workflow run release.yml \
-  --ref <branch-or-main> \
+  --ref main \
   -f sign_macos=true \
   -f publish=false
 ```

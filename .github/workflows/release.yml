@@ -17,6 +17,11 @@ on:
         required: true
         type: boolean
         default: false
+      notarize_macos:
+        description: Submit, staple, and verify a signed macOS rehearsal
+        required: true
+        type: boolean
+        default: false
       publish:
         description: Publish from main after exact-artifact acceptance
         required: true
@@ -41,6 +46,8 @@ jobs:
       release_tag: ${{ steps.vars.outputs.release_tag }}
       macos_signing: ${{ steps.vars.outputs.macos_signing }}
       macos_signing_public: ${{ steps.vars.outputs.macos_signing_public }}
+      macos_notarization: ${{ steps.vars.outputs.macos_notarization }}
+      macos_notarization_public: ${{ steps.vars.outputs.macos_notarization_public }}
       publish: ${{ steps.vars.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
@@ -51,8 +58,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_PUBLISH: ${{ inputs.publish }}
           MANUAL_SIGN_MACOS: ${{ inputs.sign_macos }}
+          MANUAL_NOTARIZE_MACOS: ${{ inputs.notarize_macos }}
           MACOS_SIGNING_ENABLED: ${{ vars.MACOS_SIGNING_ENABLED }}
           MACOS_SIGNING_PUBLICLY_VERIFIED: ${{ vars.MACOS_SIGNING_PUBLICLY_VERIFIED }}
+          MACOS_NOTARIZATION_ENABLED: ${{ vars.MACOS_NOTARIZATION_ENABLED }}
+          MACOS_NOTARIZATION_PUBLICLY_VERIFIED: ${{ vars.MACOS_NOTARIZATION_PUBLICLY_VERIFIED }}
         run: |
           set -euo pipefail
           APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' app/version.py)"
@@ -81,13 +91,29 @@ jobs:
             fi
             if [[ "${MACOS_SIGNING_ENABLED:-}" == "true" || ( "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_SIGN_MACOS" == "true" ) ]]; then
               echo "macos_signing=true"
+              SIGN_MACOS=true
             else
               echo "macos_signing=false"
+              SIGN_MACOS=false
             fi
             if [[ "${MACOS_SIGNING_ENABLED:-}" == "true" && "${MACOS_SIGNING_PUBLICLY_VERIFIED:-}" == "true" ]]; then
               echo "macos_signing_public=true"
             else
               echo "macos_signing_public=false"
+            fi
+            if [[ "${MACOS_NOTARIZATION_ENABLED:-}" == "true" || ( "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_NOTARIZE_MACOS" == "true" ) ]]; then
+              if [[ "$SIGN_MACOS" != "true" ]]; then
+                echo "macOS notarization requires Developer ID signing in the same run." >&2
+                exit 1
+              fi
+              echo "macos_notarization=true"
+            else
+              echo "macos_notarization=false"
+            fi
+            if [[ "${MACOS_NOTARIZATION_ENABLED:-}" == "true" && "${MACOS_NOTARIZATION_PUBLICLY_VERIFIED:-}" == "true" && "${MACOS_SIGNING_PUBLICLY_VERIFIED:-}" == "true" ]]; then
+              echo "macos_notarization_public=true"
+            else
+              echo "macos_notarization_public=false"
             fi
             if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
               echo "publish=true"
@@ -252,6 +278,13 @@ jobs:
         run: |
           dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
           dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke-duplicate-recovery
+      - name: Notarize and staple app bundle
+        if: needs.prepare.outputs.macos_notarization == 'true'
+        env:
+          MACOS_NOTARY_PRIVATE_KEY: ${{ secrets.MACOS_NOTARY_PRIVATE_KEY }}
+          FOLIOORB_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
+          FOLIOORB_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
+        run: packaging/macos/with_notary_key.sh app dist/FolioOrb.app
       - name: Build DMG
         env:
           ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
@@ -338,6 +371,61 @@ jobs:
           DMG_MOUNTED=false
           rmdir "$MOUNT_POINT" "$MOUNT_ROOT"
           trap - EXIT
+      - name: Notarize and staple DMG
+        if: needs.prepare.outputs.macos_notarization == 'true'
+        env:
+          MACOS_NOTARY_PRIVATE_KEY: ${{ secrets.MACOS_NOTARY_PRIVATE_KEY }}
+          FOLIOORB_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
+          FOLIOORB_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+        run: >-
+          packaging/macos/with_notary_key.sh dmg
+          "dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
+      - name: Verify notarized DMG and embedded app
+        if: needs.prepare.outputs.macos_notarization == 'true'
+        env:
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+        run: |
+          set -euo pipefail
+          DMG="dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
+          if [[ ! -f "$DMG" ]]; then
+            echo "The notarized DMG is missing." >&2
+            exit 1
+          fi
+          hdiutil verify "$DMG"
+
+          MOUNT_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-notary-check.XXXXXX")"
+          MOUNT_POINT="${MOUNT_ROOT}/mounted"
+          mkdir "$MOUNT_POINT"
+          DMG_MOUNTED=false
+          cleanup_notary_check() {
+            if [[ "$DMG_MOUNTED" == "true" ]]; then
+              hdiutil detach "$MOUNT_POINT" -quiet || true
+            fi
+            rmdir "$MOUNT_POINT" "$MOUNT_ROOT" 2>/dev/null || true
+          }
+          trap cleanup_notary_check EXIT
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_POINT" "$DMG" >/dev/null
+          DMG_MOUNTED=true
+          xcrun stapler validate "$MOUNT_POINT/FolioOrb.app"
+          APP_ASSESSMENT="$(spctl --assess --type execute --verbose=4 "$MOUNT_POINT/FolioOrb.app" 2>&1)"
+          printf '%s\n' "$APP_ASSESSMENT"
+          grep -F "source=Notarized Developer ID" <<< "$APP_ASSESSMENT"
+          hdiutil detach "$MOUNT_POINT" -quiet
+          DMG_MOUNTED=false
+          rmdir "$MOUNT_POINT" "$MOUNT_ROOT"
+          trap - EXIT
+      - name: Record macOS artifact checksum
+        run: |
+          set -euo pipefail
+          cd dist/out
+          DMGS=(FolioOrb-macOS-arm64-*.dmg)
+          if [[ "${#DMGS[@]}" != "1" || ! -f "${DMGS[0]}" ]]; then
+            echo "Expected exactly one macOS DMG before upload." >&2
+            exit 1
+          fi
+          shasum -a 256 -- "${DMGS[0]}" > macos-SHA256SUMS.txt
+          shasum -a 256 --check macos-SHA256SUMS.txt
       - name: Cleanup Developer ID keychain
         if: ${{ always() && needs.prepare.outputs.macos_signing == 'true' }}
         run: |
@@ -347,7 +435,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
-          path: dist/out/*.dmg
+          path: |
+            dist/out/*.dmg
+            dist/out/macos-SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -500,6 +590,8 @@ jobs:
       MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
       MACOS_SIGNING_ACTIVE: ${{ needs.prepare.outputs.macos_signing }}
       MACOS_SIGNED: ${{ needs.prepare.outputs.macos_signing_public }}
+      MACOS_NOTARIZATION_ACTIVE: ${{ needs.prepare.outputs.macos_notarization }}
+      MACOS_NOTARIZED: ${{ needs.prepare.outputs.macos_notarization_public }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -551,7 +643,11 @@ jobs:
         run: |
           set -euo pipefail
           BUILT="$(date -u '+%Y-%m-%d %H:%M UTC')"
-          if [[ "$MACOS_SIGNED" == "true" ]]; then
+          if [[ "$MACOS_NOTARIZED" == "true" ]]; then
+            SECURITY_NOTE="The macOS app and DMG are Developer ID signed and notarized; Windows remains unsigned."
+          elif [[ "$MACOS_NOTARIZATION_ACTIVE" == "true" ]]; then
+            SECURITY_NOTE="macOS signing and notarization are in credentialed pilot validation and are not yet accepted public guarantees; Windows remains unsigned."
+          elif [[ "$MACOS_SIGNED" == "true" ]]; then
             SECURITY_NOTE="The macOS app and DMG are Developer ID signed but not yet notarized; Windows remains unsigned."
           elif [[ "$MACOS_SIGNING_ACTIVE" == "true" ]]; then
             SECURITY_NOTE="macOS signing is in credentialed pilot validation and is not yet an accepted public guarantee; Windows remains unsigned."
