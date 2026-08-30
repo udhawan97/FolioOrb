@@ -173,6 +173,7 @@ def test_authenticode_verifier_requires_trust_identity_eku_and_timestamp():
     assert 'has no RFC 3161 timestamp certificate' in verifier
     for argument in ('"verify"', '"/pa"', '"/all"', '"/tw"', '"/v"'):
         assert argument in verifier
+    assert "$resolved:" not in verifier
 
 
 def test_raw_windows_installer_checksum_is_uploaded_with_rehearsal():

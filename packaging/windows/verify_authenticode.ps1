@@ -20,10 +20,10 @@ if ([string]::IsNullOrWhiteSpace($ExpectedSubject)) {
 
 $signature = Get-AuthenticodeSignature -LiteralPath $resolved
 if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
-    throw "Signature status is not Valid for $resolved: $($signature.Status) — $($signature.StatusMessage)"
+    throw "Signature status is not Valid for ${resolved}: $($signature.Status) — $($signature.StatusMessage)"
 }
 if ($signature.SignatureType -ne [System.Management.Automation.SignatureType]::Authenticode) {
-    throw "Signature is not embedded Authenticode for $resolved: $($signature.SignatureType)."
+    throw "Signature is not embedded Authenticode for ${resolved}: $($signature.SignatureType)."
 }
 if ($null -eq $signature.SignerCertificate) {
     throw "No signer certificate was returned for $resolved."
