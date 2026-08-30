@@ -82,9 +82,9 @@ def test_desktop_duplicate_resolver_registers_an_explicit_native_bridge():
 def test_packaged_release_runs_duplicate_recovery_smoke_on_both_platforms():
     workflow = _text(".github/workflows/release.yml")
 
-    assert workflow.count("--smoke-duplicate-recovery") == 2
+    assert workflow.count("--smoke-duplicate-recovery") == 3
     assert "dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke-duplicate-recovery" in workflow
-    assert '@("--smoke", "--smoke-duplicate-recovery")' in workflow
+    assert workflow.count('@("--smoke", "--smoke-duplicate-recovery")') == 2
 
 
 def test_source_duplicate_recovery_smoke_exercises_real_backend():

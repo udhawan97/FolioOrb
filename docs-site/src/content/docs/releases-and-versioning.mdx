@@ -52,7 +52,7 @@ forward, in order:
 | 1 · Unsigned + checksums | **Now** | Works everywhere; system warnings on first launch |
 | 2 · Apple Developer ID signing | Activation pending | Establishes publisher identity; Gatekeeper can still warn before notarization |
 | 3 · macOS notarization | Readiness checked in; activation pending | Clears the unidentified-developer block after acceptance; the normal first-open confirmation remains |
-| 4 · Windows code signing | Planned | SmartScreen warnings fade as reputation builds |
+| 4 · Windows code signing | **Readiness checked in; activation pending** | Establishes publisher identity; SmartScreen reputation warnings can still appear |
 
 <Aside type="note">
 Until signing lands, download both the asset and `SHA256SUMS.txt` from the same official
@@ -70,3 +70,9 @@ configured. It submits and staples the app before assembling the DMG, then separ
 submits and staples the signed DMG. Both artifacts must receive Apple's `Accepted` result
 and pass Gatekeeper assessment. Notarization remains a separate later gate until that exact
 downloaded DMG is independently accepted and the public-verification switch is enabled.
+Phase 4 follows the same evidence boundary on Windows. A build-only rehearsal uses
+short-lived GitHub OIDC authentication to sign both the frozen executable and final
+installer with Azure Artifact Signing, requires SHA-256 RFC 3161 timestamps, and checks
+the exact expected publisher subject before upload. Public downloads remain described as
+unsigned until the downloaded installer and its installed executable pass independent
+Authenticode verification and the Windows public-verification switch is enabled.

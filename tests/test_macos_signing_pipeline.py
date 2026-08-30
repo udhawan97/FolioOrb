@@ -41,7 +41,7 @@ def test_manual_signing_rehearsal_cannot_publish_by_default():
         default: false""" in workflow
     assert 'echo "publish=false"' in workflow
     assert "Manual publication is restricted to refs/heads/main" in workflow
-    assert "if: needs.prepare.outputs.publish == 'true'" in workflow
+    assert "needs.prepare.outputs.publish == 'true'" in workflow
 
 
 def test_public_signing_claim_has_a_separate_acceptance_gate():

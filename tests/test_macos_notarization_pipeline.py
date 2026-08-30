@@ -317,7 +317,8 @@ def test_public_notarization_claim_has_a_separate_acceptance_gate():
         in workflow
     )
     assert "MACOS_NOTARIZED: ${{ needs.prepare.outputs.macos_notarization_public }}" in workflow
-    assert "signed and notarized; Windows remains unsigned" in workflow
+    assert "The macOS app and DMG are Developer ID signed and notarized;" in workflow
+    assert "Windows remains unsigned" in workflow
     assert "credentialed pilot validation" in workflow
 
 
@@ -330,7 +331,8 @@ def test_docs_keep_readiness_separate_from_activation():
     assert "MACOS_NOTARIZATION_PUBLICLY_VERIFIED" in activation
     assert "gh run download" in activation
     assert "macos-SHA256SUMS.txt" in activation
-    assert "Windows remains unsigned" in activation
+    assert "Windows Authenticode signing path" in activation
+    assert "remains dormant" in activation
     assert "Readiness checked in; activation pending" in roadmap
     assert "normal first-open confirmation remains" in roadmap
     assert "Notarization remains a separate later gate" in roadmap

@@ -123,5 +123,6 @@ gh variable set MACOS_NOTARIZATION_ENABLED --body false
 gh variable set MACOS_NOTARIZATION_PUBLICLY_VERIFIED --body false
 ```
 
-This phase changes no Windows trust claim. Windows remains unsigned until its
-own roadmap phase is implemented and independently accepted.
+This phase changes no Windows trust claim. The separate
+[Windows Authenticode signing path](WINDOWS_SIGNING.md) remains dormant until
+its own exact-artifact acceptance gate passes.

@@ -22,6 +22,11 @@ on:
         required: true
         type: boolean
         default: false
+      sign_windows:
+        description: Build an Azure Artifact Signing rehearsal for Windows
+        required: true
+        type: boolean
+        default: false
       publish:
         description: Publish from main after exact-artifact acceptance
         required: true
@@ -48,6 +53,8 @@ jobs:
       macos_signing_public: ${{ steps.vars.outputs.macos_signing_public }}
       macos_notarization: ${{ steps.vars.outputs.macos_notarization }}
       macos_notarization_public: ${{ steps.vars.outputs.macos_notarization_public }}
+      windows_signing: ${{ steps.vars.outputs.windows_signing }}
+      windows_signing_public: ${{ steps.vars.outputs.windows_signing_public }}
       publish: ${{ steps.vars.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
@@ -59,10 +66,13 @@ jobs:
           MANUAL_PUBLISH: ${{ inputs.publish }}
           MANUAL_SIGN_MACOS: ${{ inputs.sign_macos }}
           MANUAL_NOTARIZE_MACOS: ${{ inputs.notarize_macos }}
+          MANUAL_SIGN_WINDOWS: ${{ inputs.sign_windows }}
           MACOS_SIGNING_ENABLED: ${{ vars.MACOS_SIGNING_ENABLED }}
           MACOS_SIGNING_PUBLICLY_VERIFIED: ${{ vars.MACOS_SIGNING_PUBLICLY_VERIFIED }}
           MACOS_NOTARIZATION_ENABLED: ${{ vars.MACOS_NOTARIZATION_ENABLED }}
           MACOS_NOTARIZATION_PUBLICLY_VERIFIED: ${{ vars.MACOS_NOTARIZATION_PUBLICLY_VERIFIED }}
+          WINDOWS_SIGNING_ENABLED: ${{ vars.WINDOWS_SIGNING_ENABLED }}
+          WINDOWS_SIGNING_PUBLICLY_VERIFIED: ${{ vars.WINDOWS_SIGNING_PUBLICLY_VERIFIED }}
         run: |
           set -euo pipefail
           APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' app/version.py)"
@@ -114,6 +124,20 @@ jobs:
               echo "macos_notarization_public=true"
             else
               echo "macos_notarization_public=false"
+            fi
+            if [[ "${WINDOWS_SIGNING_ENABLED:-}" == "true" || ( "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_SIGN_WINDOWS" == "true" ) ]]; then
+              if [[ "$EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
+                echo "Manual Windows signing is restricted to refs/heads/main or version tags." >&2
+                exit 1
+              fi
+              echo "windows_signing=true"
+            else
+              echo "windows_signing=false"
+            fi
+            if [[ "${WINDOWS_SIGNING_ENABLED:-}" == "true" && "${WINDOWS_SIGNING_PUBLICLY_VERIFIED:-}" == "true" ]]; then
+              echo "windows_signing_public=true"
+            else
+              echo "windows_signing_public=false"
             fi
             if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
               echo "publish=true"
@@ -465,7 +489,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          foreach ($script in @("scripts/install-win.ps1", "scripts/setup.ps1", "scripts/start.ps1")) {
+          foreach ($script in @(
+            "scripts/install-win.ps1",
+            "scripts/setup.ps1",
+            "scripts/start.ps1",
+            "packaging/windows/validate_artifact_signing.ps1",
+            "packaging/windows/verify_authenticode.ps1"
+          )) {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile(
@@ -558,7 +588,8 @@ jobs:
               exit 1
             }
           }
-      - name: Build installer
+      - name: Build unsigned installer
+        if: needs.prepare.outputs.windows_signing != 'true'
         shell: pwsh
         env:
           APP_VERSION: ${{ needs.prepare.outputs.app_version }}
@@ -569,17 +600,258 @@ jobs:
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           & $iscc "/DMyAppVersion=$env:APP_VERSION" "/DMyOutputName=$outputName" packaging\windows\installer.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Record unsigned Windows artifact checksum
+        if: needs.prepare.outputs.windows_signing != 'true'
+        shell: pwsh
+        env:
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = "dist\installer\FolioOrb-Windows-x64-$env:ASSET_TOKEN-Setup.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "The exact Windows installer is missing before upload."
+          }
+          $installers = @(Get-ChildItem "dist\installer" -File -Filter "*.exe")
+          if ($installers.Count -ne 1 -or $installers[0].FullName -ne (Resolve-Path -LiteralPath $installer).Path) {
+            throw "Expected exactly the named Windows installer before upload."
+          }
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $name = Split-Path -Leaf $installer
+          Set-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Value "$hash  $name" -Encoding ascii
+          $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
+          if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
       - uses: actions/upload-artifact@v7
+        if: needs.prepare.outputs.windows_signing != 'true'
         with:
           name: windows-installer
-          path: dist/installer/*.exe
+          path: |
+            dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
+            dist/installer/windows-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stage Windows app for isolated signing
+        if: needs.prepare.outputs.windows_signing == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-app-for-signing
+          path: dist/FolioOrb
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-windows-app:
+    name: Sign Windows app (x64)
+    needs: [prepare, build-windows]
+    if: needs.prepare.outputs.windows_signing == 'true'
+    runs-on: windows-latest
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-app-for-signing
+          path: dist/FolioOrb
+      - name: Validate Artifact Signing configuration
+        shell: pwsh
+        env:
+          AZURE_ARTIFACT_SIGNING_CLIENT_ID: ${{ vars.AZURE_ARTIFACT_SIGNING_CLIENT_ID }}
+          AZURE_ARTIFACT_SIGNING_TENANT_ID: ${{ vars.AZURE_ARTIFACT_SIGNING_TENANT_ID }}
+          AZURE_ARTIFACT_SIGNING_SUBSCRIPTION_ID: ${{ vars.AZURE_ARTIFACT_SIGNING_SUBSCRIPTION_ID }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          WINDOWS_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
+        run: packaging\windows\validate_artifact_signing.ps1
+      - name: Authenticate to Azure for Artifact Signing
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
+        with:
+          client-id: ${{ vars.AZURE_ARTIFACT_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_ARTIFACT_SIGNING_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_ARTIFACT_SIGNING_SUBSCRIPTION_ID }}
+      - name: Sign frozen Windows executable
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ github.workspace }}\dist\FolioOrb\FolioOrb.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: FolioOrb
+          description-url: https://github.com/udhawan97/FolioOrb
+      - name: Verify frozen Windows executable signature
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
+        run: >-
+          packaging\windows\verify_authenticode.ps1
+          -Path dist\FolioOrb\FolioOrb.exe
+          -ExpectedSubject $env:EXPECTED_SIGNER_SUBJECT
+      - name: Stage signed Windows app outside the OIDC job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-signed-app
+          path: dist/FolioOrb
+          if-no-files-found: error
+          retention-days: 1
+
+  package-windows-signed:
+    name: Package signed Windows app (x64)
+    needs: [prepare, sign-windows-app]
+    if: needs.prepare.outputs.windows_signing == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-signed-app
+          path: dist/FolioOrb
+      - name: Smoke test signed frozen bundle
+        shell: pwsh
+        run: |
+          foreach ($argument in @("--smoke", "--smoke-duplicate-recovery")) {
+            $stem = "signed-$($argument.TrimStart('-'))"
+            $outFile = "$stem-stdout.log"
+            $errFile = "$stem-stderr.log"
+            $proc = Start-Process -FilePath "dist\FolioOrb\FolioOrb.exe" `
+              -ArgumentList $argument -RedirectStandardOutput $outFile `
+              -RedirectStandardError $errFile -Wait -PassThru
+            if (Test-Path $outFile) { Get-Content $outFile }
+            if (Test-Path $errFile) { Get-Content $errFile }
+            if ($proc.ExitCode -ne 0) { throw "$argument failed with exit code $($proc.ExitCode)" }
+          }
+      - name: Build installer around signed executable
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ needs.prepare.outputs.app_version }}
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+        run: |
+          choco install innosetup -y --no-progress
+          $outputName = "FolioOrb-Windows-x64-$env:ASSET_TOKEN-Setup"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=$env:APP_VERSION" "/DMyOutputName=$outputName" packaging\windows\installer.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Stage Windows installer for isolated signing
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-for-signing
+          path: dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-windows-installer:
+    name: Sign Windows installer (x64)
+    needs: [prepare, package-windows-signed]
+    if: needs.prepare.outputs.windows_signing == 'true'
+    runs-on: windows-latest
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-installer-for-signing
+          path: dist/installer
+      - name: Validate Artifact Signing configuration
+        shell: pwsh
+        env:
+          AZURE_ARTIFACT_SIGNING_CLIENT_ID: ${{ vars.AZURE_ARTIFACT_SIGNING_CLIENT_ID }}
+          AZURE_ARTIFACT_SIGNING_TENANT_ID: ${{ vars.AZURE_ARTIFACT_SIGNING_TENANT_ID }}
+          AZURE_ARTIFACT_SIGNING_SUBSCRIPTION_ID: ${{ vars.AZURE_ARTIFACT_SIGNING_SUBSCRIPTION_ID }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          WINDOWS_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
+        run: packaging\windows\validate_artifact_signing.ps1
+      - name: Authenticate to Azure for Artifact Signing
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
+        with:
+          client-id: ${{ vars.AZURE_ARTIFACT_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_ARTIFACT_SIGNING_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_ARTIFACT_SIGNING_SUBSCRIPTION_ID }}
+      - name: Sign Windows installer
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ github.workspace }}\dist\installer\FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: FolioOrb installer
+          description-url: https://github.com/udhawan97/FolioOrb
+      - name: Verify Windows installer signature
+        shell: pwsh
+        env:
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+          EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
+        run: >-
+          packaging\windows\verify_authenticode.ps1
+          -Path "dist\installer\FolioOrb-Windows-x64-$env:ASSET_TOKEN-Setup.exe"
+          -ExpectedSubject $env:EXPECTED_SIGNER_SUBJECT
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-signed-installer
+          path: dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  finalize-windows-signed:
+    name: Finalize signed Windows installer (x64)
+    needs: [prepare, sign-windows-installer]
+    if: needs.prepare.outputs.windows_signing == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-signed-installer
+          path: dist/installer
+      - name: Record signed Windows artifact checksum
+        shell: pwsh
+        env:
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = "dist\installer\FolioOrb-Windows-x64-$env:ASSET_TOKEN-Setup.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "The exact Windows installer is missing before finalization."
+          }
+          $installers = @(Get-ChildItem "dist\installer" -File -Filter "*.exe")
+          $expected = (Resolve-Path -LiteralPath $installer).Path
+          if ($installers.Count -ne 1 -or $installers[0].FullName -ne $expected) {
+            throw "Expected exactly the named Windows installer before finalization."
+          }
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $name = Split-Path -Leaf $installer
+          Set-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Value "$hash  $name" -Encoding ascii
+          $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
+          if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-installer
+          path: |
+            dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
+            dist/installer/windows-SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 7
 
   publish:
     name: Publish release
-    needs: [prepare, build-macos, build-windows]
-    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, build-macos, build-windows, finalize-windows-signed]
+    if: >-
+      ${{ always()
+      && needs.prepare.outputs.publish == 'true'
+      && needs.build-macos.result == 'success'
+      && needs.build-windows.result == 'success'
+      && (needs.finalize-windows-signed.result == 'success'
+      || (needs.prepare.outputs.windows_signing != 'true'
+      && needs.finalize-windows-signed.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -592,10 +864,19 @@ jobs:
       MACOS_SIGNED: ${{ needs.prepare.outputs.macos_signing_public }}
       MACOS_NOTARIZATION_ACTIVE: ${{ needs.prepare.outputs.macos_notarization }}
       MACOS_NOTARIZED: ${{ needs.prepare.outputs.macos_notarization_public }}
+      WINDOWS_SIGNING_ACTIVE: ${{ needs.prepare.outputs.windows_signing }}
+      WINDOWS_SIGNED: ${{ needs.prepare.outputs.windows_signing_public }}
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download final macOS artifact only
+        uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: macos-dmg
+          path: artifacts/macos
+      - name: Download final Windows artifact only
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: artifacts/windows
       - name: Assemble assets and checksums
         run: |
           set -euo pipefail
@@ -644,15 +925,27 @@ jobs:
           set -euo pipefail
           BUILT="$(date -u '+%Y-%m-%d %H:%M UTC')"
           if [[ "$MACOS_NOTARIZED" == "true" ]]; then
-            SECURITY_NOTE="The macOS app and DMG are Developer ID signed and notarized; Windows remains unsigned."
+            MACOS_SECURITY_NOTE="The macOS app and DMG are Developer ID signed and notarized;"
           elif [[ "$MACOS_NOTARIZATION_ACTIVE" == "true" ]]; then
-            SECURITY_NOTE="macOS signing and notarization are in credentialed pilot validation and are not yet accepted public guarantees; Windows remains unsigned."
+            MACOS_SECURITY_NOTE="macOS signing and notarization are in credentialed pilot validation and are not yet accepted public guarantees;"
           elif [[ "$MACOS_SIGNED" == "true" ]]; then
-            SECURITY_NOTE="The macOS app and DMG are Developer ID signed but not yet notarized; Windows remains unsigned."
+            MACOS_SECURITY_NOTE="The macOS app and DMG are Developer ID signed but not yet notarized;"
           elif [[ "$MACOS_SIGNING_ACTIVE" == "true" ]]; then
-            SECURITY_NOTE="macOS signing is in credentialed pilot validation and is not yet an accepted public guarantee; Windows remains unsigned."
+            MACOS_SECURITY_NOTE="macOS signing is in credentialed pilot validation and is not yet an accepted public guarantee;"
           else
+            MACOS_SECURITY_NOTE="macOS remains unsigned and not notarized;"
+          fi
+          if [[ "$WINDOWS_SIGNED" == "true" ]]; then
+            WINDOWS_SECURITY_NOTE="the Windows executable and installer are Authenticode signed. SmartScreen reputation warnings can still appear."
+          elif [[ "$WINDOWS_SIGNING_ACTIVE" == "true" ]]; then
+            WINDOWS_SECURITY_NOTE="Windows signing is in credentialed pilot validation and is not yet an accepted public guarantee."
+          else
+            WINDOWS_SECURITY_NOTE="Windows remains unsigned."
+          fi
+          if [[ "$MACOS_SIGNING_ACTIVE" != "true" && "$WINDOWS_SIGNING_ACTIVE" != "true" ]]; then
             SECURITY_NOTE="Builds are not yet code-signed."
+          else
+            SECURITY_NOTE="${MACOS_SECURITY_NOTE} ${WINDOWS_SECURITY_NOTE}"
           fi
           NOTES=$(cat <<EOF
           **Rolling development build from \`main\`.**
