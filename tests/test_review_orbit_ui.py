@@ -43,6 +43,7 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
         "Save data health CSV",
         "Save plan CSV",
         "Save review bundle",
+        "Verify saved bundle",
     ):
         assert phrase in markup
     assert "/api/review/trust" in script
@@ -54,6 +55,7 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
     assert "/api/review/trust/export" in script
     assert "/api/review/plan/export" in script
     assert "/api/review/bundle" in script
+    assert "/api/review/bundle/verify" in script
     assert "/api/review/overview" in script
     assert "/api/review/records/realized.csv" in script
     assert "/api/review/records/archive" in script
@@ -82,6 +84,9 @@ def test_review_orbit_covers_review_and_plan_protect_contracts():
     assert "Review bundle export failed; no complete ZIP was written." in script
     assert "Review Bundle download requested." in script
     assert "sensitive portfolio and target-plan data" in markup
+    assert "Matching hashes detect changes; they do not prove who created it." in markup
+    assert "review-bundle-verdict" in styles
+    assert "HASHES MATCH" in script
 
 
 def test_review_orbit_loads_executable_continuity_logic_before_the_workspace():

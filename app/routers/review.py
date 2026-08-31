@@ -4,10 +4,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
 
 from app import app_settings, paths
 from app.database import get_db
@@ -138,6 +140,32 @@ def export_review_bundle(
             "Cache-Control": "no-store",
             "Pragma": "no-cache",
         },
+    )
+
+
+@router.post("/bundle/verify")
+async def verify_review_bundle_upload(request: Request):
+    """Check a selected Review Bundle against its included manifest, read-only."""
+    content = bytearray()
+    try:
+        async for chunk in request.stream():
+            if len(content) + len(chunk) > review_bundle.MAX_BUNDLE_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Review Bundle exceeds the 8 MiB safety limit",
+                )
+            content.extend(chunk)
+    except ClientDisconnect as exc:
+        raise HTTPException(
+            status_code=400, detail="Could not read the selected ZIP"
+        ) from exc
+    result = await run_in_threadpool(
+        review_bundle.verify_review_bundle,
+        bytes(content),
+    )
+    return JSONResponse(
+        result,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
     )
 
 

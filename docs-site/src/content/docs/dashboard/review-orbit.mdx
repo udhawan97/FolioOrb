@@ -96,6 +96,13 @@ local ZIP instead of four loose files. It contains:
 The hashes help detect member corruption. They do not authenticate the ZIP or
 prove who created it.
 
+The rolling `latest-main` build also includes **Verify saved bundle**. Choose a
+Review Bundle ZIP and FolioOrb checks the fixed five-member layout, bounded ZIP
+size, v1 manifest shape, recorded byte lengths, and all four SHA-256 hashes. The
+selected archive is read by the local FolioOrb process; it is not imported into
+the portfolio and no database or setting is changed. A passing result still
+means integrity against the included manifest, not proof of who created it.
+
 The four review artifacts reuse one in-memory quote response set. Assembly is
 read-only: it does not record a daily snapshot or change holdings, trades,
 targets, DCA rows, settings, or backups. If target inputs differ from the saved

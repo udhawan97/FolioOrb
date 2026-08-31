@@ -2579,9 +2579,20 @@
                         <button type="button" class="review-secondary-btn" id="review-bundle-export">
                             <i class="bi bi-file-earmark-zip" aria-hidden="true"></i> Save review bundle
                         </button>
+                        <button type="button" class="review-secondary-btn" id="review-bundle-verify">
+                            <i class="bi bi-shield-check" aria-hidden="true"></i> Verify saved bundle
+                        </button>
+                        <input class="visually-hidden" id="review-bundle-verify-input" type="file"
+                               accept=".zip,application/zip" aria-describedby="review-bundle-verify-note" />
                     </div>
                     <p class="review-disclosure">The bundle contains sensitive portfolio and target-plan data. Store it privately.</p>
                     <p class="review-inline-status" id="review-bundle-status" role="status"></p>
+                    <p class="review-disclosure" id="review-bundle-verify-note">
+                        Verification reads the selected ZIP through this local FolioOrb process.
+                        Matching hashes detect changes; they do not prove who created it.
+                    </p>
+                    <div class="review-bundle-verification" id="review-bundle-verification"
+                         role="status" aria-live="polite"></div>
                     <p class="review-disclosure">Value change includes cash flows and is not presented as time-weighted performance.</p>
                 </section>
 

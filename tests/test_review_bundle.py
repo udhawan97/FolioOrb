@@ -5,8 +5,9 @@ import csv
 import hashlib
 import io
 import json
+import zlib
 from datetime import date, datetime, timedelta, timezone
-from zipfile import ZipFile
+from zipfile import ZIP_BZIP2, ZIP_DEFLATED, ZipFile, ZipInfo
 
 import pytest
 from sqlalchemy import create_engine
@@ -73,6 +74,43 @@ def _seed_review_book(db) -> None:
     db.commit()
 
 
+def _rewrite_bundle(payload: bytes, mutate) -> bytes:
+    """Return a deterministic copy after ``mutate(name, content)`` edits members."""
+    source = ZipFile(io.BytesIO(payload))
+    output = io.BytesIO()
+    with source, ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
+        for name in source.namelist():
+            content = mutate(name, source.read(name))
+            if content is None:
+                continue
+            info = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            archive.writestr(info, content)
+    return output.getvalue()
+
+
+def _corrupt_deflate_stream(payload: bytes, member_name: str) -> bytes:
+    """Flip one compressed byte that the raw DEFLATE decoder rejects."""
+    raw = bytearray(payload)
+    with ZipFile(io.BytesIO(payload)) as archive:
+        info = archive.getinfo(member_name)
+        header = info.header_offset
+        name_size = int.from_bytes(raw[header + 26:header + 28], "little")
+        extra_size = int.from_bytes(raw[header + 28:header + 30], "little")
+        start = header + 30 + name_size + extra_size
+        compressed = bytes(raw[start:start + info.compress_size])
+
+    for index in range(len(compressed)):
+        candidate = bytearray(compressed)
+        candidate[index] ^= 0xFF
+        try:
+            zlib.decompress(candidate, -zlib.MAX_WBITS)
+        except zlib.error:
+            raw[start + index] ^= 0xFF
+            return bytes(raw)
+    raise AssertionError("Could not construct a malformed DEFLATE stream")
+
+
 def test_bundle_reuses_one_quote_snapshot_and_hashes_every_receipt(db):
     _seed_review_book(db)
     calls = []
@@ -121,6 +159,234 @@ def test_bundle_reuses_one_quote_snapshot_and_hashes_every_receipt(db):
             assert item["sha256"] == hashlib.sha256(member).hexdigest()
         assert b"2026-08-25T21:30:00Z" in archive.read("data-health.csv")
         assert b"2026-08-25T21:30:00Z" in archive.read("target-plan.csv")
+
+    verification = review_bundle.verify_review_bundle(payload)
+    assert verification == {
+        "valid": True,
+        "code": "verified",
+        "message": "All four Review Bundle receipts match manifest.json.",
+        "checked_files": 4,
+        "expected_files": 4,
+        "integrity_only": True,
+        "integrity_note": review_bundle.INTEGRITY_ONLY_NOTE,
+        "manifest": {
+            "format_version": 1,
+            "app_version": "5.16.1",
+            "generated_at_utc": "2026-08-25T21:30:00Z",
+            "portfolio_id": 1,
+            "period": "month",
+            "period_start": verification["manifest"]["period_start"],
+            "period_end": verification["manifest"]["period_end"],
+            "reporting_currency": "USD",
+        },
+    }
+
+
+def test_bundle_verifier_detects_changed_receipt_and_manifest_claim(db):
+    _seed_review_book(db)
+    payload = review_bundle.build_review_bundle(db, 1, "month", quote_loader=_quotes)
+
+    changed_receipt = _rewrite_bundle(
+        payload,
+        lambda name, content: content + b"changed" if name == "review-pack.html" else content,
+    )
+    result = review_bundle.verify_review_bundle(changed_receipt)
+    assert result["valid"] is False
+    assert result["code"] == "size_mismatch"
+    assert result["checked_files"] == 0
+    assert result["integrity_only"] is True
+
+    def change_digest(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["files"][0]["sha256"] = "0" * 64
+        return json.dumps(manifest).encode()
+
+    changed_manifest = _rewrite_bundle(payload, change_digest)
+    result = review_bundle.verify_review_bundle(changed_manifest)
+    assert result["valid"] is False
+    assert result["code"] == "hash_mismatch"
+
+
+def test_bundle_verifier_rejects_wrong_members_format_and_invalid_zip(db):
+    _seed_review_book(db)
+    payload = review_bundle.build_review_bundle(db, 1, "month", quote_loader=_quotes)
+
+    missing = _rewrite_bundle(
+        payload,
+        lambda name, content: None if name == "target-plan.csv" else content,
+    )
+    assert review_bundle.verify_review_bundle(missing)["code"] == "unexpected_members"
+
+    def change_format(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["format_version"] = 2
+        return json.dumps(manifest).encode()
+
+    unsupported = review_bundle.verify_review_bundle(_rewrite_bundle(payload, change_format))
+    assert unsupported["valid"] is False
+    assert unsupported["code"] == "invalid_manifest"
+    assert "not supported" in unsupported["message"]
+
+    def change_format_to_float(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["format_version"] = 1.0
+        return json.dumps(manifest).encode()
+
+    result = review_bundle.verify_review_bundle(
+        _rewrite_bundle(payload, change_format_to_float)
+    )
+    assert result["valid"] is False
+    assert result["code"] == "invalid_manifest"
+
+    invalid = review_bundle.verify_review_bundle(b"not a zip")
+    assert invalid["valid"] is False
+    assert invalid["code"] == "invalid_zip"
+
+
+def test_bundle_verifier_bounds_manifest_identity_fields(db):
+    _seed_review_book(db)
+    payload = review_bundle.build_review_bundle(db, 1, "month", quote_loader=_quotes)
+
+    def invalid_identity(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["app_version"] = "v" * 65
+        return json.dumps(manifest).encode()
+
+    result = review_bundle.verify_review_bundle(_rewrite_bundle(payload, invalid_identity))
+    assert result["valid"] is False
+    assert result["code"] == "invalid_manifest"
+    assert "identity fields" in result["message"]
+
+    def invalid_date(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["period_start"] = "not-a-date"
+        return json.dumps(manifest).encode()
+
+    result = review_bundle.verify_review_bundle(_rewrite_bundle(payload, invalid_date))
+    assert result["valid"] is False
+    assert "date metadata" in result["message"]
+
+    def noncanonical_utc(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["generated_at_utc"] = "2026-08-25T16:30:00-05:00"
+        return json.dumps(manifest).encode()
+
+    result = review_bundle.verify_review_bundle(_rewrite_bundle(payload, noncanonical_utc))
+    assert result["valid"] is False
+    assert "date metadata" in result["message"]
+
+    def overflowing_utc(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["generated_at_utc"] = "0001-01-01T00:00:00+23:59"
+        return json.dumps(manifest).encode()
+
+    result = review_bundle.verify_review_bundle(_rewrite_bundle(payload, overflowing_utc))
+    assert result["valid"] is False
+    assert result["code"] == "invalid_manifest"
+    assert "date metadata" in result["message"]
+
+
+def test_bundle_verifier_fails_closed_on_adversarial_zip_and_json(db):
+    _seed_review_book(db)
+    payload = review_bundle.build_review_bundle(db, 1, "month", quote_loader=_quotes)
+
+    corrupted = _corrupt_deflate_stream(payload, "review-pack.html")
+    result = review_bundle.verify_review_bundle(corrupted)
+    assert result["valid"] is False
+    assert result["code"] == "invalid_zip"
+
+    def pathological_integer(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["format_version"] = "INTEGER_SENTINEL"
+        encoded = json.dumps(manifest).encode()
+        return encoded.replace(b'"INTEGER_SENTINEL"', b"9" * 5000)
+
+    result = review_bundle.verify_review_bundle(
+        _rewrite_bundle(payload, pathological_integer)
+    )
+    assert result["valid"] is False
+    assert result["code"] == "invalid_manifest"
+
+    def lone_surrogate(name, content):
+        if name != "manifest.json":
+            return content
+        manifest = json.loads(content)
+        manifest["app_version"] = "\ud800"
+        return json.dumps(manifest).encode()
+
+    result = review_bundle.verify_review_bundle(_rewrite_bundle(payload, lone_surrogate))
+    assert result["valid"] is False
+    assert result["code"] == "invalid_manifest"
+    assert "app version" in result["message"]
+
+
+def test_bundle_verifier_rejects_reordered_and_unsupported_members(db):
+    _seed_review_book(db)
+    payload = review_bundle.build_review_bundle(db, 1, "month", quote_loader=_quotes)
+    with ZipFile(io.BytesIO(payload)) as source:
+        members = [(name, source.read(name)) for name in source.namelist()]
+
+    reordered_io = io.BytesIO()
+    with ZipFile(reordered_io, "w", compression=ZIP_DEFLATED) as archive:
+        for name, content in reversed(members):
+            archive.writestr(name, content)
+    result = review_bundle.verify_review_bundle(reordered_io.getvalue())
+    assert result["valid"] is False
+    assert result["code"] == "unexpected_members"
+
+    unsupported_io = io.BytesIO()
+    with ZipFile(unsupported_io, "w", compression=ZIP_BZIP2) as archive:
+        for name, content in members:
+            archive.writestr(name, content)
+    result = review_bundle.verify_review_bundle(unsupported_io.getvalue())
+    assert result["valid"] is False
+    assert result["code"] == "unsafe_member"
+
+
+def test_bundle_verifier_reports_completed_receipts_before_a_mismatch(db):
+    _seed_review_book(db)
+    payload = review_bundle.build_review_bundle(db, 1, "month", quote_loader=_quotes)
+
+    def change_second_receipt(name, content):
+        if name == "review-pack.csv":
+            return content[:-1] + bytes([content[-1] ^ 0x01])
+        return content
+
+    result = review_bundle.verify_review_bundle(
+        _rewrite_bundle(payload, change_second_receipt)
+    )
+    assert result["valid"] is False
+    assert result["code"] == "hash_mismatch"
+    assert result["checked_files"] == 1
+
+
+def test_bundle_verifier_bounds_compressed_input_and_expanded_members(monkeypatch):
+    monkeypatch.setattr(review_bundle, "MAX_BUNDLE_BYTES", 128)
+    assert review_bundle.verify_review_bundle(b"x" * 129)["code"] == "size_limit"
+
+    output = io.BytesIO()
+    with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
+        for name in review_bundle.BUNDLE_MEMBER_NAMES:
+            archive.writestr(name, b"x" * 40)
+    result = review_bundle.verify_review_bundle(output.getvalue())
+    assert result["valid"] is False
+    assert result["code"] == "size_limit"
 
 
 def test_bundle_rejects_invalid_identity_period_and_oversize_output(db, monkeypatch):

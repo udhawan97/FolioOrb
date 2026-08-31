@@ -467,6 +467,49 @@ body.review-orbit-open > .dashboard-senpai {
 .review-report-card strong { display: block; margin-top: 0.25rem; font-size: 1rem; }
 .review-report-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; margin: 1rem 0; }
 
+.review-bundle-verification:empty { display: none; }
+
+.review-bundle-verdict {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.8rem;
+    margin: -0.35rem 0 1rem;
+    padding: 0.82rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--accent-red) 30%, var(--hairline));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--accent-red) 7%, var(--surface));
+}
+
+.review-bundle-verdict.is-valid {
+    border-color: color-mix(in srgb, var(--accent-green) 32%, var(--hairline));
+    background: color-mix(in srgb, var(--accent-green) 7%, var(--surface));
+}
+
+.review-bundle-verdict.is-pending {
+    border-color: color-mix(in srgb, var(--accent-cyan) 30%, var(--hairline));
+    background: color-mix(in srgb, var(--accent-cyan) 6%, var(--surface));
+}
+
+.review-bundle-seal {
+    min-width: 6.8rem;
+    padding: 0.42rem 0.55rem;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    color: var(--accent-red);
+    font: 750 0.62rem/1 var(--font-mono, ui-monospace, "SF Mono", monospace);
+    letter-spacing: 0.08em;
+    text-align: center;
+}
+
+.review-bundle-verdict.is-valid .review-bundle-seal { color: var(--accent-green); }
+.review-bundle-verdict.is-pending .review-bundle-seal { color: var(--accent-cyan); }
+
+.review-bundle-verdict-copy { display: grid; gap: 0.18rem; min-width: 0; }
+.review-bundle-verdict-copy strong { color: var(--text-primary); font-size: 0.78rem; }
+.review-bundle-verdict-copy > span { color: var(--text-secondary); font-size: 0.69rem; }
+.review-bundle-verdict-copy small { color: var(--text-tertiary); font-size: 0.63rem; }
+
 .review-watchlist-picks { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem; }
 .review-watchlist-pick {
     display: flex;
@@ -831,6 +874,8 @@ body.review-orbit-open > .dashboard-senpai {
     .review-thesis-fields,
     .review-restore-confirm { align-items: stretch; flex-direction: column; }
     .review-report-actions button { width: 100%; }
+    .review-bundle-verdict { grid-template-columns: 1fr; }
+    .review-bundle-seal { justify-self: start; }
     .review-backup-row { grid-template-columns: 1fr; }
     .review-backup-actions { flex-wrap: wrap; }
     .review-course-summary { grid-template-columns: 1fr; justify-items: center; text-align: center; }

@@ -476,6 +476,96 @@ window.ReviewOrbit = (() => {
         }
     }
 
+    function renderBundleVerification(result) {
+        const status = $("review-bundle-verification");
+        if (!status) return;
+        const pending = result?.pending === true;
+        const valid = result?.valid === true;
+        const card = document.createElement("div");
+        const stateName = pending ? "pending" : valid ? "valid" : "invalid";
+        card.className = `review-bundle-verdict is-${stateName}`;
+
+        const seal = document.createElement("span");
+        seal.className = "review-bundle-seal";
+        seal.textContent = pending ? "CHECKING" : valid ? "HASHES MATCH" : "CHECK FAILED";
+
+        const copy = document.createElement("span");
+        copy.className = "review-bundle-verdict-copy";
+        const title = document.createElement("strong");
+        title.textContent = pending
+            ? "Checking bundle"
+            : valid ? "Integrity check passed" : "Integrity check failed";
+        const detail = document.createElement("span");
+        if (valid && result.manifest) {
+            const period = String(result.manifest.period || "review");
+            const periodLabel = period.charAt(0).toUpperCase() + period.slice(1);
+            detail.textContent = (
+                `${result.checked_files}/${result.expected_files} receipts · `
+                + `${periodLabel} · FolioOrb ${result.manifest.app_version} · `
+                + dateTime(result.manifest.generated_at_utc)
+            );
+        } else {
+            detail.textContent = result?.message || "The selected ZIP could not be verified.";
+        }
+        const note = document.createElement("small");
+        note.textContent = pending
+            ? "Nothing is imported or written to the portfolio."
+            : valid
+            ? (result.integrity_note || "Matching hashes do not authenticate the bundle creator.")
+            : "Do not rely on this copy. Export a fresh bundle from the original profile if available.";
+        copy.append(title, detail, note);
+        card.append(seal, copy);
+        status.replaceChildren(card);
+
+        live(pending
+            ? "Checking the selected Review Bundle."
+            : valid
+            ? "Review Bundle integrity check passed. Four receipts match the manifest."
+            : `Review Bundle integrity check failed. ${detail.textContent}`
+        );
+    }
+
+    async function verifyReviewBundle(file) {
+        if (!file) return;
+        const button = $("review-bundle-verify");
+        const input = $("review-bundle-verify-input");
+        if (!button || !input) return;
+        button.disabled = true;
+        renderBundleVerification({
+            pending: true,
+            valid: false,
+            message: "Reading the selected ZIP and checking four receipt hashes…",
+        });
+        try {
+            if (file.size > 8 * 1024 * 1024) {
+                renderBundleVerification({
+                    valid: false,
+                    message: "The selected Review Bundle exceeds the 8 MiB safety limit.",
+                });
+                return;
+            }
+            const response = await fetch("/api/review/bundle/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/zip" },
+                body: file,
+                cache: "no-store",
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(result?.detail || `HTTP ${response.status}`);
+            }
+            renderBundleVerification(result);
+        } catch (error) {
+            renderBundleVerification({
+                valid: false,
+                message: apiErrorMessage(error, "The selected ZIP could not be verified."),
+            });
+        } finally {
+            button.disabled = false;
+            input.value = "";
+        }
+    }
+
     async function exportSnapshot(kind) {
         const exports = {
             trust: {
@@ -1440,6 +1530,12 @@ window.ReviewOrbit = (() => {
             button.addEventListener("click", () => exportReport(button.dataset.reportExport));
         });
         $("review-bundle-export")?.addEventListener("click", saveReviewBundle);
+        $("review-bundle-verify")?.addEventListener("click", () => {
+            $("review-bundle-verify-input")?.click();
+        });
+        $("review-bundle-verify-input")?.addEventListener("change", event => {
+            verifyReviewBundle(event.target.files?.[0]);
+        });
         document.querySelectorAll("[data-review-snapshot-export]").forEach(button => {
             button.addEventListener("click", () => exportSnapshot(button.dataset.reviewSnapshotExport));
         });

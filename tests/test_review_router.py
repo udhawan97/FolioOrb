@@ -1,5 +1,10 @@
 """HTTP contract and portfolio scoping for the Review Orbit."""
 # pylint: disable=redefined-outer-name
+import hashlib
+import io
+import json
+from zipfile import ZIP_DEFLATED, ZipFile
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -182,6 +187,84 @@ def test_review_bundle_is_scoped_validated_and_downloaded_as_zip(client, monkeyp
     assert client.get(
         "/api/review/bundle?period=month&portfolio_id=999"
     ).status_code == 404
+
+
+def test_review_bundle_verification_is_read_only_bounded_and_not_cached(
+    client, monkeypatch
+):
+    seen = []
+
+    def verify(payload):
+        seen.append(payload)
+        return {
+            "valid": True,
+            "code": "verified",
+            "message": "All four receipts match.",
+        }
+
+    monkeypatch.setattr(review_bundle, "verify_review_bundle", verify)
+    response = client.post(
+        "/api/review/bundle/verify",
+        content=b"bundle-bytes",
+        headers={"Content-Type": "application/zip"},
+    )
+    assert response.status_code == 200
+    assert response.json()["valid"] is True
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert seen == [b"bundle-bytes"]
+
+    monkeypatch.setattr(review_bundle, "MAX_BUNDLE_BYTES", 4)
+    too_large = client.post(
+        "/api/review/bundle/verify",
+        content=b"12345",
+        headers={"Content-Type": "application/zip"},
+    )
+    assert too_large.status_code == 413
+    assert seen == [b"bundle-bytes"]
+
+
+def test_review_bundle_verification_rejects_unencodable_manifest_metadata(client):
+    members = {
+        "review-pack.html": b"html",
+        "review-pack.csv": b"csv",
+        "data-health.csv": b"health",
+        "target-plan.csv": b"plan",
+    }
+    manifest = {
+        "format_version": 1,
+        "app_version": "\ud800",
+        "generated_at_utc": "2026-08-25T21:30:00Z",
+        "portfolio_id": 1,
+        "period": "month",
+        "period_start": "2026-08-01",
+        "period_end": "2026-08-25",
+        "reporting_currency": "USD",
+        "member_order": [*review_bundle.BUNDLE_FILE_NAMES, "manifest.json"],
+        "manifest_included_in_files": False,
+        "files": [
+            {
+                "name": name,
+                "bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+            for name, content in members.items()
+        ],
+    }
+    output = io.BytesIO()
+    with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
+        for name, content in members.items():
+            archive.writestr(name, content)
+        archive.writestr("manifest.json", json.dumps(manifest).encode())
+
+    response = client.post(
+        "/api/review/bundle/verify",
+        content=output.getvalue(),
+        headers={"Content-Type": "application/zip"},
+    )
+    assert response.status_code == 200
+    assert response.json()["valid"] is False
+    assert response.json()["code"] == "invalid_manifest"
 
 
 def test_target_payload_requires_integer_basis_points(client):

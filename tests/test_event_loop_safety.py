@@ -36,6 +36,7 @@ import app.routers
 # The bar: it must either `await` real async I/O, or do no I/O at all.
 GENUINELY_ASYNC = {
     "import_holdings": "awaits UploadFile.read() — genuine async I/O",
+    "verify_review_bundle_upload": "streams a bounded body and offloads verification",
     "get_market_status": "pure clock arithmetic, no I/O to hand to a thread",
 }
 
