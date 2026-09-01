@@ -73,6 +73,7 @@ def quote(ticker, price, day_change=0.0, day_change_pct=0.0):
         "day_change": day_change,
         "day_change_pct": day_change_pct,
         "currency": "USD",
+        "source_currency": "USD",
     }
 
 
