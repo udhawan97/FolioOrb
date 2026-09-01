@@ -5,6 +5,7 @@ import pytest
 
 from app.models import Holding, RealizedTrade
 from app.routers import portfolio as portfolio_router
+from app.services import portfolio_valuation
 
 
 def _holding(db, *, watchlist=False):
@@ -110,7 +111,11 @@ def test_valid_explicit_usd_market_quote_records_market_provenance(
     monkeypatch.setattr(
         portfolio_router,
         "get_stock_data",
-        lambda _ticker: {"current_price": 126.5, "currency": "USD"},
+        lambda _ticker: {
+            "current_price": 126.5,
+            "currency": "USD",
+            "source_currency": "USD",
+        },
     )
 
     response = api_client(portfolio_router.router).delete(
@@ -122,6 +127,32 @@ def test_valid_explicit_usd_market_quote_records_market_provenance(
     assert trade.sale_price == 126.5
     assert trade.sale_currency == "USD"
     assert trade.sale_price_source == "market_quote"
+
+
+def test_display_usd_without_source_currency_cannot_create_a_sale_or_gain(
+    db, api_client, monkeypatch
+):
+    holding = _holding(db)
+    monkeypatch.setattr(
+        portfolio_router,
+        "get_stock_data",
+        lambda _ticker: {
+            "current_price": 103.0,
+            "currency": "USD",
+            "source_currency": None,
+        },
+    )
+
+    response = api_client(portfolio_router.router).delete(
+        f"/api/portfolio/holdings/{holding.id}"
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "sale_price_required"
+    _assert_no_removal_mutation(db, holding.id)
+    performance = portfolio_valuation.load_performance(db, 1)
+    assert performance.realized_gain == 0.0
+    assert not performance.trades
 
 
 @pytest.mark.parametrize(

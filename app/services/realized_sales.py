@@ -126,7 +126,13 @@ class RealizedSaleLedger:
             if not (
                 math.isfinite(live)
                 and live > 0
+                # ``currency`` may be the quote adapter's USD display fallback.
+                # Persist a market sale only when the provider itself supplied
+                # matching USD provenance.
                 and financial_currency.is_reporting_currency(quote.get("currency"))
+                and financial_currency.is_reporting_currency(
+                    quote.get("source_currency")
+                )
             ):
                 raise SalePriceUnavailable(str(holding.ticker))
             price = live

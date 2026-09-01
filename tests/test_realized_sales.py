@@ -86,12 +86,37 @@ def test_automatic_sale_requires_and_persists_an_explicit_usd_quote():
     trade = RealizedSaleLedger(
         db,
         1,
-        quote_loader=lambda _ticker: {"current_price": 130.0, "currency": "usd"},
+        quote_loader=lambda _ticker: {
+            "current_price": 130.0,
+            "currency": "usd",
+            "source_currency": " USD ",
+        },
     ).stage_reduction(holding, 9)
 
     assert trade.sale_price == 130.0
     assert trade.sale_currency == "USD"
     assert trade.sale_price_source == "market_quote"
+
+
+@pytest.mark.parametrize("source_currency", [None, "GBP"])
+def test_display_usd_without_trusted_usd_source_stages_nothing(source_currency):
+    db = make_db()
+    holding = add_holding(db)
+    quote = {
+        "current_price": 103.0,
+        "currency": "USD",
+        "source_currency": source_currency,
+    }
+
+    with pytest.raises(SalePriceUnavailable):
+        RealizedSaleLedger(
+            db, 1, quote_loader=lambda _ticker: quote
+        ).stage_reduction(holding, 0)
+
+    assert holding.is_active is True
+    assert db.query(RealizedTrade).count() == 0
+    assert not db.new
+    assert not db.dirty
 
 
 @pytest.mark.parametrize(
@@ -150,7 +175,11 @@ def test_holding_and_sale_roll_back_together_when_the_commit_fails(monkeypatch):
     ledger = RealizedSaleLedger(
         db,
         1,
-        quote_loader=lambda _ticker: {"current_price": 120.0, "currency": "USD"},
+        quote_loader=lambda _ticker: {
+            "current_price": 120.0,
+            "currency": "USD",
+            "source_currency": "USD",
+        },
     )
     ledger.stage_reduction(holding, 5)
     holding.shares = 5
