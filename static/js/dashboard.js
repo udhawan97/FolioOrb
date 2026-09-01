@@ -12472,7 +12472,7 @@ function promptSaleDetails({
     isWatchlist = false,
 }) {
     return new Promise((resolve) => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = HoldingRemovalLogic.localCalendarDate();
         const overlay = document.createElement("div");
         overlay.className = "sale-dialog-overlay";
         const safeTicker = escapeHtml(ticker);

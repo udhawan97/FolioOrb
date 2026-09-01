@@ -49,3 +49,10 @@ def test_removal_uses_accessible_dialog_and_locked_retry_contract():
     assert "HoldingRemovalLogic.buildPayload" in body
     assert "HoldingRemovalLogic.requiresExplicitPrice" in body
     assert "requirePrice: true" in body
+
+
+def test_sale_dialog_defaults_and_caps_at_the_local_calendar_date():
+    body = _function_body(DASHBOARD, "promptSaleDetails", "updateHolding")
+    assert "HoldingRemovalLogic.localCalendarDate()" in body
+    assert 'max="${today}" value="${today}"' in body
+    assert "toISOString" not in body
