@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import DcaPlanCreate, DcaPlanUpdate
+from app.schemas import DcaBulkAction, DcaPlanCreate, DcaPlanUpdate
 from app.services import dca_ledger, portfolio_lifecycle
 from app.services.stock_service import get_daily_closes, validate_ticker_symbol
 
@@ -134,14 +134,16 @@ def apply_contribution(
 @router.post("/plans/{plan_id}/apply-pending")
 def apply_all_pending(
     plan_id: int,
+    data: DcaBulkAction,
     portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
-    """Apply every pending buy in a plan."""
+    """Apply exactly the pending buys the user reviewed in a plan."""
     return _call(
         _ledger(db).apply_all_pending,
         plan_id,
         portfolio_id=portfolio_id,
+        contribution_ids=data.contribution_ids,
     )
 
 
@@ -162,14 +164,16 @@ def skip_contribution(
 @router.post("/plans/{plan_id}/skip-pending")
 def skip_all_pending(
     plan_id: int,
+    data: DcaBulkAction,
     portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
-    """Dismiss every pending buy in a plan."""
+    """Dismiss exactly the pending buys the user reviewed in a plan."""
     return _call(
         _ledger(db).skip_all_pending,
         plan_id,
         portfolio_id=portfolio_id,
+        contribution_ids=data.contribution_ids,
     )
 
 
@@ -204,12 +208,14 @@ def undo_contribution(
 @router.post("/plans/{plan_id}/undo-applied")
 def undo_all_applied(
     plan_id: int,
+    data: DcaBulkAction,
     portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
-    """Reverse every applied buy in a plan."""
+    """Reverse exactly the applied buys the user reviewed in a plan."""
     return _call(
         _ledger(db).undo_all_applied,
         plan_id,
         portfolio_id=portfolio_id,
+        contribution_ids=data.contribution_ids,
     )

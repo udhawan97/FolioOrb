@@ -12993,6 +12993,18 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
         });
     }
 
+    async function reportAmbiguousRemoval(error) {
+        console.warn("Unable to confirm holding removal:", error);
+        let outcome = { status: "unknown", realizedRefreshed: false };
+        try {
+            outcome = await reconcileHoldingRemovalOutcome(holdingId, ticker);
+        } catch (reconciliationError) {
+            console.warn("Unable to reconcile holding removal:", reconciliationError);
+        }
+        const disclosure = describeHoldingRemovalOutcome(ticker, outcome);
+        showToast(disclosure.message, disclosure.level);
+    }
+
     let res;
     let err = {};
     try {
@@ -13016,15 +13028,11 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
             err = res.ok ? {} : await res.json().catch(() => ({}));
         }
     } catch (requestError) {
-        console.warn("Unable to remove holding:", requestError);
-        let outcome = { status: "unknown", realizedRefreshed: false };
-        try {
-            outcome = await reconcileHoldingRemovalOutcome(holdingId, ticker);
-        } catch (reconciliationError) {
-            console.warn("Unable to reconcile holding removal:", reconciliationError);
-        }
-        const disclosure = describeHoldingRemovalOutcome(ticker, outcome);
-        showToast(disclosure.message, disclosure.level);
+        await reportAmbiguousRemoval(requestError);
+        return;
+    }
+    if (!res.ok && res.status >= 500) {
+        await reportAmbiguousRemoval(new Error(`Removal returned HTTP ${res.status}`));
         return;
     }
     if (res.ok) {

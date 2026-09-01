@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 from datetime import date
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
 
 from app.services.ticker import validated_ticker_shape
 
@@ -215,3 +215,16 @@ class DcaPlanUpdate(BaseModel):
     """Fields that can be changed on an existing DCA plan."""
     amount: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
     is_active: Optional[bool] = None  # False = pause the plan
+
+
+class DcaBulkAction(BaseModel):
+    """The exact buys the user reviewed and consented to mutate together."""
+
+    contribution_ids: list[PositiveInt] = Field(..., min_length=1, max_length=5000)
+
+    @field_validator("contribution_ids")
+    @classmethod
+    def unique_contribution_ids(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("contribution_ids must be unique")
+        return value

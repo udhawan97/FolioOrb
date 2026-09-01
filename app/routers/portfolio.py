@@ -577,7 +577,9 @@ def remove_holding(
     Soft-delete a holding by setting is_active=False.
     The row is kept in the database for historical reference.
     """
-    holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
+    holding = holdings_repository.in_portfolio(
+        db, portfolio_id, holding_id, active_only=True
+    )
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
 

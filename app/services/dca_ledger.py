@@ -567,16 +567,51 @@ class DcaLedger:
             },
         }
 
-    def apply_all_pending(self, plan_id: int, *, portfolio_id: int) -> dict:
-        plan = self._plan(plan_id, portfolio_id=portfolio_id)
-        pending = (
+    def _bulk_contributions(
+        self,
+        plan_id: int,
+        contribution_ids: list[int],
+        *,
+        expected_status: str,
+        newest_first: bool = False,
+    ) -> list[DcaContribution]:
+        """Resolve one reviewed ID set or reject the whole stale operation."""
+        ids = [int(contribution_id) for contribution_id in contribution_ids]
+        if not ids or any(contribution_id <= 0 for contribution_id in ids):
+            raise DcaConflictError("Select at least one valid DCA buy")
+        if len(ids) != len(set(ids)):
+            raise DcaConflictError("The selected DCA buys must be unique")
+        rows = (
             self.db.query(DcaContribution)
-            .filter(
-                DcaContribution.plan_id == plan_id,
-                DcaContribution.status == "pending",
-            )
-            .order_by(DcaContribution.exec_date.asc())
+            .filter(DcaContribution.id.in_(ids))
             .all()
+        )
+        by_id = {row.id: row for row in rows}
+        if len(by_id) != len(ids) or any(
+            row.plan_id != plan_id or row.status != expected_status
+            for row in rows
+        ):
+            raise DcaConflictError(
+                "The selected DCA buys changed. Refresh and review the action again."
+            )
+        return sorted(
+            rows,
+            key=lambda row: (row.exec_date, row.id),
+            reverse=newest_first,
+        )
+
+    def apply_all_pending(
+        self,
+        plan_id: int,
+        *,
+        portfolio_id: int,
+        contribution_ids: list[int],
+    ) -> dict:
+        plan = self._plan(plan_id, portfolio_id=portfolio_id)
+        pending = self._bulk_contributions(
+            plan_id,
+            contribution_ids,
+            expected_status="pending",
         )
         # Bulk apply is one financial transaction. Preflight every row before
         # touching the holding so a later ambiguous/foreign contribution cannot
@@ -601,18 +636,23 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
-    def skip_all_pending(self, plan_id: int, *, portfolio_id: int) -> dict:
+    def skip_all_pending(
+        self,
+        plan_id: int,
+        *,
+        portfolio_id: int,
+        contribution_ids: list[int],
+    ) -> dict:
         plan = self._plan(plan_id, portfolio_id=portfolio_id)
-        skipped = (
-            self.db.query(DcaContribution)
-            .filter(
-                DcaContribution.plan_id == plan_id,
-                DcaContribution.status == "pending",
-            )
-            .update({DcaContribution.status: "dismissed"}, synchronize_session=False)
+        pending = self._bulk_contributions(
+            plan_id,
+            contribution_ids,
+            expected_status="pending",
         )
+        for contribution in pending:
+            contribution.status = "dismissed"
         self.db.commit()
-        return {"skipped": skipped, "ticker": plan.ticker}
+        return {"skipped": len(pending), "ticker": plan.ticker}
 
     def restore_contribution(
         self, contribution_id: int, *, portfolio_id: int
@@ -686,16 +726,19 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
-    def undo_all_applied(self, plan_id: int, *, portfolio_id: int) -> dict:
+    def undo_all_applied(
+        self,
+        plan_id: int,
+        *,
+        portfolio_id: int,
+        contribution_ids: list[int],
+    ) -> dict:
         plan = self._plan(plan_id, portfolio_id=portfolio_id)
-        applied = (
-            self.db.query(DcaContribution)
-            .filter(
-                DcaContribution.plan_id == plan_id,
-                DcaContribution.status == "applied",
-            )
-            .order_by(DcaContribution.exec_date.desc())
-            .all()
+        applied = self._bulk_contributions(
+            plan_id,
+            contribution_ids,
+            expected_status="applied",
+            newest_first=True,
         )
         try:
             for contribution in applied:

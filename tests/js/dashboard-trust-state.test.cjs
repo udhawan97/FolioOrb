@@ -359,6 +359,44 @@ test("removeHolding reconciles a thrown request before reporting its outcome", a
     assert.doesNotMatch(toasts[0][0], /holding kept unchanged/i);
 });
 
+test("removeHolding reconciles an ambiguous server error before reporting", async () => {
+    const toasts = [];
+    let reconciliationCalls = 0;
+    const { removeHolding } = loadFunctions(
+        ["describeHoldingRemovalOutcome", "removeHolding"],
+        {
+            manageHoldingsCache: [{ id: 7, ticker: "VTI", shares: 2 }],
+            latestHoldings: [],
+            promptSaleDetails: async () => ({ sale_price: 100, sale_date: "2026-08-31" }),
+            HoldingRemovalLogic: {
+                buildPayload: value => value,
+                requiresExplicitPrice: () => false,
+            },
+            PortfolioWorkspace: {
+                response: async () => ({
+                    ok: false,
+                    status: 500,
+                    json: async () => ({ detail: "response failed after commit" }),
+                }),
+            },
+            reconcileHoldingRemovalOutcome: async () => {
+                reconciliationCalls += 1;
+                return { status: "removed", realizedRefreshed: true };
+            },
+            showToast: (message, level) => toasts.push([message, level]),
+            console: { warn: () => {} },
+        },
+    );
+
+    await removeHolding(7, "VTI");
+
+    assert.equal(reconciliationCalls, 1);
+    assert.deepEqual(toasts, [[
+        "VTI was removed — refreshed saved holdings and realized history",
+        "warning",
+    ]]);
+});
+
 test("a deterministic HTTP conflict keeps its server-proven no-mutation message", async () => {
     const toasts = [];
     let reconciliationCalls = 0;

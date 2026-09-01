@@ -269,7 +269,11 @@ def test_bulk_unsafe_undo_rolls_back_earlier_staged_reversals():
     before_summary = ledger.list_plans(1)[0]
 
     with pytest.raises(DcaConflictError, match="left unchanged"):
-        ledger.undo_all_applied(plan_id, portfolio_id=1)
+        ledger.undo_all_applied(
+            plan_id,
+            portfolio_id=1,
+            contribution_ids=[row.id for row in applied],
+        )
 
     db.refresh(holding)
     assert (holding.shares, holding.avg_cost, holding.is_active) == (0.75, 100.0, True)
@@ -397,7 +401,11 @@ def test_bulk_apply_preflights_every_currency_fact_before_holding_mutation():
     before = (holding.shares, holding.avg_cost, holding.is_active)
 
     with pytest.raises(DcaConflictError, match="left unchanged"):
-        DcaLedger(db).apply_all_pending(plan.id, portfolio_id=1)
+        DcaLedger(db).apply_all_pending(
+            plan.id,
+            portfolio_id=1,
+            contribution_ids=[good.id, ambiguous.id],
+        )
 
     db.refresh(holding)
     assert (holding.shares, holding.avg_cost, holding.is_active) == before

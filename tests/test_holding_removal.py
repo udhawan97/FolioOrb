@@ -104,6 +104,36 @@ def test_explicit_usd_price_locks_manual_provenance_without_loading_a_quote(
     assert trade.created_at == datetime(2026, 1, 15, 12, 0)
 
 
+def test_retry_after_a_committed_removal_cannot_record_the_sale_twice(
+    db, api_client, monkeypatch
+):
+    holding = _holding(db)
+
+    def quote_must_not_run(_ticker):
+        raise AssertionError("explicit sale must not load a quote")
+
+    monkeypatch.setattr(portfolio_router, "get_stock_data", quote_must_not_run)
+    request = {
+        "sale_price": 123.45,
+        "sale_currency": "USD",
+        "sale_price_source": "manual_entry",
+        "sale_date": "2026-01-15",
+    }
+    client = api_client(portfolio_router.router)
+
+    first = client.request(
+        "DELETE", f"/api/portfolio/holdings/{holding.id}", json=request
+    )
+    retry = client.request(
+        "DELETE", f"/api/portfolio/holdings/{holding.id}", json=request
+    )
+
+    assert first.status_code == 200
+    assert retry.status_code == 404
+    assert retry.json() == {"detail": "Holding not found"}
+    assert db.query(RealizedTrade).count() == 1
+
+
 def test_valid_explicit_usd_market_quote_records_market_provenance(
     db, api_client, monkeypatch
 ):

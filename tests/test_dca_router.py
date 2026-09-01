@@ -180,6 +180,8 @@ def test_id_mutations_cannot_cross_portfolios(client, db, case):
         "holding": (holding.shares, holding.avg_cost, holding.is_active),
     }
     target = path.format(plan_id=plan_id, contribution_id=contribution_id)
+    if target.endswith(("/apply-pending", "/skip-pending", "/undo-applied")):
+        payload = {"contribution_ids": [contribution_id]}
 
     response = client.request(
         method,
@@ -239,6 +241,8 @@ def test_id_mutations_require_a_known_portfolio(client, db, case, query, expecte
         "holding": (holding.shares, holding.avg_cost, holding.is_active),
     }
     target = path.format(plan_id=plan_id, contribution_id=contribution_id)
+    if target.endswith(("/apply-pending", "/skip-pending", "/undo-applied")):
+        payload = {"contribution_ids": [contribution_id]}
 
     response = client.request(method, f"{target}{query}", json=payload)
 
@@ -428,6 +432,13 @@ def _first_pending_id(client):
     return rows[0]["id"]
 
 
+def _contribution_ids(client, status):
+    rows = client.get(
+        f"/api/dca/contributions?status={status}"
+    ).json()["contributions"]
+    return [row["id"] for row in rows]
+
+
 def test_apply_creates_holding_and_updates_average(client, db):
     _create_weekly_plan(client, days_back=7, amount=50.0)  # 2 buys @ $100
     cid = _first_pending_id(client)
@@ -520,7 +531,11 @@ def test_skipped_buy_does_not_reappear_after_catchup(client):
 
 def test_apply_all_pending(client, db):
     plan_id = _create_weekly_plan(client, days_back=21, amount=50.0).json()["plan"]["id"]
-    res = client.post(f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1")
+    pending_ids = _contribution_ids(client, "pending")
+    res = client.post(
+        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
+    )
     assert res.json()["applied"] == 4
     holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
     assert holding.shares == pytest.approx(2.0)      # 4 × $50 @ $100
@@ -532,17 +547,27 @@ def test_apply_all_pending(client, db):
 
 def test_skip_all_pending(client):
     plan_id = _create_weekly_plan(client, days_back=21).json()["plan"]["id"]
-    res = client.post(f"/api/dca/plans/{plan_id}/skip-pending?portfolio_id=1")
+    pending_ids = _contribution_ids(client, "pending")
+    res = client.post(
+        f"/api/dca/plans/{plan_id}/skip-pending?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
+    )
     assert res.json()["skipped"] == 4
     assert client.get("/api/dca/contributions?status=pending").json()["contributions"] == []
 
 
 def test_undo_all_applied_reverses_everything(client, db):
     plan_id = _create_weekly_plan(client, days_back=21, amount=50.0).json()["plan"]["id"]
+    pending_ids = _contribution_ids(client, "pending")
     client.post(
-        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1"
+        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
     )  # 4 buys → 2.0 sh
-    res = client.post(f"/api/dca/plans/{plan_id}/undo-applied?portfolio_id=1")
+    applied_ids = _contribution_ids(client, "applied")
+    res = client.post(
+        f"/api/dca/plans/{plan_id}/undo-applied?portfolio_id=1",
+        json={"contribution_ids": applied_ids},
+    )
     assert res.json()["undone"] == 4
     # Every buy back to pending, and the DCA-created holding is emptied + retired.
     assert len(client.get("/api/dca/contributions?status=pending").json()["contributions"]) == 4
@@ -558,12 +583,154 @@ def test_undo_all_keeps_holding_with_manual_shares(client, db):
                    is_active=True, is_watchlist=False, hold_class="auto"))
     db.commit()
     plan_id = _create_weekly_plan(client, days_back=21, amount=50.0).json()["plan"]["id"]
-    client.post(f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1")
-    client.post(f"/api/dca/plans/{plan_id}/undo-applied?portfolio_id=1")
+    pending_ids = _contribution_ids(client, "pending")
+    client.post(
+        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
+    )
+    applied_ids = _contribution_ids(client, "applied")
+    client.post(
+        f"/api/dca/plans/{plan_id}/undo-applied?portfolio_id=1",
+        json={"contribution_ids": applied_ids},
+    )
     holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
     assert holding.shares == pytest.approx(10.0)
     assert holding.avg_cost == pytest.approx(200.0)
     assert holding.is_active is True
+
+
+@pytest.mark.parametrize(
+    "endpoint, result_key, selected_status",
+    [
+        ("apply-pending", "applied", "applied"),
+        ("skip-pending", "skipped", "dismissed"),
+    ],
+    ids=["apply-reviewed-set", "skip-reviewed-set"],
+)
+def test_bulk_pending_mutates_only_the_reviewed_ids(
+    client, endpoint, result_key, selected_status
+):
+    plan_id = _create_weekly_plan(client, days_back=21).json()["plan"]["id"]
+    pending_ids = _contribution_ids(client, "pending")
+    reviewed_ids, concurrent_id = pending_ids[:-1], pending_ids[-1]
+
+    response = client.post(
+        f"/api/dca/plans/{plan_id}/{endpoint}?portfolio_id=1",
+        json={"contribution_ids": reviewed_ids},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[result_key] == len(reviewed_ids)
+    rows = client.get(
+        "/api/dca/contributions?status=all"
+    ).json()["contributions"]
+    statuses = {row["id"]: row["status"] for row in rows}
+    assert all(statuses[row_id] == selected_status for row_id in reviewed_ids)
+    assert statuses[concurrent_id] == "pending"
+
+
+def test_bulk_undo_mutates_only_the_reviewed_ids(client, db):
+    plan_id = _create_weekly_plan(client, days_back=21).json()["plan"]["id"]
+    pending_ids = _contribution_ids(client, "pending")
+    client.post(
+        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
+    )
+    applied_ids = _contribution_ids(client, "applied")
+    reviewed_ids, concurrent_id = applied_ids[:-1], applied_ids[-1]
+
+    response = client.post(
+        f"/api/dca/plans/{plan_id}/undo-applied?portfolio_id=1",
+        json={"contribution_ids": reviewed_ids},
+    )
+
+    assert response.status_code == 200
+    rows = client.get(
+        "/api/dca/contributions?status=all"
+    ).json()["contributions"]
+    statuses = {row["id"]: row["status"] for row in rows}
+    assert all(statuses[row_id] == "pending" for row_id in reviewed_ids)
+    assert statuses[concurrent_id] == "applied"
+    holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
+    assert holding.shares == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    ["apply-pending", "skip-pending"],
+    ids=["apply-stale-set", "skip-stale-set"],
+)
+def test_bulk_pending_rejects_a_stale_reviewed_set_atomically(client, db, endpoint):
+    plan_id = _create_weekly_plan(client, days_back=21).json()["plan"]["id"]
+    pending_ids = _contribution_ids(client, "pending")
+    stale = db.get(DcaContribution, pending_ids[0])
+    stale.status = "dismissed"
+    db.commit()
+
+    response = client.post(
+        f"/api/dca/plans/{plan_id}/{endpoint}?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
+    )
+
+    assert response.status_code == 400
+    assert "changed" in response.json()["detail"]
+    db.expire_all()
+    statuses = {
+        row.id: row.status
+        for row in db.query(DcaContribution).filter_by(plan_id=plan_id).all()
+    }
+    assert statuses[pending_ids[0]] == "dismissed"
+    assert all(statuses[row_id] == "pending" for row_id in pending_ids[1:])
+    assert db.query(Holding).count() == 0
+
+
+def test_bulk_request_rejects_a_missing_reviewed_id_atomically(client, db):
+    plan_id = _create_weekly_plan(client, days_back=21).json()["plan"]["id"]
+    pending_ids = _contribution_ids(client, "pending")
+
+    response = client.post(
+        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1",
+        json={"contribution_ids": [*pending_ids, 999999]},
+    )
+
+    assert response.status_code == 400
+    assert "changed" in response.json()["detail"]
+    assert {
+        row.status
+        for row in db.query(DcaContribution).filter_by(plan_id=plan_id).all()
+    } == {"pending"}
+    assert db.query(Holding).count() == 0
+
+
+def test_bulk_undo_rejects_a_stale_reviewed_set_before_any_reversal(client, db):
+    plan_id = _create_weekly_plan(client, days_back=21).json()["plan"]["id"]
+    pending_ids = _contribution_ids(client, "pending")
+    client.post(
+        f"/api/dca/plans/{plan_id}/apply-pending?portfolio_id=1",
+        json={"contribution_ids": pending_ids},
+    )
+    applied_ids = _contribution_ids(client, "applied")
+    stale = db.get(DcaContribution, applied_ids[0])
+    stale.status = "dismissed"
+    db.commit()
+    holding = db.query(Holding).filter(Holding.ticker == "VOO").one()
+    before = (holding.shares, holding.avg_cost, holding.is_active)
+
+    response = client.post(
+        f"/api/dca/plans/{plan_id}/undo-applied?portfolio_id=1",
+        json={"contribution_ids": applied_ids},
+    )
+
+    assert response.status_code == 400
+    db.refresh(holding)
+    assert (holding.shares, holding.avg_cost, holding.is_active) == before
+    db.expire_all()
+    statuses = {
+        row.id: row.status
+        for row in db.query(DcaContribution).filter_by(plan_id=plan_id).all()
+    }
+    assert statuses[applied_ids[0]] == "dismissed"
+    assert all(statuses[row_id] == "applied" for row_id in applied_ids[1:])
 
 
 # ── Pause / resume catch-up floor ────────────────────────────────────────────

@@ -125,12 +125,16 @@
 
     async function loadPanel() {
         try {
-            const [plans, pending] = await Promise.all([
+            const [plans, contributionPayload] = await Promise.all([
                 workspace.json("/api/dca/plans"),
-                workspace.json("/api/dca/contributions?status=pending"),
+                workspace.json("/api/dca/contributions?status=all"),
             ]);
-            renderPlans(plans.plans || []);
-            renderPending(pending.contributions || [], plans.plans || []);
+            const contributions = contributionPayload.contributions || [];
+            renderPlans(plans.plans || [], contributions);
+            renderPending(
+                contributions.filter(row => row.status === "pending"),
+                plans.plans || [],
+            );
             updateBadge();
             const history = byId("dca-history-list");
             if (history && !history.hidden) loadHistory();
@@ -139,12 +143,18 @@
         }
     }
 
-    function renderPlans(plans) {
+    function renderPlans(plans, contributions = []) {
         const section = byId("dca-plans-section");
         const list = byId("dca-plans-list");
         if (!section || !list) return;
         section.hidden = plans.length === 0;
         list.innerHTML = plans.map(plan => {
+            const appliedIds = contributions
+                .filter(row => (
+                    Number(row.plan_id) === Number(plan.id)
+                    && row.status === "applied"
+                ))
+                .map(row => Number(row.id));
             const needsCurrency = plan.currency_status === "needs_currency";
             const applied = plan.applied_count
                 ? `${formatMoney(plan.applied_amount)} → ${plan.applied_shares.toFixed(4)} sh @ ${formatMoney(plan.applied_avg_cost)}`
@@ -175,7 +185,7 @@
                 <div class="dca-plan-actions">
                     ${toggle}
                     ${needsCurrency ? "" : `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="edit-plan" data-plan-id="${plan.id}" data-amount="${plan.amount}">Edit amount</button>`}
-                    ${plan.applied_count ? `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="undo-all" data-plan-id="${plan.id}" data-count="${plan.applied_count}" data-ticker="${escape(plan.ticker)}">Undo applied</button>` : ""}
+                    ${appliedIds.length ? `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="undo-all" data-plan-id="${plan.id}" data-count="${appliedIds.length}" data-cids="${appliedIds.join(",")}" data-ticker="${escape(plan.ticker)}">Undo applied</button>` : ""}
                     <button type="button" class="btn btn-sm dca-chip-btn dca-chip-btn--danger" data-dca-action="delete-plan" data-plan-id="${plan.id}" data-ticker="${escape(plan.ticker)}">Delete</button>
                 </div>
             </div>`;
@@ -422,17 +432,6 @@
         };
     }
 
-    function bulkCounterTransition(id, counter, beforeCount) {
-        return state => {
-            const plan = state.plans.find(row => Number(row.id) === id);
-            if (!plan) return "unknown";
-            const count = Number(plan[counter]);
-            if (count === 0) return "committed";
-            if (count === beforeCount) return "unchanged";
-            return "unknown";
-        };
-    }
-
     function contributionSetTransition(ids, before, after) {
         return state => {
             if (!ids.length) return "unknown";
@@ -533,7 +532,13 @@
     }
 
     function post(path, options = {}) {
-        return mutate(path, { method: "POST" }, options);
+        const { payload, ...mutationOptions } = options;
+        const init = { method: "POST" };
+        if (payload !== undefined) {
+            init.headers = { "Content-Type": "application/json" };
+            init.body = JSON.stringify(payload);
+        }
+        return mutate(path, init, mutationOptions);
     }
 
     async function afterHoldingsChange() {
@@ -631,6 +636,7 @@
             });
             if (!choice?.confirmed) return null;
             const data = await post(`/api/dca/plans/${planId}/apply-pending`, {
+                payload: { contribution_ids: contributionIds },
                 classify: contributionSetTransition(
                     contributionIds, "pending", "applied"
                 ),
@@ -652,6 +658,7 @@
             });
             if (!choice?.confirmed) return null;
             const data = await post(`/api/dca/plans/${planId}/skip-pending`, {
+                payload: { contribution_ids: contributionIds },
                 classify: contributionSetTransition(
                     contributionIds, "pending", "dismissed"
                 ),
@@ -671,7 +678,10 @@
             });
             if (!choice?.confirmed) return null;
             const data = await post(`/api/dca/plans/${planId}/undo-applied`, {
-                classify: bulkCounterTransition(planId, "applied_count", count),
+                payload: { contribution_ids: contributionIds },
+                classify: contributionSetTransition(
+                    contributionIds, "applied", "pending"
+                ),
                 holdings: true,
             });
             if (data) {
