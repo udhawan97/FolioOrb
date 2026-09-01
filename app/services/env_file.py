@@ -61,6 +61,19 @@ def _read_target(path: Path) -> tuple[str, tuple[int, int] | None]:
     return content, identity
 
 
+def _read_bytes(path: Path) -> tuple[bytes, tuple[int, int] | None]:
+    """Read exact bytes from one regular, owned, no-follow source."""
+    descriptor, identity = _open_target(path)
+    if descriptor is None:
+        return b"", None
+    try:
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            content = handle.read()
+    finally:
+        os.close(descriptor)
+    return content, identity
+
+
 def _assert_unchanged(path: Path, identity: tuple[int, int] | None) -> None:
     try:
         metadata = path.lstat()
@@ -114,8 +127,10 @@ def secure_existing_env(path: Path) -> None:
         os.close(descriptor)
 
 
-def _atomic_write(path: Path, content: str, identity: tuple[int, int] | None) -> None:
-    """Publish complete UTF-8 content from a 0600 sibling or leave target unchanged."""
+def _atomic_write_bytes(
+    path: Path, content: bytes, identity: tuple[int, int] | None
+) -> None:
+    """Publish complete bytes from a 0600 sibling or leave target unchanged."""
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}-", suffix=".tmp", dir=path.parent
@@ -123,7 +138,7 @@ def _atomic_write(path: Path, content: str, identity: tuple[int, int] | None) ->
     temporary = Path(temporary_name)
     try:
         _restrict_owner_only(descriptor, temporary)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        with os.fdopen(descriptor, "wb") as handle:
             descriptor = -1
             handle.write(content)
             handle.flush()
@@ -143,6 +158,30 @@ def _atomic_write(path: Path, content: str, identity: tuple[int, int] | None) ->
             temporary.unlink()
         except FileNotFoundError:
             pass
+
+
+def _atomic_write(path: Path, content: str, identity: tuple[int, int] | None) -> None:
+    """Publish complete UTF-8 content from a 0600 sibling or leave target unchanged."""
+    _atomic_write_bytes(path, content.encode("utf-8"), identity)
+
+
+def copy_env_file(source: Path, target: Path) -> None:
+    """Atomically copy one owner-only environment file without following links.
+
+    Both endpoints must be regular files owned by the current profile when they
+    exist. The source is read through its validated descriptor, and the target
+    is published from a file-fsynced 0600 sibling only if its identity is still
+    the one inspected before staging.
+    """
+    source = Path(source)
+    target = Path(target)
+    content, source_identity = _read_bytes(source)
+    if source_identity is None:
+        raise FileNotFoundError(source)
+    descriptor, target_identity = _open_target(target)
+    if descriptor is not None:
+        os.close(descriptor)
+    _atomic_write_bytes(target, content, target_identity)
 
 
 def update_env_key(path: Path, key: str, value: str) -> None:

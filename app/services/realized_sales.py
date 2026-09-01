@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from functools import wraps
 import logging
 import math
 from typing import Callable
@@ -17,7 +16,12 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import Holding, RealizedTrade
-from app.services import financial_currency, portfolio_valuation, write_serialization
+from app.services import (
+    financial_currency,
+    holdings_repository,
+    portfolio_valuation,
+    write_serialization,
+)
 from app.services.stock_service import get_stock_data
 
 logger = logging.getLogger(__name__)
@@ -28,20 +32,6 @@ ValuationQuoteLoader = Callable[[list[str]], list[dict]]
 SALE_SOURCE_LEGACY_UNKNOWN = financial_currency.LEGACY_UNKNOWN_PROVENANCE
 SALE_SOURCE_MANUAL_ENTRY = "manual_entry"
 SALE_SOURCE_MARKET_QUOTE = "market_quote"
-
-
-def _serialized_write(method):
-    """Read and mutate one realized-sale fact under SQLite's writer lock."""
-    @wraps(method)
-    def guarded(self, *args, **kwargs):
-        write_serialization.begin_financial_write(self.db)
-        try:
-            return method(self, *args, **kwargs)
-        except Exception:
-            self.db.rollback()
-            raise
-
-    return guarded
 
 
 @dataclass(frozen=True)
@@ -171,17 +161,65 @@ class RealizedSaleLedger:
         self.db.add(trade)
         return trade
 
-    def _commit_with_today_snapshot(self) -> None:
+    @staticmethod
+    def _holding_fingerprint(holdings: list[Holding]) -> tuple:
+        """Valuation inputs that must still match prefetched market quotes."""
+        return tuple(
+            sorted(
+                (
+                    holding.id,
+                    str(holding.ticker),
+                    float(holding.shares or 0.0),
+                    float(holding.avg_cost or 0.0),
+                    bool(holding.is_watchlist),
+                    bool(holding.is_active),
+                )
+                for holding in holdings
+            )
+        )
+
+    def _prefetch_valuation(self) -> tuple[tuple, list[dict] | None]:
+        """Load market quotes before reserving SQLite's sole writer."""
+        holdings = holdings_repository.active(self.db, self.portfolio_id)
+        fingerprint = self._holding_fingerprint(holdings)
+        tickers = [str(holding.ticker) for holding in holdings]
+        self.db.rollback()
+        try:
+            loader = (
+                self.valuation_quote_loader
+                or portfolio_valuation.get_portfolio_quotes
+            )
+            return fingerprint, loader(tickers)
+        except Exception:  # pylint: disable=broad-except
+            logger.exception(
+                "Could not prefetch valuation after realized-sale change for %s",
+                self.portfolio_id,
+            )
+            return fingerprint, None
+
+    def _commit_with_today_snapshot(
+        self,
+        expected_holdings: tuple,
+        prefetched_quotes: list[dict] | None,
+    ) -> None:
         """Commit the ledger mutation and trustworthy derived state together."""
         # Production sessions disable autoflush. Make the staged correction or
         # deletion visible to valuation before deriving today's snapshot, while
         # keeping both changes inside the same transaction.
         self.db.flush()
+        current_holdings = holdings_repository.active(self.db, self.portfolio_id)
+        if (
+            prefetched_quotes is None
+            or self._holding_fingerprint(current_holdings) != expected_holdings
+        ):
+            portfolio_valuation.discard_today_snapshot(self.db, self.portfolio_id)
+            self.db.commit()
+            return
         try:
             valuation = portfolio_valuation.evaluate(
                 self.db,
                 self.portfolio_id,
-                quote_loader=self.valuation_quote_loader,
+                quote_loader=lambda _tickers: prefetched_quotes,
                 record_snapshot=False,
             )
         except Exception:  # pylint: disable=broad-except
@@ -200,36 +238,46 @@ class RealizedSaleLedger:
                 portfolio_valuation.discard_today_snapshot(self.db, self.portfolio_id)
         self.db.commit()
 
-    @_serialized_write
     def correct(self, trade_id: int, changes: SaleCorrection) -> RealizedTrade:
         """Correct one owned sale and re-derive gain plus today's snapshot."""
-        trade = self._owned_trade(trade_id)
-        if changes.shares_sold is not None:
-            trade.shares_sold = changes.shares_sold
-        if changes.sale_price is not None:
-            trade.sale_price = round(changes.sale_price, 2)
-            # The existing field is explicitly dollar-labelled at the API/UI
-            # boundary, so this correction creates new, user-supplied USD
-            # provenance rather than guessing the meaning of a legacy value.
-            trade.sale_currency = financial_currency.REPORTING_CURRENCY
-            trade.sale_price_source = SALE_SOURCE_MANUAL_ENTRY
-        if changes.avg_cost is not None:
-            trade.avg_cost = round(changes.avg_cost, 2)
-        if changes.sale_date is not None:
-            trade.created_at = self._noon(changes.sale_date)
-        trade.realized_gain = round(
-            (float(trade.sale_price) - float(trade.avg_cost))
-            * float(trade.shares_sold),
-            2,
-        )
-        self._commit_with_today_snapshot()
-        return trade
+        expected_holdings, quotes = self._prefetch_valuation()
+        write_serialization.begin_financial_write(self.db)
+        try:
+            trade = self._owned_trade(trade_id)
+            if changes.shares_sold is not None:
+                trade.shares_sold = changes.shares_sold
+            if changes.sale_price is not None:
+                trade.sale_price = round(changes.sale_price, 2)
+                # The existing field is explicitly dollar-labelled at the API/UI
+                # boundary, so this correction creates new, user-supplied USD
+                # provenance rather than guessing the meaning of a legacy value.
+                trade.sale_currency = financial_currency.REPORTING_CURRENCY
+                trade.sale_price_source = SALE_SOURCE_MANUAL_ENTRY
+            if changes.avg_cost is not None:
+                trade.avg_cost = round(changes.avg_cost, 2)
+            if changes.sale_date is not None:
+                trade.created_at = self._noon(changes.sale_date)
+            trade.realized_gain = round(
+                (float(trade.sale_price) - float(trade.avg_cost))
+                * float(trade.shares_sold),
+                2,
+            )
+            self._commit_with_today_snapshot(expected_holdings, quotes)
+            return trade
+        except Exception:
+            self.db.rollback()
+            raise
 
-    @_serialized_write
     def remove(self, trade_id: int) -> str:
         """Remove one owned sale and commit today's consistent derived state."""
-        trade = self._owned_trade(trade_id)
-        ticker = str(trade.ticker)
-        self.db.delete(trade)
-        self._commit_with_today_snapshot()
-        return ticker
+        expected_holdings, quotes = self._prefetch_valuation()
+        write_serialization.begin_financial_write(self.db)
+        try:
+            trade = self._owned_trade(trade_id)
+            ticker = str(trade.ticker)
+            self.db.delete(trade)
+            self._commit_with_today_snapshot(expected_holdings, quotes)
+            return ticker
+        except Exception:
+            self.db.rollback()
+            raise

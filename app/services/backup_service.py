@@ -28,6 +28,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from app import paths
+from app.services import env_file
 
 logger = logging.getLogger(__name__)
 
@@ -162,27 +163,45 @@ def env_path() -> Path:
 
 
 def snapshot_env(dest_path: Path) -> Path | None:
-    """Copy the current ``.env`` to ``dest_path`` if it exists; else return None."""
+    """Securely snapshot the current ``.env`` if it exists; else return None."""
     src = env_path()
-    if not src.exists():
+    try:
+        src.lstat()
+    except FileNotFoundError:
         return None
     dest_path = Path(dest_path)
-    dest_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dest_path)
+    env_file.copy_env_file(src, dest_path)
     return dest_path
 
 
 def restore_env(env_backup: Path, ts: str | None = None) -> bool:
-    """Restore a ``.env`` backup, preserving the current one as ``.failed-<ts>``."""
+    """Atomically restore a private ``.env`` while preserving the current one."""
     env_backup = Path(env_backup)
-    if not env_backup.exists():
+    try:
+        env_backup.lstat()
+    except FileNotFoundError:
         return False
     current = env_path()
-    if current.exists():
-        stamp = ts or _timestamp()
-        current.replace(Path(f"{current}.failed-{stamp}"))
-    shutil.copyfile(env_backup, current)
-    return True
+    stamp = ts or _timestamp()
+    staging = current.parent / (
+        f".{current.name}.restore-{stamp}-{secrets.token_hex(6)}"
+    )
+    try:
+        # Validate, copy, chmod, and fsync the replacement before touching any
+        # current profile state.
+        env_file.copy_env_file(env_backup, staging)
+        try:
+            current.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            # Publish a private recovery copy; never move the canonical file
+            # away before the complete replacement is staged and ready.
+            env_file.copy_env_file(current, Path(f"{current}.failed-{stamp}"))
+        env_file.copy_env_file(staging, current)
+        return True
+    finally:
+        _safe_remove(staging)
 
 
 def live_db_path() -> Path:

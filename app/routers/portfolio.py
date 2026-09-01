@@ -503,7 +503,7 @@ def _prefetch_reduction_quote(
     new_shares: float | None,
     explicit_price: float | None,
     active_only: bool,
-) -> tuple[bool, dict]:
+) -> dict:
     """Load a market quote before reserving SQLite's sole writer.
 
     The holding is deliberately read again after the reservation. This first
@@ -511,7 +511,8 @@ def _prefetch_reduction_quote(
     mutation or supplies shares/cost basis to sale arithmetic.
     """
     if explicit_price is not None or new_shares is None:
-        return False, {}
+        db.rollback()
+        return {}
     preview = holdings_repository.in_portfolio(
         db, portfolio_id, holding_id, active_only=active_only
     )
@@ -525,13 +526,13 @@ def _prefetch_reduction_quote(
     # authoritative query below cannot reuse an identity-map snapshot.
     db.rollback()
     if not needs_quote:
-        return False, {}
+        return {}
     try:
-        return True, get_stock_data(ticker) or {}
+        return get_stock_data(ticker) or {}
     except Exception:  # pylint: disable=broad-exception-caught
         # RealizedSaleLedger maps unavailable or invalid cached quotes to the
         # same actionable 409 as a live loader failure.
-        return True, {}
+        return {}
 
 
 def _require_editable_holding(
@@ -579,7 +580,7 @@ def update_holding(
     portfolio_id: int = 1,
 ):
     """Update shares, average cost, notes, or active status of an existing holding."""
-    quote_prefetched, market_quote = _prefetch_reduction_quote(
+    market_quote = _prefetch_reduction_quote(
         db,
         portfolio_id,
         holding_id,
@@ -605,11 +606,10 @@ def update_holding(
             realized_sales.RealizedSaleLedger(
                 db,
                 portfolio_id,
-                quote_loader=(
-                    (lambda _ticker: market_quote)
-                    if quote_prefetched
-                    else get_stock_data
-                ),
+                # Never fall back to a provider while holding SQLite's writer.
+                # If discovery did not need a quote but authoritative state now
+                # does, the empty preview fails closed with sale_price_required.
+                quote_loader=lambda _ticker: market_quote,
             ).stage_reduction(
                 holding, data.shares,
                 sale_price=data.sale_price, sale_date=data.sale_date,
@@ -672,7 +672,7 @@ def remove_holding(
     The row is kept in the database for historical reference.
     """
     removal = data or HoldingRemoval()
-    quote_prefetched, market_quote = _prefetch_reduction_quote(
+    market_quote = _prefetch_reduction_quote(
         db,
         portfolio_id,
         holding_id,
@@ -693,11 +693,7 @@ def remove_holding(
         realized_sales.RealizedSaleLedger(
             db,
             portfolio_id,
-            quote_loader=(
-                (lambda _ticker: market_quote)
-                if quote_prefetched
-                else get_stock_data
-            ),
+            quote_loader=lambda _ticker: market_quote,
         ).stage_reduction(
             holding,
             0,

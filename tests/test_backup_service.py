@@ -5,12 +5,18 @@ These tests use real on-disk SQLite files in a temp directory to exercise the
 online backup API, integrity checking, the non-destructive restore path (current
 file preserved as ``*.failed-*``), and retention pruning.
 """
+import os
 import sqlite3
+import stat
 from pathlib import Path
 
 import pytest
 
 from app.services import backup_service
+
+
+def _mode(path: Path) -> int:
+    return stat.S_IMODE(path.stat().st_mode)
 
 
 def _make_db(path, rows):
@@ -353,6 +359,159 @@ def test_env_snapshot_and_restore(tmp_path, monkeypatch):
     assert (tmp_path / ".env.failed-20260101-000000").exists()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_env_snapshot_and_restore_remain_owner_only_under_common_umask(
+    tmp_path, monkeypatch
+):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    env = tmp_path / ".env"
+    env.write_text("ANTHROPIC_API_KEY=sk-original\n", encoding="utf-8")
+    env.chmod(0o600)
+    previous_umask = os.umask(0o022)
+    try:
+        snap = backup_service.snapshot_env(tmp_path / "backup.env")
+        assert _mode(snap) == 0o600
+        env.write_text("ANTHROPIC_API_KEY=sk-changed\n", encoding="utf-8")
+        backup_service.restore_env(snap, ts="20260101-000000")
+    finally:
+        os.umask(previous_umask)
+
+    assert _mode(env) == 0o600
+    assert _mode(tmp_path / ".env.failed-20260101-000000") == 0o600
+
+
+@pytest.mark.parametrize("source_kind", ["symlink", "directory"])
+def test_env_snapshot_refuses_nonregular_source(
+    tmp_path, monkeypatch, source_kind
+):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    source = tmp_path / ".env"
+    if source_kind == "symlink":
+        referent = tmp_path / "referent.env"
+        referent.write_text("ANTHROPIC_API_KEY=keep\n", encoding="utf-8")
+        source.symlink_to(referent)
+    else:
+        source.mkdir()
+
+    with pytest.raises(backup_service.env_file.EnvFileSecurityError):
+        backup_service.snapshot_env(tmp_path / "backup.env")
+
+
+@pytest.mark.parametrize("source_kind", ["symlink", "directory"])
+def test_env_restore_refuses_nonregular_backup_without_changing_canonical(
+    tmp_path, monkeypatch, source_kind
+):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    current = tmp_path / ".env"
+    current.write_text("ANTHROPIC_API_KEY=keep\n", encoding="utf-8")
+    current.chmod(0o600)
+    backup = tmp_path / "backup.env"
+    if source_kind == "symlink":
+        referent = tmp_path / "referent.env"
+        referent.write_text("ANTHROPIC_API_KEY=replace\n", encoding="utf-8")
+        backup.symlink_to(referent)
+    else:
+        backup.mkdir()
+
+    with pytest.raises(backup_service.env_file.EnvFileSecurityError):
+        backup_service.restore_env(backup, ts="20260101-000000")
+
+    assert current.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
+    assert _mode(current) == 0o600
+
+
+@pytest.mark.parametrize("target_kind", ["symlink", "directory"])
+def test_env_restore_refuses_nonregular_canonical_target(
+    tmp_path, monkeypatch, target_kind
+):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    current = tmp_path / ".env"
+    if target_kind == "symlink":
+        referent = tmp_path / "referent.env"
+        referent.write_text("ANTHROPIC_API_KEY=keep\n", encoding="utf-8")
+        current.symlink_to(referent)
+    else:
+        current.mkdir()
+    backup = tmp_path / "backup.env"
+    backup.write_text("ANTHROPIC_API_KEY=replace\n", encoding="utf-8")
+    backup.chmod(0o600)
+
+    with pytest.raises(backup_service.env_file.EnvFileSecurityError):
+        backup_service.restore_env(backup, ts="20260101-000000")
+
+    if target_kind == "symlink":
+        assert current.is_symlink()
+        assert referent.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
+    else:
+        assert current.is_dir()
+    assert not list(tmp_path.glob("..env.restore-20260101-000000-*"))
+
+
+def test_env_restore_copy_failure_preserves_canonical(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    current = tmp_path / ".env"
+    current.write_text("ANTHROPIC_API_KEY=keep\n", encoding="utf-8")
+    current.chmod(0o600)
+    backup = tmp_path / "backup.env"
+    backup.write_text("ANTHROPIC_API_KEY=replace\n", encoding="utf-8")
+    backup.chmod(0o600)
+    real_read = backup_service.env_file._read_bytes
+
+    def fail_backup_read(path):
+        if Path(path) == backup:
+            raise OSError("simulated copy failure")
+        return real_read(path)
+
+    monkeypatch.setattr(backup_service.env_file, "_read_bytes", fail_backup_read)
+
+    with pytest.raises(OSError, match="copy failure"):
+        backup_service.restore_env(backup, ts="20260101-000000")
+
+    assert current.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
+    assert _mode(current) == 0o600
+
+
+def test_env_restore_replace_failure_preserves_canonical(tmp_path, monkeypatch):
+    from app import paths
+
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    current = tmp_path / ".env"
+    current.write_text("ANTHROPIC_API_KEY=keep\n", encoding="utf-8")
+    current.chmod(0o600)
+    backup = tmp_path / "backup.env"
+    backup.write_text("ANTHROPIC_API_KEY=replace\n", encoding="utf-8")
+    backup.chmod(0o600)
+    real_replace = backup_service.env_file.os.replace
+
+    def fail_canonical_replace(source, target):
+        if Path(target) == current:
+            raise OSError("simulated publication failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(
+        backup_service.env_file.os,
+        "replace",
+        fail_canonical_replace,
+    )
+
+    with pytest.raises(OSError, match="publication failure"):
+        backup_service.restore_env(backup, ts="20260101-000000")
+
+    assert current.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
+    assert _mode(current) == 0o600
+    assert not list(tmp_path.glob("..env-*.tmp"))
+
+
 def test_snapshot_env_returns_none_when_absent(tmp_path, monkeypatch):
     from app import paths
 
@@ -363,7 +522,6 @@ def test_snapshot_env_returns_none_when_absent(tmp_path, monkeypatch):
 def test_prune_keeps_newest_n(tmp_path):
     backups = tmp_path / "backups"
     backups.mkdir()
-    import os
     import time
 
     created = []

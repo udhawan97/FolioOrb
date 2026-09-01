@@ -17,6 +17,7 @@ from app.models import (
     DcaPlan,
     Holding,
     Portfolio,
+    PortfolioSnapshot,
     RealizedTrade,
 )
 from app.routers import portfolio as portfolio_router
@@ -293,6 +294,8 @@ def test_update_resuming_after_removal_cannot_sell_archived_shares_again(
     release_quote = threading.Event()
 
     def paused_quote(_ticker):
+        connection = update_session.connection()
+        assert not connection.connection.driver_connection.in_transaction
         quote_started.set()
         assert release_quote.wait(5), "timed out waiting to release quote"
         return {
@@ -714,6 +717,16 @@ def test_watchlist_can_archive_and_reactivate_without_sale_history(session_facto
 
 def _seed_realized_trade(session_factory) -> int:
     db = session_factory()
+    db.add(
+        Holding(
+            portfolio_id=1,
+            ticker="ACME",
+            shares=10,
+            avg_cost=100,
+            is_active=True,
+            is_watchlist=False,
+        )
+    )
     trade = RealizedTrade(
         portfolio_id=1,
         ticker="ACME",
@@ -780,6 +793,137 @@ def test_concurrent_sale_corrections_compose_from_latest_facts(session_factory):
     check.close()
     for db in sessions:
         db.close()
+
+
+def test_realized_valuation_provider_runs_before_writer_and_allows_other_write(
+    session_factory, monkeypatch
+):
+    trade_id = _seed_realized_trade(session_factory)
+    correction_session = session_factory()
+    update_session = session_factory()
+    provider_started = threading.Event()
+    release_provider = threading.Event()
+
+    def paused_quotes(tickers):
+        connection = correction_session.connection()
+        assert not connection.connection.driver_connection.in_transaction
+        assert tickers == ["ACME"]
+        provider_started.set()
+        assert release_provider.wait(5), "timed out waiting to release valuation"
+        return [
+            {
+                "ticker": "ACME",
+                "current_price": 125,
+                "previous_close": 120,
+                "day_change": 5,
+                "currency": "USD",
+            }
+        ]
+
+    monkeypatch.setattr(
+        realized_sales.portfolio_valuation,
+        "get_portfolio_quotes",
+        paused_quotes,
+    )
+    correction = realized_sales.RealizedSaleLedger(correction_session, 1)
+    holding_id = update_session.query(Holding.id).filter_by(ticker="ACME").scalar()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            correction.correct,
+            trade_id,
+            SaleCorrection(sale_price=120),
+        )
+        assert provider_started.wait(5)
+        result = portfolio_router.update_holding(
+            holding_id,
+            HoldingUpdate(avg_cost=95),
+            update_session,
+            portfolio_id=1,
+        )
+        assert result["ticker"] == "ACME"
+        release_provider.set()
+        assert future.result(timeout=5).realized_gain == 20
+
+    check = session_factory()
+    assert check.get(Holding, holding_id).avg_cost == 95
+    assert check.get(RealizedTrade, trade_id).realized_gain == 20
+    # Quotes were fetched for the old basis. The correction still commits, but
+    # the now-stale derived snapshot is discarded instead of mixing vintages.
+    assert check.query(PortfolioSnapshot).count() == 0
+    check.close()
+    correction_session.close()
+    update_session.close()
+
+
+def test_state_change_after_quote_discovery_never_loads_provider_under_writer(
+    session_factory, monkeypatch
+):
+    seed = session_factory()
+    holding = Holding(
+        portfolio_id=1,
+        ticker="WATCH",
+        shares=10,
+        avg_cost=100,
+        is_active=True,
+        is_watchlist=True,
+    )
+    seed.add(holding)
+    seed.commit()
+    holding_id = holding.id
+    seed.close()
+
+    reduction_session = session_factory()
+    ownership_session = session_factory()
+    before_writer = threading.Event()
+    release_writer = threading.Event()
+    original_begin = portfolio_router.write_serialization.begin_financial_write
+
+    def pause_reduction_writer(db):
+        if db is reduction_session:
+            before_writer.set()
+            assert release_writer.wait(5), "timed out waiting to release reduction"
+        return original_begin(db)
+
+    def provider_must_not_run(_ticker):
+        raise AssertionError("provider must never run under the writer reservation")
+
+    monkeypatch.setattr(
+        portfolio_router.write_serialization,
+        "begin_financial_write",
+        pause_reduction_writer,
+    )
+    monkeypatch.setattr(portfolio_router, "get_stock_data", provider_must_not_run)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            portfolio_router.update_holding,
+            holding_id,
+            HoldingUpdate(shares=5),
+            reduction_session,
+            1,
+        )
+        assert before_writer.wait(5)
+        portfolio_router.update_holding(
+            holding_id,
+            HoldingUpdate(is_watchlist=False),
+            ownership_session,
+            portfolio_id=1,
+        )
+        release_writer.set()
+        with pytest.raises(HTTPException) as exc_info:
+            future.result(timeout=5)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "sale_price_required"
+    check = session_factory()
+    refreshed = check.get(Holding, holding_id)
+    assert refreshed.is_watchlist is False
+    assert refreshed.shares == 10
+    assert check.query(RealizedTrade).count() == 0
+    check.close()
+    reduction_session.close()
+    ownership_session.close()
 
 
 def test_sale_correction_and_delete_serialize_without_resurrection(session_factory):
