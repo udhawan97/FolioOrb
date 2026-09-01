@@ -468,6 +468,16 @@ def main() -> int:  # pylint: disable=too-many-return-statements
     if smoke or duplicate_recovery_smoke:
         _configure_smoke_environment()
 
+    # Choose the desktop origin before *any* import can reach app.config. The
+    # pending-restore and duplicate-preflight path imports app.database before
+    # the server thread starts; setting this later freezes the settings singleton
+    # at port 8000 and makes every mutation from a fallback-port window fail.
+    port = _find_free_port(PREFERRED_PORT)
+    base_url = f"http://{HOST}:{port}"
+    os.environ["CORS_ALLOWED_ORIGINS"] = (
+        f"http://127.0.0.1:{port},http://localhost:{port}"
+    )
+
     # Resolve database ownership before pending restore, settings, launch-health,
     # migration, or the server import can create any writable state.
     try:
@@ -524,13 +534,6 @@ def main() -> int:  # pylint: disable=too-many-return-statements
                 f"DuplicateActiveHoldingsError: {exc}"
             )
             return 1
-
-    port = _find_free_port(PREFERRED_PORT)
-    base_url = f"http://{HOST}:{port}"
-
-    # The window's origin must be allowed by CORS. Set this before the server
-    # thread imports app.main (which reads CORS_ALLOWED_ORIGINS at import time).
-    os.environ["CORS_ALLOWED_ORIGINS"] = f"http://127.0.0.1:{port},http://localhost:{port}"
 
     # Count this launch so a run that dies before it's healthy (e.g. a bad
     # update that won't start) is detected and rollback can be offered. Skipped
