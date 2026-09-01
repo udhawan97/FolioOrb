@@ -134,7 +134,7 @@ def test_reactivating_a_duplicate_holding_is_a_user_safe_conflict():
     assert archived.is_active is False
 
 
-def test_concurrent_reactivations_commit_one_active_holding(tmp_path, monkeypatch):
+def test_concurrent_reactivations_serialize_to_one_active_holding(tmp_path, monkeypatch):
     engine = create_engine(
         f"sqlite:///{(tmp_path / 'portfolio.db').as_posix()}",
         connect_args={"check_same_thread": False, "timeout": 5},
@@ -149,14 +149,18 @@ def test_concurrent_reactivations_commit_one_active_holding(tmp_path, monkeypatc
         db.commit()
         holding_ids = (first.id, second.id)
 
-    commit_barrier = threading.Barrier(2)
+    first_at_commit = threading.Event()
+    release_first = threading.Event()
+    second_finished = threading.Event()
     original_commit = pr._commit_holding_update
 
-    def synchronized_commit(db, holding):
-        commit_barrier.wait(timeout=10)
+    def paused_commit(db, holding):
+        if not first_at_commit.is_set():
+            first_at_commit.set()
+            assert release_first.wait(5), "timed out waiting to release reactivation"
         return original_commit(db, holding)
 
-    monkeypatch.setattr(pr, "_commit_holding_update", synchronized_commit)
+    monkeypatch.setattr(pr, "_commit_holding_update", paused_commit)
 
     def reactivate(holding_id):
         with sessions() as db:
@@ -172,8 +176,19 @@ def test_concurrent_reactivations_commit_one_active_holding(tmp_path, monkeypatc
                 assert exc.detail == "RACE already in portfolio"
                 return exc.status_code
 
+    def second_reactivation():
+        try:
+            return reactivate(holding_ids[1])
+        finally:
+            second_finished.set()
+
     with ThreadPoolExecutor(max_workers=2) as pool:
-        statuses = list(pool.map(reactivate, holding_ids))
+        first_future = pool.submit(reactivate, holding_ids[0])
+        assert first_at_commit.wait(5)
+        second_future = pool.submit(second_reactivation)
+        assert not second_finished.wait(0.2)
+        release_first.set()
+        statuses = [first_future.result(timeout=5), second_future.result(timeout=5)]
 
     with sessions() as db:
         active = (

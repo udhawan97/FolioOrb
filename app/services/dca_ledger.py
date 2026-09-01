@@ -9,6 +9,7 @@ external seams.
 from __future__ import annotations
 
 from datetime import date
+from functools import wraps
 from typing import Callable
 
 from sqlalchemy import func
@@ -20,6 +21,7 @@ from app.services import (
     financial_currency,
     holdings_repository,
     portfolio_lifecycle,
+    write_serialization,
 )
 from app.services.stock_service import (
     get_daily_closes,
@@ -38,6 +40,20 @@ _CONTRIBUTION_CURRENCY_SOURCES = (
 )
 _PLAN_CURRENCY_SOURCE = next(iter(_PLAN_CURRENCY_SOURCES))
 _CONTRIBUTION_CURRENCY_SOURCE = next(iter(_CONTRIBUTION_CURRENCY_SOURCES))
+
+
+def _serialized_write(method):
+    """Run one DCA state transition behind SQLite's writer reservation."""
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        write_serialization.begin_financial_write(self.db)
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            self.db.rollback()
+            raise
+
+    return guarded
 
 
 class DcaLedgerError(Exception):
@@ -546,6 +562,7 @@ class DcaLedger:
         contribution.applied_holding_id = holding.id
         return holding
 
+    @_serialized_write
     def apply_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
         contribution = self._contribution(
             contribution_id, portfolio_id=portfolio_id
@@ -600,6 +617,7 @@ class DcaLedger:
             reverse=newest_first,
         )
 
+    @_serialized_write
     def apply_all_pending(
         self,
         plan_id: int,
@@ -623,6 +641,7 @@ class DcaLedger:
         self.db.commit()
         return {"applied": len(pending), "ticker": plan.ticker}
 
+    @_serialized_write
     def skip_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
         contribution = self._contribution(
             contribution_id, portfolio_id=portfolio_id
@@ -636,6 +655,7 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
+    @_serialized_write
     def skip_all_pending(
         self,
         plan_id: int,
@@ -654,6 +674,7 @@ class DcaLedger:
         self.db.commit()
         return {"skipped": len(pending), "ticker": plan.ticker}
 
+    @_serialized_write
     def restore_contribution(
         self, contribution_id: int, *, portfolio_id: int
     ) -> dict:
@@ -678,6 +699,7 @@ class DcaLedger:
                 self.db,
                 contribution.plan.portfolio_id,
                 contribution.applied_holding_id,
+                active_only=True,
             )
             if contribution.applied_holding_id
             else None
@@ -713,6 +735,7 @@ class DcaLedger:
         contribution.status = "pending"
         contribution.applied_holding_id = None
 
+    @_serialized_write
     def undo_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
         contribution = self._contribution(
             contribution_id, portfolio_id=portfolio_id
@@ -726,6 +749,7 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
+    @_serialized_write
     def undo_all_applied(
         self,
         plan_id: int,

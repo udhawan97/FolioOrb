@@ -30,6 +30,7 @@ from app.services import portfolio_lifecycle
 from app.services import portfolio_valuation
 from app.services import realized_sales
 from app.services import verdict_pipeline
+from app.services import write_serialization
 from app.services.earnings_radar import get_earnings_events
 from app.services.dividend_income import compute_portfolio_income
 from app.services.etf_overlap import compute_etf_overlap
@@ -494,6 +495,45 @@ def _commit_holding_update(db: Session, holding: Holding) -> None:
         raise
 
 
+def _prefetch_reduction_quote(
+    db: Session,
+    portfolio_id: int,
+    holding_id: int,
+    *,
+    new_shares: float | None,
+    explicit_price: float | None,
+    active_only: bool,
+) -> tuple[bool, dict]:
+    """Load a market quote before reserving SQLite's sole writer.
+
+    The holding is deliberately read again after the reservation. This first
+    read only discovers whether a quote may be needed; it never authorizes the
+    mutation or supplies shares/cost basis to sale arithmetic.
+    """
+    if explicit_price is not None or new_shares is None:
+        return False, {}
+    preview = holdings_repository.in_portfolio(
+        db, portfolio_id, holding_id, active_only=active_only
+    )
+    needs_quote = bool(
+        preview
+        and not preview.is_watchlist
+        and new_shares < float(preview.shares or 0.0)
+    )
+    ticker = str(preview.ticker) if needs_quote else ""
+    # End the discovery read before the external provider call and ensure the
+    # authoritative query below cannot reuse an identity-map snapshot.
+    db.rollback()
+    if not needs_quote:
+        return False, {}
+    try:
+        return True, get_stock_data(ticker) or {}
+    except Exception:  # pylint: disable=broad-exception-caught
+        # RealizedSaleLedger maps unavailable or invalid cached quotes to the
+        # same actionable 409 as a live loader failure.
+        return True, {}
+
+
 @router.put("/holdings/{holding_id}")
 def update_holding(
     holding_id: int,
@@ -502,8 +542,18 @@ def update_holding(
     portfolio_id: int = 1,
 ):
     """Update shares, average cost, notes, or active status of an existing holding."""
+    quote_prefetched, market_quote = _prefetch_reduction_quote(
+        db,
+        portfolio_id,
+        holding_id,
+        new_shares=data.shares,
+        explicit_price=data.sale_price,
+        active_only=False,
+    )
+    write_serialization.begin_financial_write(db)
     holding = holdings_repository.in_portfolio(db, portfolio_id, holding_id)
     if not holding:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Holding not found")
 
     _ensure_reactivation_available(db, portfolio_id, holding, data.is_active)
@@ -515,7 +565,13 @@ def update_holding(
     if data.shares is not None and data.shares < holding.shares:
         try:
             realized_sales.RealizedSaleLedger(
-                db, portfolio_id, quote_loader=get_stock_data
+                db,
+                portfolio_id,
+                quote_loader=(
+                    (lambda _ticker: market_quote)
+                    if quote_prefetched
+                    else get_stock_data
+                ),
             ).stage_reduction(
                 holding, data.shares,
                 sale_price=data.sale_price, sale_date=data.sale_date,
@@ -577,17 +633,33 @@ def remove_holding(
     Soft-delete a holding by setting is_active=False.
     The row is kept in the database for historical reference.
     """
+    removal = data or HoldingRemoval()
+    quote_prefetched, market_quote = _prefetch_reduction_quote(
+        db,
+        portfolio_id,
+        holding_id,
+        new_shares=0,
+        explicit_price=removal.sale_price,
+        active_only=True,
+    )
+    write_serialization.begin_financial_write(db)
     holding = holdings_repository.in_portfolio(
         db, portfolio_id, holding_id, active_only=True
     )
     if not holding:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Holding not found")
 
     # Watchlist (research-mode) holdings are discarded silently — no realized gain recorded.
-    removal = data or HoldingRemoval()
     try:
         realized_sales.RealizedSaleLedger(
-            db, portfolio_id, quote_loader=get_stock_data
+            db,
+            portfolio_id,
+            quote_loader=(
+                (lambda _ticker: market_quote)
+                if quote_prefetched
+                else get_stock_data
+            ),
         ).stage_reduction(
             holding,
             0,

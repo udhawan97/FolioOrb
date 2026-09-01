@@ -118,11 +118,11 @@ def in_portfolio(
     were missing entirely when they looked a holding up by primary key alone,
     which let a request scoped to one portfolio edit another portfolio's row.
 
-    `active_only` is the policy the two mutating callers genuinely disagree on,
-    so it is named rather than assumed. The edit endpoint leaves it False
-    because it can flip a soft-deleted row back to active and therefore has to
-    be able to find one; thesis review passes True because reviewing a holding
-    the user has already removed is meaningless.
+    `active_only` is the policy mutating callers genuinely disagree on, so it
+    is named rather than assumed. The edit endpoint leaves it False because it
+    can flip a soft-deleted row back to active and therefore has to be able to
+    find one. Removal, thesis review, and DCA reversal pass True because none
+    may operate on a position that has already been sold or archived.
     """
     query = db.query(Holding).filter(
         Holding.id == holding_id, Holding.portfolio_id == portfolio_id
