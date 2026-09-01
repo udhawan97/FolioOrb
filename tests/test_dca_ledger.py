@@ -403,35 +403,87 @@ def test_bulk_apply_preflights_every_currency_fact_before_holding_mutation():
     assert all(row.applied_holding_id is None for row in db.query(DcaContribution).all())
 
 
+def test_ambiguous_plan_does_not_block_trusted_plan_catchup():
+    db = make_db()
+    ambiguous = DcaPlan(
+        portfolio_id=1, ticker="LEGACY", amount=50, frequency="weekly",
+        start_date=TODAY.isoformat(), quote_currency=None,
+        quote_currency_source="legacy_unknown",
+    )
+    trusted = DcaPlan(
+        portfolio_id=1, ticker="VOO", amount=50, frequency="weekly",
+        start_date=TODAY.isoformat(), quote_currency="USD",
+        quote_currency_source="ticker_validation",
+    )
+    # Insert the ambiguous row first to prove catch-up does not rely on a trusted
+    # plan happening to precede it in query order.
+    db.add_all([ambiguous, trusted])
+    db.commit()
+    loaded = []
+
+    def load_prices(ticker, start, end):
+        loaded.append(ticker)
+        return closes(ticker, start, end)
+
+    result = DcaLedger(
+        db, price_history_loader=load_prices, today=lambda: TODAY
+    ).run_catchup(1)
+
+    assert result["buys_added"] == 1
+    assert result["plans_checked"] == 2
+    assert result["plans_blocked"] == 1
+    by_ticker = {row["ticker"]: row for row in result["plans"]}
+    assert by_ticker["LEGACY"] == {
+        "plan_id": ambiguous.id,
+        "ticker": "LEGACY",
+        "buys_added": 0,
+        "price_data": None,
+        "status": "needs_currency",
+        "message": (
+            "This DCA plan has no explicit trusted USD currency provenance. "
+            "No contributions or holdings were changed; recreate it after "
+            "FolioOrb verifies an explicit USD quote."
+        ),
+    }
+    assert by_ticker["VOO"]["status"] == "ready"
+    assert by_ticker["VOO"]["buys_added"] == 1
+    assert loaded == ["VOO"]
+    assert [row.plan_id for row in db.query(DcaContribution).all()] == [trusted.id]
+
+    summary = {row["ticker"]: row for row in DcaLedger(db).list_plans(1)}["LEGACY"]
+    assert summary["is_active"] is True
+    assert summary["currency_status"] == "needs_currency"
+    assert summary["next_date"] is None
+    assert "Undo applied buys if needed, then delete this plan" in summary["currency_message"]
+    assert "only after FolioOrb verifies an explicit USD quote" in summary["currency_message"]
+
+
 @pytest.mark.parametrize(
     ("currency", "source"),
     [(None, "legacy_unknown"), ("GBp", "ticker_validation")],
     ids=["legacy-ambiguous", "foreign"],
 )
-def test_catchup_preflights_all_plans_before_prices_or_rows(currency, source):
+def test_catchup_blocks_untrusted_plan_without_prices_or_rows(currency, source):
     db = make_db()
-    db.add_all([
-        DcaPlan(
-            portfolio_id=1, ticker="VOO", amount=50, frequency="weekly",
-            start_date=TODAY.isoformat(), quote_currency="USD",
-            quote_currency_source="ticker_validation",
-        ),
+    db.add(
         DcaPlan(
             portfolio_id=1, ticker="BAD", amount=50, frequency="weekly",
             start_date=TODAY.isoformat(), quote_currency=currency,
             quote_currency_source=source,
-        ),
-    ])
+        )
+    )
     db.commit()
 
     def prices_must_not_load(*_args):
-        raise AssertionError("batch currency preflight must precede every price read")
+        raise AssertionError("blocked plan must not read prices")
 
-    with pytest.raises(DcaConflictError, match="No contributions"):
-        DcaLedger(
-            db, price_history_loader=prices_must_not_load, today=lambda: TODAY
-        ).run_catchup(1)
+    result = DcaLedger(
+        db, price_history_loader=prices_must_not_load, today=lambda: TODAY
+    ).run_catchup(1)
 
+    assert result["buys_added"] == 0
+    assert result["plans_blocked"] == 1
+    assert result["plans"][0]["status"] == "needs_currency"
     assert db.query(DcaContribution).count() == 0
 
 

@@ -199,6 +199,38 @@ def test_paused_plan_is_skipped_by_catchup(client, db):
     assert res.json()["plans_checked"] == 0
 
 
+def test_catchup_reports_legacy_plan_but_books_trusted_plan(client, db):
+    db.add_all([
+        DcaPlan(
+            portfolio_id=1, ticker="LEGACY", amount=50, frequency="weekly",
+            start_date=FIXED_TODAY.isoformat(), quote_currency=None,
+            quote_currency_source="legacy_unknown", is_active=True,
+        ),
+        DcaPlan(
+            portfolio_id=1, ticker="VOO", amount=50, frequency="weekly",
+            start_date=FIXED_TODAY.isoformat(), quote_currency="USD",
+            quote_currency_source="ticker_validation", is_active=True,
+        ),
+    ])
+    db.commit()
+
+    response = client.post("/api/dca/run")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["buys_added"] == 1
+    assert payload["plans_blocked"] == 1
+    by_ticker = {row["ticker"]: row for row in payload["plans"]}
+    assert by_ticker["LEGACY"]["status"] == "needs_currency"
+    assert by_ticker["LEGACY"]["price_data"] is None
+    assert by_ticker["VOO"]["status"] == "ready"
+    assert [row.plan.ticker for row in db.query(DcaContribution).all()] == ["VOO"]
+
+    plans = {row["ticker"]: row for row in client.get("/api/dca/plans").json()["plans"]}
+    assert plans["LEGACY"]["currency_status"] == "needs_currency"
+    assert plans["LEGACY"]["next_date"] is None
+
+
 # ── Apply / skip / undo / restore ────────────────────────────────────────────
 
 def _first_pending_id(client):

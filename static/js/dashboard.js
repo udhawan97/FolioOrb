@@ -1397,6 +1397,44 @@ function hydratePortfolioFromCache() {
     }
 }
 
+function describePortfolioSyncQuality(data = {}) {
+    const foreign = Array.isArray(data.foreign_currency_tickers)
+        ? data.foreign_currency_tickers.filter(Boolean)
+        : [];
+    const missing = Array.isArray(data.missing_tickers)
+        ? data.missing_tickers.filter(Boolean)
+        : [];
+    const excluded = Math.max(
+        0,
+        Math.floor(Number(data.excluded_realized_trade_count) || 0),
+    );
+    const issues = [];
+
+    if (foreign.length) {
+        const subject = foreign.length === 1 ? "it is" : "they are";
+        issues.push(`total excludes ${foreign.join(", ")} because ${subject} priced in another currency`);
+    }
+    if (missing.length) {
+        const subject = missing.length === 1 ? "it has" : "they have";
+        issues.push(`total excludes ${missing.join(", ")} because ${subject} no usable USD price`);
+    }
+    if (excluded) {
+        issues.push(`realized P&L excludes ${excluded} ${excluded === 1 ? "trade" : "trades"} without verified USD sale details`);
+    }
+
+    const isPartial = data.data_quality === "partial"
+        || data.data_quality === "unavailable"
+        || data.realized_data_quality === "partial"
+        || excluded > 0;
+    if (isPartial && !issues.length) {
+        issues.push("some portfolio figures are unavailable");
+    }
+
+    return issues.length
+        ? { isWarning: true, text: `Partial data — ${issues.join("; ")}` }
+        : { isWarning: false, text: "Prices, P&L and holdings pulled from market data" };
+}
+
 async function loadPortfolioValue() {
     if (_portfolioValuePromise) return _portfolioValuePromise;
     _portfolioValuePromise = (async () => {
@@ -1441,19 +1479,17 @@ async function loadPortfolioValue() {
         // Update the HUD popover sync display immediately (before rendering).
         const popUpdatedEl = document.getElementById("hud-pop-updated");
         if (popUpdatedEl) popUpdatedEl.textContent = _lastDashboardSyncText;
-        // A holding quoted in another currency is left out of the dollar total
-        // rather than added to it at face value. Say so where the sync status is
-        // explained, so the number on screen is never quietly short.
-        const foreign = data.foreign_currency_tickers || [];
+        // Quality metadata owns this status. Missing/foreign quotes and unverified
+        // legacy realized trades all make the displayed totals partial, so none
+        // may retain the green all-good market-data treatment.
+        const syncDisclosure = describePortfolioSyncQuality(data);
         const syncSubEl = document.getElementById("hud-pop-sync-sub");
         if (syncSubEl) {
-            syncSubEl.textContent = foreign.length
-                ? `Total excludes ${foreign.join(", ")} — priced in another currency`
-                : "Prices, P&L and holdings pulled from market data";
+            syncSubEl.textContent = syncDisclosure.text;
         }
         const syncIconEl = document.getElementById("hud-sync-icon");
         if (syncIconEl) {
-            syncIconEl.innerHTML = foreign.length
+            syncIconEl.innerHTML = syncDisclosure.isWarning
                 ? `<i class="bi bi-exclamation-circle" style="color:var(--bs-warning)"></i>`
                 : `<i class="bi bi-check-circle-fill"></i>`;
         }
@@ -3314,34 +3350,83 @@ let latestPnlHistory = [];
 let latestPnlHasUserData = false;
 let latestPnlIsStale = false;
 let latestPnlStaleDays = 0;
+let latestPnlDisclosure = describeRealizedQuality();
+
+function describeRealizedQuality(data = {}) {
+    const excludedCount = Math.max(
+        0,
+        Math.floor(Number(data.excluded_realized_trade_count) || 0),
+    );
+    const isPartial = data.realized_data_quality === "partial" || excludedCount > 0;
+    if (!isPartial) {
+        return {
+            isPartial: false,
+            excludedCount: 0,
+            performanceTitle: "No performance history yet",
+            performanceBody: "Set your share counts to track portfolio return over time. Showing S&P 500 as reference.",
+            realizedNotice: "",
+            realizedEmpty: "No realized trades yet — they appear here when you reduce a holding.",
+        };
+    }
+
+    const realizedReason = excludedCount
+        ? `${excludedCount} realized ${excludedCount === 1 ? "trade is" : "trades are"} excluded because ${excludedCount === 1 ? "its" : "their"} USD sale details are not verified.`
+        : "Some realized trade history could not be verified.";
+    const tableReason = excludedCount
+        ? `${excludedCount} ${excludedCount === 1 ? "trade is" : "trades are"} excluded because ${excludedCount === 1 ? "its" : "their"} USD sale details are not verified.`
+        : "Some trades could not be verified and are excluded.";
+    return {
+        isPartial: true,
+        excludedCount,
+        performanceTitle: "Performance history unavailable",
+        performanceBody: `${realizedReason} Portfolio performance is unavailable; showing S&P 500 as reference.`,
+        realizedNotice: `Partial realized history — ${tableReason}`,
+        realizedEmpty: `Partial realized history — ${tableReason}`,
+    };
+}
 
 async function loadPnl() {
     try {
         const data = await PortfolioWorkspace.json("/api/portfolio/pnl");
-        const history = data.history || [];
-
-        // Decide if the user has meaningful portfolio data
-        const lastEntry = history[history.length - 1];
-        const hasUserData = history.length >= 2 && (lastEntry?.total_value ?? 0) > 0;
-        const lastDate = lastEntry ? new Date(lastEntry.date + "T12:00:00") : null;
-        const hoursOld = lastDate ? (Date.now() - lastDate.getTime()) / 3_600_000 : Infinity;
-        const isStale = hoursOld > 24;
-
-        latestPnlHistory = history;
-        latestPnlHasUserData = hasUserData;
-        latestPnlIsStale = isStale;
-        latestPnlStaleDays = Math.floor(hoursOld / 24);
-        await renderCurrentPerformanceChart();
-        renderHeroPnl();
-
-        renderRealizedTable(data.trades || []);
-        loadRealizedRecap();
+        await renderPnlData(data);
     } catch (err) {
         console.warn("Unable to load P&L:", err);
     }
 }
 
+async function renderPnlData(data = {}) {
+    const history = data.history || [];
+
+    // Decide if the user has meaningful portfolio data
+    const lastEntry = history[history.length - 1];
+    const hasUserData = history.length >= 2 && (lastEntry?.total_value ?? 0) > 0;
+    const lastDate = lastEntry ? new Date(lastEntry.date + "T12:00:00") : null;
+    const hoursOld = lastDate ? (Date.now() - lastDate.getTime()) / 3_600_000 : Infinity;
+    const isStale = hoursOld > 24;
+    const realizedDisclosure = describeRealizedQuality(data);
+
+    latestPnlHistory = history;
+    latestPnlHasUserData = hasUserData;
+    latestPnlIsStale = isStale;
+    latestPnlStaleDays = Math.floor(hoursOld / 24);
+    latestPnlDisclosure = realizedDisclosure;
+    await renderCurrentPerformanceChart();
+    renderHeroPnl();
+
+    renderRealizedTable(data.trades || [], realizedDisclosure);
+    loadRealizedRecap();
+}
+
 async function renderCurrentPerformanceChart() {
+    if (latestPnlDisclosure.isPartial) {
+        if (pnlChart) {
+            pnlChart.destroy();
+            pnlChart = null;
+        }
+        updatePerfCallout("partial", 0, latestPnlDisclosure);
+        await loadMarketReferenceChart(performanceRange);
+        return;
+    }
     if (!latestPnlHasUserData) {
         updatePerfCallout("nodata");
         await loadMarketReferenceChart(performanceRange);
@@ -3366,14 +3451,18 @@ function filterHistoryForPerformanceRange(history, rangeKey = performanceRange) 
     return rows.filter(row => new Date(`${row.date}T12:00:00`) >= cutoff);
 }
 
-function updatePerfCallout(type, daysDiff = 0) {
+function updatePerfCallout(type, daysDiff = 0, disclosure = describeRealizedQuality()) {
     const el = document.getElementById("perf-stale-callout");
     if (!el) return;
     el.style.display = "";
     const icon  = el.querySelector(".perf-callout-icon");
     const title = el.querySelector(".perf-callout-title");
     const body  = el.querySelector(".perf-callout-body");
-    if (type === "nodata") {
+    if (type === "partial") {
+        if (icon)  icon.className = "bi bi-exclamation-triangle perf-callout-icon";
+        if (title) title.textContent = disclosure.performanceTitle;
+        if (body)  body.textContent = disclosure.performanceBody;
+    } else if (type === "nodata") {
         if (icon)  icon.className = "bi bi-bar-chart-line perf-callout-icon";
         if (title) title.textContent = "No performance history yet";
         if (body)  body.textContent = "Set your share counts to track portfolio return over time. Showing S&P 500 as reference.";
@@ -3546,14 +3635,18 @@ function renderPnlChart(history) {
     pnlChart.$chartMode = "portfolio";
 }
 
-function renderRealizedTable(trades) {
+function renderRealizedTable(trades, disclosure = describeRealizedQuality()) {
     const tbody = document.getElementById("realized-table");
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    if (!trades.length) {
+    if (disclosure.isPartial) {
+        tbody.innerHTML = `<tr data-realized-quality="partial"><td colspan="8" class="text-center text-warning py-4">
+            ${disclosure.realizedNotice}</td></tr>`;
+        if (!trades.length) return;
+    } else if (!trades.length) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-secondary py-4">
-            No realized trades yet — they appear here when you reduce a holding.</td></tr>`;
+            ${disclosure.realizedEmpty}</td></tr>`;
         return;
     }
 
@@ -12412,9 +12505,32 @@ function renderManageHoldingsLoading(list) {
     `).join("");
 }
 
-async function loadManageHoldings({ preserveExisting = false } = {}) {
+function renderManageHoldingsData(holdings) {
     const list = document.getElementById("manage-holdings-list");
     const empty = document.getElementById("manage-holdings-empty");
+    manageHoldingsCache = Array.isArray(holdings) ? holdings : [];
+    updateManageStatsPill(manageHoldingsCache);
+    if (!list) return;
+
+    list.innerHTML = "";
+    if (!manageHoldingsCache.length) {
+        list.hidden = true;
+        if (empty) empty.hidden = false;
+        filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
+        return;
+    }
+
+    if (empty) empty.hidden = true;
+    list.hidden = false;
+    manageHoldingsCache.forEach(h => {
+        list.insertAdjacentHTML("beforeend", renderManageHoldingCard(h));
+        bindManageHoldingInputs(document.getElementById(`manage-row-${h.id}`), h.id);
+    });
+    filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
+}
+
+async function loadManageHoldings({ preserveExisting = false } = {}) {
+    const list = document.getElementById("manage-holdings-list");
     const popover = document.getElementById("portfolioModal");
     if (!list) return;
 
@@ -12429,25 +12545,7 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
     try {
         const data = await PortfolioWorkspace.json("/api/portfolio/holdings");
         if (requestId !== manageHoldingsRequestId) return;
-
-        manageHoldingsCache = data.holdings || [];
-        updateManageStatsPill(manageHoldingsCache);
-        list.innerHTML = "";
-
-        if (!manageHoldingsCache.length) {
-            list.hidden = true;
-            if (empty) empty.hidden = false;
-            filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
-            return;
-        }
-
-        if (empty) empty.hidden = true;
-        list.hidden = false;
-        manageHoldingsCache.forEach(h => {
-            list.insertAdjacentHTML("beforeend", renderManageHoldingCard(h));
-            bindManageHoldingInputs(document.getElementById(`manage-row-${h.id}`), h.id);
-        });
-        filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
+        renderManageHoldingsData(data.holdings);
     } catch (err) {
         console.warn("Unable to load manage holdings:", err);
         if (requestId === manageHoldingsRequestId && !preserveExisting) {
@@ -12776,6 +12874,101 @@ async function toggleAnchorHold(event, holdingId, ticker) {
     await setHoldMode(event, holdingId, ticker, nextClass);
 }
 
+function applyRemovedHoldingState(holdingId, ticker, { updateHoldings = true } = {}) {
+    if (updateHoldings) {
+        latestHoldings = latestHoldings.filter(h => h.id !== holdingId);
+        updateHoldingsFilterCounts();
+        renderHoldings();
+    }
+    delete latestTrendData[ticker];
+    try { localStorage.removeItem(_portfolioValueCacheKey()); } catch (_) { /* best effort */ }
+    document.getElementById(`manage-row-${holdingId}`)?.remove();
+    manageHoldingsCache = manageHoldingsCache.filter(h => h.id !== holdingId);
+    updateManageStatsPill(manageHoldingsCache);
+    const list = document.getElementById("manage-holdings-list");
+    const empty = document.getElementById("manage-holdings-empty");
+    if (list && !manageHoldingsCache.length) {
+        list.hidden = true;
+        if (empty) empty.hidden = false;
+    } else {
+        filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
+    }
+}
+
+function resolveHoldingRemovalReconciliation(holdingId, data) {
+    if (!Number.isFinite(Number(holdingId)) || !Array.isArray(data?.holdings)) {
+        return { status: "unknown", holdings: [] };
+    }
+    const holdings = data.holdings;
+    const isActive = holdings.some(holding => Number(holding.id) === Number(holdingId));
+    return { status: isActive ? "active" : "removed", holdings };
+}
+
+async function reconcileHoldingRemovalOutcome(holdingId, ticker) {
+    // A response can be lost after SQLite commits. Direct uncached reads, not the
+    // thrown DELETE, decide whether the holding survived and refresh realized P&L.
+    PortfolioWorkspace.invalidate();
+    const [holdingsResult, pnlResult] = await Promise.allSettled([
+        PortfolioWorkspace.json("/api/portfolio/holdings"),
+        PortfolioWorkspace.json("/api/portfolio/pnl"),
+    ]);
+
+    let realizedRefreshed = false;
+    if (pnlResult.status === "fulfilled") {
+        try {
+            await renderPnlData(pnlResult.value);
+            realizedRefreshed = true;
+        } catch (renderError) {
+            console.warn("Unable to render reconciled realized history:", renderError);
+        }
+    }
+
+    const reconciliation = holdingsResult.status === "fulfilled"
+        ? resolveHoldingRemovalReconciliation(holdingId, holdingsResult.value)
+        : { status: "unknown", holdings: [] };
+    if (reconciliation.status !== "unknown") {
+        try {
+            renderManageHoldingsData(reconciliation.holdings);
+            if (reconciliation.status === "removed") {
+                applyRemovedHoldingState(holdingId, ticker);
+            }
+        } catch (renderError) {
+            console.warn("Unable to render reconciled holdings:", renderError);
+        }
+    }
+
+    try {
+        await loadPortfolioValueAfterMutation();
+    } catch (refreshError) {
+        console.warn("Unable to refresh reconciled portfolio value:", refreshError);
+    }
+    return { status: reconciliation.status, realizedRefreshed };
+}
+
+function describeHoldingRemovalOutcome(ticker, outcome = {}) {
+    if (outcome.status === "removed") {
+        return outcome.realizedRefreshed
+            ? {
+                message: `${ticker} was removed — refreshed saved holdings and realized history`,
+                level: "warning",
+            }
+            : {
+                message: `${ticker} was removed, but realized history couldn't refresh. Refresh before making another change.`,
+                level: "warning",
+            };
+    }
+    if (outcome.status === "active") {
+        return {
+            message: `${ticker} is still active — refreshed saved holdings after the connection error`,
+            level: "warning",
+        };
+    }
+    return {
+        message: `Couldn't confirm whether ${ticker} was removed. Refresh before trying again.`,
+        level: "danger",
+    };
+}
+
 
 async function removeHolding(holdingId, ticker, isWatchlist = false) {
     const holding = manageHoldingsCache.find(h => h.id === holdingId)
@@ -12824,7 +13017,14 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
         }
     } catch (requestError) {
         console.warn("Unable to remove holding:", requestError);
-        showToast(`Couldn't remove ${ticker} — holding kept unchanged`, "danger");
+        let outcome = { status: "unknown", realizedRefreshed: false };
+        try {
+            outcome = await reconcileHoldingRemovalOutcome(holdingId, ticker);
+        } catch (reconciliationError) {
+            console.warn("Unable to reconcile holding removal:", reconciliationError);
+        }
+        const disclosure = describeHoldingRemovalOutcome(ticker, outcome);
+        showToast(disclosure.message, disclosure.level);
         return;
     }
     if (res.ok) {
@@ -12832,21 +13032,9 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
         // The authoritative post-mutation fetch below then recalculates totals and
         // refreshes every rendered Analytics pane from the committed database.
         latestHoldings = latestHoldings.filter(h => h.id !== holdingId);
-        delete latestTrendData[ticker];
-        try { localStorage.removeItem(_portfolioValueCacheKey()); } catch (_) { /* best effort */ }
         updateHoldingsFilterCounts();
         renderHoldings();
-        document.getElementById(`manage-row-${holdingId}`)?.remove();
-        manageHoldingsCache = manageHoldingsCache.filter(h => h.id !== holdingId);
-        updateManageStatsPill(manageHoldingsCache);
-        const list = document.getElementById("manage-holdings-list");
-        const empty = document.getElementById("manage-holdings-empty");
-        if (list && !manageHoldingsCache.length) {
-            list.hidden = true;
-            if (empty) empty.hidden = false;
-        } else {
-            filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
-        }
+        applyRemovedHoldingState(holdingId, ticker, { updateHoldings: false });
         showToast(
             isWatchlist ? `${ticker} research position discarded` : `${ticker} removed`,
             isWatchlist ? "success" : "warning"

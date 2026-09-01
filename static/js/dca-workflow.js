@@ -83,9 +83,24 @@
     async function runCatchup() {
         try {
             const response = await workspace.response("/api/dca/run", { method: "POST" });
-            if (!response.ok) return;
-            const data = await response.json();
-            const unpriced = (data.plans || []).filter(plan => !plan.price_data);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                notify(
+                    typeof data.detail === "string" ? data.detail : "DCA catch-up failed",
+                    "danger",
+                );
+                return;
+            }
+            const blocked = (data.plans || []).filter(
+                plan => plan.status === "needs_currency"
+            );
+            if (blocked.length) {
+                notify(
+                    `Currency verification required for ${blocked.map(plan => plan.ticker).join(", ")} — review the plan in Manage → DCA`,
+                    "warning",
+                );
+            }
+            const unpriced = (data.plans || []).filter(plan => plan.price_data === false);
             if (unpriced.length) {
                 notify(
                     `Couldn't fetch prices for ${unpriced.map(plan => plan.ticker).join(", ")} — DCA buys not booked yet`,
@@ -101,6 +116,7 @@
             updateBadge();
         } catch (error) {
             log.warn("DCA catch-up failed:", error);
+            notify("DCA catch-up failed — is the app online?", "danger");
         }
     }
 
@@ -137,16 +153,25 @@
         if (!section || !list) return;
         section.hidden = plans.length === 0;
         list.innerHTML = plans.map(plan => {
+            const needsCurrency = plan.currency_status === "needs_currency";
             const applied = plan.applied_count
                 ? `${formatMoney(plan.applied_amount)} → ${plan.applied_shares.toFixed(4)} sh @ ${formatMoney(plan.applied_avg_cost)}`
                 : "nothing applied yet";
-            const status = plan.is_active
+            const status = needsCurrency
+                ? '<span class="dca-plan-flag">Needs currency verification</span>'
+                : plan.is_active
                 ? (plan.next_date
                     ? `<span class="dca-plan-next">Next buy ${escape(plan.next_date)}</span>`
                     : "")
                 : '<span class="dca-plan-flag">Paused</span>';
+            const currencyNotice = needsCurrency
+                ? `<div class="dca-plan-sub">${escape(plan.currency_message || "Currency verification is required before future buys can be created or applied.")}</div>`
+                : "";
+            const toggle = plan.is_active
+                ? `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="toggle-plan" data-plan-id="${plan.id}" data-active="true">Pause</button>`
+                : (needsCurrency ? "" : `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="toggle-plan" data-plan-id="${plan.id}" data-active="false">Resume</button>`);
             return `
-            <div class="dca-plan-card${plan.is_active ? "" : " dca-plan-card--paused"}" data-plan-id="${plan.id}">
+            <div class="dca-plan-card${plan.is_active && !needsCurrency ? "" : " dca-plan-card--paused"}" data-plan-id="${plan.id}">
                 <div class="dca-plan-head">
                     <div class="dca-plan-id">
                         <span class="dca-plan-ticker">${escape(plan.ticker)}</span>
@@ -154,9 +179,10 @@
                     </div>${status}
                 </div>
                 <div class="dca-plan-sub">Applied so far: ${applied}</div>
+                ${currencyNotice}
                 <div class="dca-plan-actions">
-                    <button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="toggle-plan" data-plan-id="${plan.id}" data-active="${plan.is_active}">${plan.is_active ? "Pause" : "Resume"}</button>
-                    <button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="edit-plan" data-plan-id="${plan.id}" data-amount="${plan.amount}">Edit amount</button>
+                    ${toggle}
+                    ${needsCurrency ? "" : `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="edit-plan" data-plan-id="${plan.id}" data-amount="${plan.amount}">Edit amount</button>`}
                     ${plan.applied_count ? `<button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="undo-all" data-plan-id="${plan.id}" data-count="${plan.applied_count}" data-ticker="${escape(plan.ticker)}">Undo applied</button>` : ""}
                     <button type="button" class="btn btn-sm dca-chip-btn dca-chip-btn--danger" data-dca-action="delete-plan" data-plan-id="${plan.id}" data-ticker="${escape(plan.ticker)}">Delete</button>
                 </div>
@@ -193,28 +219,32 @@
         });
         list.innerHTML = [...groups.entries()].map(([planId, buys]) => {
             const plan = plansById[planId];
+            const needsCurrency = plan?.currency_status === "needs_currency";
             const ticker = plan?.ticker || buys[0].ticker || "?";
             const terms = plan ? `${formatMoney(plan.amount)} ${escape(plan.frequency)}` : "";
             const total = buys.reduce((sum, contribution) => sum + contribution.amount, 0);
             const cap = 15;
             const rows = buys.slice(0, cap).map(contribution => buyRow(
                 contribution,
-                `<button type="button" class="btn btn-sm btn-success dca-act-btn" data-dca-action="apply" data-cid="${contribution.id}">Apply</button>
+                `${needsCurrency ? "" : `<button type="button" class="btn btn-sm btn-success dca-act-btn" data-dca-action="apply" data-cid="${contribution.id}">Apply</button>`}
                  <button type="button" class="btn btn-sm dca-chip-btn" data-dca-action="skip" data-cid="${contribution.id}">Skip</button>`,
             )).join("") + (buys.length > cap
                 ? `<div class="dca-more-note">…and ${buys.length - cap} more — use “Apply all ${buys.length}” or “Skip all” above.</div>`
                 : "");
             const bulk = buys.length > 1 ? `
                 <span class="dca-bulk-actions">
-                    <button type="button" class="btn btn-sm btn-link dca-bulk-link" data-dca-action="apply-all" data-plan-id="${planId}" data-count="${buys.length}" data-total="${total}" data-ticker="${escape(ticker)}">Apply all ${buys.length}</button>
+                    ${needsCurrency ? "" : `<button type="button" class="btn btn-sm btn-link dca-bulk-link" data-dca-action="apply-all" data-plan-id="${planId}" data-count="${buys.length}" data-total="${total}" data-ticker="${escape(ticker)}">Apply all ${buys.length}</button>`}
                     <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" data-dca-action="skip-all" data-plan-id="${planId}" data-count="${buys.length}" data-ticker="${escape(ticker)}">Skip all</button>
                 </span>` : "";
+            const blockedNotice = needsCurrency
+                ? '<span class="dca-group-count">Currency verification required — Apply is unavailable.</span>'
+                : "";
             return `
             <div class="dca-pending-group">
                 <div class="dca-pending-group-head">
                     <span class="dca-group-ticker">${escape(ticker)}</span>
                     ${terms ? `<span class="dca-group-terms">${terms}</span>` : ""}
-                    <span class="dca-group-count">${buys.length} buy${buys.length === 1 ? "" : "s"} awaiting</span>${bulk}
+                    <span class="dca-group-count">${buys.length} buy${buys.length === 1 ? "" : "s"} awaiting</span>${blockedNotice}${bulk}
                 </div>${rows}
             </div>`;
         }).join("");

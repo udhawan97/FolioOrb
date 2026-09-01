@@ -11,6 +11,9 @@ from sqlalchemy import and_, func
 
 REPORTING_CURRENCY = "USD"
 LEGACY_UNKNOWN_PROVENANCE = "legacy_unknown"
+TRUSTED_SALE_PRICE_SOURCES = frozenset({"manual_entry", "market_quote"})
+TRUSTED_DCA_PLAN_CURRENCY_SOURCES = frozenset({"ticker_validation"})
+TRUSTED_DCA_CONTRIBUTION_CURRENCY_SOURCES = frozenset({"validated_plan"})
 
 
 def normalize_currency(value) -> str | None:
@@ -37,12 +40,12 @@ def is_reporting_currency(value) -> bool:
 
 
 def is_trusted_reporting_fact(currency, provenance) -> bool:
-    """True for a persisted USD fact with non-legacy provenance."""
+    """True for a persisted USD sale with an explicitly supported price source."""
     source = normalize_currency(provenance)
     return bool(
         is_reporting_currency(currency)
         and source
-        and source.lower() != LEGACY_UNKNOWN_PROVENANCE
+        and source.lower() in TRUSTED_SALE_PRICE_SOURCES
     )
 
 
@@ -52,11 +55,9 @@ def reporting_currency_clause(column):
 
 
 def trusted_reporting_fact_clause(currency_column, provenance_column):
-    """SQL expression selecting explicitly sourced reporting-currency facts."""
+    """SQL expression selecting USD sales with explicitly supported price sources."""
     normalized_source = func.lower(func.trim(provenance_column))
     return and_(
         reporting_currency_clause(currency_column),
-        provenance_column.is_not(None),
-        normalized_source != "",
-        normalized_source != LEGACY_UNKNOWN_PROVENANCE,
+        normalized_source.in_(tuple(sorted(TRUSTED_SALE_PRICE_SOURCES))),
     )

@@ -145,3 +145,89 @@ test("failed action reports the error without refreshing holdings", async () => 
     assert.equal(refreshes, 0);
     assert.deepEqual(messages[0], ["Already applied", "danger"]);
 });
+
+test("legacy plan is visibly blocked and has no financial action controls", async () => {
+    const document = fakeDocument();
+    const legacy = {
+        id: 9,
+        ticker: "LEGACY",
+        amount: 50,
+        frequency: "weekly",
+        is_active: true,
+        next_date: null,
+        applied_count: 0,
+        applied_amount: 0,
+        applied_shares: 0,
+        applied_avg_cost: null,
+        currency_status: "needs_currency",
+        currency_message: "Undo applied buys if needed, then delete this plan. Create a replacement only after FolioOrb verifies an explicit USD quote.",
+    };
+    const pending = {
+        id: 17,
+        plan_id: 9,
+        ticker: "LEGACY",
+        exec_date: "2026-06-12",
+        shares: 0.5,
+        price: 100,
+        amount: 50,
+    };
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            json: async url => url.includes("plans")
+                ? { plans: [legacy] }
+                : { contributions: [pending] },
+        }),
+        document,
+    });
+
+    workflow.open();
+    await new Promise(resolve => setImmediate(resolve));
+
+    const planHtml = document.elements.get("dca-plans-list").innerHTML;
+    const pendingHtml = document.elements.get("dca-pending-list").innerHTML;
+    assert.match(planHtml, /Needs currency verification/);
+    assert.match(planHtml, /Undo applied buys if needed, then delete this plan/);
+    assert.match(planHtml, /Create a replacement only after FolioOrb verifies/);
+    assert.doesNotMatch(planHtml, /Next buy/);
+    assert.doesNotMatch(planHtml, /data-dca-action="edit-plan"/);
+    assert.match(planHtml, /data-dca-action="delete-plan"/);
+    assert.doesNotMatch(pendingHtml, /data-dca-action="apply"/);
+    assert.doesNotMatch(pendingHtml, /data-dca-action="apply-all"/);
+    assert.match(pendingHtml, /Currency verification required/);
+    assert.match(pendingHtml, /data-dca-action="skip"/);
+});
+
+test("catch-up HTTP failure is reported instead of silently swallowed", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => new Response(
+                JSON.stringify({ detail: "Catch-up unavailable" }),
+                { status: 409 },
+            ),
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+    });
+
+    workflow.init();
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.deepEqual(messages[0], ["Catch-up unavailable", "danger"]);
+});
+
+test("catch-up network failure is reported instead of silently swallowed", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("offline"); },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+    });
+
+    workflow.init();
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.deepEqual(messages[0], ["DCA catch-up failed — is the app online?", "danger"]);
+});

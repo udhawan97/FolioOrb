@@ -28,8 +28,12 @@ PriceHistoryLoader = Callable[[str, str, str], dict[str, float]]
 TodayFactory = Callable[[], date]
 
 _ZERO_EPS = 1e-9
-_PLAN_CURRENCY_SOURCE = "ticker_validation"
-_CONTRIBUTION_CURRENCY_SOURCE = "validated_plan"
+_PLAN_CURRENCY_SOURCES = financial_currency.TRUSTED_DCA_PLAN_CURRENCY_SOURCES
+_CONTRIBUTION_CURRENCY_SOURCES = (
+    financial_currency.TRUSTED_DCA_CONTRIBUTION_CURRENCY_SOURCES
+)
+_PLAN_CURRENCY_SOURCE = next(iter(_PLAN_CURRENCY_SOURCES))
+_CONTRIBUTION_CURRENCY_SOURCE = next(iter(_CONTRIBUTION_CURRENCY_SOURCES))
 
 
 class DcaLedgerError(Exception):
@@ -90,7 +94,30 @@ class DcaLedger:
         return bool(
             financial_currency.is_reporting_currency(plan.quote_currency)
             and source
-            and source.lower() == _PLAN_CURRENCY_SOURCE
+            and source.lower() in _PLAN_CURRENCY_SOURCES
+        )
+
+    @staticmethod
+    def _untrusted_plan_reason(plan: DcaPlan) -> str:
+        currency = financial_currency.normalize_currency(plan.quote_currency)
+        if currency and not financial_currency.is_reporting_currency(currency):
+            return f"is recorded in {currency}, not USD"
+        return "has no explicit trusted USD currency provenance"
+
+    @classmethod
+    def _untrusted_plan_message(cls, plan: DcaPlan) -> str:
+        return (
+            f"This DCA plan {cls._untrusted_plan_reason(plan)}. "
+            "No contributions or holdings were changed; "
+            "recreate it after FolioOrb verifies an explicit USD quote."
+        )
+
+    @classmethod
+    def _plan_currency_message(cls, plan: DcaPlan) -> str:
+        return (
+            f"This plan {cls._untrusted_plan_reason(plan)}. Future buys cannot be "
+            "created or applied. Undo applied buys if needed, then delete this plan. "
+            "Create a replacement only after FolioOrb verifies an explicit USD quote."
         )
 
     @staticmethod
@@ -101,22 +128,14 @@ class DcaLedger:
         return bool(
             financial_currency.is_reporting_currency(contribution.price_currency)
             and source
-            and source.lower() == _CONTRIBUTION_CURRENCY_SOURCE
+            and source.lower() in _CONTRIBUTION_CURRENCY_SOURCES
         )
 
     @classmethod
     def _require_trusted_plan(cls, plan: DcaPlan) -> None:
         if cls._plan_has_trusted_usd(plan):
             return
-        currency = financial_currency.normalize_currency(plan.quote_currency)
-        if currency and not financial_currency.is_reporting_currency(currency):
-            reason = f"is recorded in {currency}, not USD"
-        else:
-            reason = "has no explicit trusted USD currency provenance"
-        raise DcaConflictError(
-            f"This DCA plan {reason}. No contributions or holdings were changed; "
-            "recreate it after FolioOrb verifies an explicit USD quote."
-        )
+        raise DcaConflictError(cls._untrusted_plan_message(plan))
 
     @classmethod
     def _require_trusted_contribution(
@@ -164,6 +183,7 @@ class DcaLedger:
             "applied", (0, 0.0, 0.0)
         )
         pending_count = by_status.get("pending", (0, 0.0, 0.0))[0]
+        trusted_usd = self._plan_has_trusted_usd(plan)
         next_date = dca_service.next_scheduled_date(
             plan.frequency,
             date.fromisoformat(plan.start_date),
@@ -176,6 +196,10 @@ class DcaLedger:
             "amount": plan.amount,
             "quote_currency": plan.quote_currency,
             "quote_currency_source": plan.quote_currency_source,
+            "currency_status": "trusted_usd" if trusted_usd else "needs_currency",
+            "currency_message": (
+                None if trusted_usd else self._plan_currency_message(plan)
+            ),
             "frequency": plan.frequency,
             "start_date": plan.start_date,
             "is_active": plan.is_active,
@@ -188,7 +212,11 @@ class DcaLedger:
                 if applied_shares > 0
                 else None
             ),
-            "next_date": next_date.isoformat() if plan.is_active and next_date else None,
+            "next_date": (
+                next_date.isoformat()
+                if trusted_usd and plan.is_active and next_date
+                else None
+            ),
         }
 
     @staticmethod
@@ -414,14 +442,27 @@ class DcaLedger:
             .filter(DcaPlan.portfolio_id == portfolio_id, DcaPlan.is_active.is_(True))
             .all()
         )
-        # Validate the complete batch before the first price read or staged row.
-        # A later ambiguous plan must not leave earlier plans partially caught up.
-        for plan in plans:
-            self._require_trusted_plan(plan)
         results = []
         total = 0
+        blocked = 0
         today = self._today()
         for plan in plans:
+            # Legacy and foreign-currency plans remain fail-closed, but their
+            # migration state is local to the plan. One such row must not prevent
+            # an unrelated, explicitly verified USD plan from catching up.
+            if not self._plan_has_trusted_usd(plan):
+                blocked += 1
+                results.append(
+                    {
+                        "plan_id": plan.id,
+                        "ticker": plan.ticker,
+                        "buys_added": 0,
+                        "price_data": None,
+                        "status": "needs_currency",
+                        "message": self._untrusted_plan_message(plan),
+                    }
+                )
+                continue
             added, priced = self._catch_up(plan, today)
             total += added
             results.append(
@@ -430,10 +471,16 @@ class DcaLedger:
                     "ticker": plan.ticker,
                     "buys_added": added,
                     "price_data": priced,
+                    "status": "ready" if priced else "price_unavailable",
                 }
             )
         self.db.commit()
-        return {"buys_added": total, "plans_checked": len(plans), "plans": results}
+        return {
+            "buys_added": total,
+            "plans_checked": len(plans),
+            "plans_blocked": blocked,
+            "plans": results,
+        }
 
     def list_contributions(self, portfolio_id: int, status: str = "pending") -> list[dict]:
         portfolio_lifecycle.require_portfolio(self.db, portfolio_id)
