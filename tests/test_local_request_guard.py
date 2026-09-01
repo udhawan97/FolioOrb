@@ -12,7 +12,7 @@ from app.services.local_request_guard import LocalRequestGuardMiddleware
 
 def _guarded_app(origins: list[str]) -> tuple[FastAPI, dict[str, int]]:
     application = FastAPI()
-    calls = {"mutations": 0}
+    calls = {"mutations": 0, "stateful_reads": 0}
 
     @application.post("/mutate")
     def mutate():
@@ -21,6 +21,11 @@ def _guarded_app(origins: list[str]) -> tuple[FastAPI, dict[str, int]]:
 
     @application.get("/read")
     def read():
+        return {"ok": True}
+
+    @application.get("/api/stateful-read")
+    def stateful_read():
+        calls["stateful_reads"] += 1
         return {"ok": True}
 
     application.add_middleware(
@@ -75,6 +80,50 @@ def test_reads_do_not_require_origin_but_still_require_local_host():
 
     assert TestClient(app, base_url="http://localhost:8000").get("/read").status_code == 200
     assert TestClient(app, base_url="http://attacker.example").get("/read").status_code == 400
+
+
+@pytest.mark.parametrize(
+    "headers",
+    (
+        {"Origin": "http://localhost:8000"},
+        {"Sec-Fetch-Site": "same-origin"},
+        {"Referer": "http://localhost:8000/dashboard?tab=overview"},
+    ),
+)
+def test_api_reads_require_and_accept_same_origin_browser_provenance(headers):
+    app, calls = _guarded_app(["http://localhost:8000"])
+    client = TestClient(app, base_url="http://localhost:8000")
+
+    response = client.get("/api/stateful-read", headers=headers)
+
+    assert response.status_code == 200
+    assert calls["stateful_reads"] == 1
+
+
+@pytest.mark.parametrize(
+    "headers",
+    (
+        {},
+        {"Origin": "null"},
+        {"Origin": "https://attacker.example"},
+        {"Origin": "http://localhost:9999"},
+        {"Sec-Fetch-Site": "cross-site"},
+        {"Referer": "https://attacker.example/trap"},
+        {
+            "Origin": "https://attacker.example",
+            "Sec-Fetch-Site": "same-origin",
+        },
+    ),
+)
+def test_api_reads_with_missing_or_hostile_provenance_change_nothing(headers):
+    app, calls = _guarded_app(["http://localhost:8000"])
+    client = TestClient(app, base_url="http://localhost:8000")
+
+    response = client.get("/api/stateful-read", headers=headers)
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "local_api_provenance_required"}
+    assert calls["stateful_reads"] == 0
 
 
 @pytest.mark.parametrize("host", ("localhost:not-a-port", "localhost:8000?"))
