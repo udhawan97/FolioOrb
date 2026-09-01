@@ -185,6 +185,14 @@ class DcaPlan(Base):
     amount = Column(Float, nullable=False)               # dollars invested per interval
     frequency = Column(String(10), nullable=False)       # daily | weekly | monthly
     start_date = Column(String(10), nullable=False)      # "YYYY-MM-DD"
+    # Currency is a persisted financial fact, not ticker metadata FolioOrb may
+    # infer again later. New plans store the source quote's explicit currency;
+    # legacy rows remain NULL/unknown and therefore cannot create or apply buys.
+    quote_currency = Column(String(10), nullable=True)
+    quote_currency_source = Column(
+        String(30), nullable=False, default="legacy_unknown",
+        server_default="legacy_unknown",
+    )
     is_active = Column(Boolean, default=True, server_default="1")  # False = paused
     # Earliest date catch-up may book from ("YYYY-MM-DD"); null means the start
     # date (full backfill). Advanced to the resume date when a paused plan is
@@ -222,6 +230,14 @@ class DcaContribution(Base):
     price = Column(Float, nullable=False)                 # close used for the buy
     shares = Column(Float, nullable=False)                # amount / price (fractional)
     amount = Column(Float, nullable=False)                # dollars invested
+    # Each contribution carries the plan trust decision that made its historical
+    # close safe to interpret. This keeps pending rows fail-closed even if they
+    # outlive or are inspected independently of the creating request.
+    price_currency = Column(String(10), nullable=True)
+    price_currency_source = Column(
+        String(30), nullable=False, default="legacy_unknown",
+        server_default="legacy_unknown",
+    )
     status = Column(
         String(10), nullable=False, default="pending", server_default="pending"
     )

@@ -29,7 +29,7 @@ from app.services import financial_currency
 from app.services.holdings_csv import escape_csv_cell
 from app.version import __version__
 
-EXPORT_FORMAT_VERSION = 1
+EXPORT_FORMAT_VERSION = 2
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MIN_RECAP_YEAR = 1900
 RECAP_LIMITATION = (
@@ -245,21 +245,26 @@ def _model_rows(db: Session) -> list[tuple[str, tuple[str, ...], list[dict]]]:
         } for row in snapshots]),
         ("dca_plans.csv", (
             "id", "portfolio_id", "ticker", "amount", "frequency", "start_date",
-            "is_active", "catchup_floor", "created_at_utc",
+            "quote_currency", "quote_currency_source", "is_active",
+            "catchup_floor", "created_at_utc",
         ), [{
             "id": row.id, "portfolio_id": row.portfolio_id, "ticker": row.ticker,
             "amount": row.amount, "frequency": row.frequency, "start_date": row.start_date,
+            "quote_currency": row.quote_currency,
+            "quote_currency_source": row.quote_currency_source,
             "is_active": str(bool(row.is_active)).lower(), "catchup_floor": row.catchup_floor,
             "created_at_utc": _utc_text(row.created_at),
         } for row in plans]),
         ("dca_contributions.csv", (
             "id", "portfolio_id", "plan_id", "scheduled_date", "exec_date", "price",
-            "shares", "amount", "status", "applied_holding_id", "created_at_utc",
+            "shares", "amount", "price_currency", "price_currency_source", "status",
+            "applied_holding_id", "created_at_utc",
         ), [{
             "id": row.id, "portfolio_id": plan_portfolios.get(row.plan_id),
             "plan_id": row.plan_id, "scheduled_date": row.scheduled_date,
             "exec_date": row.exec_date, "price": row.price, "shares": row.shares,
-            "amount": row.amount, "status": row.status,
+            "amount": row.amount, "price_currency": row.price_currency,
+            "price_currency_source": row.price_currency_source, "status": row.status,
             "applied_holding_id": row.applied_holding_id,
             "created_at_utc": _utc_text(row.created_at),
         } for row in contributions]),

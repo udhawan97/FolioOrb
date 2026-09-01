@@ -28,6 +28,8 @@ PriceHistoryLoader = Callable[[str, str, str], dict[str, float]]
 TodayFactory = Callable[[], date]
 
 _ZERO_EPS = 1e-9
+_PLAN_CURRENCY_SOURCE = "ticker_validation"
+_CONTRIBUTION_CURRENCY_SOURCE = "validated_plan"
 
 
 class DcaLedgerError(Exception):
@@ -72,6 +74,69 @@ class DcaLedger:
             raise DcaNotFoundError("DCA plan not found")
         return plan
 
+    @staticmethod
+    def _validated_source_currency(validation: dict) -> str | None:
+        """Read provider currency without mistaking a display fallback for proof."""
+        quote = validation.get("quote")
+        if isinstance(quote, dict):
+            raw = quote.get("source_currency")
+        else:
+            raw = validation.get("source_currency")
+        return financial_currency.normalize_currency(raw)
+
+    @staticmethod
+    def _plan_has_trusted_usd(plan: DcaPlan) -> bool:
+        source = financial_currency.normalize_currency(plan.quote_currency_source)
+        return bool(
+            financial_currency.is_reporting_currency(plan.quote_currency)
+            and source
+            and source.lower() == _PLAN_CURRENCY_SOURCE
+        )
+
+    @staticmethod
+    def _contribution_has_trusted_usd(contribution: DcaContribution) -> bool:
+        source = financial_currency.normalize_currency(
+            contribution.price_currency_source
+        )
+        return bool(
+            financial_currency.is_reporting_currency(contribution.price_currency)
+            and source
+            and source.lower() == _CONTRIBUTION_CURRENCY_SOURCE
+        )
+
+    @classmethod
+    def _require_trusted_plan(cls, plan: DcaPlan) -> None:
+        if cls._plan_has_trusted_usd(plan):
+            return
+        currency = financial_currency.normalize_currency(plan.quote_currency)
+        if currency and not financial_currency.is_reporting_currency(currency):
+            reason = f"is recorded in {currency}, not USD"
+        else:
+            reason = "has no explicit trusted USD currency provenance"
+        raise DcaConflictError(
+            f"This DCA plan {reason}. No contributions or holdings were changed; "
+            "recreate it after FolioOrb verifies an explicit USD quote."
+        )
+
+    @classmethod
+    def _require_trusted_contribution(
+        cls, contribution: DcaContribution
+    ) -> None:
+        cls._require_trusted_plan(contribution.plan)
+        if cls._contribution_has_trusted_usd(contribution):
+            return
+        currency = financial_currency.normalize_currency(
+            contribution.price_currency
+        )
+        if currency and not financial_currency.is_reporting_currency(currency):
+            reason = f"is recorded in {currency}, not USD"
+        else:
+            reason = "has no explicit trusted USD currency provenance"
+        raise DcaConflictError(
+            f"This DCA contribution {reason}. The holding and DCA ledger were "
+            "left unchanged."
+        )
+
     def _contribution(self, contribution_id: int) -> DcaContribution:
         contribution = (
             self.db.query(DcaContribution)
@@ -109,6 +174,8 @@ class DcaLedger:
             "portfolio_id": plan.portfolio_id,
             "ticker": plan.ticker,
             "amount": plan.amount,
+            "quote_currency": plan.quote_currency,
+            "quote_currency_source": plan.quote_currency_source,
             "frequency": plan.frequency,
             "start_date": plan.start_date,
             "is_active": plan.is_active,
@@ -135,6 +202,8 @@ class DcaLedger:
             "price": round(float(contribution.price), 4),
             "shares": round(float(contribution.shares), 6),
             "amount": round(float(contribution.amount), 2),
+            "price_currency": contribution.price_currency,
+            "price_currency_source": contribution.price_currency_source,
             "status": contribution.status,
         }
 
@@ -168,6 +237,7 @@ class DcaLedger:
         )
 
     def _catch_up(self, plan: DcaPlan, today: date) -> tuple[int, bool]:
+        self._require_trusted_plan(plan)
         start = date.fromisoformat(plan.start_date)
         if start > today:
             return 0, True
@@ -208,6 +278,8 @@ class DcaLedger:
                     price=item["price"],
                     shares=item["shares"],
                     amount=item["amount"],
+                    price_currency=plan.quote_currency,
+                    price_currency_source=_CONTRIBUTION_CURRENCY_SOURCE,
                     status="pending",
                 )
             )
@@ -248,13 +320,19 @@ class DcaLedger:
                     "suggestions": validation["suggestions"],
                 }
             )
-        quote = validation.get("quote")
-        currency = financial_currency.normalize_currency(
-            quote.get("currency")
-            if isinstance(quote, dict)
-            else validation.get("currency")
-        )
-        if currency and not financial_currency.is_reporting_currency(currency):
+        currency = self._validated_source_currency(validation)
+        if not currency:
+            raise DcaValidationError(
+                {
+                    "message": (
+                        f"Could not verify that {ticker} is quoted in USD. "
+                        "No DCA plan was created because missing currency cannot "
+                        "be treated as dollar provenance."
+                    ),
+                    "suggestions": validation.get("suggestions", []),
+                }
+            )
+        if not financial_currency.is_reporting_currency(currency):
             raise DcaValidationError(
                 {
                     "message": (
@@ -270,6 +348,8 @@ class DcaLedger:
             amount=amount,
             frequency=frequency,
             start_date=start_date,
+            quote_currency=currency,
+            quote_currency_source=_PLAN_CURRENCY_SOURCE,
             is_active=True,
         )
         self.db.add(plan)
@@ -334,6 +414,10 @@ class DcaLedger:
             .filter(DcaPlan.portfolio_id == portfolio_id, DcaPlan.is_active.is_(True))
             .all()
         )
+        # Validate the complete batch before the first price read or staged row.
+        # A later ambiguous plan must not leave earlier plans partially caught up.
+        for plan in plans:
+            self._require_trusted_plan(plan)
         results = []
         total = 0
         today = self._today()
@@ -366,6 +450,7 @@ class DcaLedger:
         ]
 
     def _apply(self, contribution: DcaContribution) -> Holding:
+        self._require_trusted_contribution(contribution)
         plan = contribution.plan
         holding = holdings_repository.active_by_ticker(
             self.db, plan.portfolio_id, plan.ticker
@@ -426,6 +511,11 @@ class DcaLedger:
             .order_by(DcaContribution.exec_date.asc())
             .all()
         )
+        # Bulk apply is one financial transaction. Preflight every row before
+        # touching the holding so a later ambiguous/foreign contribution cannot
+        # leave earlier rows staged in the session.
+        for contribution in pending:
+            self._require_trusted_contribution(contribution)
         for contribution in pending:
             self._apply(contribution)
         self.db.commit()

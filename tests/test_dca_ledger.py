@@ -53,15 +53,20 @@ def closes(_ticker: str, start: str, end: str) -> dict[str, float]:
     return rows
 
 
+def usd_validation(ticker: str) -> dict:
+    return {
+        "valid": True,
+        "ticker": ticker,
+        "quote": {"currency": "USD", "source_currency": "USD"},
+        "suggestions": [],
+    }
+
+
 def test_ledger_catchup_apply_and_undo_are_traceable_and_idempotent():
     db = make_db()
     ledger = DcaLedger(
         db,
-        ticker_validator=lambda ticker: {
-            "valid": True,
-            "ticker": ticker,
-            "suggestions": [],
-        },
+        ticker_validator=usd_validation,
         price_history_loader=closes,
         today=lambda: TODAY,
     )
@@ -93,7 +98,7 @@ def test_applied_contributions_block_plan_deletion_until_undone():
     db = make_db()
     ledger = DcaLedger(
         db,
-        ticker_validator=lambda ticker: {"valid": True, "ticker": ticker, "suggestions": []},
+        ticker_validator=usd_validation,
         price_history_loader=closes,
         today=lambda: TODAY,
     )
@@ -126,7 +131,7 @@ def test_foreign_currency_plan_is_rejected_before_any_persistence():
         ticker_validator=lambda ticker: {
             "valid": True,
             "ticker": ticker,
-            "quote": {"currency": "GBp"},
+            "quote": {"currency": "GBp", "source_currency": "GBp"},
             "suggestions": [],
         },
         price_history_loader=prices_must_not_load,
@@ -146,6 +151,39 @@ def test_foreign_currency_plan_is_rejected_before_any_persistence():
     assert db.query(DcaContribution).count() == 0
 
 
+def test_missing_source_currency_is_rejected_before_any_persistence():
+    db = make_db()
+
+    def prices_must_not_load(*_args):
+        raise AssertionError("ambiguous DCA must stop before contribution pricing")
+
+    ledger = DcaLedger(
+        db,
+        ticker_validator=lambda ticker: {
+            "valid": True,
+            "ticker": ticker,
+            # The display boundary may retain USD, but the provider supplied no
+            # currency. DCA must use the source fact and fail closed.
+            "quote": {"currency": "USD", "source_currency": None},
+            "suggestions": [],
+        },
+        price_history_loader=prices_must_not_load,
+        today=lambda: TODAY,
+    )
+
+    with pytest.raises(DcaValidationError, match="missing currency"):
+        ledger.create_plan(
+            portfolio_id=1,
+            ticker="UNKNOWN",
+            amount=50,
+            frequency="weekly",
+            start_date=TODAY.isoformat(),
+        )
+
+    assert db.query(DcaPlan).count() == 0
+    assert db.query(DcaContribution).count() == 0
+
+
 def test_explicit_usd_plan_preserves_domestic_creation_behavior():
     db = make_db()
     ledger = DcaLedger(
@@ -153,7 +191,7 @@ def test_explicit_usd_plan_preserves_domestic_creation_behavior():
         ticker_validator=lambda ticker: {
             "valid": True,
             "ticker": ticker,
-            "quote": {"currency": "USD"},
+            "quote": {"currency": "USD", "source_currency": "USD"},
             "suggestions": [],
         },
         price_history_loader=closes,
@@ -169,8 +207,14 @@ def test_explicit_usd_plan_preserves_domestic_creation_behavior():
     )
 
     assert result["buys_added"] == 1
-    assert db.query(DcaPlan).count() == 1
-    assert db.query(DcaContribution).count() == 1
+    plan = db.query(DcaPlan).one()
+    contribution = db.query(DcaContribution).one()
+    assert (plan.quote_currency, plan.quote_currency_source) == (
+        "USD", "ticker_validation"
+    )
+    assert (contribution.price_currency, contribution.price_currency_source) == (
+        "USD", "validated_plan"
+    )
 
 
 def test_unsafe_undo_preserves_holding_contribution_link_and_totals():
@@ -243,11 +287,7 @@ def test_apply_reuses_one_legacy_formatted_active_holding():
     db.commit()
     ledger = DcaLedger(
         db,
-        ticker_validator=lambda ticker: {
-            "valid": True,
-            "ticker": ticker,
-            "suggestions": [],
-        },
+        ticker_validator=usd_validation,
         price_history_loader=closes,
         today=lambda: TODAY,
     )
@@ -289,14 +329,110 @@ def _counting_loader():
 def _ledger_for(db, loader, today=TODAY):
     return DcaLedger(
         db,
-        ticker_validator=lambda ticker: {
-            "valid": True,
-            "ticker": ticker,
-            "suggestions": [],
-        },
+        ticker_validator=usd_validation,
         price_history_loader=loader,
         today=lambda: today,
     )
+
+
+@pytest.mark.parametrize(
+    ("currency", "source"),
+    [(None, "legacy_unknown"), ("GBp", "ticker_validation")],
+    ids=["legacy-ambiguous", "foreign"],
+)
+def test_single_apply_blocks_untrusted_pending_rows_without_mutation(currency, source):
+    db = make_db()
+    plan = DcaPlan(
+        portfolio_id=1, ticker="VOO", amount=50, frequency="weekly",
+        start_date=TODAY.isoformat(), quote_currency=currency,
+        quote_currency_source=source,
+    )
+    db.add(plan)
+    db.flush()
+    contribution = DcaContribution(
+        plan_id=plan.id, scheduled_date=TODAY.isoformat(),
+        exec_date=TODAY.isoformat(), price=100, shares=0.5, amount=50,
+        price_currency=currency,
+        price_currency_source=("legacy_unknown" if currency is None else "validated_plan"),
+    )
+    db.add(contribution)
+    db.commit()
+    holding = db.query(Holding).filter_by(portfolio_id=1, ticker="VOO").one()
+    before = (holding.shares, holding.avg_cost, holding.is_active)
+
+    with pytest.raises(DcaConflictError, match="left unchanged|No contributions"):
+        DcaLedger(db).apply_contribution(contribution.id)
+
+    db.refresh(holding)
+    db.refresh(contribution)
+    assert (holding.shares, holding.avg_cost, holding.is_active) == before
+    assert contribution.status == "pending"
+    assert contribution.applied_holding_id is None
+
+
+def test_bulk_apply_preflights_every_currency_fact_before_holding_mutation():
+    db = make_db()
+    plan = DcaPlan(
+        portfolio_id=1, ticker="VOO", amount=50, frequency="weekly",
+        start_date="2026-06-05", quote_currency="USD",
+        quote_currency_source="ticker_validation",
+    )
+    db.add(plan)
+    db.flush()
+    good = DcaContribution(
+        plan_id=plan.id, scheduled_date="2026-06-05", exec_date="2026-06-05",
+        price=100, shares=0.5, amount=50, price_currency="USD",
+        price_currency_source="validated_plan",
+    )
+    ambiguous = DcaContribution(
+        plan_id=plan.id, scheduled_date=TODAY.isoformat(),
+        exec_date=TODAY.isoformat(), price=100, shares=0.5, amount=50,
+        price_currency=None, price_currency_source="legacy_unknown",
+    )
+    db.add_all([good, ambiguous])
+    db.commit()
+    holding = db.query(Holding).filter_by(portfolio_id=1, ticker="VOO").one()
+    before = (holding.shares, holding.avg_cost, holding.is_active)
+
+    with pytest.raises(DcaConflictError, match="left unchanged"):
+        DcaLedger(db).apply_all_pending(plan.id)
+
+    db.refresh(holding)
+    assert (holding.shares, holding.avg_cost, holding.is_active) == before
+    assert {row.status for row in db.query(DcaContribution).all()} == {"pending"}
+    assert all(row.applied_holding_id is None for row in db.query(DcaContribution).all())
+
+
+@pytest.mark.parametrize(
+    ("currency", "source"),
+    [(None, "legacy_unknown"), ("GBp", "ticker_validation")],
+    ids=["legacy-ambiguous", "foreign"],
+)
+def test_catchup_preflights_all_plans_before_prices_or_rows(currency, source):
+    db = make_db()
+    db.add_all([
+        DcaPlan(
+            portfolio_id=1, ticker="VOO", amount=50, frequency="weekly",
+            start_date=TODAY.isoformat(), quote_currency="USD",
+            quote_currency_source="ticker_validation",
+        ),
+        DcaPlan(
+            portfolio_id=1, ticker="BAD", amount=50, frequency="weekly",
+            start_date=TODAY.isoformat(), quote_currency=currency,
+            quote_currency_source=source,
+        ),
+    ])
+    db.commit()
+
+    def prices_must_not_load(*_args):
+        raise AssertionError("batch currency preflight must precede every price read")
+
+    with pytest.raises(DcaConflictError, match="No contributions"):
+        DcaLedger(
+            db, price_history_loader=prices_must_not_load, today=lambda: TODAY
+        ).run_catchup(1)
+
+    assert db.query(DcaContribution).count() == 0
 
 
 def test_catchup_skips_the_price_fetch_when_every_buy_is_already_booked():

@@ -45,7 +45,9 @@ logger = logging.getLogger(__name__)
 # blocks legacy duplicates for explicit user resolution; it never auto-dedupes.
 # v8 adds realized sale currency and price provenance. Legacy currency remains
 # NULL and provenance is marked unknown, so no migration guesses a USD fact.
-SCHEMA_VERSION = 8
+# v9 adds DCA plan/contribution currency provenance. Legacy rows remain NULL and
+# unknown, so catch-up/apply fail closed without ticker-based currency inference.
+SCHEMA_VERSION = 9
 
 # Oldest app version whose ORM models can still read this schema. Additive-only
 # migrations (new tables/columns/indexes) keep this unchanged, so a normal
@@ -65,6 +67,8 @@ _USER_DATA_TABLES = (
     "verdict_snapshots",
     "portfolio_snapshots",
     "ai_summaries",
+    "dca_plans",
+    "dca_contributions",
 )
 
 

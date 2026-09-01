@@ -104,13 +104,15 @@ def test_portable_archive_has_deterministic_members_checksums_and_exclusions(db)
     ))
     plan = DcaPlan(
         portfolio_id=1, ticker="AAPL", amount=50, frequency="monthly",
-        start_date="2026-01-01", is_active=True,
+        start_date="2026-01-01", quote_currency="USD",
+        quote_currency_source="ticker_validation", is_active=True,
     )
     db.add(plan)
     db.flush()
     db.add(DcaContribution(
         plan_id=plan.id, scheduled_date="2026-01-01", exec_date="2026-01-02",
-        price=100, shares=0.5, amount=50, status="pending",
+        price=100, shares=0.5, amount=50, price_currency="USD",
+        price_currency_source="validated_plan", status="pending",
     ))
     db.add(RealizedTrade(
         portfolio_id=1, ticker="VOD.L", shares_sold=1,
@@ -132,7 +134,7 @@ def test_portable_archive_has_deterministic_members_checksums_and_exclusions(db)
             "manifest.json",
         ]
         manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["format_version"] == 1
+        assert manifest["format_version"] == 2
         assert manifest["portfolio_ids"] == [1]
         assert manifest["member_order"] == archive.namelist()
         assert manifest["row_count_semantics"] == "CSV data rows; header excluded."
@@ -144,8 +146,13 @@ def test_portable_archive_has_deterministic_members_checksums_and_exclusions(db)
             assert hashlib.sha256(archive.read(item["name"])).hexdigest() == item["sha256"]
         holdings = archive.read("holdings.csv").decode("utf-8-sig")
         assert "'=private thesis" in holdings
+        plans = _csv_rows(archive.read("dca_plans.csv"))
+        assert plans[0]["quote_currency"] == "USD"
+        assert plans[0]["quote_currency_source"] == "ticker_validation"
         contributions = _csv_rows(archive.read("dca_contributions.csv"))
         assert contributions[0]["portfolio_id"] == "1"
+        assert contributions[0]["price_currency"] == "USD"
+        assert contributions[0]["price_currency_source"] == "validated_plan"
         trades = _csv_rows(archive.read("realized_trades.csv"))
         assert trades[0]["sale_currency"] == "GBp"
         assert trades[0]["sale_price_source"] == "market_quote"

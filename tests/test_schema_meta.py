@@ -113,7 +113,7 @@ def test_v5_to_v6_adds_nullable_targets_idempotently_and_preserves_rows(file_db)
     assert tuple(row) == ("AAPL", 2.0, 100.0, None)
 
 
-def test_v7_to_v8_backs_up_then_marks_legacy_sale_currency_ambiguous(file_db):
+def test_v7_to_current_backs_up_then_marks_legacy_sale_currency_ambiguous(file_db):
     engine, _ = file_db
     from app import models
 
@@ -136,7 +136,7 @@ def test_v7_to_v8_backs_up_then_marks_legacy_sale_currency_ambiguous(file_db):
     second = schema_meta.apply_migrations_safely(engine)
 
     assert first.previous_schema_version == 7
-    assert first.schema_version == 8
+    assert first.schema_version == schema_meta.SCHEMA_VERSION
     assert first.backed_up is True
     assert second.ran_migration is False
     with engine.begin() as conn:
@@ -161,6 +161,73 @@ def test_v7_to_v8_backs_up_then_marks_legacy_sale_currency_ambiguous(file_db):
     assert "sale_currency" not in backup_columns
     assert "sale_price_source" not in backup_columns
     assert backup_row == ("VOD.L", 2.0, 100.0)
+
+
+def test_v8_to_v9_backs_up_then_marks_legacy_dca_currency_ambiguous(file_db):
+    engine, _ = file_db
+    from app import models
+
+    models.Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE dca_contributions DROP COLUMN price_currency_source"))
+        conn.execute(text("ALTER TABLE dca_contributions DROP COLUMN price_currency"))
+        conn.execute(text("ALTER TABLE dca_plans DROP COLUMN quote_currency_source"))
+        conn.execute(text("ALTER TABLE dca_plans DROP COLUMN quote_currency"))
+        conn.execute(text("INSERT INTO portfolios (name) VALUES ('Legacy DCA')"))
+        conn.execute(text(
+            "INSERT INTO dca_plans "
+            "(portfolio_id, ticker, amount, frequency, start_date, is_active) "
+            "VALUES (1, 'VOD.L', 50, 'weekly', '2026-06-05', 1)"
+        ))
+        conn.execute(text(
+            "INSERT INTO dca_contributions "
+            "(plan_id, scheduled_date, exec_date, price, shares, amount, status) "
+            "VALUES (1, '2026-06-05', '2026-06-05', 250, 0.2, 50, 'pending')"
+        ))
+        schema_meta._ensure_app_meta(conn)
+        schema_meta._write_meta(conn, "schema_version", "8")
+
+    first = schema_meta.apply_migrations_safely(engine)
+    second = schema_meta.apply_migrations_safely(engine)
+
+    assert first.previous_schema_version == 8
+    assert first.schema_version == schema_meta.SCHEMA_VERSION
+    assert first.backed_up is True
+    assert second.ran_migration is False
+    with engine.begin() as conn:
+        plan = conn.execute(text(
+            "SELECT ticker, quote_currency, quote_currency_source FROM dca_plans"
+        )).one()
+        contribution = conn.execute(text(
+            "SELECT price, price_currency, price_currency_source "
+            "FROM dca_contributions"
+        )).one()
+    assert tuple(plan) == ("VOD.L", None, "legacy_unknown")
+    assert tuple(contribution) == (250.0, None, "legacy_unknown")
+
+    backup = sqlite3.connect(first.backup_path)
+    try:
+        plan_columns = {
+            item[1] for item in backup.execute("PRAGMA table_info(dca_plans)")
+        }
+        contribution_columns = {
+            item[1]
+            for item in backup.execute("PRAGMA table_info(dca_contributions)")
+        }
+        plan_row = backup.execute(
+            "SELECT ticker, amount, frequency, start_date FROM dca_plans"
+        ).fetchone()
+        contribution_row = backup.execute(
+            "SELECT price, shares, amount, status FROM dca_contributions"
+        ).fetchone()
+    finally:
+        backup.close()
+    assert "quote_currency" not in plan_columns
+    assert "quote_currency_source" not in plan_columns
+    assert "price_currency" not in contribution_columns
+    assert "price_currency_source" not in contribution_columns
+    assert plan_row == ("VOD.L", 50.0, "weekly", "2026-06-05")
+    assert contribution_row == (250.0, 0.2, 50.0, "pending")
 
 
 def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):

@@ -285,6 +285,10 @@ def get_stock_data(ticker: str) -> dict:
                 pass
 
         dividend_rate, dividend_yield = _normalized_dividend(info, current_price)
+        raw_currency = info.get("currency")
+        source_currency = (
+            str(raw_currency).strip() if raw_currency is not None else None
+        ) or None
         result = {
             "ticker": ticker.upper(),
             "name": info.get("longName") or info.get("shortName") or ticker,
@@ -324,7 +328,11 @@ def get_stock_data(ticker: str) -> dict:
             "dividend_yield": _round_or_none(dividend_yield, 5),
             "dividend_rate": _round_or_none(dividend_rate, 4),
             "ex_dividend_date": _ex_dividend_date(info),
-            "currency": info.get("currency") or "USD",
+            # Keep the historic quote-display fallback, but retain whether the
+            # provider actually supplied a currency. Persistence boundaries such
+            # as DCA must use source_currency and fail closed when it is absent.
+            "currency": source_currency or "USD",
+            "source_currency": source_currency,
             "sector": info.get("sector") or info.get("categoryName") or "N/A",
             "quote_type": info.get("quoteType") or "EQUITY",
             "security_type": security_type,
@@ -381,6 +389,10 @@ def get_fast_quote(ticker: str) -> dict:
         year_low = _fast_float(fast.get("year_low"))
         security_type = classify_security(ticker, None).value
 
+        raw_currency = fast.get("currency")
+        source_currency = (
+            str(raw_currency).strip() if raw_currency is not None else None
+        ) or None
         result = {
             "ticker": ticker,
             "name": ticker,
@@ -422,7 +434,8 @@ def get_fast_quote(ticker: str) -> dict:
             "dividend_yield": None,
             "dividend_rate": None,
             "ex_dividend_date": None,
-            "currency": str(fast.get("currency") or "USD"),
+            "currency": source_currency or "USD",
+            "source_currency": source_currency,
             "sector": "N/A",
             "quote_type": "ETF" if security_type == "ETF" else "EQUITY",
             "security_type": security_type,

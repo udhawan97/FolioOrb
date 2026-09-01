@@ -70,7 +70,12 @@ def client(db, monkeypatch):
     monkeypatch.setattr(
         dca_router,
         "validate_ticker_symbol",
-        lambda t, **k: {"valid": True, "ticker": t, "suggestions": []},
+        lambda t, **k: {
+            "valid": True,
+            "ticker": t,
+            "quote": {"currency": "USD", "source_currency": "USD"},
+            "suggestions": [],
+        },
     )
     monkeypatch.setattr(dca_router, "get_daily_closes", _fake_closes)
     monkeypatch.setattr(dca_router, "date", _FixedDate)
@@ -333,7 +338,8 @@ def test_catchup_respects_floor(client, db):
     # A plan whose floor sits after its start must only book from the floor
     # onward — the pre-floor (paused) intervals are never retroactively bought.
     db.add(DcaPlan(portfolio_id=1, ticker="VOO", amount=50.0, frequency="weekly",
-                   start_date="2026-05-13", catchup_floor="2026-06-05", is_active=True))
+                   start_date="2026-05-13", catchup_floor="2026-06-05", is_active=True,
+                   quote_currency="USD", quote_currency_source="ticker_validation"))
     db.commit()
     assert client.post("/api/dca/run").status_code == 200
     rows = client.get("/api/dca/contributions?status=pending").json()["contributions"]

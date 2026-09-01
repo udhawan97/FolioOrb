@@ -459,6 +459,8 @@ def test_import_racing_dca_apply_uses_one_active_holding(tmp_path, monkeypatch):
             amount=50,
             frequency="weekly",
             start_date="2026-08-21",
+            quote_currency="USD",
+            quote_currency_source="ticker_validation",
         )
         db.add(plan)
         db.flush()
@@ -469,6 +471,8 @@ def test_import_racing_dca_apply_uses_one_active_holding(tmp_path, monkeypatch):
             price=100,
             shares=0.5,
             amount=50,
+            price_currency="USD",
+            price_currency_source="validated_plan",
         )
         db.add(contribution)
         db.commit()

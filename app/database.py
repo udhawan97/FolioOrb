@@ -110,6 +110,17 @@ def ensure_startup_migrations(target_engine=None):
         _ensure_startup_migrations_on_connection(conn)
 
 
+def _add_column_if_missing(
+    conn: Connection,
+    columns: set[str],
+    column: str,
+    statement: str,
+) -> None:
+    """Run one fixed additive migration only when its table already exists."""
+    if columns and column not in columns:
+        conn.execute(text(statement))
+
+
 def _ensure_startup_migrations_on_connection(conn: Connection) -> None:
     """Apply the idempotent migration SQL inside the caller's transaction."""
     columns = {
@@ -154,6 +165,42 @@ def _ensure_startup_migrations_on_connection(conn: Connection) -> None:
         conn.execute(
             text("ALTER TABLE dca_plans ADD COLUMN catchup_floor VARCHAR(10)")
         )
+
+    # v9: DCA prices may enter dollar-labelled holdings only when the provider
+    # currency was explicit and persisted. Legacy rows stay ambiguous: no ticker
+    # inference or retroactive USD guess is made by this migration.
+    _add_column_if_missing(
+        conn,
+        dca_plan_cols,
+        "quote_currency",
+        "ALTER TABLE dca_plans ADD COLUMN quote_currency VARCHAR(10)",
+    )
+    _add_column_if_missing(
+        conn,
+        dca_plan_cols,
+        "quote_currency_source",
+        "ALTER TABLE dca_plans ADD COLUMN quote_currency_source "
+        "VARCHAR(30) NOT NULL DEFAULT 'legacy_unknown'",
+    )
+    dca_contribution_cols = {
+        row[1]
+        for row in conn.execute(
+            text("PRAGMA table_info(dca_contributions)")
+        ).fetchall()
+    }
+    _add_column_if_missing(
+        conn,
+        dca_contribution_cols,
+        "price_currency",
+        "ALTER TABLE dca_contributions ADD COLUMN price_currency VARCHAR(10)",
+    )
+    _add_column_if_missing(
+        conn,
+        dca_contribution_cols,
+        "price_currency_source",
+        "ALTER TABLE dca_contributions ADD COLUMN price_currency_source "
+        "VARCHAR(30) NOT NULL DEFAULT 'legacy_unknown'",
+    )
 
     # v8: retain realized-sale currency and price provenance. Existing rows
     # remain explicitly ambiguous; neither migration nor ORM guesses USD.
