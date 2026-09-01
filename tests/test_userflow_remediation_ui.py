@@ -186,6 +186,8 @@ def test_dca_action_dialog_traps_focus_and_restores_the_manager():
 def test_dca_delete_explains_and_surfaces_applied_buy_conflicts():
     delete = _function("handleAction", "hideBackfillConfirm", DCA)
     assert "Undo every applied buy before deleting this plan" in delete
-    assert 'typeof data.detail === "string" ? data.detail' in delete
-    assert "if (!response.ok)" in delete
-    assert 'notify(`${ticker} plan deleted`, "success")' in delete
+    assert 'failureMessage: "Could not delete plan"' in delete
+    assert "classify: deleteTransition(planId)" in delete
+    assert 'successMessage: `${ticker} plan deleted`' in delete
+    assert "function detailMessage" in DCA
+    assert "if (response.status >= 500)" in DCA

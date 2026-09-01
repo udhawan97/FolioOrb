@@ -38,7 +38,7 @@ def _call(operation: Callable, *args, **kwargs):
 @router.post("/plans")
 def create_plan(
     data: DcaPlanCreate,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Create a DCA plan and backfill past buys into the pending bucket."""
@@ -62,7 +62,7 @@ def list_plans(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def update_plan(
     plan_id: int,
     data: DcaPlanUpdate,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Pause, resume, or resize a DCA plan."""
@@ -79,7 +79,7 @@ def update_plan(
 @router.delete("/plans/{plan_id}")
 def delete_plan(
     plan_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Delete a plan only when its bucket has no applied buys."""
@@ -93,7 +93,10 @@ def delete_plan(
 
 
 @router.post("/run")
-def run_catchup(portfolio_id: int = 1, db: Session = Depends(get_db)):
+def run_catchup(
+    portfolio_id: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+):
     """Fill every active plan's missing scheduled buys idempotently."""
     return _call(_ledger(db).run_catchup, portfolio_id)
 
@@ -117,7 +120,7 @@ def list_contributions(
 @router.post("/contributions/{contribution_id}/apply")
 def apply_contribution(
     contribution_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Apply one pending buy to its Portfolio holding."""
@@ -131,7 +134,7 @@ def apply_contribution(
 @router.post("/plans/{plan_id}/apply-pending")
 def apply_all_pending(
     plan_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Apply every pending buy in a plan."""
@@ -145,7 +148,7 @@ def apply_all_pending(
 @router.post("/contributions/{contribution_id}/skip")
 def skip_contribution(
     contribution_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Dismiss one pending buy without mutating a holding."""
@@ -159,7 +162,7 @@ def skip_contribution(
 @router.post("/plans/{plan_id}/skip-pending")
 def skip_all_pending(
     plan_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Dismiss every pending buy in a plan."""
@@ -173,7 +176,7 @@ def skip_all_pending(
 @router.post("/contributions/{contribution_id}/restore")
 def restore_contribution(
     contribution_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Return one dismissed buy to pending."""
@@ -187,7 +190,7 @@ def restore_contribution(
 @router.post("/contributions/{contribution_id}/undo")
 def undo_contribution(
     contribution_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Reverse one applied buy exactly and return it to pending."""
@@ -201,7 +204,7 @@ def undo_contribution(
 @router.post("/plans/{plan_id}/undo-applied")
 def undo_all_applied(
     plan_id: int,
-    portfolio_id: int = 1,
+    portfolio_id: int = Query(..., gt=0),
     db: Session = Depends(get_db),
 ):
     """Reverse every applied buy in a plan."""

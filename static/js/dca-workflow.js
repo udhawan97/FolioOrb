@@ -81,43 +81,35 @@
     }
 
     async function runCatchup() {
-        try {
-            const response = await workspace.response("/api/dca/run", { method: "POST" });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                notify(
-                    typeof data.detail === "string" ? data.detail : "DCA catch-up failed",
-                    "danger",
-                );
-                return;
-            }
-            const blocked = (data.plans || []).filter(
-                plan => plan.status === "needs_currency"
+        const data = await mutate(
+            "/api/dca/run",
+            { method: "POST" },
+            { failureMessage: "DCA catch-up failed" },
+        );
+        if (!data) return;
+        const blocked = (data.plans || []).filter(
+            plan => plan.status === "needs_currency"
+        );
+        if (blocked.length) {
+            notify(
+                `Currency verification required for ${blocked.map(plan => plan.ticker).join(", ")} — review the plan in Manage → DCA`,
+                "warning",
             );
-            if (blocked.length) {
-                notify(
-                    `Currency verification required for ${blocked.map(plan => plan.ticker).join(", ")} — review the plan in Manage → DCA`,
-                    "warning",
-                );
-            }
-            const unpriced = (data.plans || []).filter(plan => plan.price_data === false);
-            if (unpriced.length) {
-                notify(
-                    `Couldn't fetch prices for ${unpriced.map(plan => plan.ticker).join(", ")} — DCA buys not booked yet`,
-                    "warning",
-                );
-            }
-            if (data.buys_added > 0) {
-                notify(
-                    `${data.buys_added} DCA buy${data.buys_added === 1 ? "" : "s"} ready to review in Manage → DCA`,
-                    "info",
-                );
-            }
-            updateBadge();
-        } catch (error) {
-            log.warn("DCA catch-up failed:", error);
-            notify("DCA catch-up failed — is the app online?", "danger");
         }
+        const unpriced = (data.plans || []).filter(plan => plan.price_data === false);
+        if (unpriced.length) {
+            notify(
+                `Couldn't fetch prices for ${unpriced.map(plan => plan.ticker).join(", ")} — DCA buys not booked yet`,
+                "warning",
+            );
+        }
+        if (data.buys_added > 0) {
+            notify(
+                `${data.buys_added} DCA buy${data.buys_added === 1 ? "" : "s"} ready to review in Manage → DCA`,
+                "info",
+            );
+        }
+        updateBadge();
     }
 
     async function updateBadge() {
@@ -392,24 +384,151 @@
         document.addEventListener("keydown", handleDialogKeydown, true);
     }
 
-    async function post(path, successMessage) {
+    async function readCanonicalDca() {
+        workspace.invalidate?.();
+        const [plansPayload, contributionsPayload] = await Promise.all([
+            workspace.json("/api/dca/plans"),
+            workspace.json("/api/dca/contributions?status=all"),
+        ]);
+        return {
+            plans: plansPayload.plans || [],
+            contributions: contributionsPayload.contributions || [],
+        };
+    }
+
+    function contributionTransition(id, before, after) {
+        return state => {
+            const contribution = state.contributions.find(row => Number(row.id) === id);
+            if (!contribution) return "unknown";
+            if (contribution.status === after) return "committed";
+            if (contribution.status === before) return "unchanged";
+            return "unknown";
+        };
+    }
+
+    function planPatchTransition(id, before, after) {
+        const matches = (plan, expected) => Object.entries(expected).every(
+            ([key, value]) => typeof value === "number"
+                ? Number(plan[key]) === value
+                : plan[key] === value
+        );
+        return state => {
+            const plan = state.plans.find(row => Number(row.id) === id);
+            if (!plan) return "unknown";
+            if (matches(plan, after)) return "committed";
+            if (matches(plan, before)) return "unchanged";
+            return "unknown";
+        };
+    }
+
+    function bulkTransition(id, counter, beforeCount) {
+        return state => {
+            const plan = state.plans.find(row => Number(row.id) === id);
+            if (!plan) return "unknown";
+            const count = Number(plan[counter]);
+            if (count === 0) return "committed";
+            if (count === beforeCount) return "unchanged";
+            return "unknown";
+        };
+    }
+
+    function deleteTransition(id) {
+        return state => state.plans.some(row => Number(row.id) === id)
+            ? "unchanged"
+            : "committed";
+    }
+
+    function createTransition(payload) {
+        return state => state.plans.some(plan => (
+            plan.ticker === payload.ticker
+            && Number(plan.amount) === Number(payload.amount)
+            && plan.frequency === payload.frequency
+            && plan.start_date === payload.start_date
+        )) ? "committed" : "unchanged";
+    }
+
+    async function reconcileMutation(classify, { holdings = false } = {}) {
+        let state;
+        try {
+            state = await readCanonicalDca();
+        } catch (error) {
+            log.warn("DCA reconciliation failed:", error);
+            notify(
+                "DCA result is unknown — reconnect and refresh before retrying",
+                "warning",
+            );
+            return "unknown";
+        }
+        let outcome = "unknown";
+        try {
+            outcome = classify?.(state) || "unknown";
+        } catch (error) {
+            log.warn("DCA reconciliation could not classify saved state:", error);
+        }
+        try {
+            if (holdings) await afterHoldingsChange();
+            else await loadPanel();
+        } catch (error) {
+            log.warn("DCA reconciliation UI refresh failed:", error);
+        }
+        const messages = {
+            committed: ["DCA action completed — refreshed from saved state", "success"],
+            unchanged: ["DCA action did not complete — saved state is unchanged", "warning"],
+            unknown: [
+                "DCA result is still unknown — review the refreshed state before retrying",
+                "warning",
+            ],
+        };
+        notify(...messages[outcome]);
+        return outcome;
+    }
+
+    function detailMessage(data, fallback) {
+        const detail = data?.detail;
+        if (typeof detail === "string") return detail;
+        if (detail?.message) return detail.message;
+        if (Array.isArray(detail)) {
+            return detail.map(item => item?.msg || String(item)).join("; ") || fallback;
+        }
+        return fallback;
+    }
+
+    async function mutate(path, init, {
+        successMessage = "",
+        failureMessage = "DCA action failed",
+        classify = null,
+        holdings = false,
+    } = {}) {
         if (mutationInFlight) return null;
         mutationInFlight = true;
         try {
-            const response = await workspace.response(path, { method: "POST" });
-            const data = await response.json().catch(() => ({}));
+            const response = await workspace.response(path, init);
+            const data = await response.json().catch(() => null);
             if (!response.ok) {
-                notify(typeof data.detail === "string" ? data.detail : "DCA action failed", "danger");
+                if (response.status >= 500) {
+                    await reconcileMutation(classify, { holdings });
+                } else {
+                    notify(detailMessage(data, failureMessage), "danger");
+                }
+                return null;
+            }
+            if (data === null) {
+                await reconcileMutation(classify, { holdings });
                 return null;
             }
             if (successMessage) notify(successMessage, "success");
             return data;
-        } catch (_) {
-            notify("DCA action failed — is the app online?", "danger");
+        } catch (error) {
+            log.warn("DCA mutation response was lost:", error);
+            await reconcileMutation(classify, { holdings });
             return null;
         } finally {
             mutationInFlight = false;
         }
+    }
+
+    function post(path, options = {}) {
+        return mutate(path, { method: "POST" }, options);
     }
 
     async function afterHoldingsChange() {
@@ -417,20 +536,22 @@
         await holdingsChanged();
     }
 
-    async function patchPlan(id, payload, successMessage) {
-        try {
-            const response = await workspace.response(`/api/dca/plans/${id}`, {
+    async function patchPlan(id, payload, successMessage, before) {
+        const data = await mutate(
+            `/api/dca/plans/${id}`,
+            {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
-            });
-            if (response.ok) {
-                notify(successMessage, "success");
-                loadPanel();
-            }
-        } catch (_) {
-            notify("Could not update plan", "danger");
-        }
+            },
+            {
+                successMessage,
+                failureMessage: "Could not update plan",
+                classify: planPatchTransition(id, before, payload),
+            },
+        );
+        if (data) await loadPanel();
+        return data;
     }
 
     async function handleAction(event) {
@@ -445,7 +566,10 @@
         const count = Number(button.dataset.count);
 
         if (action === "apply") {
-            const data = await post(`/api/dca/contributions/${id}/apply`);
+            const data = await post(`/api/dca/contributions/${id}/apply`, {
+                classify: contributionTransition(id, "pending", "applied"),
+                holdings: true,
+            });
             if (data) {
                 notify(data.message || "Buy applied", "success");
                 await afterHoldingsChange();
@@ -455,13 +579,19 @@
         if (action === "skip") {
             const data = await post(
                 `/api/dca/contributions/${id}/skip`,
-                "Buy skipped — plan still active (pause it in Plans if needed)",
+                {
+                    successMessage: "Buy skipped — plan still active (pause it in Plans if needed)",
+                    classify: contributionTransition(id, "pending", "dismissed"),
+                },
             );
             if (data) loadPanel();
             return data;
         }
         if (action === "undo") {
-            const data = await post(`/api/dca/contributions/${id}/undo`);
+            const data = await post(`/api/dca/contributions/${id}/undo`, {
+                classify: contributionTransition(id, "applied", "pending"),
+                holdings: true,
+            });
             if (data) {
                 notify(data.message || "Buy undone", "success");
                 await afterHoldingsChange();
@@ -471,7 +601,11 @@
         }
         if (action === "restore") {
             const data = await post(
-                `/api/dca/contributions/${id}/restore`, "Buy restored to pending"
+                `/api/dca/contributions/${id}/restore`,
+                {
+                    successMessage: "Buy restored to pending",
+                    classify: contributionTransition(id, "dismissed", "pending"),
+                },
             );
             if (data) {
                 loadPanel();
@@ -483,11 +617,14 @@
             const choice = await openDialog({
                 title: `Apply ${count} ${ticker} buys?`,
                 copy: `${formatMoney(Number(button.dataset.total))} will be added to your holding using the recorded closes.`,
-                warning: "You can reverse these later with “Undo applied”.",
+                warning: "Undo is available only while the linked holding still contains these shares and basis; later sales or edits can block reversal.",
                 confirmLabel: "Apply all buys",
             });
             if (!choice?.confirmed) return null;
-            const data = await post(`/api/dca/plans/${planId}/apply-pending`);
+            const data = await post(`/api/dca/plans/${planId}/apply-pending`, {
+                classify: bulkTransition(planId, "pending_count", count),
+                holdings: true,
+            });
             if (data) {
                 notify(`Applied ${data.applied} buys to ${data.ticker}`, "success");
                 await afterHoldingsChange();
@@ -503,7 +640,9 @@
                 danger: true,
             });
             if (!choice?.confirmed) return null;
-            const data = await post(`/api/dca/plans/${planId}/skip-pending`);
+            const data = await post(`/api/dca/plans/${planId}/skip-pending`, {
+                classify: bulkTransition(planId, "pending_count", count),
+            });
             if (data) {
                 notify(`Skipped ${data.skipped} buys for ${data.ticker}`, "success");
                 loadPanel();
@@ -518,7 +657,10 @@
                 confirmLabel: "Undo applied buys",
             });
             if (!choice?.confirmed) return null;
-            const data = await post(`/api/dca/plans/${planId}/undo-applied`);
+            const data = await post(`/api/dca/plans/${planId}/undo-applied`, {
+                classify: bulkTransition(planId, "applied_count", count),
+                holdings: true,
+            });
             if (data) {
                 notify(`Reversed ${data.undone} buys for ${data.ticker}`, "success");
                 await afterHoldingsChange();
@@ -527,12 +669,14 @@
             return data;
         }
         if (action === "toggle-plan") {
+            const wasActive = button.dataset.active === "true";
             return patchPlan(
                 planId,
-                { is_active: button.dataset.active !== "true" },
-                button.dataset.active === "true"
+                { is_active: !wasActive },
+                wasActive
                     ? "Plan paused — no new buys will book"
                     : "Plan resumed",
+                { is_active: wasActive },
             );
         }
         if (action === "edit-plan") {
@@ -543,7 +687,12 @@
                 value: Number(button.dataset.amount),
             });
             if (choice?.confirmed) {
-                return patchPlan(planId, { amount: choice.value }, "Plan amount updated");
+                return patchPlan(
+                    planId,
+                    { amount: choice.value },
+                    "Plan amount updated",
+                    { amount: Number(button.dataset.amount) },
+                );
             }
             return null;
         }
@@ -556,21 +705,19 @@
                 danger: true,
             });
             if (!choice?.confirmed) return null;
-            try {
-                const response = await workspace.response(`/api/dca/plans/${planId}`, {
+            const data = await mutate(
+                `/api/dca/plans/${planId}`,
+                {
                     method: "DELETE",
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    notify(typeof data.detail === "string" ? data.detail : "Could not delete plan", "danger");
-                    return null;
-                }
-                notify(`${ticker} plan deleted`, "success");
-                loadPanel();
-                return data;
-            } catch (_) {
-                notify("Could not delete plan — is the app online?", "danger");
-            }
+                },
+                {
+                    successMessage: `${ticker} plan deleted`,
+                    failureMessage: "Could not delete plan",
+                    classify: deleteTransition(planId),
+                },
+            );
+            if (data) await loadPanel();
+            return data;
         }
         return null;
     }
@@ -620,22 +767,19 @@
         const button = byId("dca-create-btn");
         button.disabled = true;
         try {
-            const response = await workspace.response("/api/dca/plans", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                const detail = data.detail;
-                notify(
-                    typeof detail === "string"
-                        ? detail
-                        : detail?.message || detail?.[0]?.msg || "Could not create plan",
-                    "danger",
-                );
-                return;
-            }
+            const data = await mutate(
+                "/api/dca/plans",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                },
+                {
+                    failureMessage: "Could not create plan",
+                    classify: createTransition(payload),
+                },
+            );
+            if (!data) return;
             byId("dca-create-form").reset();
             formDefaults();
             notify(
@@ -645,8 +789,6 @@
                 "success",
             );
             loadPanel();
-        } catch (_) {
-            notify("Could not create plan — is the app online?", "danger");
         } finally {
             button.disabled = false;
         }

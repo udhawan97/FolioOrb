@@ -625,7 +625,7 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
-    def _reverse(self, contribution: DcaContribution) -> str | None:
+    def _reverse(self, contribution: DcaContribution) -> None:
         # Scoped by the plan's portfolio, mirroring `_apply`. `applied_holding_id`
         # is a bare integer with no foreign key, so resolving it by primary key
         # alone let an undo rewrite a holding owned by a different portfolio.
@@ -638,33 +638,31 @@ class DcaLedger:
             if contribution.applied_holding_id
             else None
         )
-        note = None
         if holding is None:
-            # Covers both "the holding was deleted" and "it belongs to another
-            # portfolio", so the wording does not assert it no longer exists.
-            note = (
-                "No matching holding in this portfolio; buy returned to pending "
-                "without changing holdings."
+            # Missing and foreign links are both integrity failures: clearing the
+            # ledger would make a later re-apply duplicate shares or basis.
+            raise DcaConflictError(
+                "This buy cannot be safely undone because its linked holding is "
+                "not available in this portfolio. The holding and DCA ledger "
+                "were left unchanged."
             )
-        else:
-            try:
-                new_shares, new_avg = dca_service.undo_from_holding(
-                    holding.shares or 0.0,
-                    holding.avg_cost or 0.0,
-                    contribution.shares,
-                    contribution.amount,
-                )
-            except ValueError as exc:
-                raise DcaConflictError(
-                    "This buy cannot be safely undone after later holding changes. "
-                    "The holding and DCA ledger were left unchanged."
-                ) from exc
-            holding.shares, holding.avg_cost = new_shares, new_avg
-            if holding.shares <= _ZERO_EPS:
-                holding.is_active = False
+        try:
+            new_shares, new_avg = dca_service.undo_from_holding(
+                holding.shares or 0.0,
+                holding.avg_cost or 0.0,
+                contribution.shares,
+                contribution.amount,
+            )
+        except ValueError as exc:
+            raise DcaConflictError(
+                "This buy cannot be safely undone after later holding changes. "
+                "The holding and DCA ledger were left unchanged."
+            ) from exc
+        holding.shares, holding.avg_cost = new_shares, new_avg
+        if holding.shares <= _ZERO_EPS:
+            holding.is_active = False
         contribution.status = "pending"
         contribution.applied_holding_id = None
-        return note
 
     def undo_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
         contribution = self._contribution(
@@ -672,10 +670,10 @@ class DcaLedger:
         )
         if contribution.status != "applied":
             raise DcaConflictError("Only applied buys can be undone")
-        note = self._reverse(contribution)
+        self._reverse(contribution)
         self.db.commit()
         return {
-            "message": note or "Buy undone",
+            "message": "Buy undone",
             "contribution": self._contribution_dict(contribution),
         }
 

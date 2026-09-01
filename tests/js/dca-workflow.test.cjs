@@ -102,6 +102,7 @@ test("one mutation in flight blocks a double apply", async () => {
 
 test("cancelling a bulk action sends no mutation", async () => {
     let mutations = 0;
+    let prompt = null;
     const workflow = createDcaWorkflow({
         workspace: emptyWorkspace({
             response: async () => {
@@ -110,7 +111,7 @@ test("cancelling a bulk action sends no mutation", async () => {
             },
         }),
         document: fakeDocument(),
-        confirmAction: async () => null,
+        confirmAction: async value => { prompt = value; return null; },
     });
 
     const result = await workflow.handleAction(actionEvent({
@@ -123,6 +124,7 @@ test("cancelling a bulk action sends no mutation", async () => {
 
     assert.equal(result, null);
     assert.equal(mutations, 0);
+    assert.match(prompt.warning, /later sales or edits can block reversal/);
 });
 
 test("failed action reports the error without refreshing holdings", async () => {
@@ -216,7 +218,7 @@ test("catch-up HTTP failure is reported instead of silently swallowed", async ()
     assert.deepEqual(messages[0], ["Catch-up unavailable", "danger"]);
 });
 
-test("catch-up network failure is reported instead of silently swallowed", async () => {
+test("catch-up response loss refreshes state and reports an unknown outcome", async () => {
     const messages = [];
     const workflow = createDcaWorkflow({
         workspace: emptyWorkspace({
@@ -229,5 +231,165 @@ test("catch-up network failure is reported instead of silently swallowed", async
     workflow.init();
     await new Promise(resolve => setImmediate(resolve));
 
-    assert.deepEqual(messages[0], ["DCA catch-up failed — is the app online?", "danger"]);
+    assert.deepEqual(messages[0], [
+        "DCA result is still unknown — review the refreshed state before retrying",
+        "warning",
+    ]);
+});
+
+test("lost apply response reconciles a committed contribution and holdings", async () => {
+    const messages = [];
+    let holdingsRefreshes = 0;
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => {
+                if (url.includes("plans")) return { plans: [] };
+                if (url.includes("status=all")) {
+                    return { contributions: [{ id: 3, status: "applied" }] };
+                }
+                return { contributions: [] };
+            },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+        holdingsChanged: async () => { holdingsRefreshes += 1; },
+    });
+
+    const result = await workflow.handleAction(
+        actionEvent({ dcaAction: "apply", cid: "3" })
+    );
+
+    assert.equal(result, null);
+    assert.equal(holdingsRefreshes, 1);
+    assert.deepEqual(messages.at(-1), [
+        "DCA action completed — refreshed from saved state",
+        "success",
+    ]);
+});
+
+test("lost apply response reports a proven unchanged contribution", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => {
+                if (url.includes("plans")) return { plans: [] };
+                if (url.includes("status=all")) {
+                    return { contributions: [{ id: 3, status: "pending" }] };
+                }
+                return { contributions: [] };
+            },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+    });
+
+    await workflow.handleAction(actionEvent({ dcaAction: "apply", cid: "3" }));
+
+    assert.deepEqual(messages.at(-1), [
+        "DCA action did not complete — saved state is unchanged",
+        "warning",
+    ]);
+});
+
+test("lost bulk-apply response reconciles the plan counters and holdings", async () => {
+    const messages = [];
+    let holdingsRefreshes = 0;
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => url.includes("plans")
+                ? { plans: [{ id: 7, pending_count: 0, applied_count: 2 }] }
+                : { contributions: [] },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+        holdingsChanged: async () => { holdingsRefreshes += 1; },
+        confirmAction: async () => ({ confirmed: true }),
+    });
+
+    await workflow.handleAction(actionEvent({
+        dcaAction: "apply-all",
+        planId: "7",
+        count: "2",
+        total: "100",
+        ticker: "VOO",
+    }));
+
+    assert.equal(holdingsRefreshes, 1);
+    assert.deepEqual(messages.at(-1), [
+        "DCA action completed — refreshed from saved state",
+        "success",
+    ]);
+});
+
+test("lost patch response reconciles the saved plan state", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => url.includes("plans")
+                ? { plans: [{ id: 7, is_active: false }] }
+                : { contributions: [] },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+    });
+
+    await workflow.handleAction(actionEvent({
+        dcaAction: "toggle-plan",
+        planId: "7",
+        active: "true",
+    }));
+
+    assert.deepEqual(messages.at(-1), [
+        "DCA action completed — refreshed from saved state",
+        "success",
+    ]);
+});
+
+test("lost delete response reconciles an absent plan as committed", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => url.includes("plans")
+                ? { plans: [] }
+                : { contributions: [] },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+        confirmAction: async () => ({ confirmed: true }),
+    });
+
+    await workflow.handleAction(actionEvent({
+        dcaAction: "delete-plan",
+        planId: "7",
+        ticker: "VOO",
+    }));
+
+    assert.deepEqual(messages.at(-1), [
+        "DCA action completed — refreshed from saved state",
+        "success",
+    ]);
+});
+
+test("failed reconciliation keeps a lost mutation outcome unknown", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async () => { throw new Error("still offline"); },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+    });
+
+    await workflow.handleAction(actionEvent({ dcaAction: "apply", cid: "3" }));
+
+    assert.deepEqual(messages.at(-1), [
+        "DCA result is unknown — reconnect and refresh before retrying",
+        "warning",
+    ]);
 });

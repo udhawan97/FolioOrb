@@ -14,12 +14,15 @@ integer column with no foreign key and no portfolio of its own, so whenever it
 points outside the plan's portfolio the undo silently rewrote a stranger's
 shares and could deactivate it.
 
-The buy is still returned to pending either way — an undo must never strand a
-contribution in ``applied`` because its holding could not be found.
+The operation must fail atomically when the linked holding is unavailable. If
+the contribution were cleared to pending, a later apply could duplicate shares
+or basis while the original holding mutation remains unreversed.
 """
 
+import pytest
+
 from app.models import DcaContribution, DcaPlan, Holding, Portfolio
-from app.services.dca_ledger import DcaLedger
+from app.services.dca_ledger import DcaConflictError, DcaLedger
 
 
 def _seed_cross_portfolio_contribution(db):
@@ -61,7 +64,8 @@ def test_undo_does_not_touch_a_holding_in_another_portfolio(db):
     contribution, stranger = _seed_cross_portfolio_contribution(db)
     before_shares, before_cost = stranger.shares, stranger.avg_cost
 
-    DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
+    with pytest.raises(DcaConflictError, match="left unchanged"):
+        DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(stranger)
     assert stranger.shares == before_shares, (
@@ -71,18 +75,29 @@ def test_undo_does_not_touch_a_holding_in_another_portfolio(db):
     assert stranger.is_active is True
 
 
-def test_undo_still_returns_the_buy_to_pending(db):
+def test_undo_keeps_the_buy_applied_when_the_linked_holding_is_foreign(db):
     contribution, _stranger = _seed_cross_portfolio_contribution(db)
 
-    result = DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
+    with pytest.raises(DcaConflictError, match="not available in this portfolio"):
+        DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(contribution)
-    assert contribution.status == "pending"
-    assert contribution.applied_holding_id is None
-    # The caller is told the holding could not be reversed rather than being
-    # given a silent success. The wording must not claim the holding no longer
-    # exists — in this case it exists and was deliberately left alone.
-    assert "No matching holding in this portfolio" in result["message"]
+    assert contribution.status == "applied"
+    assert contribution.applied_holding_id is not None
+
+
+def test_undo_keeps_the_buy_applied_when_the_linked_holding_is_missing(db):
+    contribution, stranger = _seed_cross_portfolio_contribution(db)
+    linked_id = stranger.id
+    db.delete(stranger)
+    db.commit()
+
+    with pytest.raises(DcaConflictError, match="not available in this portfolio"):
+        DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
+
+    db.refresh(contribution)
+    assert contribution.status == "applied"
+    assert contribution.applied_holding_id == linked_id
 
 
 def test_undo_still_reverses_a_holding_in_the_plans_own_portfolio(db):
