@@ -57,6 +57,8 @@ if _IS_SQLITE:
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA busy_timeout=5000")
             cursor.execute("PRAGMA synchronous=NORMAL")
+            # Enforce declared ownership links at the database boundary too.
+            cursor.execute("PRAGMA foreign_keys=ON")
         finally:
             cursor.close()
 

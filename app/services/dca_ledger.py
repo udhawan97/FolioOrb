@@ -297,7 +297,41 @@ class DcaLedger:
             day >= floor and day.isoformat() not in existing for day in intended
         )
 
-    def _catch_up(self, plan: DcaPlan, today: date) -> tuple[int, bool]:
+    @staticmethod
+    def _catch_up_fingerprint(plan: DcaPlan) -> tuple:
+        """Facts that must still match after price discovery completes."""
+        return (
+            plan.ticker,
+            float(plan.amount),
+            plan.frequency,
+            plan.start_date,
+            plan.catchup_floor,
+            plan.quote_currency,
+            plan.quote_currency_source,
+            bool(plan.is_active),
+        )
+
+    def _catch_up_needs_prices(self, plan: DcaPlan, today: date) -> bool:
+        """Preview whether catch-up needs an external price-history request."""
+        start = date.fromisoformat(plan.start_date)
+        if start > today:
+            return False
+        existing = {
+            row[0]
+            for row in self.db.query(DcaContribution.scheduled_date)
+            .filter(DcaContribution.plan_id == plan.id)
+            .all()
+        }
+        floor = date.fromisoformat(plan.catchup_floor) if plan.catchup_floor else start
+        return self._has_unbooked_dates(plan, start, today, existing, floor)
+
+    def _catch_up(
+        self,
+        plan: DcaPlan,
+        today: date,
+        closes: dict[str, float] | None,
+    ) -> tuple[int, bool]:
+        """Persist due buys using prices fetched before the writer reservation."""
         self._require_trusted_plan(plan)
         start = date.fromisoformat(plan.start_date)
         if start > today:
@@ -314,9 +348,6 @@ class DcaLedger:
             # window would be the plan's whole history, so not fetching it is
             # the difference between a no-op and years of daily bars per plan.
             return 0, True
-        closes = self._price_history_loader(
-            plan.ticker, plan.start_date, today.isoformat()
-        )
         if not closes:
             return 0, False
         computed = dca_service.plan_contributions(
@@ -357,6 +388,9 @@ class DcaLedger:
         start_date: str,
     ) -> dict:
         """Create a validated plan and backfill due buys atomically."""
+        # Local ownership and duplicate previews avoid unnecessary provider work.
+        # Neither preview authorizes the write; both are repeated after reserving
+        # SQLite's sole writer below.
         portfolio_lifecycle.require_portfolio(self.db, portfolio_id)
         duplicate = (
             self.db.query(DcaPlan)
@@ -413,12 +447,53 @@ class DcaLedger:
             quote_currency_source=_PLAN_CURRENCY_SOURCE,
             is_active=True,
         )
-        self.db.add(plan)
-        self.db.flush()
-        added, _ = self._catch_up(plan, self._today())
-        self.db.commit()
-        self.db.refresh(plan)
-        return {"plan": self._plan_summary(plan), "buys_added": added}
+        today = self._today()
+        needs_prices = (
+            date.fromisoformat(start_date) <= today
+            and self._has_unbooked_dates(
+                plan,
+                date.fromisoformat(start_date),
+                today,
+                set(),
+                date.fromisoformat(start_date),
+            )
+        )
+        # End discovery reads before waiting on a provider or a writer lock.
+        self.db.rollback()
+        closes = (
+            self._price_history_loader(ticker, start_date, today.isoformat())
+            if needs_prices
+            else None
+        )
+
+        write_serialization.begin_financial_write(self.db)
+        try:
+            portfolio_lifecycle.require_portfolio(self.db, portfolio_id)
+            duplicate = (
+                self.db.query(DcaPlan)
+                .filter(
+                    DcaPlan.portfolio_id == portfolio_id,
+                    DcaPlan.ticker == ticker,
+                    DcaPlan.frequency == frequency,
+                    DcaPlan.amount == amount,
+                    DcaPlan.is_active.is_(True),
+                )
+                .first()
+            )
+            if duplicate:
+                raise DcaConflictError(
+                    f"You already have an active {frequency} ${amount:g} "
+                    f"{ticker} plan."
+                )
+            self.db.add(plan)
+            self.db.flush()
+            added, _ = self._catch_up(plan, today, closes)
+            self.db.commit()
+            self.db.refresh(plan)
+            return {"plan": self._plan_summary(plan), "buys_added": added}
+        except Exception:
+            self.db.rollback()
+            raise
 
     def list_plans(self, portfolio_id: int) -> list[dict]:
         portfolio_lifecycle.require_portfolio(self.db, portfolio_id)
@@ -430,6 +505,7 @@ class DcaLedger:
         )
         return [self._plan_summary(plan) for plan in plans]
 
+    @_serialized_write
     def update_plan(
         self,
         plan_id: int,
@@ -471,51 +547,106 @@ class DcaLedger:
         return f"DCA plan for {ticker} deleted"
 
     def run_catchup(self, portfolio_id: int) -> dict:
+        """Discover prices outside the lock, then revalidate and persist once."""
         portfolio_lifecycle.require_portfolio(self.db, portfolio_id)
-        plans = (
+        preview_plans = (
             self.db.query(DcaPlan)
             .filter(DcaPlan.portfolio_id == portfolio_id, DcaPlan.is_active.is_(True))
             .all()
         )
-        results = []
-        total = 0
-        blocked = 0
         today = self._today()
-        for plan in plans:
-            # Legacy and foreign-currency plans remain fail-closed, but their
-            # migration state is local to the plan. One such row must not prevent
-            # an unrelated, explicitly verified USD plan from catching up.
-            if not self._plan_has_trusted_usd(plan):
-                blocked += 1
+        previews = {}
+        for plan in preview_plans:
+            trusted = self._plan_has_trusted_usd(plan)
+            previews[plan.id] = {
+                "fingerprint": self._catch_up_fingerprint(plan),
+                "load": trusted and self._catch_up_needs_prices(plan, today),
+                "ticker": plan.ticker,
+                "start_date": plan.start_date,
+            }
+        self.db.rollback()
+
+        for preview in previews.values():
+            preview["closes"] = (
+                self._price_history_loader(
+                    preview["ticker"], preview["start_date"], today.isoformat()
+                )
+                if preview["load"]
+                else None
+            )
+
+        write_serialization.begin_financial_write(self.db)
+        try:
+            portfolio_lifecycle.require_portfolio(self.db, portfolio_id)
+            plans = (
+                self.db.query(DcaPlan)
+                .filter(
+                    DcaPlan.portfolio_id == portfolio_id,
+                    DcaPlan.is_active.is_(True),
+                )
+                .all()
+            )
+            results = []
+            total = 0
+            blocked = 0
+            for plan in plans:
+                preview = previews.get(plan.id)
+                if (
+                    preview is None
+                    or preview["fingerprint"] != self._catch_up_fingerprint(plan)
+                ):
+                    blocked += 1
+                    results.append(
+                        {
+                            "plan_id": plan.id,
+                            "ticker": plan.ticker,
+                            "buys_added": 0,
+                            "price_data": None,
+                            "status": "changed",
+                            "message": (
+                                "This plan changed while prices were loading. "
+                                "No buys were added; run catch-up again."
+                            ),
+                        }
+                    )
+                    continue
+                # Legacy and foreign-currency plans remain fail-closed, but their
+                # migration state is local to the plan. One such row must not prevent
+                # an unrelated, explicitly verified USD plan from catching up.
+                if not self._plan_has_trusted_usd(plan):
+                    blocked += 1
+                    results.append(
+                        {
+                            "plan_id": plan.id,
+                            "ticker": plan.ticker,
+                            "buys_added": 0,
+                            "price_data": None,
+                            "status": "needs_currency",
+                            "message": self._untrusted_plan_message(plan),
+                        }
+                    )
+                    continue
+                added, priced = self._catch_up(plan, today, preview["closes"])
+                total += added
                 results.append(
                     {
                         "plan_id": plan.id,
                         "ticker": plan.ticker,
-                        "buys_added": 0,
-                        "price_data": None,
-                        "status": "needs_currency",
-                        "message": self._untrusted_plan_message(plan),
+                        "buys_added": added,
+                        "price_data": priced,
+                        "status": "ready" if priced else "price_unavailable",
                     }
                 )
-                continue
-            added, priced = self._catch_up(plan, today)
-            total += added
-            results.append(
-                {
-                    "plan_id": plan.id,
-                    "ticker": plan.ticker,
-                    "buys_added": added,
-                    "price_data": priced,
-                    "status": "ready" if priced else "price_unavailable",
-                }
-            )
-        self.db.commit()
-        return {
-            "buys_added": total,
-            "plans_checked": len(plans),
-            "plans_blocked": blocked,
-            "plans": results,
-        }
+            self.db.commit()
+            return {
+                "buys_added": total,
+                "plans_checked": len(plans),
+                "plans_blocked": blocked,
+                "plans": results,
+            }
+        except Exception:
+            self.db.rollback()
+            raise
 
     def list_contributions(self, portfolio_id: int, status: str = "pending") -> list[dict]:
         portfolio_lifecycle.require_portfolio(self.db, portfolio_id)

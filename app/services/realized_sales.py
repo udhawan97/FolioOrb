@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from functools import wraps
 import logging
 import math
 from typing import Callable
@@ -16,7 +17,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import Holding, RealizedTrade
-from app.services import financial_currency, portfolio_valuation
+from app.services import financial_currency, portfolio_valuation, write_serialization
 from app.services.stock_service import get_stock_data
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,20 @@ ValuationQuoteLoader = Callable[[list[str]], list[dict]]
 SALE_SOURCE_LEGACY_UNKNOWN = financial_currency.LEGACY_UNKNOWN_PROVENANCE
 SALE_SOURCE_MANUAL_ENTRY = "manual_entry"
 SALE_SOURCE_MARKET_QUOTE = "market_quote"
+
+
+def _serialized_write(method):
+    """Read and mutate one realized-sale fact under SQLite's writer lock."""
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        write_serialization.begin_financial_write(self.db)
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            self.db.rollback()
+            raise
+
+    return guarded
 
 
 @dataclass(frozen=True)
@@ -185,6 +200,7 @@ class RealizedSaleLedger:
                 portfolio_valuation.discard_today_snapshot(self.db, self.portfolio_id)
         self.db.commit()
 
+    @_serialized_write
     def correct(self, trade_id: int, changes: SaleCorrection) -> RealizedTrade:
         """Correct one owned sale and re-derive gain plus today's snapshot."""
         trade = self._owned_trade(trade_id)
@@ -209,6 +225,7 @@ class RealizedSaleLedger:
         self._commit_with_today_snapshot()
         return trade
 
+    @_serialized_write
     def remove(self, trade_id: int) -> str:
         """Remove one owned sale and commit today's consistent derived state."""
         trade = self._owned_trade(trade_id)

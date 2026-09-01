@@ -537,30 +537,35 @@ def _prefetch_reduction_quote(
 def _require_editable_holding(
     db: Session, holding: Holding, data: HoldingUpdate
 ) -> None:
-    """Keep archived owned positions immutable after their sale is recorded.
+    """Keep owned-position archives on the realized-sale path.
 
     A removed watchlist row has no sale history, so it may be restored by one
-    explicit state-only request. Owned positions must be added as a new holding
-    after a sale instead of reviving or reducing archived shares behind the
-    realized ledger.
+    explicit state-only request. Active owned positions cannot be archived by a
+    state-only update, and removed owned positions cannot be revived or edited.
     """
-    if holding.is_active:
-        return
-    watchlist_reactivation = bool(
+    state_only_watchlist_change = bool(
         holding.is_watchlist
-        and data.is_active is True
         and data.model_fields_set == {"is_active"}
     )
-    if watchlist_reactivation:
+    if state_only_watchlist_change:
         return
+    if holding.is_active and data.is_active is not False:
+        return
+    removal_required = holding.is_active and data.is_active is False
     db.rollback()
     raise HTTPException(
         status_code=409,
         detail={
-            "code": "holding_archived",
+            "code": (
+                "holding_removal_required"
+                if removal_required
+                else "holding_archived"
+            ),
             "message": (
-                "This holding has already been removed and cannot be edited or "
-                "sold again. Add a new holding for a new owned position."
+                "Owned holdings must be reduced or removed through the sale "
+                "workflow so realized history stays complete. Archived owned "
+                "positions cannot be edited or sold again; add a new holding "
+                "for a new owned position."
             ),
         },
     )
