@@ -86,7 +86,9 @@ for the underlying numbers.
 
 Open the portfolio manager (press **M**) and choose **DCA** to mirror a recurring buy without
 connecting a brokerage. Each due interval waits in a local review bucket until you apply or
-skip it; applied buys can be undone exactly.
+skip it. Applied buys can be undone exactly only while their linked holding still contains
+the recorded shares and basis; later sales or edits can block reversal, leaving both the
+holding and DCA ledger unchanged.
 
 Bulk apply, undo, skip, amount changes, and plan deletion use FolioOrb dialogs rather than
 browser-native prompts. Each dialog states what changes and what stays, keeps keyboard focus

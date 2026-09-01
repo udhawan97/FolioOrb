@@ -21,7 +21,11 @@ from app.services import (
     holdings_repository,
     portfolio_lifecycle,
 )
-from app.services.stock_service import get_daily_closes, validate_ticker_symbol
+from app.services.stock_service import (
+    get_daily_closes,
+    normalize_ticker,
+    validate_ticker_symbol,
+)
 
 TickerValidator = Callable[[str], dict]
 PriceHistoryLoader = Callable[[str, str, str], dict[str, float]]
@@ -638,13 +642,18 @@ class DcaLedger:
             if contribution.applied_holding_id
             else None
         )
-        if holding is None:
-            # Missing and foreign links are both integrity failures: clearing the
-            # ledger would make a later re-apply duplicate shares or basis.
+        if (
+            holding is None
+            or normalize_ticker(holding.ticker)
+            != normalize_ticker(contribution.plan.ticker)
+        ):
+            # Missing, foreign, and wrong-ticker links are integrity failures:
+            # clearing the ledger would make a later re-apply duplicate shares
+            # or basis while mutating the wrong position is worse.
             raise DcaConflictError(
                 "This buy cannot be safely undone because its linked holding is "
-                "not available in this portfolio. The holding and DCA ledger "
-                "were left unchanged."
+                "not the matching position in this portfolio. The holding and "
+                "DCA ledger were left unchanged."
             )
         try:
             new_shares, new_avg = dca_service.undo_from_holding(

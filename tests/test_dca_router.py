@@ -256,7 +256,7 @@ def test_id_mutations_require_a_known_portfolio(client, db, case, query, expecte
 
 
 @pytest.mark.parametrize(
-    "path, payload",
+    "request_case",
     [
         (
             "/api/dca/plans",
@@ -272,13 +272,15 @@ def test_id_mutations_require_a_known_portfolio(client, db, case, query, expecte
     ids=["create-plan", "run-catchup"],
 )
 @pytest.mark.parametrize(
-    "query, expected_status",
+    "ownership_case",
     [("", 422), ("?portfolio_id=999", 404)],
     ids=["missing-portfolio", "unknown-portfolio"],
 )
 def test_other_dca_writes_require_a_known_portfolio(
-    client, db, path, payload, query, expected_status
+    client, db, request_case, ownership_case
 ):
+    path, payload = request_case
+    query, expected_status = ownership_case
     response = client.post(f"{path}{query}", json=payload)
 
     assert response.status_code == expected_status

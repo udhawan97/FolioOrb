@@ -78,7 +78,7 @@ def test_undo_does_not_touch_a_holding_in_another_portfolio(db):
 def test_undo_keeps_the_buy_applied_when_the_linked_holding_is_foreign(db):
     contribution, _stranger = _seed_cross_portfolio_contribution(db)
 
-    with pytest.raises(DcaConflictError, match="not available in this portfolio"):
+    with pytest.raises(DcaConflictError, match="not the matching position"):
         DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(contribution)
@@ -92,12 +92,50 @@ def test_undo_keeps_the_buy_applied_when_the_linked_holding_is_missing(db):
     db.delete(stranger)
     db.commit()
 
-    with pytest.raises(DcaConflictError, match="not available in this portfolio"):
+    with pytest.raises(DcaConflictError, match="not the matching position"):
         DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(contribution)
     assert contribution.status == "applied"
     assert contribution.applied_holding_id == linked_id
+
+
+def test_undo_rejects_a_wrong_ticker_holding_in_the_same_portfolio(db):
+    wrong = Holding(
+        portfolio_id=1, ticker="MSFT", shares=12.0, avg_cost=100.0,
+        is_watchlist=False,
+    )
+    db.add(wrong)
+    plan = DcaPlan(
+        portfolio_id=1,
+        ticker="AAPL",
+        amount=100.0,
+        frequency="monthly",
+        start_date="2026-01-01",
+    )
+    db.add(plan)
+    db.flush()
+    contribution = DcaContribution(
+        plan_id=plan.id,
+        scheduled_date="2026-01-01",
+        exec_date="2026-01-02",
+        price=50.0,
+        shares=2.0,
+        amount=100.0,
+        status="applied",
+        applied_holding_id=wrong.id,
+    )
+    db.add(contribution)
+    db.commit()
+
+    with pytest.raises(DcaConflictError, match="not the matching position"):
+        DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
+
+    db.refresh(wrong)
+    db.refresh(contribution)
+    assert (wrong.shares, wrong.avg_cost, wrong.is_active) == (12.0, 100.0, True)
+    assert contribution.status == "applied"
+    assert contribution.applied_holding_id == wrong.id
 
 
 def test_undo_still_reverses_a_holding_in_the_plans_own_portfolio(db):

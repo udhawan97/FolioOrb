@@ -25,6 +25,10 @@ function fakeDocument() {
         ["dca-pending-list", element()],
         ["dca-badge", element()],
         ["dca-history-list", element({ hidden: true })],
+        ["dca-create-btn", element({ disabled: false })],
+        ["dca-create-form", element({ reset() {} })],
+        ["dca-start-date", element({ value: "", max: "" })],
+        ["dca-frequency", element({ value: "weekly" })],
     ]);
     return {
         elements,
@@ -118,6 +122,7 @@ test("cancelling a bulk action sends no mutation", async () => {
         dcaAction: "apply-all",
         planId: "7",
         count: "2",
+        cids: "10,11",
         total: "50",
         ticker: "AAPL",
     }));
@@ -301,7 +306,10 @@ test("lost bulk-apply response reconciles the plan counters and holdings", async
             response: async () => { throw new Error("response lost"); },
             json: async url => url.includes("plans")
                 ? { plans: [{ id: 7, pending_count: 0, applied_count: 2 }] }
-                : { contributions: [] },
+                : { contributions: [
+                    { id: 10, status: "applied" },
+                    { id: 11, status: "applied" },
+                ] },
         }),
         document: fakeDocument(),
         notify: (...args) => messages.push(args),
@@ -313,6 +321,7 @@ test("lost bulk-apply response reconciles the plan counters and holdings", async
         dcaAction: "apply-all",
         planId: "7",
         count: "2",
+        cids: "10,11",
         total: "100",
         ticker: "VOO",
     }));
@@ -322,6 +331,124 @@ test("lost bulk-apply response reconciles the plan counters and holdings", async
         "DCA action completed — refreshed from saved state",
         "success",
     ]);
+});
+
+test("lost apply-all response does not confuse skipped buys with a commit", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => url.includes("plans")
+                ? { plans: [{ id: 7, pending_count: 0, applied_count: 0 }] }
+                : { contributions: [
+                    { id: 10, status: "dismissed" },
+                    { id: 11, status: "dismissed" },
+                ] },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+        confirmAction: async () => ({ confirmed: true }),
+    });
+
+    await workflow.handleAction(actionEvent({
+        dcaAction: "apply-all",
+        planId: "7",
+        count: "2",
+        cids: "10,11",
+        total: "100",
+        ticker: "VOO",
+    }));
+
+    assert.deepEqual(messages.at(-1), [
+        "DCA result is still unknown — review the refreshed state before retrying",
+        "warning",
+    ]);
+});
+
+test("lost skip-all response requires every targeted buy to be dismissed", async () => {
+    const messages = [];
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => url.includes("plans")
+                ? { plans: [{ id: 7, pending_count: 0, applied_count: 0 }] }
+                : { contributions: [
+                    { id: 10, status: "dismissed" },
+                    { id: 11, status: "dismissed" },
+                ] },
+        }),
+        document: fakeDocument(),
+        notify: (...args) => messages.push(args),
+        confirmAction: async () => ({ confirmed: true }),
+    });
+
+    await workflow.handleAction(actionEvent({
+        dcaAction: "skip-all",
+        planId: "7",
+        count: "2",
+        cids: "10,11",
+        ticker: "VOO",
+    }));
+
+    assert.deepEqual(messages.at(-1), [
+        "DCA action completed — refreshed from saved state",
+        "success",
+    ]);
+});
+
+test("lost create response remains unknown even when a matching plan exists", async () => {
+    const messages = [];
+    const document = fakeDocument();
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace({
+            response: async () => { throw new Error("response lost"); },
+            json: async url => url.includes("plans")
+                ? { plans: [{
+                    id: 7,
+                    ticker: "VOO",
+                    amount: 50,
+                    frequency: "weekly",
+                    start_date: "2026-06-12",
+                    is_active: false,
+                    applied_count: 0,
+                }] }
+                : { contributions: [] },
+        }),
+        document,
+        notify: (...args) => messages.push(args),
+    });
+
+    await workflow.submitPlan({
+        ticker: "VOO",
+        amount: 50,
+        frequency: "weekly",
+        start_date: "2026-06-12",
+    });
+
+    assert.equal(document.elements.get("dca-create-btn").disabled, false);
+    assert.deepEqual(messages.at(-1), [
+        "DCA result is still unknown — review the refreshed state before retrying",
+        "warning",
+    ]);
+});
+
+test("bulk undo copy does not guarantee reversal after later holding changes", async () => {
+    let prompt = null;
+    const workflow = createDcaWorkflow({
+        workspace: emptyWorkspace(),
+        document: fakeDocument(),
+        confirmAction: async value => { prompt = value; return null; },
+    });
+
+    await workflow.handleAction(actionEvent({
+        dcaAction: "undo-all",
+        planId: "7",
+        count: "2",
+        ticker: "VOO",
+    }));
+
+    assert.match(prompt.copy, /only if the linked holding still contains them/);
+    assert.match(prompt.copy, /stops without changing/);
 });
 
 test("lost patch response reconciles the saved plan state", async () => {

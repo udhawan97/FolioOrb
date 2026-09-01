@@ -215,6 +215,7 @@
             const ticker = plan?.ticker || buys[0].ticker || "?";
             const terms = plan ? `${formatMoney(plan.amount)} ${escape(plan.frequency)}` : "";
             const total = buys.reduce((sum, contribution) => sum + contribution.amount, 0);
+            const contributionIds = buys.map(contribution => contribution.id).join(",");
             const cap = 15;
             const rows = buys.slice(0, cap).map(contribution => buyRow(
                 contribution,
@@ -225,8 +226,8 @@
                 : "");
             const bulk = buys.length > 1 ? `
                 <span class="dca-bulk-actions">
-                    ${needsCurrency ? "" : `<button type="button" class="btn btn-sm btn-link dca-bulk-link" data-dca-action="apply-all" data-plan-id="${planId}" data-count="${buys.length}" data-total="${total}" data-ticker="${escape(ticker)}">Apply all ${buys.length}</button>`}
-                    <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" data-dca-action="skip-all" data-plan-id="${planId}" data-count="${buys.length}" data-ticker="${escape(ticker)}">Skip all</button>
+                    ${needsCurrency ? "" : `<button type="button" class="btn btn-sm btn-link dca-bulk-link" data-dca-action="apply-all" data-plan-id="${planId}" data-count="${buys.length}" data-cids="${contributionIds}" data-total="${total}" data-ticker="${escape(ticker)}">Apply all ${buys.length}</button>`}
+                    <button type="button" class="btn btn-sm btn-link dca-bulk-link dca-bulk-skip" data-dca-action="skip-all" data-plan-id="${planId}" data-count="${buys.length}" data-cids="${contributionIds}" data-ticker="${escape(ticker)}">Skip all</button>
                 </span>` : "";
             const blockedNotice = needsCurrency
                 ? '<span class="dca-group-count">Currency verification required — Apply is unavailable.</span>'
@@ -421,7 +422,7 @@
         };
     }
 
-    function bulkTransition(id, counter, beforeCount) {
+    function bulkCounterTransition(id, counter, beforeCount) {
         return state => {
             const plan = state.plans.find(row => Number(row.id) === id);
             if (!plan) return "unknown";
@@ -432,19 +433,23 @@
         };
     }
 
+    function contributionSetTransition(ids, before, after) {
+        return state => {
+            if (!ids.length) return "unknown";
+            const byId = new Map(
+                state.contributions.map(row => [Number(row.id), row.status])
+            );
+            const statuses = ids.map(id => byId.get(id));
+            if (statuses.every(status => status === after)) return "committed";
+            if (statuses.every(status => status === before)) return "unchanged";
+            return "unknown";
+        };
+    }
+
     function deleteTransition(id) {
         return state => state.plans.some(row => Number(row.id) === id)
             ? "unchanged"
             : "committed";
-    }
-
-    function createTransition(payload) {
-        return state => state.plans.some(plan => (
-            plan.ticker === payload.ticker
-            && Number(plan.amount) === Number(payload.amount)
-            && plan.frequency === payload.frequency
-            && plan.start_date === payload.start_date
-        )) ? "committed" : "unchanged";
     }
 
     async function reconcileMutation(classify, { holdings = false } = {}) {
@@ -564,6 +569,10 @@
         const planId = Number(button.dataset.planId);
         const ticker = button.dataset.ticker || "";
         const count = Number(button.dataset.count);
+        const contributionIds = (button.dataset.cids || "")
+            .split(",")
+            .map(value => Number(value))
+            .filter(Number.isFinite);
 
         if (action === "apply") {
             const data = await post(`/api/dca/contributions/${id}/apply`, {
@@ -622,7 +631,9 @@
             });
             if (!choice?.confirmed) return null;
             const data = await post(`/api/dca/plans/${planId}/apply-pending`, {
-                classify: bulkTransition(planId, "pending_count", count),
+                classify: contributionSetTransition(
+                    contributionIds, "pending", "applied"
+                ),
                 holdings: true,
             });
             if (data) {
@@ -641,7 +652,9 @@
             });
             if (!choice?.confirmed) return null;
             const data = await post(`/api/dca/plans/${planId}/skip-pending`, {
-                classify: bulkTransition(planId, "pending_count", count),
+                classify: contributionSetTransition(
+                    contributionIds, "pending", "dismissed"
+                ),
             });
             if (data) {
                 notify(`Skipped ${data.skipped} buys for ${data.ticker}`, "success");
@@ -652,13 +665,13 @@
         if (action === "undo-all") {
             const choice = await openDialog({
                 title: `Undo ${count} applied ${ticker} buys?`,
-                copy: "Your holding’s shares and average cost will roll back exactly.",
+                copy: "FolioOrb will reverse the recorded shares and basis only if the linked holding still contains them; otherwise this action stops without changing the holding or DCA ledger.",
                 warning: "The buys return to the pending bucket and can be reviewed again.",
                 confirmLabel: "Undo applied buys",
             });
             if (!choice?.confirmed) return null;
             const data = await post(`/api/dca/plans/${planId}/undo-applied`, {
-                classify: bulkTransition(planId, "applied_count", count),
+                classify: bulkCounterTransition(planId, "applied_count", count),
                 holdings: true,
             });
             if (data) {
@@ -776,7 +789,6 @@
                 },
                 {
                     failureMessage: "Could not create plan",
-                    classify: createTransition(payload),
                 },
             );
             if (!data) return;
@@ -813,5 +825,5 @@
 
     // The browser exposes only open(); the factory returns its lifecycle/action
     // seams so runtime tests can exercise behavior without a browser framework.
-    return { open, init, handleAction };
+    return { open, init, handleAction, submitPlan };
 });
