@@ -313,6 +313,7 @@ def test_report_labels_value_change_as_cash_flow_affected(db):
         RealizedTrade(
             portfolio_id=1, ticker="AAPL", shares_sold=1, sale_price=140,
             avg_cost=100, realized_gain=40, created_at=datetime.now(),
+            sale_currency="USD", sale_price_source="market_quote",
         ),
     ])
     db.commit()

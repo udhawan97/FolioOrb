@@ -58,6 +58,8 @@ def add_trade(db, ticker, shares_sold, sale_price, avg_cost):
             sale_price=sale_price,
             avg_cost=avg_cost,
             realized_gain=(sale_price - avg_cost) * shares_sold,
+            sale_currency="USD",
+            sale_price_source="manual_entry",
         )
     )
     db.commit()
@@ -70,6 +72,7 @@ def quote(ticker, price, day_change=0.0, day_change_pct=0.0):
         "current_price": price,
         "day_change": day_change,
         "day_change_pct": day_change_pct,
+        "currency": "USD",
     }
 
 

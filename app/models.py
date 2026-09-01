@@ -89,8 +89,9 @@ class AISummary(Base):
 class RealizedTrade(Base):
     """
     A realized gain/loss event, recorded whenever a holding's share count is
-    reduced (a sell). The sale price is the live market price at update time.
-    Summing realized_gain across all rows gives cumulative realized P&L.
+    reduced (a sell). Currency and price provenance determine whether the fact
+    may participate in USD totals; legacy and non-USD rows stay in the ledger
+    but are excluded from dollar aggregates.
     """
     __tablename__ = "realized_trades"
     # Realized stats are read per portfolio and grouped by ticker.
@@ -105,6 +106,14 @@ class RealizedTrade(Base):
     sale_price = Column(Float, nullable=False)      # Live price at the time of the reduction
     avg_cost = Column(Float, nullable=False)        # Cost basis per share at the time
     realized_gain = Column(Float, nullable=False)   # (sale_price - avg_cost) * shares_sold
+    # Nullable by design: pre-v8 rows cannot be truthfully inferred as USD.
+    sale_currency = Column(String(10), nullable=True)
+    sale_price_source = Column(
+        String(30),
+        nullable=False,
+        default="legacy_unknown",
+        server_default="legacy_unknown",
+    )
     created_at = Column(DateTime, default=func.now())
 
 

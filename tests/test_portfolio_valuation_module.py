@@ -102,6 +102,8 @@ def test_total_return_pct_includes_open_and_realized_cost_basis():
             sale_price=120,
             avg_cost=100,
             realized_gain=100,
+            sale_currency="USD",
+            sale_price_source="manual_entry",
         )
     )
     db.commit()
@@ -129,6 +131,8 @@ def test_performance_history_reports_realized_ledger_and_daily_snapshots():
                 sale_price=150,
                 avg_cost=100,
                 realized_gain=50,
+                sale_currency="USD",
+                sale_price_source="market_quote",
             ),
             RealizedTrade(
                 portfolio_id=1,
@@ -137,6 +141,8 @@ def test_performance_history_reports_realized_ledger_and_daily_snapshots():
                 sale_price=110,
                 avg_cost=100,
                 realized_gain=30,
+                sale_currency="USD",
+                sale_price_source="manual_entry",
             ),
             PortfolioSnapshot(
                 portfolio_id=1,
@@ -164,4 +170,62 @@ def test_performance_history_reports_realized_ledger_and_daily_snapshots():
             "realized_gain": 80.0,
             "total_return": 100.0,
         }
+    ]
+
+
+def test_foreign_and_ambiguous_sales_never_enter_usd_returns_or_history():
+    db = _db()
+    db.add(Holding(portfolio_id=1, ticker="MIX", shares=5, avg_cost=100))
+    db.add_all(
+        [
+            RealizedTrade(
+                portfolio_id=1, ticker="MIX", shares_sold=5,
+                sale_price=120, avg_cost=100, realized_gain=100,
+                sale_currency="USD", sale_price_source="market_quote",
+            ),
+            RealizedTrade(
+                portfolio_id=1, ticker="MIX", shares_sold=5,
+                sale_price=140, avg_cost=100, realized_gain=200,
+                sale_currency="GBp", sale_price_source="market_quote",
+            ),
+            RealizedTrade(
+                portfolio_id=1, ticker="MIX", shares_sold=5,
+                sale_price=160, avg_cost=100, realized_gain=300,
+            ),
+            RealizedTrade(
+                portfolio_id=1, ticker="MIX", shares_sold=5,
+                sale_price=180, avg_cost=100, realized_gain=400,
+                sale_currency="USD", sale_price_source="legacy_unknown",
+            ),
+            PortfolioSnapshot(
+                portfolio_id=1, snapshot_date="2026-07-14", total_value=500,
+                total_cost_basis=500, unrealized_gain=100,
+                realized_gain=1000, total_return=1100,
+            ),
+        ]
+    )
+    db.commit()
+
+    valuation = portfolio_valuation.evaluate(
+        db, 1, quote_loader=lambda _tickers: [_quote("MIX", 120)],
+        record_snapshot=True,
+    )
+
+    assert valuation.realized_gain == 100
+    assert valuation.total_return_cost_basis == 1000
+    assert valuation.total_return == 200
+    assert valuation.total_return_pct == 20
+    assert valuation.excluded_realized_trade_count == 3
+    assert valuation.realized_data_quality == "partial"
+    assert valuation.data_quality == "partial"
+    assert valuation.snapshot_recorded is False
+
+    performance = portfolio_valuation.load_performance(db, 1)
+    assert performance.realized_gain == 100
+    assert [trade["realized_gain"] for trade in performance.trades] == [100]
+    assert performance.excluded_realized_trade_count == 3
+    assert performance.realized_data_quality == "partial"
+    assert not performance.history
+    assert portfolio_valuation.snapshot_history(db, 1) == [
+        {"date": "2026-07-14", "total_value": 500.0}
     ]

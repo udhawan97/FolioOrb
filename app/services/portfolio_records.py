@@ -25,6 +25,7 @@ from app.models import (
     RealizedTrade,
 )
 from app.schema_meta import SCHEMA_VERSION
+from app.services import financial_currency
 from app.services.holdings_csv import escape_csv_cell
 from app.version import __version__
 
@@ -32,8 +33,8 @@ EXPORT_FORMAT_VERSION = 1
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MIN_RECAP_YEAR = 1900
 RECAP_LIMITATION = (
-    "Average-cost recap only; not a tax form. Excludes lots, fees, holding periods, "
-    "wash sales, and tax classification."
+    "Average-cost recap only; not a tax form. Excludes non-USD or ambiguous sales, "
+    "lots, fees, holding periods, wash sales, and tax classification."
 )
 
 
@@ -96,7 +97,13 @@ def build_realized_recap_csv(
         raise ValueError("Portfolio not found")
     trades = (
         db.query(RealizedTrade)
-        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .filter(
+            RealizedTrade.portfolio_id == portfolio_id,
+            financial_currency.trusted_reporting_fact_clause(
+                RealizedTrade.sale_currency,
+                RealizedTrade.sale_price_source,
+            ),
+        )
         .order_by(RealizedTrade.created_at.asc(), RealizedTrade.id.asc())
         .all()
     )
@@ -216,11 +223,14 @@ def _model_rows(db: Session) -> list[tuple[str, tuple[str, ...], list[dict]]]:
         } for row in holdings]),
         ("realized_trades.csv", (
             "id", "portfolio_id", "ticker", "shares_sold", "sale_price",
-            "avg_cost", "realized_gain", "created_at_utc",
+            "avg_cost", "realized_gain", "sale_currency", "sale_price_source",
+            "created_at_utc",
         ), [{
             "id": row.id, "portfolio_id": row.portfolio_id, "ticker": row.ticker,
             "shares_sold": row.shares_sold, "sale_price": row.sale_price,
             "avg_cost": row.avg_cost, "realized_gain": row.realized_gain,
+            "sale_currency": row.sale_currency,
+            "sale_price_source": row.sale_price_source,
             "created_at_utc": _utc_text(row.created_at),
         } for row in trades]),
         ("portfolio_snapshots.csv", (

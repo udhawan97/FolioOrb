@@ -43,7 +43,9 @@ logger = logging.getLogger(__name__)
 # nullable, and ignored by older binaries, so rollback compatibility is unchanged.
 # v7 enforces one active row per (portfolio_id, ticker). A read-only preflight
 # blocks legacy duplicates for explicit user resolution; it never auto-dedupes.
-SCHEMA_VERSION = 7
+# v8 adds realized sale currency and price provenance. Legacy currency remains
+# NULL and provenance is marked unknown, so no migration guesses a USD fact.
+SCHEMA_VERSION = 8
 
 # Oldest app version whose ORM models can still read this schema. Additive-only
 # migrations (new tables/columns/indexes) keep this unchanged, so a normal

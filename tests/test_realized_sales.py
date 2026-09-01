@@ -71,9 +71,34 @@ def test_reduction_stages_average_cost_facts_without_committing():
     assert trade.sale_price == 120.0
     assert trade.avg_cost == 100.0
     assert trade.realized_gain == 80.0
+    assert trade.sale_currency == "USD"
+    assert trade.sale_price_source == "manual_entry"
     assert trade.created_at == datetime(2025, 12, 15, 12, 0)
     db.rollback()
     assert db.query(RealizedTrade).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("quote", "currency", "source"),
+    [
+        ({"current_price": 130.0, "currency": "USD"}, "USD", "market_quote"),
+        ({"current_price": 130.0, "currency": "GBp"}, "GBp", "market_quote"),
+        ({"current_price": 130.0}, None, "market_quote"),
+        ({"current_price": 0.0, "currency": "USD"}, None, "cost_basis_fallback"),
+    ],
+)
+def test_automatic_sale_persists_exact_currency_and_price_provenance(
+    quote, currency, source
+):
+    db = make_db()
+    holding = add_holding(db)
+
+    trade = RealizedSaleLedger(
+        db, 1, quote_loader=lambda _ticker: quote
+    ).stage_reduction(holding, 9)
+
+    assert trade.sale_currency == currency
+    assert trade.sale_price_source == source
 
 
 def test_watchlist_reduction_never_creates_a_sale_fact():
@@ -134,7 +159,30 @@ def test_correction_and_today_snapshot_commit_as_one_consistent_unit():
     ).one()
     assert result.realized_gain == 120.0
     assert result.created_at == datetime(2025, 12, 28, 12, 0)
+    assert result.sale_currency == "USD"
+    assert result.sale_price_source == "manual_entry"
     assert snapshot.realized_gain == 120.0
+
+
+def test_non_price_correction_does_not_upgrade_ambiguous_legacy_provenance():
+    db = make_db()
+    trade = RealizedTrade(
+        portfolio_id=1,
+        ticker="AAPL",
+        shares_sold=2,
+        sale_price=150,
+        avg_cost=100,
+        realized_gain=100,
+    )
+    db.add(trade)
+    db.commit()
+
+    result = RealizedSaleLedger(
+        db, 1, valuation_quote_loader=lambda _tickers: []
+    ).correct(trade.id, SaleCorrection(shares_sold=3))
+
+    assert result.sale_currency is None
+    assert result.sale_price_source == "legacy_unknown"
 
 
 def test_unpriceable_correction_removes_stale_today_snapshot_atomically():

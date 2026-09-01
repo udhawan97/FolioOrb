@@ -15,13 +15,18 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import Holding, RealizedTrade
-from app.services import portfolio_valuation
+from app.services import financial_currency, portfolio_valuation
 from app.services.stock_service import get_stock_data
 
 logger = logging.getLogger(__name__)
 
 QuoteLoader = Callable[[str], dict]
 ValuationQuoteLoader = Callable[[list[str]], list[dict]]
+
+SALE_SOURCE_LEGACY_UNKNOWN = financial_currency.LEGACY_UNKNOWN_PROVENANCE
+SALE_SOURCE_MANUAL_ENTRY = "manual_entry"
+SALE_SOURCE_MARKET_QUOTE = "market_quote"
+SALE_SOURCE_COST_BASIS_FALLBACK = "cost_basis_fallback"
 
 
 @dataclass(frozen=True)
@@ -92,10 +97,25 @@ class RealizedSaleLedger:
         basis = float(holding.avg_cost or 0.0)
         if sale_price is not None and sale_price > 0:
             price = float(sale_price)
+            sale_currency = financial_currency.REPORTING_CURRENCY
+            sale_price_source = SALE_SOURCE_MANUAL_ENTRY
         else:
             quote = self.quote_loader(str(holding.ticker))
             live = float(quote.get("current_price") or 0.0)
-            price = live if live > 0 else basis
+            if live > 0:
+                price = live
+                # Missing currency is ambiguous at the persistence boundary,
+                # even though quote-only views historically display it as USD.
+                sale_currency = financial_currency.normalize_currency(
+                    quote.get("currency")
+                )
+                sale_price_source = SALE_SOURCE_MARKET_QUOTE
+            else:
+                # DR-003 owns removal of this legacy behavior. Mark it plainly
+                # so it cannot enter dollar totals in the meantime.
+                price = basis
+                sale_currency = None
+                sale_price_source = SALE_SOURCE_COST_BASIS_FALLBACK
 
         stored_price = round(price, 2)
         stored_basis = round(basis, 2)
@@ -106,6 +126,8 @@ class RealizedSaleLedger:
             sale_price=stored_price,
             avg_cost=stored_basis,
             realized_gain=round((stored_price - stored_basis) * sold, 2),
+            sale_currency=sale_currency,
+            sale_price_source=sale_price_source,
         )
         if sale_date:
             trade.created_at = self._noon(sale_date)
@@ -148,6 +170,11 @@ class RealizedSaleLedger:
             trade.shares_sold = changes.shares_sold
         if changes.sale_price is not None:
             trade.sale_price = round(changes.sale_price, 2)
+            # The existing field is explicitly dollar-labelled at the API/UI
+            # boundary, so this correction creates new, user-supplied USD
+            # provenance rather than guessing the meaning of a legacy value.
+            trade.sale_currency = financial_currency.REPORTING_CURRENCY
+            trade.sale_price_source = SALE_SOURCE_MANUAL_ENTRY
         if changes.avg_cost is not None:
             trade.avg_cost = round(changes.avg_cost, 2)
         if changes.sale_date is not None:

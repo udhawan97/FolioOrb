@@ -155,6 +155,24 @@ def _ensure_startup_migrations_on_connection(conn: Connection) -> None:
             text("ALTER TABLE dca_plans ADD COLUMN catchup_floor VARCHAR(10)")
         )
 
+    # v8: retain realized-sale currency and price provenance. Existing rows
+    # remain explicitly ambiguous; neither migration nor ORM guesses USD.
+    realized_trade_cols = {
+        row[1]
+        for row in conn.execute(text("PRAGMA table_info(realized_trades)")).fetchall()
+    }
+    if realized_trade_cols and "sale_currency" not in realized_trade_cols:
+        conn.execute(
+            text("ALTER TABLE realized_trades ADD COLUMN sale_currency VARCHAR(10)")
+        )
+    if realized_trade_cols and "sale_price_source" not in realized_trade_cols:
+        conn.execute(
+            text(
+                "ALTER TABLE realized_trades ADD COLUMN sale_price_source "
+                "VARCHAR(30) NOT NULL DEFAULT 'legacy_unknown'"
+            )
+        )
+
     # v4: per-portfolio verdict history. Add the column, then backfill any
     # pre-scoping rows to the default portfolio so their history isn't lost.
     verdict_cols = {

@@ -22,6 +22,7 @@ from app.services.stock_service import (
     validate_ticker_symbol,
 )
 from app.services import dividend_calendar
+from app.services import financial_currency
 from app.services import holdings_csv
 from app.services import holdings_repository
 from app.services import portfolio_lifecycle
@@ -670,6 +671,8 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
         "data_quality": valuation.data_quality,
         "missing_tickers": list(valuation.missing_tickers),
         "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
+        "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+        "realized_data_quality": valuation.realized_data_quality,
         "priced_position_count": valuation.priced_position_count,
         "expected_position_count": valuation.expected_position_count,
         "total_value": valuation.total_value,
@@ -723,6 +726,8 @@ def get_pnl(portfolio_id: int = 1, db: Session = Depends(get_db)):
         "realized_gain": performance.realized_gain,
         "trades": performance.trades,
         "history": performance.history,
+        "excluded_realized_trade_count": performance.excluded_realized_trade_count,
+        "realized_data_quality": performance.realized_data_quality,
     }
 
 
@@ -734,21 +739,33 @@ def get_realized_summary(
 ):
     """Year-by-year recap of realized (closed-trade) P&L for a portfolio.
 
-    Aggregates every stored `RealizedTrade` — not just the last 100 the P&L
-    ledger shows — grouped by the calendar year of each sale. `year` selects
-    which year to detail; it defaults to the most recent year with trades and
-    falls back to that default for an unknown year. Stored data only, no live
-    quotes.
+    Aggregates every explicitly sourced USD `RealizedTrade` — not just the last
+    100 the P&L ledger shows — grouped by the calendar year of each sale. Foreign
+    and ambiguous legacy facts are counted but excluded from dollar totals.
+    `year` selects which year to detail; it defaults to the most recent year
+    with trades and falls back to that default for an unknown year. Stored data
+    only, no live quotes.
     """
     _require_portfolio(portfolio_id, db)
-    trades = (
+    stored_trades = (
         db.query(RealizedTrade)
         .filter(RealizedTrade.portfolio_id == portfolio_id)
         .order_by(RealizedTrade.created_at.asc())
         .all()
     )
+    trades = [
+        trade
+        for trade in stored_trades
+        if financial_currency.is_trusted_reporting_fact(
+            trade.sale_currency, trade.sale_price_source
+        )
+    ]
     recap = build_realized_recap(trades, year=year)
     recap["portfolio_id"] = portfolio_id
+    recap["excluded_realized_trade_count"] = len(stored_trades) - len(trades)
+    recap["realized_data_quality"] = (
+        "partial" if len(stored_trades) != len(trades) else "complete"
+    )
     return recap
 
 

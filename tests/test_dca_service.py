@@ -166,3 +166,13 @@ def test_undo_last_buy_zeroes_out():
     s2, a2 = dca_service.undo_from_holding(s, a, 0.5, 50.0)
     assert s2 == 0.0
     assert a2 == 0.0
+
+
+def test_undo_rejects_when_a_later_sale_consumed_contribution_shares():
+    with pytest.raises(ValueError, match="safely reversible"):
+        dca_service.undo_from_holding(0.25, 100.0, 0.5, 50.0)
+
+
+def test_undo_rejects_when_shares_remain_but_contribution_basis_does_not():
+    with pytest.raises(ValueError, match="safely reversible"):
+        dca_service.undo_from_holding(2.0, 20.0, 0.5, 50.0)

@@ -15,7 +15,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import DcaContribution, DcaPlan, Holding
-from app.services import dca_service, holdings_repository, portfolio_lifecycle
+from app.services import (
+    dca_service,
+    financial_currency,
+    holdings_repository,
+    portfolio_lifecycle,
+)
 from app.services.stock_service import get_daily_closes, validate_ticker_symbol
 
 TickerValidator = Callable[[str], dict]
@@ -243,6 +248,22 @@ class DcaLedger:
                     "suggestions": validation["suggestions"],
                 }
             )
+        quote = validation.get("quote")
+        currency = financial_currency.normalize_currency(
+            quote.get("currency")
+            if isinstance(quote, dict)
+            else validation.get("currency")
+        )
+        if currency and not financial_currency.is_reporting_currency(currency):
+            raise DcaValidationError(
+                {
+                    "message": (
+                        f"{ticker} is quoted in {currency}. FolioOrb DCA plans "
+                        "support USD quotes only because no FX conversion is applied."
+                    ),
+                    "suggestions": validation.get("suggestions", []),
+                }
+            )
         plan = DcaPlan(
             portfolio_id=portfolio_id,
             ticker=ticker,
@@ -467,12 +488,19 @@ class DcaLedger:
                 "without changing holdings."
             )
         else:
-            holding.shares, holding.avg_cost = dca_service.undo_from_holding(
-                holding.shares or 0.0,
-                holding.avg_cost or 0.0,
-                contribution.shares,
-                contribution.amount,
-            )
+            try:
+                new_shares, new_avg = dca_service.undo_from_holding(
+                    holding.shares or 0.0,
+                    holding.avg_cost or 0.0,
+                    contribution.shares,
+                    contribution.amount,
+                )
+            except ValueError as exc:
+                raise DcaConflictError(
+                    "This buy cannot be safely undone after later holding changes. "
+                    "The holding and DCA ledger were left unchanged."
+                ) from exc
+            holding.shares, holding.avg_cost = new_shares, new_avg
             if holding.shares <= _ZERO_EPS:
                 holding.is_active = False
         contribution.status = "pending"
@@ -501,7 +529,13 @@ class DcaLedger:
             .order_by(DcaContribution.exec_date.desc())
             .all()
         )
-        for contribution in applied:
-            self._reverse(contribution)
+        try:
+            for contribution in applied:
+                self._reverse(contribution)
+        except DcaConflictError:
+            # A prior iteration may already have staged a safe reversal. Bulk
+            # undo is one operation, so restore every holding/contribution row.
+            self.db.rollback()
+            raise
         self.db.commit()
         return {"undone": len(applied), "ticker": plan.ticker}

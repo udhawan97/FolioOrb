@@ -113,6 +113,56 @@ def test_v5_to_v6_adds_nullable_targets_idempotently_and_preserves_rows(file_db)
     assert tuple(row) == ("AAPL", 2.0, 100.0, None)
 
 
+def test_v7_to_v8_backs_up_then_marks_legacy_sale_currency_ambiguous(file_db):
+    engine, _ = file_db
+    from app import models
+
+    models.Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE realized_trades DROP COLUMN sale_price_source"))
+        conn.execute(text("ALTER TABLE realized_trades DROP COLUMN sale_currency"))
+        conn.execute(text("INSERT INTO portfolios (name) VALUES ('Legacy')"))
+        conn.execute(
+            text(
+                "INSERT INTO realized_trades "
+                "(portfolio_id, ticker, shares_sold, sale_price, avg_cost, realized_gain) "
+                "VALUES (1, 'VOD.L', 2, 250, 200, 100)"
+            )
+        )
+        schema_meta._ensure_app_meta(conn)
+        schema_meta._write_meta(conn, "schema_version", "7")
+
+    first = schema_meta.apply_migrations_safely(engine)
+    second = schema_meta.apply_migrations_safely(engine)
+
+    assert first.previous_schema_version == 7
+    assert first.schema_version == 8
+    assert first.backed_up is True
+    assert second.ran_migration is False
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT ticker, shares_sold, realized_gain, sale_currency, "
+                "sale_price_source FROM realized_trades"
+            )
+        ).one()
+    assert tuple(row) == ("VOD.L", 2.0, 100.0, None, "legacy_unknown")
+
+    backup = sqlite3.connect(first.backup_path)
+    try:
+        backup_columns = {
+            item[1] for item in backup.execute("PRAGMA table_info(realized_trades)")
+        }
+        backup_row = backup.execute(
+            "SELECT ticker, shares_sold, realized_gain FROM realized_trades"
+        ).fetchone()
+    finally:
+        backup.close()
+    assert "sale_currency" not in backup_columns
+    assert "sale_price_source" not in backup_columns
+    assert backup_row == ("VOD.L", 2.0, 100.0)
+
+
 def test_backup_rejects_result_that_lost_holdings(file_db, monkeypatch):
     """Regression: verification must use the DB's real holdings count, not 0.
 
@@ -262,7 +312,7 @@ def test_migration_writer_lock_covers_backup_schema_index_and_stamp(
     )
     try:
         result = schema_meta.apply_migrations_safely(engine)
-        assert result.schema_version == 7
+        assert result.schema_version == schema_meta.SCHEMA_VERSION
         assert writer_result["returncode"] != 0
         assert "locked" in writer_result["stderr"].lower()
         with engine.connect() as check:
@@ -392,7 +442,7 @@ def test_v6_to_v7_adds_active_holding_uniqueness_without_deduping(tmp_path, monk
     try:
         result = schema_meta.apply_migrations_safely(engine)
         assert result.previous_schema_version == 6
-        assert result.schema_version == 7
+        assert result.schema_version == schema_meta.SCHEMA_VERSION
         with engine.begin() as connection:
             index_sql = connection.execute(
                 text(

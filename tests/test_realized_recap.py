@@ -131,9 +131,16 @@ def client():
     session = sessionmaker(bind=engine)()
     session.add(Portfolio(id=1, name="Test"))
     session.add(RealizedTrade(portfolio_id=1, ticker="AAPL", shares_sold=10, sale_price=110,
-                              avg_cost=100, realized_gain=100.0, created_at=datetime(2026, 3, 1)))
+                              avg_cost=100, realized_gain=100.0,
+                              sale_currency="USD", sale_price_source="manual_entry",
+                              created_at=datetime(2026, 3, 1)))
     session.add(RealizedTrade(portfolio_id=1, ticker="MSFT", shares_sold=5, sale_price=90,
-                              avg_cost=100, realized_gain=-50.0, created_at=datetime(2025, 8, 1)))
+                              avg_cost=100, realized_gain=-50.0,
+                              sale_currency="USD", sale_price_source="market_quote",
+                              created_at=datetime(2025, 8, 1)))
+    session.add(RealizedTrade(portfolio_id=1, ticker="LEGACY", shares_sold=5,
+                              sale_price=300, avg_cost=100, realized_gain=1000.0,
+                              created_at=datetime(2026, 6, 1)))
     session.commit()
     app = FastAPI()
     app.include_router(portfolio_router.router)
@@ -147,6 +154,8 @@ def test_endpoint_defaults_to_latest_year(client):
     assert body["year"] == 2026
     assert body["years"] == [2026, 2025]
     assert body["summary"]["realized_gain"] == 100.0
+    assert body["excluded_realized_trade_count"] == 1
+    assert body["realized_data_quality"] == "partial"
 
 
 def test_endpoint_year_param(client):

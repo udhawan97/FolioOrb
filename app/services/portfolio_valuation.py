@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import PortfolioSnapshot, RealizedTrade
-from app.services import holdings_repository
+from app.services import financial_currency, holdings_repository
 from app.services.stock_service import get_portfolio_quotes, usable_price
 
 QuoteLoader = Callable[[list[str]], list[dict]]
@@ -24,7 +24,7 @@ QuoteLoader = Callable[[list[str]], list[dict]]
 # Every total this module produces is denominated in dollars. Yahoo prices a
 # foreign listing in its home currency — and London quotes in *pence*, not
 # pounds — so a quote that says anything else is not addable here.
-REPORTING_CURRENCY = "USD"
+REPORTING_CURRENCY = financial_currency.REPORTING_CURRENCY
 
 
 @dataclass
@@ -44,6 +44,8 @@ class PortfolioValuation:  # pylint: disable=too-many-instance-attributes
     data_quality: str
     missing_tickers: tuple[str, ...]
     foreign_currency_tickers: tuple[str, ...]
+    excluded_realized_trade_count: int
+    realized_data_quality: str
     expected_position_count: int
     priced_position_count: int
     snapshot_recorded: bool
@@ -62,12 +64,20 @@ class PortfolioPerformance:
     realized_by_ticker: dict[str, dict]
     trades: list[dict]
     history: list[dict]
+    excluded_realized_trade_count: int
+    realized_data_quality: str
 
 
 def _realized_stats(db: Session, portfolio_id: int) -> dict[str, dict]:
     trades = (
         db.query(RealizedTrade)
-        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .filter(
+            RealizedTrade.portfolio_id == portfolio_id,
+            financial_currency.trusted_reporting_fact_clause(
+                RealizedTrade.sale_currency,
+                RealizedTrade.sale_price_source,
+            ),
+        )
         .all()
     )
     stats: dict[str, dict] = {}
@@ -103,10 +113,39 @@ def _realized_stats(db: Session, portfolio_id: int) -> dict[str, dict]:
 def _realized_gain(db: Session, portfolio_id: int) -> float:
     total = (
         db.query(func.coalesce(func.sum(RealizedTrade.realized_gain), 0.0))
-        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .filter(
+            RealizedTrade.portfolio_id == portfolio_id,
+            financial_currency.trusted_reporting_fact_clause(
+                RealizedTrade.sale_currency,
+                RealizedTrade.sale_price_source,
+            ),
+        )
         .scalar()
     )
     return round(float(total or 0.0), 2)
+
+
+def _excluded_realized_trade_count(db: Session, portfolio_id: int) -> int:
+    """Count sale facts that cannot truthfully enter dollar aggregates."""
+    total = int(
+        db.query(func.count(RealizedTrade.id))
+        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .scalar()
+        or 0
+    )
+    included = int(
+        db.query(func.count(RealizedTrade.id))
+        .filter(
+            RealizedTrade.portfolio_id == portfolio_id,
+            financial_currency.trusted_reporting_fact_clause(
+                RealizedTrade.sale_currency,
+                RealizedTrade.sale_price_source,
+            ),
+        )
+        .scalar()
+        or 0
+    )
+    return total - included
 
 
 def _current_price(quote: dict) -> float | None:
@@ -128,7 +167,7 @@ def _quote_currency(quote: dict) -> str:
     Yahoo writes London's pence "GBp" and pounds "GBP", a hundred-fold
     difference that a row displaying its own currency must not erase.
     """
-    return str(quote.get("currency") or REPORTING_CURRENCY).strip() or REPORTING_CURRENCY
+    return financial_currency.quote_currency(quote.get("currency"))
 
 
 def _is_reporting_currency(currency: str) -> bool:
@@ -137,7 +176,7 @@ def _is_reporting_currency(currency: str) -> bool:
     Only here is case folded — for deciding addability, "usd" is "USD", while
     "GBp" and "GBP" are both simply not it.
     """
-    return currency.upper() == REPORTING_CURRENCY
+    return financial_currency.is_reporting_currency(currency)
 
 
 def _today_snapshot(db: Session, portfolio_id: int) -> PortfolioSnapshot | None:
@@ -212,6 +251,12 @@ def evaluate(
     by_ticker = {str(holding.ticker): holding for holding in holdings}
     quotes = (quote_loader or get_portfolio_quotes)(list(by_ticker))
     realized_stats = _realized_stats(db, portfolio_id)
+    excluded_realized_trade_count = _excluded_realized_trade_count(
+        db, portfolio_id
+    )
+    realized_data_quality = (
+        "partial" if excluded_realized_trade_count else "complete"
+    )
 
     rows: list[dict] = []
     total_value = 0.0
@@ -315,6 +360,8 @@ def evaluate(
         data_quality = "partial"
     else:
         data_quality = "unavailable"
+    if excluded_realized_trade_count and data_quality == "complete":
+        data_quality = "partial"
 
     total_unrealized_gain = round(
         sum(row["unrealized_gain"] for row in rows if counts_toward_totals(row)),
@@ -346,6 +393,8 @@ def evaluate(
         data_quality=data_quality,
         missing_tickers=missing_tickers,
         foreign_currency_tickers=foreign_currency_tickers,
+        excluded_realized_trade_count=excluded_realized_trade_count,
+        realized_data_quality=realized_data_quality,
         expected_position_count=len(expected_tickers),
         priced_position_count=len(priced_tickers),
         snapshot_recorded=False,
@@ -363,9 +412,19 @@ def load_performance(
 ) -> PortfolioPerformance:
     """Load stored realized returns and daily history without fetching quotes."""
     realized_stats = _realized_stats(db, portfolio_id)
+    excluded_realized_trade_count = _excluded_realized_trade_count(db, portfolio_id)
+    realized_data_quality = (
+        "partial" if excluded_realized_trade_count else "complete"
+    )
     trades = (
         db.query(RealizedTrade)
-        .filter(RealizedTrade.portfolio_id == portfolio_id)
+        .filter(
+            RealizedTrade.portfolio_id == portfolio_id,
+            financial_currency.trusted_reporting_fact_clause(
+                RealizedTrade.sale_currency,
+                RealizedTrade.sale_price_source,
+            ),
+        )
         .order_by(RealizedTrade.created_at.desc())
         .limit(trade_limit)
         .all()
@@ -387,6 +446,8 @@ def load_performance(
                 "sale_price": float(trade.sale_price or 0.0),
                 "avg_cost": float(trade.avg_cost or 0.0),
                 "realized_gain": float(trade.realized_gain or 0.0),
+                "sale_currency": str(trade.sale_currency),
+                "sale_price_source": str(trade.sale_price_source),
                 "total_return_pct": (
                     round(realized_stats[str(trade.ticker)]["total_return_pct"], 2)
                     if realized_stats.get(str(trade.ticker), {}).get("total_return_pct")
@@ -397,7 +458,7 @@ def load_performance(
             }
             for trade in trades
         ],
-        history=[
+        history=[] if excluded_realized_trade_count else [
             {
                 "date": snapshot.snapshot_date,
                 "total_value": float(snapshot.total_value or 0.0),
@@ -408,12 +469,23 @@ def load_performance(
             }
             for snapshot in snapshots
         ],
+        excluded_realized_trade_count=excluded_realized_trade_count,
+        realized_data_quality=realized_data_quality,
     )
 
 
 def snapshot_history(db: Session, portfolio_id: int) -> list[dict]:
     """Return stored daily values for analytics that do not need the trade ledger."""
+    snapshots = (
+        db.query(PortfolioSnapshot)
+        .filter(PortfolioSnapshot.portfolio_id == portfolio_id)
+        .order_by(PortfolioSnapshot.snapshot_date.asc())
+        .all()
+    )
     return [
-        {"date": row["date"], "total_value": row["total_value"]}
-        for row in load_performance(db, portfolio_id, trade_limit=0).history
+        {
+            "date": snapshot.snapshot_date,
+            "total_value": float(snapshot.total_value or 0.0),
+        }
+        for snapshot in snapshots
     ]

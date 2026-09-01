@@ -162,14 +162,24 @@ def undo_from_holding(
     """Return ``(new_shares, new_avg_cost)`` after reversing a previously applied
     buy — the exact inverse of :func:`apply_to_holding`.
 
-    The reversal is arithmetic on the cost basis, so it stays correct even if
-    other buys were applied to the same holding in between.
+    The reversal is arithmetic on the cost basis, so it stays correct when
+    other buys were applied in between. It raises when a later reduction has
+    consumed shares or basis needed to reverse this contribution independently.
     """
-    new_shares = old_shares - buy_shares
-    if new_shares <= eps:
-        return 0.0, 0.0
     old_basis = old_shares * (old_avg or 0.0)
+    new_shares = old_shares - buy_shares
     new_basis = old_basis - buy_amount
+
+    # A later sale can consume shares or basis that belonged to this buy. In
+    # that state the contribution is no longer independently reversible: the
+    # old clamp silently erased the residual position. Reject the whole ledger
+    # operation before any holding or contribution field is changed.
+    if new_shares < -eps or new_basis < -eps:
+        raise ValueError("Contribution is no longer safely reversible")
+    if abs(new_shares) <= eps:
+        if abs(new_basis) > eps:
+            raise ValueError("Contribution reversal would leave basis without shares")
+        return 0.0, 0.0
     if new_basis < 0:
         new_basis = 0.0
     return new_shares, new_basis / new_shares

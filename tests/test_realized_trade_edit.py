@@ -44,6 +44,8 @@ def add_trade(db, **overrides):
         "sale_price": 150.0,
         "avg_cost": 100.0,
         "realized_gain": 500.0,
+        "sale_currency": "USD",
+        "sale_price_source": "manual_entry",
     }
     fields.update(overrides)
     trade = RealizedTrade(**fields)
