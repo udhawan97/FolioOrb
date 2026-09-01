@@ -20,27 +20,28 @@ in the same run. Phase 3 never accepts an ad-hoc-signed app.
 1. Create an App Store Connect team API key authorized for Developer ID
    notarization. Download its `AuthKey_<KEY_ID>.p8` file once and keep it out of
    the repository.
-2. Store the base64-encoded `.p8` as the Actions secret
+2. Store the base64-encoded `.p8` as the `macos-signing` environment secret
    `MACOS_NOTARY_PRIVATE_KEY`:
 
    ```bash
-   base64 -i AuthKey_ABCDEFGHIJ.p8 | gh secret set MACOS_NOTARY_PRIVATE_KEY
+   base64 -i AuthKey_ABCDEFGHIJ.p8 \
+     | gh secret set --env macos-signing MACOS_NOTARY_PRIVATE_KEY
    ```
 
 3. Record the key ID (at least 10 uppercase alphanumeric characters) and issuer
-   UUID as repository variables:
+   UUID as `macos-signing` environment variables:
 
    ```bash
-   gh variable set MACOS_NOTARY_KEY_ID --body ABCDEFGHIJ
-   gh variable set MACOS_NOTARY_ISSUER_ID \
+   gh variable set --env macos-signing MACOS_NOTARY_KEY_ID --body ABCDEFGHIJ
+   gh variable set --env macos-signing MACOS_NOTARY_ISSUER_ID \
      --body 01234567-89ab-cdef-0123-456789abcdef
    ```
 
 Each submission decodes its own private-key copy into the runner's temporary
 directory, rejects empty or non-PKCS#8 PEM content, parses it with OpenSSL,
 removes the secret from the child process environment, and trap-deletes the
-file as soon as that submission finishes. Build, smoke, Homebrew, and DMG
-packaging steps never receive the decoded key.
+file as soon as that submission finishes. Build, smoke, dependency installation,
+and DMG packaging steps never receive the decoded key.
 
 ## First notarized-build gate
 

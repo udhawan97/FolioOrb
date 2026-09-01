@@ -1,6 +1,5 @@
-# Desktop packaging dependencies — kept separate from requirements.txt so the
-# web/dev/CI path and dependency audit scope stay unchanged. Install alongside
-# requirements.txt only when building the DMG/EXE:
-#   pip install -r requirements.txt -r requirements-desktop.txt
+# Direct desktop packaging requirements. Release jobs install the generated,
+# hash-checked platform locks instead; refresh both after changing either input:
+#   scripts/lock_desktop_dependencies.sh
 pyinstaller>=6.11,<7
 pywebview>=5.3,<6

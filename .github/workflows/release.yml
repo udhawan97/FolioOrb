@@ -58,7 +58,7 @@ jobs:
       windows_signing_public: ${{ steps.vars.outputs.windows_signing_public }}
       publish: ${{ steps.vars.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Resolve build variables
         id: vars
@@ -108,8 +108,8 @@ jobs:
               echo "release_tag=latest-main"
             fi
             if [[ "${MACOS_SIGNING_ENABLED:-}" == "true" || ( "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_SIGN_MACOS" == "true" ) ]]; then
-              if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
-                echo "Manual macOS signing is restricted to refs/heads/main or version tags." >&2
+              if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+                echo "macOS credentialed release work is restricted to protected refs/heads/main." >&2
                 exit 1
               fi
               if [[ "${MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED:-}" != "true" ]]; then
@@ -172,10 +172,10 @@ jobs:
     name: Test gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
           cache: pip
       - name: Install dependencies
         run: |
@@ -192,129 +192,112 @@ jobs:
         run: python -m pytest -q
 
   build-macos:
-    name: Build macOS DMG (arm64)
+    name: Build macOS app (arm64)
     needs: [prepare, test]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
           cache: pip
-      - name: Install dependencies
+      - name: Install locked desktop dependencies
+        run: python -m pip install --require-hashes -r requirements-desktop-macos.lock
+      - name: Build app bundle
+        run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
+      - name: Repair macOS bundle data symlinks
+        run: python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
+      - name: Smoke test the frozen bundle
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -r requirements-desktop.txt
-      - name: Prepare Developer ID keychain
+          dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
+          dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke-duplicate-recovery
+      - name: Install pinned create-dmg
+        if: needs.prepare.outputs.macos_signing != 'true'
+        run: |
+          packaging/macos/install_create_dmg.sh "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Build and structurally verify unsigned DMG
+        if: needs.prepare.outputs.macos_signing != 'true'
+        env:
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+        run: >-
+          packaging/macos/build_and_verify_dmg.sh
+          dist/FolioOrb.app
+          "dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
+      - name: Record unsigned macOS artifact checksum
+        if: needs.prepare.outputs.macos_signing != 'true'
+        run: |
+          set -euo pipefail
+          cd dist/out
+          DMGS=(FolioOrb-macOS-arm64-*.dmg)
+          if [[ "${#DMGS[@]}" != "1" || ! -f "${DMGS[0]}" ]]; then
+            echo "Expected exactly one macOS DMG before upload." >&2
+            exit 1
+          fi
+          shasum -a 256 -- "${DMGS[0]}" > macos-SHA256SUMS.txt
+          shasum -a 256 --check macos-SHA256SUMS.txt
+          printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
+          test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: needs.prepare.outputs.macos_signing != 'true'
+        with:
+          name: macos-dmg
+          path: |
+            dist/out/*.dmg
+            dist/out/macos-SHA256SUMS.txt
+            dist/out/macos-SOURCE-SHA.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stage SHA-bound app for isolated signing
         if: needs.prepare.outputs.macos_signing == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p dist/signing-input
+          COPYFILE_DISABLE=1 tar -C dist -czf dist/signing-input/FolioOrb-app.tar.gz FolioOrb.app
+          cd dist/signing-input
+          shasum -a 256 FolioOrb-app.tar.gz > macos-app-SHA256SUMS.txt
+          shasum -a 256 --check macos-app-SHA256SUMS.txt
+          printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
+          test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: needs.prepare.outputs.macos_signing == 'true'
+        with:
+          name: macos-app-for-signing
+          path: dist/signing-input
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-macos:
+    name: Sign macOS app and DMG (arm64)
+    needs: [prepare, build-macos]
+    if: needs.prepare.outputs.macos_signing == 'true'
+    runs-on: macos-latest
+    environment: macos-signing
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-app-for-signing
+          path: dist/signing-input
+      - name: Verify exact source and app before credential access
+        run: |
+          set -euo pipefail
+          cd dist/signing-input
+          test "$(cat macos-SOURCE-SHA.txt)" = "${{ needs.prepare.outputs.source_sha }}"
+          test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
+          shasum -a 256 --check macos-app-SHA256SUMS.txt
+          python ../../packaging/macos/verify_signing_archive.py FolioOrb-app.tar.gz ..
+          test -d ../FolioOrb.app
+      - name: Sign and verify Developer ID app bundle
         env:
           MACOS_DEVELOPER_ID_CERTIFICATE: ${{ secrets.MACOS_DEVELOPER_ID_CERTIFICATE }}
           MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
           EXPECTED_TEAM_ID: ${{ vars.MACOS_DEVELOPER_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${MACOS_DEVELOPER_ID_CERTIFICATE:-}" || -z "${MACOS_DEVELOPER_ID_PASSWORD:-}" ]]; then
-            echo "MACOS_SIGNING_ENABLED=true requires both Developer ID secrets." >&2
-            exit 1
-          fi
-          if [[ ! "${EXPECTED_TEAM_ID:-}" =~ ^[A-Z0-9]{10}$ ]]; then
-            echo "MACOS_DEVELOPER_TEAM_ID must be the expected 10-character Apple Team ID." >&2
-            exit 1
-          fi
-
-          umask 077
-          KEYCHAIN_PATH="${RUNNER_TEMP}/folioorb-developer-id.keychain-db"
-          CERTIFICATE_PATH="${RUNNER_TEMP}/folioorb-developer-id.p12"
-          export CERTIFICATE_PATH
-          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
-          echo "::add-mask::${KEYCHAIN_PASSWORD}"
-          SIGNING_KEYCHAIN_READY=false
-          cleanup_signing_setup() {
-            rm -f "$CERTIFICATE_PATH"
-            if [[ "$SIGNING_KEYCHAIN_READY" != "true" && -f "$KEYCHAIN_PATH" ]]; then
-              security delete-keychain "$KEYCHAIN_PATH" || true
-            fi
-          }
-          trap cleanup_signing_setup EXIT
-
-          python - <<'PY'
-          import base64
-          import binascii
-          import os
-          from pathlib import Path
-
-          try:
-              certificate = base64.b64decode(
-                  os.environ["MACOS_DEVELOPER_ID_CERTIFICATE"], validate=True
-              )
-          except (KeyError, ValueError, binascii.Error) as exc:
-              raise SystemExit("MACOS_DEVELOPER_ID_CERTIFICATE is not valid base64") from exc
-          if not certificate:
-              raise SystemExit("MACOS_DEVELOPER_ID_CERTIFICATE decoded to an empty file")
-          Path(os.environ["CERTIFICATE_PATH"]).write_bytes(certificate)
-          PY
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERTIFICATE_PATH" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$MACOS_DEVELOPER_ID_PASSWORD" \
-            -T /usr/bin/codesign
-          security set-key-partition-list \
-            -S apple-tool:,apple: \
-            -s \
-            -k "$KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
-
-          IDENTITIES="$(
-            security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
-              | awk -F'"' -v suffix="(${EXPECTED_TEAM_ID})" \
-                  '/Developer ID Application:/ && index($2, suffix) == length($2) - length(suffix) + 1 {print $2}'
-          )"
-          IDENTITY_COUNT="$(printf '%s\n' "$IDENTITIES" | sed '/^$/d' | wc -l | tr -d ' ')"
-          if [[ "$IDENTITY_COUNT" != "1" ]]; then
-            echo "Expected exactly one valid Developer ID Application identity for team ${EXPECTED_TEAM_ID}; found ${IDENTITY_COUNT}." >&2
-            exit 1
-          fi
-          IDENTITY="$(printf '%s\n' "$IDENTITIES" | sed -n '1p')"
-          {
-            echo "FOLIOORB_CODESIGN_IDENTITY=$IDENTITY"
-            echo "FOLIOORB_SIGNING_KEYCHAIN=$KEYCHAIN_PATH"
-          } >> "$GITHUB_ENV"
-          SIGNING_KEYCHAIN_READY=true
-      - name: Build app bundle
-        run: python -m PyInstaller --noconfirm packaging/pyinstaller/FolioOrb.spec
-      - name: Repair macOS bundle data symlinks
-        # PyInstaller's macOS BUNDLE step can leave dangling Frameworks -> Resources
-        # symlinks for pure-data package trees (observed with static/, templates/,
-        # and pytz's zoneinfo data). See the script for the full explanation.
-        run: python packaging/pyinstaller/fix_macos_bundle_symlinks.py dist
-      - name: Seal and verify Developer ID app bundle
-        if: needs.prepare.outputs.macos_signing == 'true'
-        run: |
-          set -euo pipefail
-          codesign \
-            --force \
-            --all-architectures \
-            --timestamp \
-            --options runtime \
-            --entitlements packaging/macos/FolioOrb.entitlements \
-            --sign "$FOLIOORB_CODESIGN_IDENTITY" \
-            dist/FolioOrb.app
-          codesign --verify --deep --strict --verbose=2 dist/FolioOrb.app
-          codesign --display --verbose=4 dist/FolioOrb.app 2>&1 \
-            | grep -F "Authority=Developer ID Application:"
-          ACTUAL_TEAM_ID="$(
-            codesign --display --verbose=4 dist/FolioOrb.app 2>&1 \
-              | sed -n 's/^TeamIdentifier=//p'
-          )"
-          if [[ "$ACTUAL_TEAM_ID" != "${{ vars.MACOS_DEVELOPER_TEAM_ID }}" ]]; then
-            echo "Signed app team ${ACTUAL_TEAM_ID:-missing} does not match the expected Team ID." >&2
-            exit 1
-          fi
-      - name: Smoke test the frozen bundle
+        run: >-
+          packaging/macos/sign_artifact.sh app dist/FolioOrb.app "$EXPECTED_TEAM_ID"
+      - name: Smoke test signed frozen bundle
         run: |
           dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke
           dist/FolioOrb.app/Contents/MacOS/FolioOrb --smoke-duplicate-recovery
@@ -325,91 +308,37 @@ jobs:
           FOLIOORB_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
           FOLIOORB_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
         run: packaging/macos/with_notary_key.sh app dist/FolioOrb.app
+      - name: Install pinned create-dmg
+        run: |
+          packaging/macos/install_create_dmg.sh "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Build DMG
         env:
           ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
-        run: |
-          set -euo pipefail
-          brew install create-dmg
-          mkdir -p dist/dmg-src dist/out
-          cp -R dist/FolioOrb.app dist/dmg-src/
-          # Back-compat for pre-rename (<= v4.x) macOS auto-updaters: their baked
-          # swap script mounts this DMG and looks for a bundle named literally
-          # "FolioSenseAI.app". A relative symlink to the real app lets those old
-          # installs complete the update to FolioOrb — the swap's `ditto`
-          # dereferences the symlink into a real copy and its `[ -d ]` follows it
-          # (both verified). It's parked off-window below so new users only ever
-          # see FolioOrb.app; the current FolioOrb updater globs *.app and picks
-          # FolioOrb.app (sorts first), so it's unaffected.
-          ln -s FolioOrb.app dist/dmg-src/FolioSenseAI.app
-          DMG="dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
-          create-dmg \
-            --volname "FolioOrb" \
-            --volicon packaging/icons/FolioOrb.icns \
-            --window-size 540 380 \
-            --icon-size 110 \
-            --icon "FolioOrb.app" 150 190 \
-            --app-drop-link 390 190 \
-            --hide-extension "FolioOrb.app" \
-            --icon "FolioSenseAI.app" 620 999 \
-            "$DMG" "dist/dmg-src/" || true
-          if [[ ! -f "$DMG" ]]; then
-            echo "DMG was not produced" >&2
-            exit 1
-          fi
-          echo "Built $DMG"
+        run: >-
+          packaging/macos/build_and_verify_dmg.sh
+          dist/FolioOrb.app
+          "dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
       - name: Sign and verify Developer ID DMG
-        if: needs.prepare.outputs.macos_signing == 'true'
+        env:
+          ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+          MACOS_DEVELOPER_ID_CERTIFICATE: ${{ secrets.MACOS_DEVELOPER_ID_CERTIFICATE }}
+          MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
+          EXPECTED_TEAM_ID: ${{ vars.MACOS_DEVELOPER_TEAM_ID }}
         run: |
           set -euo pipefail
-          DMG="$(find dist/out -maxdepth 1 -type f -name '*.dmg' -print -quit)"
-          if [[ -z "$DMG" ]]; then
-            echo "No DMG exists to sign." >&2
-            exit 1
-          fi
-          codesign \
-            --force \
-            --timestamp \
-            --sign "$FOLIOORB_CODESIGN_IDENTITY" \
-            "$DMG"
-          codesign --verify --strict --verbose=2 "$DMG"
-          codesign --display --verbose=4 "$DMG" 2>&1 \
-            | grep -F "Authority=Developer ID Application:"
-          ACTUAL_TEAM_ID="$(
-            codesign --display --verbose=4 "$DMG" 2>&1 \
-              | sed -n 's/^TeamIdentifier=//p'
-          )"
-          if [[ "$ACTUAL_TEAM_ID" != "${{ vars.MACOS_DEVELOPER_TEAM_ID }}" ]]; then
-            echo "Signed DMG team ${ACTUAL_TEAM_ID:-missing} does not match the expected Team ID." >&2
-            exit 1
-          fi
-
+          DMG="dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
+          packaging/macos/sign_artifact.sh dmg "$DMG" "$EXPECTED_TEAM_ID"
           hdiutil verify "$DMG"
-          MOUNT_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-dmg-check.XXXXXX")"
-          MOUNT_POINT="${MOUNT_ROOT}/mounted"
-          mkdir "$MOUNT_POINT"
-          DMG_MOUNTED=false
-          cleanup_dmg_check() {
-            if [[ "$DMG_MOUNTED" == "true" ]]; then
-              hdiutil detach "$MOUNT_POINT" -quiet || true
-            fi
-            rmdir "$MOUNT_POINT" "$MOUNT_ROOT" 2>/dev/null || true
-          }
-          trap cleanup_dmg_check EXIT
+          MOUNT_POINT="$(mktemp -d "${RUNNER_TEMP}/folioorb-signed-dmg.XXXXXX")"
+          trap 'hdiutil detach "$MOUNT_POINT" -quiet || true; rmdir "$MOUNT_POINT" 2>/dev/null || true' EXIT
           hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_POINT" "$DMG" >/dev/null
-          DMG_MOUNTED=true
           codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/FolioOrb.app"
-          EMBEDDED_TEAM_ID="$(
-            codesign --display --verbose=4 "$MOUNT_POINT/FolioOrb.app" 2>&1 \
-              | sed -n 's/^TeamIdentifier=//p'
-          )"
-          if [[ "$EMBEDDED_TEAM_ID" != "${{ vars.MACOS_DEVELOPER_TEAM_ID }}" ]]; then
-            echo "DMG app team ${EMBEDDED_TEAM_ID:-missing} does not match the expected Team ID." >&2
-            exit 1
-          fi
+          EMBEDDED_TEAM_ID="$(codesign --display --verbose=4 "$MOUNT_POINT/FolioOrb.app" 2>&1 \
+            | sed -n 's/^TeamIdentifier=//p')"
+          test "$EMBEDDED_TEAM_ID" = "${{ vars.MACOS_DEVELOPER_TEAM_ID }}"
           hdiutil detach "$MOUNT_POINT" -quiet
-          DMG_MOUNTED=false
-          rmdir "$MOUNT_POINT" "$MOUNT_ROOT"
+          rmdir "$MOUNT_POINT"
           trap - EXIT
       - name: Notarize and staple DMG
         if: needs.prepare.outputs.macos_notarization == 'true'
@@ -428,32 +357,16 @@ jobs:
         run: |
           set -euo pipefail
           DMG="dist/out/FolioOrb-macOS-arm64-${ASSET_TOKEN}.dmg"
-          if [[ ! -f "$DMG" ]]; then
-            echo "The notarized DMG is missing." >&2
-            exit 1
-          fi
           hdiutil verify "$DMG"
-
-          MOUNT_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-notary-check.XXXXXX")"
-          MOUNT_POINT="${MOUNT_ROOT}/mounted"
-          mkdir "$MOUNT_POINT"
-          DMG_MOUNTED=false
-          cleanup_notary_check() {
-            if [[ "$DMG_MOUNTED" == "true" ]]; then
-              hdiutil detach "$MOUNT_POINT" -quiet || true
-            fi
-            rmdir "$MOUNT_POINT" "$MOUNT_ROOT" 2>/dev/null || true
-          }
-          trap cleanup_notary_check EXIT
+          MOUNT_POINT="$(mktemp -d "${RUNNER_TEMP}/folioorb-notary-check.XXXXXX")"
+          trap 'hdiutil detach "$MOUNT_POINT" -quiet || true; rmdir "$MOUNT_POINT" 2>/dev/null || true' EXIT
           hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_POINT" "$DMG" >/dev/null
-          DMG_MOUNTED=true
           xcrun stapler validate "$MOUNT_POINT/FolioOrb.app"
           APP_ASSESSMENT="$(spctl --assess --type execute --verbose=4 "$MOUNT_POINT/FolioOrb.app" 2>&1)"
           printf '%s\n' "$APP_ASSESSMENT"
           grep -F "source=Notarized Developer ID" <<< "$APP_ASSESSMENT"
           hdiutil detach "$MOUNT_POINT" -quiet
-          DMG_MOUNTED=false
-          rmdir "$MOUNT_POINT" "$MOUNT_ROOT"
+          rmdir "$MOUNT_POINT"
           trap - EXIT
       - name: Record macOS artifact checksum
         run: |
@@ -468,13 +381,7 @@ jobs:
           shasum -a 256 --check macos-SHA256SUMS.txt
           printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
           test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
-      - name: Cleanup Developer ID keychain
-        if: ${{ always() && needs.prepare.outputs.macos_signing == 'true' }}
-        run: |
-          if [[ -n "${FOLIOORB_SIGNING_KEYCHAIN:-}" && -f "$FOLIOORB_SIGNING_KEYCHAIN" ]]; then
-            security delete-keychain "$FOLIOORB_SIGNING_KEYCHAIN"
-          fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-dmg
           path: |
@@ -489,15 +396,13 @@ jobs:
     needs: [prepare, test]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
           cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -r requirements-desktop.txt pytest
+      - name: Install locked desktop dependencies
+        run: python -m pip install --require-hashes -r requirements-desktop-windows.lock
       - name: Exercise Windows backup safety
         run: >-
           python -m pytest -q
@@ -639,7 +544,7 @@ jobs:
           Set-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Value "$hash  $name" -Encoding ascii
           $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
           if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: needs.prepare.outputs.windows_signing != 'true'
         with:
           name: windows-installer
@@ -650,7 +555,7 @@ jobs:
           retention-days: 7
       - name: Stage Windows app for isolated signing
         if: needs.prepare.outputs.windows_signing == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-app-for-signing
           path: dist/FolioOrb
@@ -723,7 +628,7 @@ jobs:
     if: needs.prepare.outputs.windows_signing == 'true'
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: windows-signed-app
@@ -754,7 +659,7 @@ jobs:
           & $iscc "/DMyAppVersion=$env:APP_VERSION" "/DMyOutputName=$outputName" packaging\windows\installer.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Stage Windows installer for isolated signing
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-installer-for-signing
           path: dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
@@ -862,11 +767,14 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [prepare, build-macos, build-windows, finalize-windows-signed]
+    needs: [prepare, build-macos, sign-macos, build-windows, finalize-windows-signed]
     if: >-
       ${{ always()
       && needs.prepare.outputs.publish == 'true'
       && needs.build-macos.result == 'success'
+      && (needs.sign-macos.result == 'success'
+      || (needs.prepare.outputs.macos_signing != 'true'
+      && needs.sign-macos.result == 'skipped'))
       && needs.build-windows.result == 'success'
       && (needs.finalize-windows-signed.result == 'success'
       || (needs.prepare.outputs.windows_signing != 'true'
@@ -887,12 +795,12 @@ jobs:
       WINDOWS_SIGNED: ${{ needs.prepare.outputs.windows_signing_public }}
     steps:
       - name: Download final macOS artifact only
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: macos-dmg
           path: artifacts/macos
       - name: Download final Windows artifact only
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: windows-installer
           path: artifacts/windows

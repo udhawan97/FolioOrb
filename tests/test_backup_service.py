@@ -19,6 +19,12 @@ def _mode(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
 
 
+def _assert_owner_only(path: Path) -> None:
+    """Check the POSIX privacy contract where permission bits are meaningful."""
+    if os.name != "nt":
+        assert _mode(path) == 0o600
+
+
 def _make_db(path, rows):
     """Create a minimal holdings DB with ``rows`` holding records."""
     conn = sqlite3.connect(str(path))
@@ -372,14 +378,14 @@ def test_env_snapshot_and_restore_remain_owner_only_under_common_umask(
     previous_umask = os.umask(0o022)
     try:
         snap = backup_service.snapshot_env(tmp_path / "backup.env")
-        assert _mode(snap) == 0o600
+        _assert_owner_only(snap)
         env.write_text("ANTHROPIC_API_KEY=sk-changed\n", encoding="utf-8")
         backup_service.restore_env(snap, ts="20260101-000000")
     finally:
         os.umask(previous_umask)
 
-    assert _mode(env) == 0o600
-    assert _mode(tmp_path / ".env.failed-20260101-000000") == 0o600
+    _assert_owner_only(env)
+    _assert_owner_only(tmp_path / ".env.failed-20260101-000000")
 
 
 @pytest.mark.parametrize("source_kind", ["symlink", "directory"])
@@ -423,7 +429,7 @@ def test_env_restore_refuses_nonregular_backup_without_changing_canonical(
         backup_service.restore_env(backup, ts="20260101-000000")
 
     assert current.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
-    assert _mode(current) == 0o600
+    _assert_owner_only(current)
 
 
 @pytest.mark.parametrize("target_kind", ["symlink", "directory"])
@@ -478,7 +484,7 @@ def test_env_restore_copy_failure_preserves_canonical(tmp_path, monkeypatch):
         backup_service.restore_env(backup, ts="20260101-000000")
 
     assert current.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
-    assert _mode(current) == 0o600
+    _assert_owner_only(current)
 
 
 def test_env_restore_replace_failure_preserves_canonical(tmp_path, monkeypatch):
@@ -508,7 +514,7 @@ def test_env_restore_replace_failure_preserves_canonical(tmp_path, monkeypatch):
         backup_service.restore_env(backup, ts="20260101-000000")
 
     assert current.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=keep\n"
-    assert _mode(current) == 0o600
+    _assert_owner_only(current)
     assert not list(tmp_path.glob("..env-*.tmp"))
 
 

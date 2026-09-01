@@ -18,11 +18,10 @@ from app.version import __version__  # noqa: E402
 ICON_ICNS = str(ROOT / "packaging" / "icons" / "FolioOrb.icns")
 ICON_ICO = str(ROOT / "packaging" / "icons" / "FolioOrb.ico")
 
-# CI leaves this unset for today's unsigned builds. Once the Developer ID
-# activation gate is enabled, release.yml imports exactly one certificate into
-# an ephemeral keychain and passes its public identity here. PyInstaller then
-# signs every collected Mach-O binary with the hardened runtime before the
-# repaired outer bundle is sealed and verified by the workflow.
+# CI leaves this unset. The release workflow builds without credentials, then a
+# protected fixed-logic job signs the SHA-bound repaired app. These options stay
+# available for deliberate local Developer ID builds without changing the
+# default packaging environment.
 CODESIGN_IDENTITY = os.getenv("FOLIOORB_CODESIGN_IDENTITY") or None
 ENTITLEMENTS_FILE = (
     str(ROOT / "packaging" / "macos" / "FolioOrb.entitlements")
