@@ -11458,6 +11458,7 @@ let _cachedWorldMarketsForAnalytics = [];
 const WORLD_MARKETS_KEY = "folioorb-world-markets-v1";
 
 function persistWorldMarkets(markets) {
+    if (!FolioMarketState.availableRows(markets).length) return;
     try {
         localStorage.setItem(WORLD_MARKETS_KEY, JSON.stringify(markets));
     } catch (_) { /* quota or private mode — caching is best-effort */ }
@@ -11466,13 +11467,7 @@ function persistWorldMarkets(markets) {
 function hydrateWorldMarketsFromCache() {
     try {
         const cached = JSON.parse(localStorage.getItem(WORLD_MARKETS_KEY));
-        // Every tile reads .region, .name, .price and .day_change_pct; a row
-        // missing them would render "undefined" or throw on .toFixed.
-        if (!Array.isArray(cached) || !cached.length) return false;
-        const usable = cached.every(m =>
-            m && typeof m.region === "string" && typeof m.name === "string"
-            && Number.isFinite(m.day_change_pct));
-        if (!usable) return false;
+        if (!FolioMarketState.cachePayloadIsUsable(cached)) return false;
         renderWorldMarkets(cached);
         return true;
     } catch (_) {
@@ -11481,14 +11476,15 @@ function hydrateWorldMarketsFromCache() {
 }
 
 function renderWorldMarkets(markets) {
-    _cachedWorldMarketsForAnalytics = markets || [];
+    const rows = Array.isArray(markets) ? markets : [];
+    _cachedWorldMarketsForAnalytics = FolioMarketState.availableRows(rows);
     const strip = document.getElementById("world-markets-strip");
     if (strip) {
         strip.innerHTML = "";
 
         // Group by region, preserve defined order
         const byRegion = {};
-        markets.forEach(m => {
+        rows.forEach(m => {
             if (!byRegion[m.region]) byRegion[m.region] = [];
             byRegion[m.region].push(m);
         });
@@ -11504,13 +11500,20 @@ function renderWorldMarkets(markets) {
             }
 
             group.forEach((m, marketIdx) => {
-                const up   = m.day_change_pct >= 0;
-                const cls  = up ? "text-success" : "text-danger";
-                const icon = up ? "bi-caret-up-fill" : "bi-caret-down-fill";
-                const sign = up ? "+" : "";
+                const direction = FolioMarketState.direction(m);
+                const tileTone = direction ? `is-${direction}` : "is-unavailable";
+                let changeHtml = '<span class="market-tile-unavailable">Unavailable</span>';
+                if (direction === "up" || direction === "down") {
+                    const cls = direction === "up" ? "text-success" : "text-danger";
+                    const icon = direction === "up" ? "bi-caret-up-fill" : "bi-caret-down-fill";
+                    const sign = direction === "up" ? "+" : "";
+                    changeHtml = `<span class="${cls}"><i class="bi ${icon}"></i>${sign}${m.day_change_pct.toFixed(2)}%</span>`;
+                } else if (direction === "flat") {
+                    changeHtml = `<span class="market-tile-flat">${m.day_change_pct.toFixed(2)}%</span>`;
+                }
 
                 const tile = document.createElement("div");
-                tile.className = `market-tile ${up ? "is-positive" : "is-negative"}`;
+                tile.className = `market-tile ${tileTone}`;
                 tile.style.setProperty("--tile-index", regionIdx * 3 + marketIdx);
                 tile.innerHTML = `
                     <div class="market-tile-top">
@@ -11519,10 +11522,7 @@ function renderWorldMarkets(markets) {
                     </div>
                     <div class="market-tile-name">${escapeHtml(m.name)}</div>
                     <div class="market-tile-price">${_marketPrice(m.price)}</div>
-                    <div class="market-tile-change ${cls}">
-                        <i class="bi ${icon}"></i>
-                        ${sign}${m.day_change_pct.toFixed(2)}%
-                    </div>
+                    <div class="market-tile-change">${changeHtml}</div>
                 `;
                 strip.appendChild(tile);
             });
@@ -12460,31 +12460,54 @@ async function loadManageHoldings({ preserveExisting = false } = {}) {
 }
 
 
-// Collect the actual price and date for a realized sale (a share reduction).
-// Resolves to { sale_price, sale_date } — sale_price null means "use today's
-// market price" — or null if the user cancels (keep the holding unchanged).
-function promptSaleDetails({ ticker, soldQty, fromShares, toShares, defaultPrice }) {
+// Collect the actual price and date for a realized sale. A blank price asks the
+// server for a verified current USD quote; it never authorizes a basis fallback.
+function promptSaleDetails({
+    ticker,
+    soldQty,
+    fromShares,
+    toShares,
+    requirePrice = false,
+    removal = false,
+    isWatchlist = false,
+}) {
     return new Promise((resolve) => {
         const today = new Date().toISOString().slice(0, 10);
         const overlay = document.createElement("div");
         overlay.className = "sale-dialog-overlay";
+        const safeTicker = escapeHtml(ticker);
+        const title = isWatchlist
+            ? `Discard ${safeTicker} research position?`
+            : removal
+                ? `Remove ${safeTicker} and record the sale`
+                : `Record a sale of ${escapeHtml(String(soldQty))} ${safeTicker}`;
+        const copy = isWatchlist
+            ? "This removes the research position without changing realized P&L or performance."
+            : requirePrice
+                ? `FolioOrb could not verify a current USD market price for ${safeTicker}. Enter the actual USD sale price, or cancel to keep the holding unchanged.`
+                : `${removal ? "Removing" : "Reducing"} ${safeTicker} from ${escapeHtml(String(fromShares))} to ${escapeHtml(String(toShares))} shares books a realized sale. Enter the actual USD price, or leave it blank to use a verified current USD market quote.`;
+        const fields = isWatchlist ? "" : `
+            <div class="sale-dialog-fields">
+                <label class="sale-dialog-field">
+                    <span>Sale price (USD per share)${requirePrice ? " · required" : ""}</span>
+                    <input type="number" id="sale-price-input" min="0.01" step="0.01"
+                           inputmode="decimal" autocomplete="off"
+                           placeholder="${requirePrice ? "Enter actual USD price" : "Use verified current USD quote"}">
+                </label>
+                <label class="sale-dialog-field">
+                    <span>Sale date</span>
+                    <input type="date" id="sale-date-input" max="${today}" value="${today}">
+                </label>
+            </div>
+            <p class="sale-dialog-error" role="alert" hidden>Enter a positive USD sale price.</p>`;
         overlay.innerHTML = `
-            <div class="sale-dialog" role="dialog" aria-modal="true" aria-label="Record a sale">
-                <div class="sale-dialog-title">Record a sale of ${escapeHtml(String(soldQty))} ${escapeHtml(ticker)}</div>
-                <p class="sale-dialog-sub">Reducing ${escapeHtml(ticker)} from ${escapeHtml(String(fromShares))} to ${escapeHtml(String(toShares))} shares books a realized sale. Enter the real details, or leave the price blank to use today's market price. Correcting a typo? Cancel.</p>
-                <div class="sale-dialog-fields">
-                    <label class="sale-dialog-field">
-                        <span>Sale price (per share)</span>
-                        <input type="number" id="sale-price-input" min="0.01" step="0.01" placeholder="Today's market price"${Number.isFinite(defaultPrice) ? ` value="${defaultPrice}"` : ""}>
-                    </label>
-                    <label class="sale-dialog-field">
-                        <span>Sale date</span>
-                        <input type="date" id="sale-date-input" max="${today}" value="${today}">
-                    </label>
-                </div>
+            <div class="sale-dialog" role="dialog" aria-modal="true" aria-labelledby="sale-dialog-title">
+                <div class="sale-dialog-title" id="sale-dialog-title">${title}</div>
+                <p class="sale-dialog-sub">${copy}</p>
+                ${fields}
                 <div class="sale-dialog-actions">
                     <button type="button" class="btn btn-sm sale-dialog-cancel">Cancel — keep unchanged</button>
-                    <button type="button" class="btn btn-sm btn-warning sale-dialog-confirm">Record sale</button>
+                    <button type="button" class="btn btn-sm btn-warning sale-dialog-confirm">${isWatchlist ? "Discard research" : "Record sale"}</button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
@@ -12504,10 +12527,15 @@ function promptSaleDetails({ ticker, soldQty, fromShares, toShares, defaultPrice
             resolve(result);
         }
         function onConfirm() {
+            if (isWatchlist) {
+                cleanup({});
+                return;
+            }
             const rawPrice = priceInput.value.trim();
             const price = rawPrice ? Number(rawPrice) : null;
-            if (rawPrice && (!Number.isFinite(price) || price <= 0)) {
+            if ((requirePrice && !rawPrice) || (rawPrice && (!Number.isFinite(price) || price <= 0))) {
                 priceInput.classList.add("is-invalid");
+                overlay.querySelector(".sale-dialog-error").hidden = false;
                 priceInput.focus();
                 return;
             }
@@ -12516,7 +12544,7 @@ function promptSaleDetails({ ticker, soldQty, fromShares, toShares, defaultPrice
         overlay.querySelector(".sale-dialog-confirm").addEventListener("click", onConfirm);
         overlay.querySelector(".sale-dialog-cancel").addEventListener("click", () => cleanup(null));
         overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) cleanup(null); });
-        setTimeout(() => priceInput.focus(), 30);
+        setTimeout(() => (priceInput || overlay.querySelector(".sale-dialog-confirm"))?.focus(), 30);
     });
 }
 
@@ -12558,9 +12586,8 @@ async function updateHolding(holdingId, options = {}) {
     if (isReduction) {
         const soldQty = Number((originalShares - shares).toFixed(4));
         const ticker = card?.dataset.ticker || "this holding";
-        const marketPrice = (latestHoldings.find(h => h.ticker === ticker) || {}).current_price;
         saleDetails = await promptSaleDetails({
-            ticker, soldQty, fromShares: originalShares, toShares: shares, defaultPrice: marketPrice,
+            ticker, soldQty, fromShares: originalShares, toShares: shares,
         });
         if (!saleDetails) {  // cancelled → revert, book nothing
             if (sharesInput) sharesInput.value = sharesInput.defaultValue;
@@ -12751,14 +12778,55 @@ async function toggleAnchorHold(event, holdingId, ticker) {
 
 
 async function removeHolding(holdingId, ticker, isWatchlist = false) {
-    const msg = isWatchlist
-        ? `Discard ${ticker} research position? This won't affect your P&L or performance.`
-        : `Remove ${ticker} from your portfolio? This will record any realized gain/loss.`;
-    if (!confirm(msg)) return;
-
-    const res = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
-        method: "DELETE"
+    const holding = manageHoldingsCache.find(h => h.id === holdingId)
+        || latestHoldings.find(h => h.id === holdingId)
+        || {};
+    const fromShares = Number(holding.shares);
+    let saleDetails = await promptSaleDetails({
+        ticker,
+        soldQty: Number.isFinite(fromShares) ? fromShares : "all",
+        fromShares: Number.isFinite(fromShares) ? fromShares : "all",
+        toShares: 0,
+        removal: true,
+        isWatchlist,
     });
+    if (saleDetails === null) return;
+
+    async function requestRemoval(details) {
+        return PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(HoldingRemovalLogic.buildPayload(details)),
+        });
+    }
+
+    let res;
+    let err = {};
+    try {
+        res = await requestRemoval(saleDetails);
+        if (!res.ok) err = await res.json().catch(() => ({}));
+        if (
+            !isWatchlist
+            && !saleDetails.sale_price
+            && HoldingRemovalLogic.requiresExplicitPrice(res.status, err)
+        ) {
+            saleDetails = await promptSaleDetails({
+                ticker,
+                soldQty: Number.isFinite(fromShares) ? fromShares : "all",
+                fromShares: Number.isFinite(fromShares) ? fromShares : "all",
+                toShares: 0,
+                requirePrice: true,
+                removal: true,
+            });
+            if (saleDetails === null) return;
+            res = await requestRemoval(saleDetails);
+            err = res.ok ? {} : await res.json().catch(() => ({}));
+        }
+    } catch (requestError) {
+        console.warn("Unable to remove holding:", requestError);
+        showToast(`Couldn't remove ${ticker} — holding kept unchanged`, "danger");
+        return;
+    }
     if (res.ok) {
         // Remove the deleted holding from the shared client state immediately.
         // The authoritative post-mutation fetch below then recalculates totals and
@@ -12785,8 +12853,10 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
         );
         refreshPortfolioMutationInBackground();
     } else {
-        const err = await res.json().catch(() => ({}));
-        showToast(apiErrorMessage(err, `Couldn't remove ${ticker} — please try again`), "danger");
+        showToast(
+            apiErrorMessage(err, `Couldn't remove ${ticker} — holding kept unchanged`),
+            "danger"
+        );
     }
 }
 

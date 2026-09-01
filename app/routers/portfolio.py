@@ -10,6 +10,7 @@ from app.models import Holding, RealizedTrade
 from app.routers.deps import require_portfolio
 from app.schemas import (
     HoldingCreate,
+    HoldingRemoval,
     HoldingUpdate,
     PortfolioCreate,
     RealizedTradeUpdate,
@@ -512,12 +513,26 @@ def update_holding(
     # mode) holdings can hold nonzero shares too, but they're promised to never
     # touch P&L — skip recording for them, matching remove_holding's guard below.
     if data.shares is not None and data.shares < holding.shares:
-        realized_sales.RealizedSaleLedger(
-            db, portfolio_id, quote_loader=get_stock_data
-        ).stage_reduction(
-            holding, data.shares,
-            sale_price=data.sale_price, sale_date=data.sale_date,
-        )
+        try:
+            realized_sales.RealizedSaleLedger(
+                db, portfolio_id, quote_loader=get_stock_data
+            ).stage_reduction(
+                holding, data.shares,
+                sale_price=data.sale_price, sale_date=data.sale_date,
+            )
+        except realized_sales.SalePriceUnavailable as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "sale_price_required",
+                    "message": (
+                        f"Could not verify a current USD sale price for {exc.ticker}. "
+                        "The holding was kept unchanged; enter the actual USD sale "
+                        "price to record the sale truthfully."
+                    ),
+                },
+            ) from exc
 
     # Only update fields that were actually provided (not None)
     if data.shares is not None:
@@ -553,7 +568,10 @@ def update_holding(
 
 @router.delete("/holdings/{holding_id}")
 def remove_holding(
-    holding_id: int, db: Session = Depends(get_db), portfolio_id: int = 1
+    holding_id: int,
+    db: Session = Depends(get_db),
+    portfolio_id: int = 1,
+    data: HoldingRemoval | None = None,
 ):
     """
     Soft-delete a holding by setting is_active=False.
@@ -564,9 +582,29 @@ def remove_holding(
         raise HTTPException(status_code=404, detail="Holding not found")
 
     # Watchlist (research-mode) holdings are discarded silently — no realized gain recorded.
-    realized_sales.RealizedSaleLedger(
-        db, portfolio_id, quote_loader=get_stock_data
-    ).stage_reduction(holding, 0)
+    removal = data or HoldingRemoval()
+    try:
+        realized_sales.RealizedSaleLedger(
+            db, portfolio_id, quote_loader=get_stock_data
+        ).stage_reduction(
+            holding,
+            0,
+            sale_price=removal.sale_price,
+            sale_date=removal.sale_date,
+        )
+    except realized_sales.SalePriceUnavailable as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "sale_price_required",
+                "message": (
+                    f"Could not verify a current USD sale price for {exc.ticker}. "
+                    "The holding was kept unchanged; enter the actual USD sale "
+                    "price to record the sale truthfully."
+                ),
+            },
+        ) from exc
 
     holding.is_active = False
     db.commit()

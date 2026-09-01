@@ -101,7 +101,16 @@ class TestRemoveHolding:
     def test_the_owning_portfolio_can(self, two_books):
         target = _holding(two_books, "BBB")
 
-        portfolio_router.remove_holding(target.id, two_books, portfolio_id=2)
+        portfolio_router.remove_holding(
+            target.id,
+            two_books,
+            portfolio_id=2,
+            data=portfolio_router.HoldingRemoval(
+                sale_price=250,
+                sale_currency="USD",
+                sale_price_source="manual_entry",
+            ),
+        )
 
         two_books.refresh(target)
         assert target.is_active is False

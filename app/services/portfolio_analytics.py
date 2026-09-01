@@ -573,15 +573,38 @@ def compute_market_context(
     """
     Enrich world indices with portfolio correlation and geographic alignment.
     """
+    available_world_markets = [
+        market for market in world_markets
+        if market.get("available") is True
+        and market.get("day_change_pct") is not None
+    ]
     cache_key = (
         f"mktctx:{_tickers_key([h['ticker'] for h in holdings if not h.get('is_watchlist')])}"
     )
     cached = _cache_get(cache_key)
     if cached is not None:
-        quote_map = {m["ticker"]: m for m in world_markets}
+        quote_map = {m["ticker"]: m for m in available_world_markets}
+        cached_tickers = {row["ticker"] for row in cached.get("markets", [])}
+        if not quote_map:
+            return {
+                **cached,
+                "has_data": False,
+                "markets": [],
+                "summary": None,
+                "best_match": None,
+            }
+        # A previously dead row may recover before the correlation cache
+        # expires. Recompute so that recovery appears independently instead of
+        # staying suppressed by an older mixed result.
+        if not set(quote_map).issubset(cached_tickers):
+            cached = None
+    if cached is not None:
+        quote_map = {m["ticker"]: m for m in available_world_markets}
         markets = []
         for row in cached.get("markets", []):
-            live = quote_map.get(row["ticker"], {})
+            live = quote_map.get(row["ticker"])
+            if live is None:
+                continue
             markets.append({
                 **row,
                 "price": live.get("price", row.get("price")),
@@ -590,6 +613,16 @@ def compute_market_context(
             })
         return {**cached, "markets": markets}
 
+    if not available_world_markets:
+        # Do not cache a fully dead market context; the next request gets an
+        # immediate chance to observe provider recovery.
+        return {
+            "has_data": False,
+            "markets": [],
+            "summary": None,
+            "best_match": None,
+        }
+
     active = [
         h for h in holdings
         if not h.get("is_watchlist") and float(h.get("allocation_pct") or 0) > 0
@@ -597,7 +630,7 @@ def compute_market_context(
     if not active:
         return _cache_set(cache_key, {
             "has_data": False,
-            "markets": world_markets,
+            "markets": available_world_markets,
             "summary": None,
             "best_match": None,
         })
@@ -616,11 +649,11 @@ def compute_market_context(
     )
     country_exposure = exposure.get("country_exposure") or []
 
-    index_tickers = [m["ticker"] for m in world_markets]
+    index_tickers = [m["ticker"] for m in available_world_markets]
     correlations = _portfolio_index_correlations(holdings, index_tickers)
 
     enriched: list[dict] = []
-    for market in world_markets:
+    for market in available_world_markets:
         ticker = market["ticker"]
         corr = correlations.get(ticker, 0.0)
         geo = _geo_weight(country_exposure, _INDEX_GEO_KEYS.get(ticker, []))

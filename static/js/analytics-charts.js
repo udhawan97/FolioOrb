@@ -2897,22 +2897,24 @@ const AnalyticsCharts = (() => {
     }
 
     function tapeItemHtml(m) {
-        const up = (m.day_change_pct ?? 0) >= 0;
-        const cls = up ? "tape-chg-up" : "tape-chg-down";
-        const sign = up ? "+" : "";
+        const direction = FolioMarketState.direction(m);
+        const cls = direction === "up"
+            ? "tape-chg-up"
+            : direction === "down" ? "tape-chg-down" : "tape-chg-flat";
+        const sign = direction === "up" ? "+" : "";
         const price = typeof _marketPrice === "function" ? _marketPrice(m.price) : m.price;
         return html`<span class="markets-tape-item">
             <span class="tape-flag">${m.flag || ""}</span>
             <span class="tape-name">${m.name}</span>
             <span class="tape-price">${price}</span>
-            <span class="${cls}">${sign}${(m.day_change_pct ?? 0).toFixed(2)}%</span>
+            <span class="${cls}">${sign}${m.day_change_pct.toFixed(2)}%</span>
         </span>`;
     }
 
     let _tapeListenersBound = false;
 
     function refreshMarketsTape(markets) {
-        _cachedMarkets = markets || [];
+        _cachedMarkets = FolioMarketState.availableRows(markets);
         const track = $("markets-tape-track");
         if (!track) return;
 
@@ -2956,15 +2958,19 @@ const AnalyticsCharts = (() => {
         const grid = $("markets-portfolio-grid");
         if (!grid) return;
 
-        if (!markets?.length) {
+        const availableMarkets = FolioMarketState.availableRows(markets);
+
+        if (!availableMarkets.length) {
             grid.innerHTML = `<p class="markets-portfolio-empty">Portfolio market context unavailable</p>`;
             return;
         }
 
-        grid.innerHTML = markets.map(m => {
-            const up = (m.day_change_pct ?? 0) >= 0;
-            const chgCls = up ? "text-success" : "text-danger";
-            const sign = up ? "+" : "";
+        grid.innerHTML = availableMarkets.map(m => {
+            const direction = FolioMarketState.direction(m);
+            const chgCls = direction === "up"
+                ? "text-success"
+                : direction === "down" ? "text-danger" : "text-secondary";
+            const sign = direction === "up" ? "+" : "";
             const price = typeof _marketPrice === "function" ? _marketPrice(m.price) : m.price;
             const corr = Number(m.correlation) || 0;
             const corrPct = Math.round(Math.abs(corr) * 100);
@@ -2979,7 +2985,7 @@ const AnalyticsCharts = (() => {
                 <div class="markets-portfolio-tile-head">
                     <span class="markets-portfolio-flag">${m.flag || ""}</span>
                     <span class="markets-portfolio-name">${m.name}</span>
-                    <span class="markets-portfolio-chg ${chgCls}">${sign}${(m.day_change_pct ?? 0).toFixed(2)}%</span>
+                    <span class="markets-portfolio-chg ${chgCls}">${sign}${m.day_change_pct.toFixed(2)}%</span>
                 </div>
                 <div class="markets-portfolio-price">${price}</div>
                 <div class="markets-portfolio-corr-row">

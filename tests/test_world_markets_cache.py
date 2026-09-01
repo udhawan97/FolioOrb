@@ -11,12 +11,14 @@ from app.services import world_markets
 
 def _priced(ticker="^GSPC", price=100.0):
     return {"ticker": ticker, "name": "Index", "region": "US", "flag": "US",
-            "price": price, "day_change": 1.0, "day_change_pct": 1.0}
+            "available": True, "price": price,
+            "day_change": 1.0, "day_change_pct": 1.0}
 
 
 def _dead(ticker="^GSPC"):
     return {"ticker": ticker, "name": "Index", "region": "US", "flag": "US",
-            "price": 0, "day_change": 0, "day_change_pct": 0}
+            "available": False, "price": None,
+            "day_change": None, "day_change_pct": None}
 
 
 def test_a_successful_fan_out_is_fetched_once(monkeypatch):
@@ -74,8 +76,60 @@ def test_fetch_world_market_never_raises(monkeypatch):
 
     row = world_markets.fetch_world_market(world_markets.WORLD_MARKETS[0])
 
-    assert row["price"] == 0 and row["day_change_pct"] == 0
+    assert row["available"] is False
+    assert row["price"] is None and row["day_change_pct"] is None
     assert row["name"] == world_markets.WORLD_MARKETS[0]["name"]
+
+
+def test_genuine_flat_market_remains_available(monkeypatch):
+    monkeypatch.setattr(
+        world_markets.market_data,
+        "get_fast_info",
+        lambda _ticker: {"last_price": 100.0, "previous_close": 100.0},
+    )
+
+    row = world_markets.fetch_world_market(world_markets.WORLD_MARKETS[0])
+
+    assert row["available"] is True
+    assert row["price"] == 100.0
+    assert row["day_change"] == 0.0
+    assert row["day_change_pct"] == 0.0
+
+
+def test_partial_quote_is_explicitly_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        world_markets.market_data,
+        "get_fast_info",
+        lambda _ticker: {"last_price": 100.0, "previous_close": None},
+    )
+
+    row = world_markets.fetch_world_market(world_markets.WORLD_MARKETS[0])
+
+    assert row["available"] is False
+    assert row["price"] is None
+    assert row["day_change"] is None
+    assert row["day_change_pct"] is None
+
+
+def test_mixed_fan_out_keeps_rows_independent_and_caches_the_live_rows(monkeypatch):
+    calls = []
+    first_ticker = world_markets.WORLD_MARKETS[0]["ticker"]
+
+    def fetch(market):
+        calls.append(market["ticker"])
+        if market["ticker"] == first_ticker:
+            return _dead(market["ticker"])
+        return _priced(market["ticker"])
+
+    monkeypatch.setattr(world_markets, "fetch_world_market", fetch)
+
+    first = world_markets.get_world_markets_cached()
+    second = world_markets.get_world_markets_cached()
+
+    assert first == second
+    assert first[0]["available"] is False
+    assert all(row["available"] is True for row in first[1:])
+    assert len(calls) == len(world_markets.WORLD_MARKETS)
 
 
 def test_the_router_and_the_startup_warmup_share_one_cache(monkeypatch):

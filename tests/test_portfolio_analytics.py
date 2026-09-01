@@ -189,6 +189,7 @@ def test_compute_market_context_enriches(mock_quotes, mock_exposure, mock_corr):
             "name": "S&P 500",
             "region": "US",
             "flag": "🇺🇸",
+            "available": True,
             "price": 100,
             "day_change_pct": -0.1,
         },
@@ -197,6 +198,7 @@ def test_compute_market_context_enriches(mock_quotes, mock_exposure, mock_corr):
             "name": "Nikkei 225",
             "region": "Asia",
             "flag": "🇯🇵",
+            "available": True,
             "price": 200,
             "day_change_pct": -1.0,
         },
@@ -213,6 +215,58 @@ def test_compute_market_context_enriches(mock_quotes, mock_exposure, mock_corr):
     assert result["markets"][0]["correlation"] == 0.82
     assert result["markets"][0]["geo_weight_pct"] == 61.0
     assert "S&P 500" in result["summary"]
+
+
+@patch.object(pa, "_portfolio_index_correlations")
+@patch.object(pa, "build_portfolio_exposure")
+@patch.object(pa, "get_all_quotes")
+def test_market_context_excludes_only_the_unavailable_rows(
+    mock_quotes, mock_exposure, mock_corr
+):
+    mock_quotes.return_value = [{"ticker": "VOO", "current_price": 400}]
+    mock_exposure.return_value = {"country_exposure": []}
+    mock_corr.return_value = {"^GSPC": 0.4, "^N225": 0.8}
+    world = [
+        {
+            "ticker": "^GSPC", "name": "S&P 500", "region": "US", "flag": "US",
+            "available": True, "price": 100, "day_change": 0, "day_change_pct": 0,
+        },
+        {
+            "ticker": "^N225", "name": "Nikkei", "region": "Asia", "flag": "JP",
+            "available": False, "price": None,
+            "day_change": None, "day_change_pct": None,
+        },
+    ]
+    holdings = [{"ticker": "VOO", "allocation_pct": 100, "is_watchlist": False}]
+
+    pa._cache.clear()
+    result = pa.compute_market_context(holdings, world)
+
+    assert [row["ticker"] for row in result["markets"]] == ["^GSPC"]
+    assert result["markets"][0]["day_change_pct"] == 0
+    mock_corr.assert_called_once_with(holdings, ["^GSPC"])
+
+
+@patch.object(pa, "get_all_quotes")
+def test_fully_unavailable_market_context_is_not_cached(mock_quotes):
+    dead = [{
+        "ticker": "^GSPC", "name": "S&P 500", "region": "US", "flag": "US",
+        "available": False, "price": None,
+        "day_change": None, "day_change_pct": None,
+    }]
+    holdings = [{"ticker": "VOO", "allocation_pct": 100, "is_watchlist": False}]
+
+    pa._cache.clear()
+    first = pa.compute_market_context(holdings, dead)
+
+    assert first == {
+        "has_data": False,
+        "markets": [],
+        "summary": None,
+        "best_match": None,
+    }
+    assert not any(key.startswith("mktctx:") for key in pa._cache)
+    mock_quotes.assert_not_called()
 
 
 def test_correlation_single_holding():

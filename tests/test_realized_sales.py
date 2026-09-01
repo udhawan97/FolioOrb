@@ -10,6 +10,7 @@ from app.models import Base, Holding, Portfolio, PortfolioSnapshot, RealizedTrad
 from app.services.realized_sales import (
     RealizedSaleLedger,
     RealizedSaleNotFound,
+    SalePriceUnavailable,
     SaleCorrection,
 )
 
@@ -78,27 +79,59 @@ def test_reduction_stages_average_cost_facts_without_committing():
     assert db.query(RealizedTrade).count() == 0
 
 
-@pytest.mark.parametrize(
-    ("quote", "currency", "source"),
-    [
-        ({"current_price": 130.0, "currency": "USD"}, "USD", "market_quote"),
-        ({"current_price": 130.0, "currency": "GBp"}, "GBp", "market_quote"),
-        ({"current_price": 130.0}, None, "market_quote"),
-        ({"current_price": 0.0, "currency": "USD"}, None, "cost_basis_fallback"),
-    ],
-)
-def test_automatic_sale_persists_exact_currency_and_price_provenance(
-    quote, currency, source
-):
+def test_automatic_sale_requires_and_persists_an_explicit_usd_quote():
     db = make_db()
     holding = add_holding(db)
 
     trade = RealizedSaleLedger(
-        db, 1, quote_loader=lambda _ticker: quote
+        db,
+        1,
+        quote_loader=lambda _ticker: {"current_price": 130.0, "currency": "usd"},
     ).stage_reduction(holding, 9)
 
-    assert trade.sale_currency == currency
-    assert trade.sale_price_source == source
+    assert trade.sale_price == 130.0
+    assert trade.sale_currency == "USD"
+    assert trade.sale_price_source == "market_quote"
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        {"current_price": 130.0, "currency": "GBp"},
+        {"current_price": 130.0},
+        {"current_price": 0.0, "currency": "USD"},
+        {"current_price": None, "currency": "USD"},
+        {"current_price": float("nan"), "currency": "USD"},
+        {"current_price": float("inf"), "currency": "USD"},
+    ],
+)
+def test_unusable_automatic_sale_price_stages_nothing(quote):
+    db = make_db()
+    holding = add_holding(db)
+
+    with pytest.raises(SalePriceUnavailable):
+        RealizedSaleLedger(
+            db, 1, quote_loader=lambda _ticker: quote
+        ).stage_reduction(holding, 0)
+
+    assert holding.is_active is True
+    assert db.query(RealizedTrade).count() == 0
+    assert not db.new
+
+
+def test_quote_loader_failure_stages_nothing():
+    db = make_db()
+    holding = add_holding(db)
+
+    def fail(_ticker):
+        raise RuntimeError("provider unavailable")
+
+    with pytest.raises(SalePriceUnavailable):
+        RealizedSaleLedger(db, 1, quote_loader=fail).stage_reduction(holding, 0)
+
+    assert holding.is_active is True
+    assert db.query(RealizedTrade).count() == 0
+    assert not db.new
 
 
 def test_watchlist_reduction_never_creates_a_sale_fact():
@@ -115,7 +148,9 @@ def test_holding_and_sale_roll_back_together_when_the_commit_fails(monkeypatch):
     db = make_db()
     holding = add_holding(db)
     ledger = RealizedSaleLedger(
-        db, 1, quote_loader=lambda _ticker: {"current_price": 120.0}
+        db,
+        1,
+        quote_loader=lambda _ticker: {"current_price": 120.0, "currency": "USD"},
     )
     ledger.stage_reduction(holding, 5)
     holding.shares = 5

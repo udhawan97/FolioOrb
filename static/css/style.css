@@ -4320,6 +4320,11 @@ body > .sale-dialog-overlay {
     font-variant-numeric: tabular-nums;
 }
 .sale-dialog-field input.is-invalid { border-color: var(--accent-red); }
+.sale-dialog-error {
+    margin: -0.55rem 0 0.9rem;
+    color: var(--accent-red);
+    font-size: 0.75rem;
+}
 
 .sale-dialog-actions {
     display: flex;
@@ -10327,6 +10332,10 @@ body > .dashboard-senpai {
 }
 .market-tile.is-positive { --market-tile-tone: var(--accent-green); }
 .market-tile.is-negative { --market-tile-tone: var(--accent-red); }
+.market-tile.is-up { --market-tile-tone: var(--accent-green); }
+.market-tile.is-down { --market-tile-tone: var(--accent-red); }
+.market-tile.is-flat,
+.market-tile.is-unavailable { --market-tile-tone: var(--text-tertiary); }
 .market-tile:hover {
     background: var(--control-hover);
     border-color: var(--hairline-hover);
@@ -10391,6 +10400,9 @@ body > .dashboard-senpai {
     gap: 0.22rem;
 }
 .market-tile-change i { font-size: 0.6rem; opacity: 0.8; line-height: 1; flex-shrink: 0; }
+.market-tile-change > span { display: inline-flex; align-items: center; gap: 0.22rem; }
+.market-tile-flat,
+.market-tile-unavailable { color: var(--text-tertiary); }
 
 @keyframes marketTileTrace {
     0%, 54% {
@@ -19635,6 +19647,7 @@ body > .correlation-cell-tip {
 .markets-tape-item .tape-price { font-weight: 600; font-variant-numeric: tabular-nums; }
 .markets-tape-item .tape-chg-up { color: var(--accent-green); }
 .markets-tape-item .tape-chg-down { color: var(--accent-red); }
+.markets-tape-item .tape-chg-flat { color: var(--text-tertiary); }
 
 .markets-portfolio-summary {
     margin: 0;

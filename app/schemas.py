@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 from datetime import date
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -85,6 +85,44 @@ class HoldingUpdate(BaseModel):
     @classmethod
     def valid_hold_class(cls, v):
         return _normalize_hold_class(v)
+
+    @field_validator("sale_date")
+    @classmethod
+    def valid_sale_date(cls, v):
+        if v is None:
+            return None
+        try:
+            parsed = date.fromisoformat(str(v).strip())
+        except (TypeError, ValueError) as exc:
+            raise ValueError("sale_date must be an ISO date, e.g. 2026-01-15") from exc
+        if parsed > date.today():
+            raise ValueError("sale_date cannot be in the future")
+        return parsed.isoformat()
+
+
+class HoldingRemoval(BaseModel):
+    """Optional facts supplied when removing an owned position.
+
+    An omitted price asks FolioOrb to use a current, explicitly USD market
+    quote. A supplied price is always an actual user-entered USD sale fact and
+    must carry that provenance as one indivisible request contract.
+    """
+
+    sale_price: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
+    sale_currency: Optional[Literal["USD"]] = None
+    sale_price_source: Optional[Literal["manual_entry"]] = None
+    sale_date: Optional[str] = None
+
+    @model_validator(mode="after")
+    def explicit_sale_fields_move_together(self):
+        explicit_fields = (self.sale_currency, self.sale_price_source)
+        if self.sale_price is None and any(value is not None for value in explicit_fields):
+            raise ValueError("sale currency and source require a sale price")
+        if self.sale_price is not None and explicit_fields != ("USD", "manual_entry"):
+            raise ValueError(
+                "an explicit sale price requires USD currency and manual_entry source"
+            )
+        return self
 
     @field_validator("sale_date")
     @classmethod

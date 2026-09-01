@@ -130,5 +130,9 @@ def test_a_failed_refresh_leaves_cached_tiles_alone():
 
 def test_a_malformed_market_row_is_not_rendered():
     body = _js().split("function hydrateWorldMarketsFromCache")[1][:800]
-    assert "Array.isArray(cached)" in body
-    assert "Number.isFinite(m.day_change_pct)" in body
+    assert "FolioMarketState.cachePayloadIsUsable(cached)" in body
+
+
+def test_a_fully_dead_client_result_does_not_replace_the_last_live_cache():
+    body = _js().split("function persistWorldMarkets")[1][:400]
+    assert "FolioMarketState.availableRows(markets).length" in body

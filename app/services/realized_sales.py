@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 import logging
+import math
 from typing import Callable
 
 from sqlalchemy.orm import Session
@@ -26,7 +27,6 @@ ValuationQuoteLoader = Callable[[list[str]], list[dict]]
 SALE_SOURCE_LEGACY_UNKNOWN = financial_currency.LEGACY_UNKNOWN_PROVENANCE
 SALE_SOURCE_MANUAL_ENTRY = "manual_entry"
 SALE_SOURCE_MARKET_QUOTE = "market_quote"
-SALE_SOURCE_COST_BASIS_FALLBACK = "cost_basis_fallback"
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,14 @@ class SaleCorrection:
 
 class RealizedSaleNotFound(LookupError):
     """The requested sale does not belong to the active portfolio."""
+
+
+class SalePriceUnavailable(ValueError):
+    """A reduction cannot be priced as a trustworthy USD sale."""
+
+    def __init__(self, ticker: str):
+        super().__init__(ticker)
+        self.ticker = ticker
 
 
 class RealizedSaleLedger:
@@ -95,27 +103,35 @@ class RealizedSaleLedger:
             return None
 
         basis = float(holding.avg_cost or 0.0)
-        if sale_price is not None and sale_price > 0:
-            price = float(sale_price)
+        if sale_price is not None:
+            try:
+                price = float(sale_price)
+            except (TypeError, ValueError, OverflowError):
+                raise SalePriceUnavailable(str(holding.ticker)) from None
+            if not math.isfinite(price) or price <= 0:
+                raise SalePriceUnavailable(str(holding.ticker))
             sale_currency = financial_currency.REPORTING_CURRENCY
             sale_price_source = SALE_SOURCE_MANUAL_ENTRY
         else:
-            quote = self.quote_loader(str(holding.ticker))
-            live = float(quote.get("current_price") or 0.0)
-            if live > 0:
-                price = live
-                # Missing currency is ambiguous at the persistence boundary,
-                # even though quote-only views historically display it as USD.
-                sale_currency = financial_currency.normalize_currency(
-                    quote.get("currency")
+            try:
+                quote = self.quote_loader(str(holding.ticker)) or {}
+                live = float(quote.get("current_price") or 0.0)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logger.warning(
+                    "Sale quote unavailable; ticker=%s exception_type=%s",
+                    holding.ticker,
+                    type(exc).__name__,
                 )
-                sale_price_source = SALE_SOURCE_MARKET_QUOTE
-            else:
-                # DR-003 owns removal of this legacy behavior. Mark it plainly
-                # so it cannot enter dollar totals in the meantime.
-                price = basis
-                sale_currency = None
-                sale_price_source = SALE_SOURCE_COST_BASIS_FALLBACK
+                raise SalePriceUnavailable(str(holding.ticker)) from None
+            if not (
+                math.isfinite(live)
+                and live > 0
+                and financial_currency.is_reporting_currency(quote.get("currency"))
+            ):
+                raise SalePriceUnavailable(str(holding.ticker))
+            price = live
+            sale_currency = financial_currency.REPORTING_CURRENCY
+            sale_price_source = SALE_SOURCE_MARKET_QUOTE
 
         stored_price = round(price, 2)
         stored_basis = round(basis, 2)

@@ -17,6 +17,7 @@ miss together now share one fan-out instead of each spinning up ten workers.
 from __future__ import annotations
 
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor
 
 from app.services import market_data
@@ -43,21 +44,31 @@ WORLD_MARKETS: list[dict] = [
 def fetch_world_market(market: dict) -> dict:
     """Quote one index: the market's static fields plus price and day change.
 
-    Never raises, and never returns a partial payload — a failed or priceless
-    fetch zeroes the numbers rather than dropping keys, so one dead index
-    can't blank the strip or trip up market-context scoring.
+    Never raises. A complete quote carries ``available=True`` and numeric
+    fields, including a genuine flat 0.00% session. Missing or partial quotes
+    carry ``available=False`` and null numeric fields so no consumer can infer
+    direction from a synthetic zero.
     """
     try:
         fast = market_data.get_fast_info(market["ticker"]) or {}
         price = float(fast.get("last_price") or 0)
         prev = float(fast.get("previous_close") or 0)
-        if price > 0 and prev > 0:
-            chg = price - prev
-            chg_pct = chg / prev * 100
-        else:
-            chg = chg_pct = 0.0
+        if not (
+            math.isfinite(price) and price > 0
+            and math.isfinite(prev) and prev > 0
+        ):
+            return {
+                **market,
+                "available": False,
+                "price": None,
+                "day_change": None,
+                "day_change_pct": None,
+            }
+        chg = price - prev
+        chg_pct = chg / prev * 100
         return {
             **market,
+            "available": True,
             "price": round(price, 2),
             "day_change": round(chg, 2),
             "day_change_pct": round(chg_pct, 2),
@@ -68,7 +79,13 @@ def fetch_world_market(market: dict) -> dict:
             market.get("ticker"),
             type(exc).__name__,
         )
-        return {**market, "price": 0, "day_change": 0, "day_change_pct": 0}
+        return {
+            **market,
+            "available": False,
+            "price": None,
+            "day_change": None,
+            "day_change_pct": None,
+        }
 
 
 def _any_index_priced(markets: list[dict]) -> bool:
@@ -78,7 +95,7 @@ def _any_index_priced(markets: list[dict]) -> bool:
     when Yahoo is briefly unreachable — an all-dead result is retried on the
     next request instead of being remembered as an answer.
     """
-    return any((m.get("price") or 0) > 0 for m in markets)
+    return any(m.get("available") is True for m in markets)
 
 
 @ttl_cache(ttl=_CACHE_TTL, cache_when=_any_index_priced, copy=list)
