@@ -62,12 +62,14 @@ def list_plans(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def update_plan(
     plan_id: int,
     data: DcaPlanUpdate,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """Pause, resume, or resize a DCA plan."""
     plan = _call(
         _ledger(db).update_plan,
         plan_id,
+        portfolio_id=portfolio_id,
         amount=data.amount,
         is_active=data.is_active,
     )
@@ -75,9 +77,19 @@ def update_plan(
 
 
 @router.delete("/plans/{plan_id}")
-def delete_plan(plan_id: int, db: Session = Depends(get_db)):
+def delete_plan(
+    plan_id: int,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """Delete a plan only when its bucket has no applied buys."""
-    return {"message": _call(_ledger(db).delete_plan, plan_id)}
+    return {
+        "message": _call(
+            _ledger(db).delete_plan,
+            plan_id,
+            portfolio_id=portfolio_id,
+        )
+    }
 
 
 @router.post("/run")
@@ -105,52 +117,96 @@ def list_contributions(
 @router.post("/contributions/{contribution_id}/apply")
 def apply_contribution(
     contribution_id: int,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """Apply one pending buy to its Portfolio holding."""
-    return _call(_ledger(db).apply_contribution, contribution_id)
+    return _call(
+        _ledger(db).apply_contribution,
+        contribution_id,
+        portfolio_id=portfolio_id,
+    )
 
 
 @router.post("/plans/{plan_id}/apply-pending")
-def apply_all_pending(plan_id: int, db: Session = Depends(get_db)):
+def apply_all_pending(
+    plan_id: int,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """Apply every pending buy in a plan."""
-    return _call(_ledger(db).apply_all_pending, plan_id)
+    return _call(
+        _ledger(db).apply_all_pending,
+        plan_id,
+        portfolio_id=portfolio_id,
+    )
 
 
 @router.post("/contributions/{contribution_id}/skip")
 def skip_contribution(
     contribution_id: int,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """Dismiss one pending buy without mutating a holding."""
-    return _call(_ledger(db).skip_contribution, contribution_id)
+    return _call(
+        _ledger(db).skip_contribution,
+        contribution_id,
+        portfolio_id=portfolio_id,
+    )
 
 
 @router.post("/plans/{plan_id}/skip-pending")
-def skip_all_pending(plan_id: int, db: Session = Depends(get_db)):
+def skip_all_pending(
+    plan_id: int,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """Dismiss every pending buy in a plan."""
-    return _call(_ledger(db).skip_all_pending, plan_id)
+    return _call(
+        _ledger(db).skip_all_pending,
+        plan_id,
+        portfolio_id=portfolio_id,
+    )
 
 
 @router.post("/contributions/{contribution_id}/restore")
 def restore_contribution(
     contribution_id: int,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """Return one dismissed buy to pending."""
-    return _call(_ledger(db).restore_contribution, contribution_id)
+    return _call(
+        _ledger(db).restore_contribution,
+        contribution_id,
+        portfolio_id=portfolio_id,
+    )
 
 
 @router.post("/contributions/{contribution_id}/undo")
 def undo_contribution(
     contribution_id: int,
+    portfolio_id: int = 1,
     db: Session = Depends(get_db),
 ):
     """Reverse one applied buy exactly and return it to pending."""
-    return _call(_ledger(db).undo_contribution, contribution_id)
+    return _call(
+        _ledger(db).undo_contribution,
+        contribution_id,
+        portfolio_id=portfolio_id,
+    )
 
 
 @router.post("/plans/{plan_id}/undo-applied")
-def undo_all_applied(plan_id: int, db: Session = Depends(get_db)):
+def undo_all_applied(
+    plan_id: int,
+    portfolio_id: int = 1,
+    db: Session = Depends(get_db),
+):
     """Reverse every applied buy in a plan."""
-    return _call(_ledger(db).undo_all_applied, plan_id)
+    return _call(
+        _ledger(db).undo_all_applied,
+        plan_id,
+        portfolio_id=portfolio_id,
+    )

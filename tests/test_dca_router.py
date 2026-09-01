@@ -98,6 +98,108 @@ def _create_weekly_plan(client, days_back=21, amount=50.0):
     )
 
 
+def _seed_other_portfolio_dca(db, status):
+    """Return IDs and persisted state owned entirely by portfolio 2."""
+    db.add(Portfolio(id=2, name="Other portfolio"))
+    holding = Holding(
+        portfolio_id=2,
+        ticker="OWNED",
+        shares=10.5 if status == "applied" else 10.0,
+        avg_cost=(2050.0 / 10.5) if status == "applied" else 200.0,
+        is_active=True,
+        is_watchlist=False,
+        hold_class="auto",
+    )
+    db.add(holding)
+    plan = DcaPlan(
+        portfolio_id=2,
+        ticker="OWNED",
+        amount=50.0,
+        frequency="weekly",
+        start_date=FIXED_TODAY.isoformat(),
+        quote_currency="USD",
+        quote_currency_source="ticker_validation",
+        is_active=True,
+    )
+    db.add(plan)
+    db.flush()
+    contribution = DcaContribution(
+        plan_id=plan.id,
+        scheduled_date=FIXED_TODAY.isoformat(),
+        exec_date=FIXED_TODAY.isoformat(),
+        price=100.0,
+        shares=0.5,
+        amount=50.0,
+        price_currency="USD",
+        price_currency_source="validated_plan",
+        status=status,
+        applied_holding_id=holding.id if status == "applied" else None,
+    )
+    db.add(contribution)
+    db.commit()
+    return plan.id, contribution.id, holding.id
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        ("PATCH", "/api/dca/plans/{plan_id}", "pending",
+         {"amount": 75, "is_active": False}, "DCA plan not found"),
+        ("DELETE", "/api/dca/plans/{plan_id}", "pending", None,
+         "DCA plan not found"),
+        ("POST", "/api/dca/contributions/{contribution_id}/apply", "pending",
+         None, "Contribution not found"),
+        ("POST", "/api/dca/contributions/{contribution_id}/skip", "pending",
+         None, "Contribution not found"),
+        ("POST", "/api/dca/contributions/{contribution_id}/restore", "dismissed",
+         None, "Contribution not found"),
+        ("POST", "/api/dca/contributions/{contribution_id}/undo", "applied",
+         None, "Contribution not found"),
+        ("POST", "/api/dca/plans/{plan_id}/apply-pending", "pending",
+         None, "DCA plan not found"),
+        ("POST", "/api/dca/plans/{plan_id}/skip-pending", "pending",
+         None, "DCA plan not found"),
+        ("POST", "/api/dca/plans/{plan_id}/undo-applied", "applied",
+         None, "DCA plan not found"),
+    ],
+    ids=[
+        "update-plan", "delete-plan", "apply", "skip", "restore", "undo",
+        "apply-all", "skip-all", "undo-all",
+    ],
+)
+def test_id_mutations_cannot_cross_portfolios(client, db, case):
+    method, path, status, payload, detail = case
+    plan_id, contribution_id, holding_id = _seed_other_portfolio_dca(db, status)
+    plan = db.get(DcaPlan, plan_id)
+    contribution = db.get(DcaContribution, contribution_id)
+    holding = db.get(Holding, holding_id)
+    before = {
+        "plan": (plan.amount, plan.is_active, plan.catchup_floor),
+        "contribution": (contribution.status, contribution.applied_holding_id),
+        "holding": (holding.shares, holding.avg_cost, holding.is_active),
+    }
+    target = path.format(plan_id=plan_id, contribution_id=contribution_id)
+
+    response = client.request(
+        method,
+        f"{target}?portfolio_id=1",
+        json=payload,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": detail}
+    db.expire_all()
+    plan = db.get(DcaPlan, plan_id)
+    contribution = db.get(DcaContribution, contribution_id)
+    holding = db.get(Holding, holding_id)
+    assert plan is not None
+    assert contribution is not None
+    assert holding is not None
+    assert (plan.amount, plan.is_active, plan.catchup_floor) == before["plan"]
+    assert (contribution.status, contribution.applied_holding_id) == before["contribution"]
+    assert (holding.shares, holding.avg_cost, holding.is_active) == before["holding"]
+
+
 # ── Plan creation + backfill ─────────────────────────────────────────────────
 
 def test_create_plan_backfills_pending_buys(client):

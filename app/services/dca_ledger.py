@@ -72,8 +72,15 @@ class DcaLedger:
         self._price_history_loader = price_history_loader or get_daily_closes
         self._today = today or date.today
 
-    def _plan(self, plan_id: int) -> DcaPlan:
-        plan = self.db.query(DcaPlan).filter(DcaPlan.id == plan_id).first()
+    def _plan(self, plan_id: int, *, portfolio_id: int) -> DcaPlan:
+        plan = (
+            self.db.query(DcaPlan)
+            .filter(
+                DcaPlan.id == plan_id,
+                DcaPlan.portfolio_id == portfolio_id,
+            )
+            .first()
+        )
         if plan is None:
             raise DcaNotFoundError("DCA plan not found")
         return plan
@@ -156,10 +163,16 @@ class DcaLedger:
             "left unchanged."
         )
 
-    def _contribution(self, contribution_id: int) -> DcaContribution:
+    def _contribution(
+        self, contribution_id: int, *, portfolio_id: int
+    ) -> DcaContribution:
         contribution = (
             self.db.query(DcaContribution)
-            .filter(DcaContribution.id == contribution_id)
+            .join(DcaPlan, DcaContribution.plan_id == DcaPlan.id)
+            .filter(
+                DcaContribution.id == contribution_id,
+                DcaPlan.portfolio_id == portfolio_id,
+            )
             .first()
         )
         if contribution is None:
@@ -401,10 +414,11 @@ class DcaLedger:
         self,
         plan_id: int,
         *,
+        portfolio_id: int,
         amount: float | None = None,
         is_active: bool | None = None,
     ) -> dict:
-        plan = self._plan(plan_id)
+        plan = self._plan(plan_id, portfolio_id=portfolio_id)
         if amount is not None:
             plan.amount = amount
         if is_active is not None:
@@ -415,8 +429,8 @@ class DcaLedger:
         self.db.refresh(plan)
         return self._plan_summary(plan)
 
-    def delete_plan(self, plan_id: int) -> str:
-        plan = self._plan(plan_id)
+    def delete_plan(self, plan_id: int, *, portfolio_id: int) -> str:
+        plan = self._plan(plan_id, portfolio_id=portfolio_id)
         applied_count = (
             self.db.query(DcaContribution)
             .filter(
@@ -528,8 +542,10 @@ class DcaLedger:
         contribution.applied_holding_id = holding.id
         return holding
 
-    def apply_contribution(self, contribution_id: int) -> dict:
-        contribution = self._contribution(contribution_id)
+    def apply_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
+        contribution = self._contribution(
+            contribution_id, portfolio_id=portfolio_id
+        )
         if contribution.status != "pending":
             raise DcaConflictError(f"Buy is already {contribution.status}")
         holding = self._apply(contribution)
@@ -547,8 +563,8 @@ class DcaLedger:
             },
         }
 
-    def apply_all_pending(self, plan_id: int) -> dict:
-        plan = self._plan(plan_id)
+    def apply_all_pending(self, plan_id: int, *, portfolio_id: int) -> dict:
+        plan = self._plan(plan_id, portfolio_id=portfolio_id)
         pending = (
             self.db.query(DcaContribution)
             .filter(
@@ -568,8 +584,10 @@ class DcaLedger:
         self.db.commit()
         return {"applied": len(pending), "ticker": plan.ticker}
 
-    def skip_contribution(self, contribution_id: int) -> dict:
-        contribution = self._contribution(contribution_id)
+    def skip_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
+        contribution = self._contribution(
+            contribution_id, portfolio_id=portfolio_id
+        )
         if contribution.status != "pending":
             raise DcaConflictError(f"Buy is already {contribution.status}")
         contribution.status = "dismissed"
@@ -579,8 +597,8 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
-    def skip_all_pending(self, plan_id: int) -> dict:
-        plan = self._plan(plan_id)
+    def skip_all_pending(self, plan_id: int, *, portfolio_id: int) -> dict:
+        plan = self._plan(plan_id, portfolio_id=portfolio_id)
         skipped = (
             self.db.query(DcaContribution)
             .filter(
@@ -592,8 +610,12 @@ class DcaLedger:
         self.db.commit()
         return {"skipped": skipped, "ticker": plan.ticker}
 
-    def restore_contribution(self, contribution_id: int) -> dict:
-        contribution = self._contribution(contribution_id)
+    def restore_contribution(
+        self, contribution_id: int, *, portfolio_id: int
+    ) -> dict:
+        contribution = self._contribution(
+            contribution_id, portfolio_id=portfolio_id
+        )
         if contribution.status != "dismissed":
             raise DcaConflictError("Only skipped buys can be restored")
         contribution.status = "pending"
@@ -644,8 +666,10 @@ class DcaLedger:
         contribution.applied_holding_id = None
         return note
 
-    def undo_contribution(self, contribution_id: int) -> dict:
-        contribution = self._contribution(contribution_id)
+    def undo_contribution(self, contribution_id: int, *, portfolio_id: int) -> dict:
+        contribution = self._contribution(
+            contribution_id, portfolio_id=portfolio_id
+        )
         if contribution.status != "applied":
             raise DcaConflictError("Only applied buys can be undone")
         note = self._reverse(contribution)
@@ -655,8 +679,8 @@ class DcaLedger:
             "contribution": self._contribution_dict(contribution),
         }
 
-    def undo_all_applied(self, plan_id: int) -> dict:
-        plan = self._plan(plan_id)
+    def undo_all_applied(self, plan_id: int, *, portfolio_id: int) -> dict:
+        plan = self._plan(plan_id, portfolio_id=portfolio_id)
         applied = (
             self.db.query(DcaContribution)
             .filter(

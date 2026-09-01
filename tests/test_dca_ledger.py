@@ -82,11 +82,11 @@ def test_ledger_catchup_apply_and_undo_are_traceable_and_idempotent():
     assert ledger.run_catchup(1)["buys_added"] == 0
 
     contribution = ledger.list_contributions(1)[0]
-    applied = ledger.apply_contribution(contribution["id"])
+    applied = ledger.apply_contribution(contribution["id"], portfolio_id=1)
     assert applied["holding"]["shares"] == pytest.approx(10.5)
     assert applied["holding"]["avg_cost"] == pytest.approx(2050 / 10.5)
 
-    undone = ledger.undo_contribution(contribution["id"])
+    undone = ledger.undo_contribution(contribution["id"], portfolio_id=1)
     assert undone["contribution"]["status"] == "pending"
     holding = db.query(Holding).filter_by(portfolio_id=1, ticker="VOO").one()
     assert holding.shares == pytest.approx(10)
@@ -110,14 +110,16 @@ def test_applied_contributions_block_plan_deletion_until_undone():
         start_date=TODAY.isoformat(),
     )
     contribution_id = ledger.list_contributions(1)[0]["id"]
-    ledger.apply_contribution(contribution_id)
+    ledger.apply_contribution(contribution_id, portfolio_id=1)
 
     with pytest.raises(DcaConflictError, match="Undo applied buys"):
-        ledger.delete_plan(created["plan"]["id"])
+        ledger.delete_plan(created["plan"]["id"], portfolio_id=1)
 
     assert ledger.list_contributions(1, "applied")[0]["id"] == contribution_id
-    ledger.undo_contribution(contribution_id)
-    assert "deleted" in ledger.delete_plan(created["plan"]["id"])
+    ledger.undo_contribution(contribution_id, portfolio_id=1)
+    assert "deleted" in ledger.delete_plan(
+        created["plan"]["id"], portfolio_id=1
+    )
 
 
 def test_foreign_currency_plan_is_rejected_before_any_persistence():
@@ -227,7 +229,7 @@ def test_unsafe_undo_preserves_holding_contribution_link_and_totals():
         start_date=TODAY.isoformat(),
     )
     contribution_id = ledger.list_contributions(1)[0]["id"]
-    ledger.apply_contribution(contribution_id)
+    ledger.apply_contribution(contribution_id, portfolio_id=1)
     contribution = db.get(DcaContribution, contribution_id)
     holding = db.get(Holding, contribution.applied_holding_id)
     holding.shares = 0.25
@@ -237,7 +239,7 @@ def test_unsafe_undo_preserves_holding_contribution_link_and_totals():
     holding_id = holding.id
 
     with pytest.raises(DcaConflictError, match="left unchanged"):
-        ledger.undo_contribution(contribution_id)
+        ledger.undo_contribution(contribution_id, portfolio_id=1)
 
     db.refresh(holding)
     db.refresh(contribution)
@@ -258,7 +260,7 @@ def test_bulk_unsafe_undo_rolls_back_earlier_staged_reversals():
     )["plan"]["id"]
     pending = ledger.list_contributions(plan_id)
     for contribution in pending:
-        ledger.apply_contribution(contribution["id"])
+        ledger.apply_contribution(contribution["id"], portfolio_id=1)
     applied = db.query(DcaContribution).filter_by(plan_id=plan_id).all()
     holding = db.get(Holding, applied[0].applied_holding_id)
     holding.shares = 0.75
@@ -267,7 +269,7 @@ def test_bulk_unsafe_undo_rolls_back_earlier_staged_reversals():
     before_summary = ledger.list_plans(1)[0]
 
     with pytest.raises(DcaConflictError, match="left unchanged"):
-        ledger.undo_all_applied(plan_id)
+        ledger.undo_all_applied(plan_id, portfolio_id=1)
 
     db.refresh(holding)
     assert (holding.shares, holding.avg_cost, holding.is_active) == (0.75, 100.0, True)
@@ -300,7 +302,7 @@ def test_apply_reuses_one_legacy_formatted_active_holding():
     )
     contribution = ledger.list_contributions(1)[0]
 
-    result = ledger.apply_contribution(contribution["id"])
+    result = ledger.apply_contribution(contribution["id"], portfolio_id=1)
 
     holdings = db.query(Holding).filter_by(portfolio_id=1, is_active=True).all()
     assert len(holdings) == 1
@@ -361,7 +363,7 @@ def test_single_apply_blocks_untrusted_pending_rows_without_mutation(currency, s
     before = (holding.shares, holding.avg_cost, holding.is_active)
 
     with pytest.raises(DcaConflictError, match="left unchanged|No contributions"):
-        DcaLedger(db).apply_contribution(contribution.id)
+        DcaLedger(db).apply_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(holding)
     db.refresh(contribution)
@@ -395,7 +397,7 @@ def test_bulk_apply_preflights_every_currency_fact_before_holding_mutation():
     before = (holding.shares, holding.avg_cost, holding.is_active)
 
     with pytest.raises(DcaConflictError, match="left unchanged"):
-        DcaLedger(db).apply_all_pending(plan.id)
+        DcaLedger(db).apply_all_pending(plan.id, portfolio_id=1)
 
     db.refresh(holding)
     assert (holding.shares, holding.avg_cost, holding.is_active) == before

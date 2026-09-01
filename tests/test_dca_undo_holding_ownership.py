@@ -61,7 +61,7 @@ def test_undo_does_not_touch_a_holding_in_another_portfolio(db):
     contribution, stranger = _seed_cross_portfolio_contribution(db)
     before_shares, before_cost = stranger.shares, stranger.avg_cost
 
-    DcaLedger(db).undo_contribution(contribution.id)
+    DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(stranger)
     assert stranger.shares == before_shares, (
@@ -74,7 +74,7 @@ def test_undo_does_not_touch_a_holding_in_another_portfolio(db):
 def test_undo_still_returns_the_buy_to_pending(db):
     contribution, _stranger = _seed_cross_portfolio_contribution(db)
 
-    result = DcaLedger(db).undo_contribution(contribution.id)
+    result = DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(contribution)
     assert contribution.status == "pending"
@@ -113,7 +113,7 @@ def test_undo_still_reverses_a_holding_in_the_plans_own_portfolio(db):
     db.add(contribution)
     db.commit()
 
-    DcaLedger(db).undo_contribution(contribution.id)
+    DcaLedger(db).undo_contribution(contribution.id, portfolio_id=1)
 
     db.refresh(own)
     assert own.shares == 10.0  # 12 - 2, the buy reversed exactly

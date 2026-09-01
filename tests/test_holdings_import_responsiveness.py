@@ -491,7 +491,9 @@ def test_import_racing_dca_apply_uses_one_active_holding(tmp_path, monkeypatch):
 
     def apply_dca():
         with sessions() as db:
-            return DcaLedger(db).apply_contribution(contribution_id)
+            return DcaLedger(db).apply_contribution(
+                contribution_id, portfolio_id=1
+            )
 
     with client, ThreadPoolExecutor(max_workers=2) as pool:
         import_future = pool.submit(
