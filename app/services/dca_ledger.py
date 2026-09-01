@@ -449,6 +449,7 @@ class DcaLedger:
         self.db.refresh(plan)
         return self._plan_summary(plan)
 
+    @_serialized_write
     def delete_plan(self, plan_id: int, *, portfolio_id: int) -> str:
         plan = self._plan(plan_id, portfolio_id=portfolio_id)
         applied_count = (

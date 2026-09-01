@@ -109,13 +109,20 @@ def test_delete_missing_portfolio_404():
 
 def test_reactivating_a_duplicate_holding_is_a_user_safe_conflict():
     db = _db()
-    active = Holding(portfolio_id=1, ticker="AAPL", shares=1, avg_cost=100)
+    active = Holding(
+        portfolio_id=1,
+        ticker="AAPL",
+        shares=1,
+        avg_cost=100,
+        is_watchlist=True,
+    )
     archived = Holding(
         portfolio_id=1,
         ticker="AAPL",
         shares=2,
         avg_cost=90,
         is_active=False,
+        is_watchlist=True,
     )
     db.add_all([active, archived])
     db.commit()
@@ -143,8 +150,20 @@ def test_concurrent_reactivations_serialize_to_one_active_holding(tmp_path, monk
     sessions = sessionmaker(bind=engine, autoflush=False)
     with sessions() as db:
         db.add(Portfolio(id=1, name="My Portfolio"))
-        first = Holding(portfolio_id=1, ticker="RACE", shares=1, is_active=False)
-        second = Holding(portfolio_id=1, ticker="RACE", shares=2, is_active=False)
+        first = Holding(
+            portfolio_id=1,
+            ticker="RACE",
+            shares=1,
+            is_active=False,
+            is_watchlist=True,
+        )
+        second = Holding(
+            portfolio_id=1,
+            ticker="RACE",
+            shares=2,
+            is_active=False,
+            is_watchlist=True,
+        )
         db.add_all([first, second])
         db.commit()
         holding_ids = (first.id, second.id)

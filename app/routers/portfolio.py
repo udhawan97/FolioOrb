@@ -534,6 +534,38 @@ def _prefetch_reduction_quote(
         return True, {}
 
 
+def _require_editable_holding(
+    db: Session, holding: Holding, data: HoldingUpdate
+) -> None:
+    """Keep archived owned positions immutable after their sale is recorded.
+
+    A removed watchlist row has no sale history, so it may be restored by one
+    explicit state-only request. Owned positions must be added as a new holding
+    after a sale instead of reviving or reducing archived shares behind the
+    realized ledger.
+    """
+    if holding.is_active:
+        return
+    watchlist_reactivation = bool(
+        holding.is_watchlist
+        and data.is_active is True
+        and data.model_fields_set == {"is_active"}
+    )
+    if watchlist_reactivation:
+        return
+    db.rollback()
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "holding_archived",
+            "message": (
+                "This holding has already been removed and cannot be edited or "
+                "sold again. Add a new holding for a new owned position."
+            ),
+        },
+    )
+
+
 @router.put("/holdings/{holding_id}")
 def update_holding(
     holding_id: int,
@@ -556,6 +588,7 @@ def update_holding(
         db.rollback()
         raise HTTPException(status_code=404, detail="Holding not found")
 
+    _require_editable_holding(db, holding, data)
     _ensure_reactivation_available(db, portfolio_id, holding, data.is_active)
 
     # A drop in share count is a sale → record the realized gain/loss first,
