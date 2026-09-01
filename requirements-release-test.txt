@@ -1,0 +1,3 @@
+# Release-only tests that execute on the native Windows packaging runner.
+# This input is compiled into requirements-desktop-windows.lock.
+pytest>=9,<10

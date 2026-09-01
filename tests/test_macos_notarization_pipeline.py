@@ -146,7 +146,10 @@ def test_app_is_notarized_before_the_dmg_and_dmg_after_signing():
     sign_dmg = workflow.index("- name: Sign and verify Developer ID DMG")
     notarize_dmg = workflow.index("- name: Notarize and staple DMG")
     verify_dmg = workflow.index("- name: Verify notarized DMG and embedded app")
-    upload = workflow.index("- uses: actions/upload-artifact@v7", notarize_dmg)
+    upload = workflow.index(
+        "- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        notarize_dmg,
+    )
 
     assert smoke < notarize_app < build_dmg < sign_dmg < notarize_dmg < verify_dmg < upload
     assert "packaging/macos/with_notary_key.sh app dist/FolioOrb.app" in workflow
@@ -175,7 +178,10 @@ def test_raw_dmg_checksum_is_recorded_and_uploaded_with_the_rehearsal():
     workflow = _text(".github/workflows/release.yml")
 
     checksum = workflow.index("- name: Record macOS artifact checksum")
-    upload = workflow.index("- uses: actions/upload-artifact@v7", checksum)
+    upload = workflow.index(
+        "- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        checksum,
+    )
     assert checksum < upload
     assert 'shasum -a 256 -- "${DMGS[0]}" > macos-SHA256SUMS.txt' in workflow
     assert "dist/out/macos-SHA256SUMS.txt" in workflow
