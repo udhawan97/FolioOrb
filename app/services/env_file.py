@@ -15,6 +15,7 @@ class EnvFileSecurityError(OSError):
 
 
 _KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
+_OWNER_ONLY_MODE = stat.S_IRUSR | stat.S_IWUSR
 
 
 def _assert_owner(path: Path, metadata: os.stat_result) -> None:
@@ -22,12 +23,12 @@ def _assert_owner(path: Path, metadata: os.stat_result) -> None:
         raise EnvFileSecurityError(f"Refusing environment file not owned by this user: {path}")
 
 
-def _read_target(path: Path) -> tuple[str, tuple[int, int] | None]:
-    """Read one regular, owned target without following a final-component symlink."""
+def _open_target(path: Path) -> tuple[int | None, tuple[int, int] | None]:
+    """Open one regular, owned target without following a final-component symlink."""
     try:
         metadata = path.lstat()
     except FileNotFoundError:
-        return "", None
+        return None, None
     if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
         raise EnvFileSecurityError(f"Environment target must be a regular file: {path}")
     _assert_owner(path, metadata)
@@ -41,11 +42,23 @@ def _read_target(path: Path) -> tuple[str, tuple[int, int] | None]:
         _assert_owner(path, opened)
         if (opened.st_dev, opened.st_ino) != (metadata.st_dev, metadata.st_ino):
             raise EnvFileSecurityError("Environment target changed while it was being opened")
+    except OSError:
+        os.close(descriptor)
+        raise
+    return descriptor, (metadata.st_dev, metadata.st_ino)
+
+
+def _read_target(path: Path) -> tuple[str, tuple[int, int] | None]:
+    """Read one regular, owned target without following a final-component symlink."""
+    descriptor, identity = _open_target(path)
+    if descriptor is None:
+        return "", None
+    try:
         with os.fdopen(descriptor, "r", encoding="utf-8", closefd=False) as handle:
             content = handle.read()
     finally:
         os.close(descriptor)
-    return content, (metadata.st_dev, metadata.st_ino)
+    return content, identity
 
 
 def _assert_unchanged(path: Path, identity: tuple[int, int] | None) -> None:
@@ -75,14 +88,30 @@ def _fsync_directory(directory: Path) -> None:
         os.close(descriptor)
 
 
-def _restrict_staging_file(descriptor: int, path: Path) -> None:
-    """Apply the strongest portable owner-only mode before writing secret bytes."""
+def _restrict_owner_only(descriptor: int, path: Path) -> None:
+    """Apply the strongest portable owner-only mode to an opened file."""
     if os.name == "posix":
-        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        os.fchmod(descriptor, _OWNER_ONLY_MODE)
         return
     # chmod is not a Windows ACL guarantee; it only preserves functional parity
     # while Windows ACL enforcement remains an explicit research item.
-    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+    os.chmod(path, _OWNER_ONLY_MODE)
+
+
+def secure_existing_env(path: Path) -> None:
+    """Validate and retighten an existing environment file without reading its content."""
+    path = Path(path)
+    descriptor, identity = _open_target(path)
+    if descriptor is None:
+        raise FileNotFoundError(path)
+    try:
+        _restrict_owner_only(descriptor, path)
+        secured = os.fstat(descriptor)
+        if os.name == "posix" and stat.S_IMODE(secured.st_mode) != _OWNER_ONLY_MODE:
+            raise EnvFileSecurityError(f"Environment target is not owner-only: {path}")
+        _assert_unchanged(path, identity)
+    finally:
+        os.close(descriptor)
 
 
 def _atomic_write(path: Path, content: str, identity: tuple[int, int] | None) -> None:
@@ -93,7 +122,7 @@ def _atomic_write(path: Path, content: str, identity: tuple[int, int] | None) ->
     )
     temporary = Path(temporary_name)
     try:
-        _restrict_staging_file(descriptor, temporary)
+        _restrict_owner_only(descriptor, temporary)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             handle.write(content)
@@ -166,9 +195,14 @@ def initialize_profile_env(path: Path, api_key: str, secret_key: str) -> None:
 
 def _main() -> int:
     parser = argparse.ArgumentParser(description="Create a private FolioOrb source profile")
-    parser.add_argument("--set-secret", action="store_true")
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument("--set-secret", action="store_true")
+    operation.add_argument("--secure-existing", action="store_true")
     parser.add_argument("path", type=Path)
     arguments = parser.parse_args()
+    if arguments.secure_existing:
+        secure_existing_env(arguments.path)
+        return 0
     if arguments.set_secret:
         update_env_key(
             arguments.path,

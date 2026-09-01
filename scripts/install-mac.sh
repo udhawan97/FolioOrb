@@ -169,10 +169,13 @@ if [[ ! -f "$DATA_DIR/.env" ]]; then
   FOLIOORB_SETUP_API_KEY="" \
     FOLIOORB_SETUP_SECRET_KEY="$SECRET" \
     python -m app.services.env_file "$DATA_DIR/.env"
-elif ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?SECRET_KEY[[:space:]]*=' "$DATA_DIR/.env"; then
-  SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-  FOLIOORB_SETUP_SECRET_KEY="$SECRET" \
-    python -m app.services.env_file --set-secret "$DATA_DIR/.env"
+else
+  python -m app.services.env_file --secure-existing "$DATA_DIR/.env"
+  if ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?SECRET_KEY[[:space:]]*=' "$DATA_DIR/.env"; then
+    SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+    FOLIOORB_SETUP_SECRET_KEY="$SECRET" \
+      python -m app.services.env_file --set-secret "$DATA_DIR/.env"
+  fi
 fi
 printf 'source installer profile ready\n' > "$MIGRATION_COMPLETE"
 

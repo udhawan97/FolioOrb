@@ -70,6 +70,7 @@ PY
     python -m app.services.env_file "$PROFILE_DIR/.env"
   echo "Created .env with local defaults."
 else
+  python -m app.services.env_file --secure-existing "$PROFILE_DIR/.env"
   echo "Using existing $PROFILE_DIR/.env."
 fi
 
