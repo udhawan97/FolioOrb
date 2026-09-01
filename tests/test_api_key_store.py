@@ -86,10 +86,10 @@ def test_a_padded_key_line_still_matches(env_path):
     assert env_path.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=new\n"
 
 
-def test_only_the_first_duplicate_line_is_rewritten(env_path):
+def test_duplicate_lines_are_canonicalized_to_one(env_path):
     env_path.write_text("ANTHROPIC_API_KEY=a\nANTHROPIC_API_KEY=b\n", encoding="utf-8")
     store._update_env_file("ANTHROPIC_API_KEY", "c")
-    assert env_path.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=c\nANTHROPIC_API_KEY=b\n"
+    assert env_path.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=c\n"
 
 
 def test_a_file_with_no_trailing_newline_still_appends_cleanly(env_path):
@@ -159,6 +159,27 @@ def test_clear_blanks_the_line_and_drops_the_client_to_local(env_path, calls):
     assert env_path.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=\nLOG_LEVEL=INFO\n"
     assert calls["reinit"] == [""]
     assert calls["heartbeats"] == 0
+
+
+def test_clear_removes_duplicate_exported_keys_and_restart_stays_disconnected(
+    env_path, calls
+):
+    from dotenv import dotenv_values
+
+    env_path.write_text(
+        f"ANTHROPIC_API_KEY={_VALID_KEY}\n"
+        "LOG_LEVEL=INFO\n"
+        f"export ANTHROPIC_API_KEY={_VALID_KEY}\n",
+        encoding="utf-8",
+    )
+
+    store.clear()
+
+    assert env_path.read_text(encoding="utf-8") == (
+        "ANTHROPIC_API_KEY=\nLOG_LEVEL=INFO\n"
+    )
+    assert dotenv_values(env_path).get("ANTHROPIC_API_KEY") == ""
+    assert calls["reinit"] == [""]
 
 
 @pytest.mark.usefixtures("calls")

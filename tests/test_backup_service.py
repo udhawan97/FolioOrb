@@ -234,6 +234,91 @@ def test_restore_failure_mid_copy_leaves_live_db_intact(tmp_path, monkeypatch):
     assert not (tmp_path / "portfolio.db.failed-20260101-000000").exists()
 
 
+def _restore_fault_fixture(tmp_path):
+    live = tmp_path / "portfolio.db"
+    _make_db(live, ["BACKUP"])
+    backup = backup_service.create_backup(
+        live, label="snap", dest_dir=tmp_path / "backups"
+    )
+    connection = sqlite3.connect(str(live))
+    connection.execute("DELETE FROM holdings")
+    connection.execute("INSERT INTO holdings (ticker) VALUES ('CURRENT')")
+    connection.commit()
+    connection.close()
+    Path(f"{live}-wal").write_bytes(b"current-wal")
+    Path(f"{live}-shm").write_bytes(b"current-shm")
+    originals = {
+        suffix: Path(f"{live}{suffix}").read_bytes()
+        for suffix in ("", "-wal", "-shm")
+    }
+    return live, backup, originals
+
+
+@pytest.mark.parametrize("fault_suffix", ("", "-wal", "-shm", "publish"))
+def test_every_forward_restore_rename_fault_restores_canonical_originals(
+    tmp_path, monkeypatch, fault_suffix
+):
+    live, backup, originals = _restore_fault_fixture(tmp_path)
+    stamp = "20260101-000000"
+    staging = tmp_path / f"portfolio.db.staging-{stamp}"
+    real_replace = Path.replace
+
+    def faulted_replace(source, destination):
+        destination = Path(destination)
+        if fault_suffix == "publish":
+            should_fault = source == staging and destination == live
+        else:
+            current = Path(f"{live}{fault_suffix}")
+            should_fault = source == current and destination == Path(
+                f"{current}.failed-{stamp}"
+            )
+        if should_fault:
+            raise OSError("simulated forward rename failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(Path, "replace", faulted_replace)
+
+    with pytest.raises(OSError, match="forward rename failure"):
+        backup_service.restore_backup(backup, live, ts=stamp)
+
+    for suffix, expected in originals.items():
+        assert Path(f"{live}{suffix}").read_bytes() == expected
+    assert _holdings(live) == ["CURRENT"]
+    assert staging.read_bytes() == backup.read_bytes()
+
+
+@pytest.mark.parametrize("rollback_suffix", ("", "-wal", "-shm"))
+def test_every_rollback_rename_fault_falls_back_to_preserving_copy(
+    tmp_path, monkeypatch, rollback_suffix
+):
+    live, backup, originals = _restore_fault_fixture(tmp_path)
+    stamp = "20260101-000000"
+    staging = tmp_path / f"portfolio.db.staging-{stamp}"
+    real_replace = Path.replace
+
+    def faulted_replace(source, destination):
+        destination = Path(destination)
+        failed = Path(f"{live}{rollback_suffix}.failed-{stamp}")
+        current = Path(f"{live}{rollback_suffix}")
+        if (source == staging and destination == live) or (
+            source == failed and destination == current
+        ):
+            raise OSError("simulated rename failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(Path, "replace", faulted_replace)
+
+    with pytest.raises(OSError, match="rename failure"):
+        backup_service.restore_backup(backup, live, ts=stamp)
+
+    for suffix, expected in originals.items():
+        assert Path(f"{live}{suffix}").read_bytes() == expected
+    assert _holdings(live) == ["CURRENT"]
+    assert staging.read_bytes() == backup.read_bytes()
+    failed = Path(f"{live}{rollback_suffix}.failed-{stamp}")
+    assert failed.read_bytes() == originals[rollback_suffix]
+
+
 def test_count_holdings(tmp_path):
     db = tmp_path / "portfolio.db"
     _make_db(db, ["VOO", "AAPL"])

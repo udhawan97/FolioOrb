@@ -12,7 +12,9 @@ a project dependency), so it is safe to import from ``config`` and ``database``
 without creating an import cycle.
 """
 
+import hashlib
 import os
+import secrets
 import shutil
 import sys
 from dataclasses import dataclass, replace
@@ -27,11 +29,16 @@ APP_NAME = "FolioOrb"
 # written under this name.
 LEGACY_APP_NAME = "FolioSenseAI"
 _MIGRATION_MARKER = ".migrated-from-foliosenseai"
+_MIGRATION_STAGING_SUFFIX = ".migrating-from-foliosenseai"
 _CANONICAL_RELATIVE_DATABASE = Path("database/portfolio.db")
 
 
 class ProfileConfigurationError(RuntimeError):
     """The configured database and writable data root do not form one profile."""
+
+
+class ProfileMigrationAmbiguityError(ProfileConfigurationError):
+    """Legacy and current profiles cannot be assigned ownership without user input."""
 
 
 @dataclass(frozen=True)
@@ -107,36 +114,171 @@ def _migrate_legacy_data(new_dir: Path) -> None:
     directory untouched as a fallback. A marker file makes this idempotent and
     cheap (a single ``stat``) on every subsequent launch.
     """
+    new_dir = Path(new_dir)
     marker = new_dir / _MIGRATION_MARKER
-    if marker.exists():
+    if marker.is_file() and not marker.is_symlink():
         return
-    # If FolioOrb already has its own data, never overwrite it — just record that
-    # the legacy scan is done so we don't repeat it on later launches.
-    if (new_dir / ".env").exists() or (new_dir / "database" / "portfolio.db").exists():
-        try:
-            marker.write_text("skipped: folioorb data already present\n", encoding="utf-8")
-        except OSError:
-            pass
-        return
+    if marker.exists() or marker.is_symlink():
+        raise ProfileMigrationAmbiguityError(
+            "The FolioOrb migration marker is not a regular file."
+        )
     try:
         legacy_dir = _legacy_data_root()
     except Exception:  # pylint: disable=broad-except
         return
     if not legacy_dir.is_dir() or legacy_dir.resolve() == new_dir.resolve():
         return
+    if not _migration_subset_matches(legacy_dir, legacy_dir):
+        raise ProfileMigrationAmbiguityError(
+            "The legacy profile contains a symlink or non-regular entry."
+        )
+
+    if not _migration_subset_matches(new_dir, legacy_dir):
+        raise ProfileMigrationAmbiguityError(
+            "FolioOrb and FolioSenseAI both contain data with ambiguous ownership; "
+            "choose which profile to keep before relaunching."
+        )
+
+    staging = new_dir.parent / f".{new_dir.name}{_MIGRATION_STAGING_SUFFIX}"
+    if staging.exists() and (staging.is_symlink() or not staging.is_dir()):
+        raise ProfileMigrationAmbiguityError(
+            "The legacy migration staging path is not an owned directory."
+        )
+    staging.mkdir(mode=0o700, parents=False, exist_ok=True)
+    if os.name == "posix":
+        staging.chmod(0o700)
+
+    _copy_migration_tree(legacy_dir, staging)
+    if not _migration_trees_match(legacy_dir, staging):
+        raise OSError("Legacy profile staging verification failed")
+    (staging / _MIGRATION_MARKER).write_text(
+        f"migrated from {legacy_dir}\n", encoding="utf-8"
+    )
+
+    previous = new_dir.parent / (
+        f".{new_dir.name}.migration-previous-{secrets.token_hex(6)}"
+    )
+    moved_previous = False
     try:
-        for item in legacy_dir.iterdir():
-            dest = new_dir / item.name
-            if dest.exists():
-                continue
-            if item.is_dir():
-                shutil.copytree(item, dest)
-            else:
-                shutil.copy2(item, dest)
-        marker.write_text(f"migrated from {legacy_dir}\n", encoding="utf-8")
+        new_dir.replace(previous)
+        moved_previous = True
+        staging.replace(new_dir)
+    except OSError as forward_error:
+        if moved_previous:
+            _rollback_profile_publication(previous, new_dir, forward_error)
+        raise
+
+    try:
+        shutil.rmtree(previous)
     except OSError:
-        # A partial copy still beats losing the data; never crash startup on it.
+        # The completed profile and legacy source remain canonical. A private
+        # previous-directory copy is harmless and may aid manual recovery.
         pass
+    _fsync_profile_parent(new_dir.parent)
+
+
+def _migration_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _migration_subset_matches(candidate: Path, source: Path) -> bool:
+    """Return whether every candidate entry is byte-identical legacy state."""
+    for item in candidate.rglob("*"):
+        if item.name == _MIGRATION_MARKER and item.parent == candidate:
+            continue
+        if item.is_symlink():
+            return False
+        relative = item.relative_to(candidate)
+        original = source / relative
+        if not original.exists() or original.is_symlink():
+            return False
+        if item.is_dir() != original.is_dir():
+            return False
+        if item.is_file():
+            if not original.is_file() or _migration_digest(item) != _migration_digest(original):
+                return False
+        elif not item.is_dir():
+            return False
+    return True
+
+
+def _migration_trees_match(source: Path, candidate: Path) -> bool:
+    if not _migration_subset_matches(candidate, source):
+        return False
+    source_entries = {
+        item.relative_to(source) for item in source.rglob("*")
+    }
+    candidate_entries = {
+        item.relative_to(candidate)
+        for item in candidate.rglob("*")
+        if not (item.name == _MIGRATION_MARKER and item.parent == candidate)
+    }
+    return source_entries == candidate_entries
+
+
+def _copy_migration_tree(source: Path, destination: Path) -> None:
+    """Resume a private staging copy, overwriting only regular partial files."""
+    for item in source.iterdir():
+        if item.is_symlink():
+            raise ProfileMigrationAmbiguityError(
+                f"Legacy profile contains a symlink: {item.name}"
+            )
+        target = destination / item.name
+        if item.is_dir():
+            if target.exists() and (target.is_symlink() or not target.is_dir()):
+                raise ProfileMigrationAmbiguityError(
+                    f"Migration staging entry has ambiguous type: {item.name}"
+                )
+            target.mkdir(exist_ok=True)
+            _copy_migration_tree(item, target)
+        elif item.is_file():
+            if target.exists() and (target.is_symlink() or not target.is_file()):
+                raise ProfileMigrationAmbiguityError(
+                    f"Migration staging entry has ambiguous type: {item.name}"
+                )
+            shutil.copy2(item, target)
+        else:
+            raise ProfileMigrationAmbiguityError(
+                f"Legacy profile entry is not a regular file or directory: {item.name}"
+            )
+
+
+def _rollback_profile_publication(
+    previous: Path, new_dir: Path, forward_error: OSError
+) -> None:
+    """Republish the previous canonical root after a staging rename failure."""
+    try:
+        previous.replace(new_dir)
+    except OSError:
+        try:
+            shutil.copytree(previous, new_dir)
+        except OSError as copy_error:
+            raise ProfileConfigurationError(
+                "Legacy migration failed and the previous FolioOrb root could not "
+                "be republished automatically."
+            ) from copy_error
+    _fsync_profile_parent(new_dir.parent)
+    if not new_dir.is_dir():
+        raise ProfileConfigurationError(
+            "Legacy migration failed without a readable FolioOrb profile root."
+        ) from forward_error
+
+
+def _fsync_profile_parent(parent: Path) -> None:
+    if os.name == "nt":
+        return
+    descriptor = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        # No power-loss safety claim is made for this best-effort migration.
+        pass
+    finally:
+        os.close(descriptor)
 
 
 def _prospective_env_source(data_root: Path, frozen: bool, explicit: bool) -> Path:

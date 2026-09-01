@@ -18,6 +18,7 @@ from app.config import settings
 from app.database import engine
 from app.schema_meta import apply_migrations_safely
 from app.paths import resource_dir
+from app.services.local_request_guard import LocalRequestGuardMiddleware
 from app.version import __version__
 
 # Absolute paths to bundled resources so the app works whether it is run from a
@@ -130,6 +131,10 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=500)
+app.add_middleware(
+    LocalRequestGuardMiddleware,
+    allowed_origins=settings.CORS_ALLOWED_ORIGINS,
+)
 
 # Serve static files (CSS, JS, images) from the /static folder
 # Files at static/css/style.css → URL: /static/css/style.css

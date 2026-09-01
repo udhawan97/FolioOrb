@@ -5,6 +5,7 @@ import webbrowser
 import uvicorn
 
 URL = "http://localhost:8000"
+HOST = "127.0.0.1"
 
 
 def _open_browser():
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     threading.Thread(target=_open_browser, daemon=True).start()
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
+        host=HOST,
         port=8000,
         reload=True,
     )

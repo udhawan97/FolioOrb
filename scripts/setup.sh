@@ -52,6 +52,7 @@ python -m pip install -r requirements.txt
 mkdir -p "$PROFILE_DIR/database"
 
 if [[ ! -f "$PROFILE_DIR/.env" ]]; then
+  # Shared writer preserves the historical DATABASE_URL=sqlite:///./database/portfolio.db.
   SECRET_KEY="$(python - <<'PY'
 import secrets
 print(secrets.token_hex(32))
@@ -64,14 +65,9 @@ PY
     read -r ANTHROPIC_API_KEY
   fi
 
-  cat > "$PROFILE_DIR/.env" <<EOF
-ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-SECRET_KEY=${SECRET_KEY}
-DEBUG=True
-DATABASE_URL=sqlite:///./database/portfolio.db
-CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
-DEFAULT_HOLDINGS=
-EOF
+  FOLIOORB_SETUP_API_KEY="$ANTHROPIC_API_KEY" \
+    FOLIOORB_SETUP_SECRET_KEY="$SECRET_KEY" \
+    python -m app.services.env_file "$PROFILE_DIR/.env"
   echo "Created .env with local defaults."
 else
   echo "Using existing $PROFILE_DIR/.env."

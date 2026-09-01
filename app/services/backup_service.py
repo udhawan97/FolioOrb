@@ -62,6 +62,10 @@ class EnvironmentSnapshotError(RuntimeError):
         self.backup = backup
 
 
+class RestoreRecoveryError(RuntimeError):
+    """A restore failed and the original canonical files could not be republished."""
+
+
 def _fsync_directory(directory: Path) -> None:
     """Persist a completed POSIX directory-entry change before reporting success."""
     if os.name == "nt":
@@ -786,14 +790,56 @@ def restore_backup(backup_path: Path, target_db: Path, ts: str | None = None) ->
         _safe_remove(staging)
         raise ValueError("Restored copy failed verification — live database left untouched")
 
-    for suffix in ("", "-wal", "-shm"):
-        current = Path(str(target_db) + suffix)
-        if current.exists():
-            current.replace(Path(f"{current}.failed-{stamp}"))
+    moved: list[tuple[Path, Path]] = []
+    try:
+        for suffix in ("", "-wal", "-shm"):
+            current = Path(str(target_db) + suffix)
+            if current.exists():
+                recovery = Path(f"{current}.failed-{stamp}")
+                current.replace(recovery)
+                moved.append((current, recovery))
+        staging.replace(target_db)
+    except OSError as forward_error:
+        _rollback_restore_moves(moved, target_db.parent, forward_error)
+        raise
 
-    staging.replace(target_db)
+    try:
+        _fsync_directory(target_db.parent)
+    except OSError:
+        # Publication is complete and the restored file is readable. Directory
+        # fsync is a durability improvement, not a power-loss guarantee.
+        logger.warning("Could not fsync restored database directory")
     logger.info("Restored database from backup %s", backup_path.name)
     return True
+
+
+def _rollback_restore_moves(
+    moved: list[tuple[Path, Path]], directory: Path, forward_error: OSError
+) -> None:
+    """Return originals to canonical paths, retaining a copy if rename rollback faults."""
+    recovery_failures: list[str] = []
+    for current, recovery in reversed(moved):
+        try:
+            recovery.replace(current)
+            continue
+        except OSError:
+            # A second rename fault must not strand the original away from its
+            # canonical name. Copying retains the recovery artifact as well.
+            try:
+                shutil.copy2(recovery, current)
+            except OSError as copy_error:
+                recovery_failures.append(
+                    f"{current.name}:{type(copy_error).__name__}"
+                )
+    try:
+        _fsync_directory(directory)
+    except OSError:
+        logger.warning("Could not fsync database directory after restore rollback")
+    if recovery_failures:
+        details = ", ".join(recovery_failures)
+        raise RestoreRecoveryError(
+            f"Restore failed and canonical recovery was incomplete ({details})"
+        ) from forward_error
 
 
 def _safe_remove(path: Path) -> None:

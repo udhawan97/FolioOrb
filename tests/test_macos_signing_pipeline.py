@@ -44,6 +44,31 @@ def test_manual_signing_rehearsal_cannot_publish_by_default():
     assert "needs.prepare.outputs.publish == 'true'" in workflow
 
 
+def test_macos_signing_fails_closed_until_external_trust_boundary_is_accepted():
+    workflow = _text(".github/workflows/release.yml")
+    activation = _text("packaging/MACOS_SIGNING.md")
+
+    assert (
+        "Manual macOS signing is restricted to refs/heads/main or version tags"
+        in workflow
+    )
+    assert "MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED" in workflow
+    assert "macOS signing remains disabled until its external protected-environment" in workflow
+    assert "Repository source" in activation
+    assert "alone cannot prove that external policy is configured" in activation
+    assert "Feature-ref credentialed rehearsals are refused" in activation
+
+
+def test_macos_artifact_records_and_checks_exact_source_sha():
+    workflow = _text(".github/workflows/release.yml")
+
+    assert "source_sha: ${{ steps.vars.outputs.source_sha }}" in workflow
+    assert 'if [[ "$SOURCE_SHA" != "$GITHUB_SHA" ]]' in workflow
+    assert 'printf \'%s\\n\' "${{ needs.prepare.outputs.source_sha }}"' in workflow
+    assert 'test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"' in workflow
+    assert "dist/out/macos-SOURCE-SHA.txt" in workflow
+
+
 def test_public_signing_claim_has_a_separate_acceptance_gate():
     workflow = _text(".github/workflows/release.yml")
 

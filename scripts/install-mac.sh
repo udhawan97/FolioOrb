@@ -164,11 +164,15 @@ python -m pip install --upgrade pip -q
 python -m pip install -r requirements.txt -q
 
 if [[ ! -f "$DATA_DIR/.env" ]]; then
+  # Shared writer preserves the historical DATABASE_URL=sqlite:///./database/portfolio.db.
   SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-  printf 'ANTHROPIC_API_KEY=\nSECRET_KEY=%s\nDEBUG=True\nDATABASE_URL=sqlite:///./database/portfolio.db\nCORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000\nDEFAULT_HOLDINGS=\n' "$SECRET" > "$DATA_DIR/.env"
+  FOLIOORB_SETUP_API_KEY="" \
+    FOLIOORB_SETUP_SECRET_KEY="$SECRET" \
+    python -m app.services.env_file "$DATA_DIR/.env"
 elif ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?SECRET_KEY[[:space:]]*=' "$DATA_DIR/.env"; then
   SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-  printf 'SECRET_KEY=%s\n' "$SECRET" >> "$DATA_DIR/.env"
+  FOLIOORB_SETUP_SECRET_KEY="$SECRET" \
+    python -m app.services.env_file --set-secret "$DATA_DIR/.env"
 fi
 printf 'source installer profile ready\n' > "$MIGRATION_COMPLETE"
 

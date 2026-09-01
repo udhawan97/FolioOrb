@@ -9,6 +9,16 @@ This is Phase 2 readiness, not proof that Phase 2 is live. Keep the README,
 website, install guide, and release page labelled unsigned until a real workflow
 run produces artifacts that pass the checks below.
 
+The repository now rejects credentialed dispatches outside `main` and version
+tags and records the exact source SHA beside the DMG. Those checks are
+defense-in-depth inside ref-controlled workflow code; they do **not** establish
+the required external trust boundary. Keep
+`MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED` unset and signing disabled until a
+`macos-signing` protected environment or equivalent repository ruleset limits
+credential access to trusted refs, and a separate credential job consumes only
+SHA-bound build artifacts using fixed trusted signing logic. Repository source
+alone cannot prove that external policy is configured.
+
 ## One-time activation
 
 1. Join the Apple Developer Program and export the **Developer ID Application**
@@ -34,7 +44,8 @@ run produces artifacts that pass the checks below.
    gh variable set MACOS_DEVELOPER_TEAM_ID --body ABCDE12345
    ```
 
-Do not enable continuous signing yet. First run the build-only rehearsal below.
+Do not enable continuous signing yet. First complete and independently verify
+the external trust boundary above, then run the build-only rehearsal below.
 The workflow fails closed when signing is requested but either secret is absent,
 the certificate cannot be decoded or imported, or the temporary keychain does
 not contain exactly one valid `Developer ID Application` identity for that Team ID.
@@ -58,8 +69,8 @@ not contain exactly one valid `Developer ID Application` identity for that Team 
 
 ## First signed-build gate
 
-Run a manual build without publication. This works from a feature branch and
-uploads ordinary workflow artifacts, but it cannot move `latest-main`:
+Run a manual build without publication from protected `main` (version tags are
+also accepted by the workflow). Feature-ref credentialed rehearsals are refused:
 
 ```bash
 gh workflow run release.yml \
@@ -94,6 +105,10 @@ public release-note claim be enabled:
 gh variable set MACOS_SIGNING_ENABLED --body true
 gh variable set MACOS_SIGNING_PUBLICLY_VERIFIED --body true
 ```
+
+Set `MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED=true` only after the external
+protected-environment/ruleset and fixed signing-job acceptance are recorded.
+It is an operator acknowledgement, not proof by itself.
 
 `MACOS_SIGNING_ENABLED` activates signing on normal release builds. The separate
 `MACOS_SIGNING_PUBLICLY_VERIFIED` gate permits release notes to say Developer ID

@@ -29,12 +29,11 @@ exception message — only the exception *type* of a failure is ever recorded.
 from __future__ import annotations
 
 import logging
-import os
 import re
-import stat
 
 from app.paths import data_dir
 from app.services.ai_service import claude_api_heartbeat, reinitialize_client
+from app.services.env_file import update_env_key
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class KeyStorageError(RuntimeError):
 
 
 def _update_env_file(key: str, value: str) -> None:
-    """Write or overwrite a single KEY=value line in the local .env file.
+    """Atomically canonicalize one owner-only ``KEY=value`` environment entry.
 
     The file holds secrets (e.g. ANTHROPIC_API_KEY), so it's restricted to
     owner-only read/write (0600) on every write, including first creation —
@@ -67,36 +66,11 @@ def _update_env_file(key: str, value: str) -> None:
     key is still transmitted to Anthropic as the credential for availability
     checks and Claude-backed requests.
 
-    The write is in place rather than write-temp-then-rename: a crash mid-write
-    can truncate the file, and on first creation the mode is tightened just
-    after the file appears rather than at open time. Both are long-standing
-    behaviour, kept as-is here so this module is a move and not a rewrite.
+    The shared writer refuses symlink, non-regular, and wrong-owner targets,
+    creates a 0600 sibling before writing any secret bytes, removes duplicate
+    occurrences, fsyncs the complete file, and atomically replaces the target.
     """
-    env_path = data_dir() / ".env"
-    if env_path.exists():
-        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    else:
-        lines = []
-
-    new_line = f"{key}={value}\n"
-    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
-    replaced = False
-    for i, line in enumerate(lines):
-        if pattern.match(line):
-            lines[i] = new_line
-            replaced = True
-            break
-
-    if not replaced:
-        # A hand-edited .env may not end in a newline. splitlines() can't tell us
-        # that, so without this the appended line is concatenated onto the last
-        # entry and both are destroyed.
-        if lines and not lines[-1].endswith("\n"):
-            lines[-1] += "\n"
-        lines.append(new_line)
-
-    env_path.write_text("".join(lines), encoding="utf-8")
-    os.chmod(env_path, stat.S_IRUSR | stat.S_IWUSR)
+    update_env_key(data_dir() / ".env", key, value)
 
 
 def save(api_key: str) -> bool:

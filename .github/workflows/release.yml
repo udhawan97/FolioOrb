@@ -49,6 +49,7 @@ jobs:
       app_version: ${{ steps.vars.outputs.app_version }}
       asset_token: ${{ steps.vars.outputs.asset_token }}
       release_tag: ${{ steps.vars.outputs.release_tag }}
+      source_sha: ${{ steps.vars.outputs.source_sha }}
       macos_signing: ${{ steps.vars.outputs.macos_signing }}
       macos_signing_public: ${{ steps.vars.outputs.macos_signing_public }}
       macos_notarization: ${{ steps.vars.outputs.macos_notarization }}
@@ -73,6 +74,7 @@ jobs:
           MACOS_NOTARIZATION_PUBLICLY_VERIFIED: ${{ vars.MACOS_NOTARIZATION_PUBLICLY_VERIFIED }}
           WINDOWS_SIGNING_ENABLED: ${{ vars.WINDOWS_SIGNING_ENABLED }}
           WINDOWS_SIGNING_PUBLICLY_VERIFIED: ${{ vars.WINDOWS_SIGNING_PUBLICLY_VERIFIED }}
+          MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED: ${{ vars.MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED }}
         run: |
           set -euo pipefail
           APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' app/version.py)"
@@ -81,6 +83,12 @@ jobs:
             exit 1
           fi
           {
+            SOURCE_SHA="$(git rev-parse HEAD)"
+            if [[ "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "Checked-out source SHA does not match the workflow source SHA." >&2
+              exit 1
+            fi
+            echo "source_sha=$SOURCE_SHA"
             if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
               TAG_VERSION="${GITHUB_REF_NAME#v}"
               if [[ "$TAG_VERSION" != "$APP_VERSION" ]]; then
@@ -100,6 +108,14 @@ jobs:
               echo "release_tag=latest-main"
             fi
             if [[ "${MACOS_SIGNING_ENABLED:-}" == "true" || ( "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_SIGN_MACOS" == "true" ) ]]; then
+              if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
+                echo "Manual macOS signing is restricted to refs/heads/main or version tags." >&2
+                exit 1
+              fi
+              if [[ "${MACOS_SIGNING_TRUST_BOUNDARY_ACCEPTED:-}" != "true" ]]; then
+                echo "macOS signing remains disabled until its external protected-environment and fixed-logic boundary is accepted." >&2
+                exit 1
+              fi
               echo "macos_signing=true"
               SIGN_MACOS=true
             else
@@ -450,6 +466,8 @@ jobs:
           fi
           shasum -a 256 -- "${DMGS[0]}" > macos-SHA256SUMS.txt
           shasum -a 256 --check macos-SHA256SUMS.txt
+          printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
+          test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
       - name: Cleanup Developer ID keychain
         if: ${{ always() && needs.prepare.outputs.macos_signing == 'true' }}
         run: |
@@ -462,6 +480,7 @@ jobs:
           path: |
             dist/out/*.dmg
             dist/out/macos-SHA256SUMS.txt
+            dist/out/macos-SOURCE-SHA.txt
           if-no-files-found: error
           retention-days: 7
 
