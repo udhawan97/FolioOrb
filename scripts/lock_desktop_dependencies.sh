@@ -20,6 +20,12 @@ uv pip compile requirements.txt requirements-desktop.txt \
   --generate-hashes \
   --output-file "$OUTPUT_DIR/requirements-desktop-macos.lock"
 
+uv pip compile requirements.txt requirements-release-test.txt \
+  --python-version 3.12 \
+  --python-platform x86_64-manylinux_2_17 \
+  --generate-hashes \
+  --output-file "$OUTPUT_DIR/requirements-release-test-linux.lock"
+
 uv pip compile requirements.txt requirements-desktop.txt requirements-release-test.txt \
   --python-version 3.12 \
   --python-platform x86_64-pc-windows-msvc \

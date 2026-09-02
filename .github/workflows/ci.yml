@@ -81,6 +81,7 @@ jobs:
           python -m pip install pip-audit
           pip-audit -r requirements.txt
           pip-audit --no-deps --disable-pip -r requirements-desktop-macos.lock
+          pip-audit --no-deps --disable-pip -r requirements-release-test-linux.lock
           pip-audit --no-deps --disable-pip -r requirements-desktop-windows.lock
 
       - name: Verify generated desktop locks are current
@@ -89,4 +90,5 @@ jobs:
           LOCK_CHECK="$(mktemp -d "${RUNNER_TEMP}/folioorb-lock-check.XXXXXX")"
           scripts/lock_desktop_dependencies.sh "$LOCK_CHECK"
           diff -u requirements-desktop-macos.lock "$LOCK_CHECK/requirements-desktop-macos.lock"
+          diff -u requirements-release-test-linux.lock "$LOCK_CHECK/requirements-release-test-linux.lock"
           diff -u requirements-desktop-windows.lock "$LOCK_CHECK/requirements-desktop-windows.lock"
