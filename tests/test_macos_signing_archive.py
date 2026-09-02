@@ -88,3 +88,21 @@ def test_validator_rejects_special_files(tmp_path):
 
     with pytest.raises(ValueError, match="unsupported archive member type"):
         validate_and_extract(archive, tmp_path / "out")
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "FolioOrb.app/Contents//value.txt",
+        "FolioOrb.app/Contents/./value.txt",
+        "FolioOrb.app/Contents/value.txt/",
+    ],
+)
+def test_validator_rejects_noncanonical_path_aliases(tmp_path, alias):
+    archive = _archive(
+        tmp_path / "alias.tar.gz",
+        [_dir("FolioOrb.app"), _file(alias, b"hostile")],
+    )
+
+    with pytest.raises(ValueError, match="non-canonical archive path"):
+        validate_and_extract(archive, tmp_path / "out")

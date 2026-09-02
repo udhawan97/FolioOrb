@@ -24,6 +24,9 @@ def _normalized_target(member_name: str, link_name: str) -> PurePosixPath:
 
 
 def _validated_path(member: tarfile.TarInfo, names: set[str]) -> PurePosixPath:
+    canonical_name = posixpath.normpath(member.name)
+    if "\\" in member.name or member.name != canonical_name:
+        raise ValueError(f"non-canonical archive path: {member.name}")
     path = PurePosixPath(member.name)
     unsafe_part = any(part in ("", ".", "..") for part in path.parts)
     if path.is_absolute() or not path.parts or unsafe_part:

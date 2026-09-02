@@ -177,10 +177,8 @@ jobs:
         with:
           python-version: "3.12.10"
           cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pytest
+      - name: Install hash-locked test dependencies
+        run: python -m pip install --require-hashes -r requirements-release-test-linux.lock
       - name: Prepare isolated FolioOrb profile
         run: |
           PROFILE_ROOT="$(mktemp -d "${RUNNER_TEMP}/folioorb-release.XXXXXX")"
