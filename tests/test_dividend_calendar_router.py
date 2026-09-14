@@ -29,6 +29,14 @@ _FULL_QUOTES = {
 _FETCHED: list[list[str]] = []
 
 
+def _trailing_quarterly_dates(today: date) -> list[date]:
+    month_index = today.year * 12 + today.month - 1
+    return [
+        date((month_index - offset) // 12, (month_index - offset) % 12 + 1, 1)
+        for offset in (9, 6, 3, 0)
+    ]
+
+
 def _make_db(payers_only: bool = False):
     engine = create_engine(
         "sqlite:///:memory:",
@@ -58,8 +66,8 @@ def _fast_quotes(tickers):
 
 def _fake_ex_dates(tickers):
     _FETCHED.append(sorted(tickers))
-    return {t: [date(2025, 8, 8), date(2025, 11, 7), date(2026, 2, 6), date(2026, 5, 8)]
-            for t in tickers}
+    dates = _trailing_quarterly_dates(date.today())
+    return {t: list(dates) for t in tickers}
 
 
 @pytest.fixture
