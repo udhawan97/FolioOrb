@@ -17,17 +17,20 @@ export UV_CUSTOM_COMPILE_COMMAND="scripts/lock_desktop_dependencies.sh"
 uv pip compile requirements.txt requirements-desktop.txt \
   --python-version 3.12 \
   --python-platform aarch64-apple-darwin \
+  --upgrade \
   --generate-hashes \
   --output-file "$OUTPUT_DIR/requirements-desktop-macos.lock"
 
 uv pip compile requirements.txt requirements-release-test.txt \
   --python-version 3.12 \
   --python-platform x86_64-manylinux_2_17 \
+  --upgrade \
   --generate-hashes \
   --output-file "$OUTPUT_DIR/requirements-release-test-linux.lock"
 
 uv pip compile requirements.txt requirements-desktop.txt requirements-release-test.txt \
   --python-version 3.12 \
   --python-platform x86_64-pc-windows-msvc \
+  --upgrade \
   --generate-hashes \
   --output-file "$OUTPUT_DIR/requirements-desktop-windows.lock"

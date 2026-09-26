@@ -36,6 +36,7 @@ def test_lock_generator_targets_the_release_platforms():
     assert "requirements-desktop.txt requirements-release-test.txt" in script
     assert "--python-platform aarch64-apple-darwin" in script
     assert "--python-platform x86_64-pc-windows-msvc" in script
+    assert script.count("--upgrade") == 3
     assert script.count("--generate-hashes") == 3
     assert "--python-platform x86_64-manylinux_2_17" in script
     assert 'UV_CUSTOM_COMPILE_COMMAND="scripts/lock_desktop_dependencies.sh"' in script
