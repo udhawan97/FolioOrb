@@ -198,6 +198,13 @@ ANTHROPIC_API_KEY= python -m pytest -q
 python -m pylint $(git ls-files '*.py')
 ```
 
+Validate committed desktop/release dependency locks with
+`scripts/lock_desktop_dependencies.sh --check` (requires `uv==0.11.30`). This checks
+that the locked versions and hashes still match the dependency inputs without
+upgrading unrelated transitive packages. CI also audits all four dependency files.
+For an intentional dependency refresh, run `scripts/lock_desktop_dependencies.sh`
+and review its version/hash changes before committing.
+
 Frontend behavior is plain JavaScript and its runtime contracts run with Node:
 
 ```bash
