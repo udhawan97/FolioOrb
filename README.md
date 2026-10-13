@@ -211,6 +211,11 @@ Frontend behavior is plain JavaScript and its runtime contracts run with Node:
 node --test tests/js/*.test.cjs
 ```
 
+For the docs site, run `npm ci`, `npm audit`, and `npm run build` from `docs-site/`.
+Pull requests audit and build the site before it is deployed from `main`.
+The scoped `postcss-nested` override selects the patched selector parser;
+remove it when the upstream dependency accepts parser 7.1.6 or later.
+
 | Area | Owner |
 | --- | --- |
 | `app/routers/` | FastAPI request boundaries |
