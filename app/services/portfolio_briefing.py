@@ -428,7 +428,7 @@ def _local_day(db: Session, portfolio_id: int = 1) -> dict:
 
     if rose > 0 and best_t and total > 0:
         lead = f"{rose} of {total} holdings rose today, led by {best_t} ({best_pct:+.1f}%)."
-    elif fell == total and total > 0:
+    elif fell == total > 0:
         w_t = worst_snap.get("ticker", "")
         w_pct = float(worst_snap.get("day_change_pct") or 0)
         lead = (

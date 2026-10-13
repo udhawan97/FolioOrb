@@ -166,6 +166,26 @@ class TestBuildSnapshot:
 # ── Local digest ──────────────────────────────────────────────────────────────
 
 class TestBuildLocal:
+    @pytest.mark.parametrize(
+        ("changes", "expected_lead"),
+        [
+            ((-2.0, -1.0),
+             "All 2 holdings fell today; AAPL pulled back the most (-2.0%)."),
+            ((0.0, 0.0), "Holdings were mixed today — no clear directional trend."),
+        ],
+        ids=["all-falling", "all-flat"],
+    )
+    def test_day_lead_handles_declines_and_zero_directional_moves(
+        self, db, monkeypatch, changes, expected_lead
+    ):
+        holdings = [
+            {**holding, "day_change_pct": change}
+            for holding, change in zip(_HOLDINGS, changes)
+        ]
+        _valuation(monkeypatch, holdings=holdings)
+
+        assert portfolio_briefing.build_local(db, "day")["lead"] == expected_lead
+
     def test_the_day_digest_carries_move_explanations(self, db):
         result = portfolio_briefing.build_local(db, "day")
 

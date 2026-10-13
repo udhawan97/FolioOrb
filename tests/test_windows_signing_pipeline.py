@@ -17,7 +17,7 @@ def test_windows_signing_is_explicit_and_uses_oidc_without_a_private_key():
     assert "WINDOWS_SIGNING_ENABLED: ${{ vars.WINDOWS_SIGNING_ENABLED }}" in workflow
     assert "windows_signing: ${{ steps.vars.outputs.windows_signing }}" in workflow
     assert "id-token: write" in workflow
-    assert "azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c" in workflow
+    assert "azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906" in workflow
     assert "azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82" in workflow
     assert "AZURE_ARTIFACT_SIGNING_CLIENT_ID" in workflow
     assert "AZURE_ARTIFACT_SIGNING_TENANT_ID" in workflow
