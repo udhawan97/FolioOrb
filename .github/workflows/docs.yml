@@ -1,6 +1,11 @@
 name: Docs
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs-site/**"
+      - ".github/workflows/docs.yml"
   push:
     branches: [main]
     paths:
@@ -10,11 +15,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'deploy' }}
   cancel-in-progress: false
 
 jobs:
@@ -39,14 +42,23 @@ jobs:
         working-directory: docs-site
         run: npm run build
 
+      - name: Audit docs dependencies
+        working-directory: docs-site
+        run: npm audit --audit-level=low
+
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: docs-site/dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     name: Deploy to GitHub Pages
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     runs-on: ubuntu-latest
     environment:
       name: github-pages
