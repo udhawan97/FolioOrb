@@ -19,7 +19,7 @@ jiter==0.16.0
 markdown-it-py==4.2.0
 mdurl==0.1.2
 multitasking==0.0.13
-numpy==2.4.6
+numpy==2.5.3
 pandas==3.0.3
 peewee==4.4.0
 platformdirs==4.10.0
