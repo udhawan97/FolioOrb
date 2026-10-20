@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200" role="img" aria-label="Release pipeline: a merge to main triggers tests, then parallel macOS and Windows builds, each smoke-tested, then published to a GitHub Release that feeds the website download buttons.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200" role="img" aria-label="Main merges build candidates. Explicit publication runs stage exact installer bytes, wait for owner acceptance, then publish without rebuilding.">
   <defs>
     <linearGradient id="fs-accent" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#6fd6f0"/>
@@ -35,13 +35,13 @@
 
   <!-- release -->
   <rect class="box" x="522" y="78" width="140" height="44" rx="10"/>
-  <text class="lbl" x="592" y="98" text-anchor="middle">GitHub Release</text>
+  <text class="lbl" x="592" y="98" text-anchor="middle">Stage candidate</text>
   <text class="sub" x="592" y="114" text-anchor="middle">assets + SHA256SUMS</text>
 
   <!-- website -->
   <rect x="708" y="78" width="140" height="44" rx="10" fill="#12222c" stroke="url(#fs-accent)" stroke-width="1.8"/>
-  <text class="lbl" x="778" y="98" text-anchor="middle">Website buttons</text>
-  <text class="sub" x="778" y="114" text-anchor="middle">always current</text>
+  <text class="lbl" x="778" y="98" text-anchor="middle">Owner acceptance</text>
+  <text class="sub" x="778" y="114" text-anchor="middle">then publish same bytes</text>
 
   <!-- edges -->
   <path class="edge" d="M130 100 H172" marker-end="url(#fs-arrow)"/>

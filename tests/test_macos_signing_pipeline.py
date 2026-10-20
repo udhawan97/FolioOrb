@@ -38,12 +38,12 @@ def test_manual_signing_rehearsal_cannot_publish_by_default():
     workflow = _text(".github/workflows/release.yml")
 
     assert """publish:
-        description: Publish from main after exact-artifact acceptance
+        description: Request protected publication of this run after exact-artifact acceptance
         required: true
         type: boolean
         default: false""" in workflow
     assert 'echo "publish=false"' in workflow
-    assert "Manual publication is restricted to refs/heads/main" in workflow
+    assert "Manual publication is restricted to main or matching version tags." in workflow
     assert "needs.prepare.outputs.publish == 'true'" in workflow
 
 

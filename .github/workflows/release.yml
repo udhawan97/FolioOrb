@@ -1,10 +1,7 @@
 name: Release
 
-# Two channels from one pipeline:
-#   • push a tag v*   → stable GitHub Release with DMG + EXE + checksums
-#   • push to main    → refresh the rolling "latest-main" prerelease
-# Installers are published only after both platform builds AND their smoke
-# tests pass, so a red build can never replace a good release.
+# Main/tag pushes build candidates only. Explicit manual publication waits for
+# acceptance of the staged bytes in the protected release-publication environment.
 
 on:
   push:
@@ -28,7 +25,7 @@ on:
         type: boolean
         default: false
       publish:
-        description: Publish from main after exact-artifact acceptance
+        description: Request protected publication of this run after exact-artifact acceptance
         required: true
         type: boolean
         default: false
@@ -59,6 +56,9 @@ jobs:
       publish: ${{ steps.vars.outputs.publish }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+        with:
+          fetch-depth: 0
 
       - name: Resolve build variables
         id: vars
@@ -155,13 +155,16 @@ jobs:
             else
               echo "windows_signing_public=false"
             fi
-            if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
-              echo "publish=true"
-            elif [[ "$MANUAL_PUBLISH" == "true" ]]; then
-              if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-                echo "Manual publication is restricted to refs/heads/main." >&2
+            if [[ "$EVENT_NAME" == "workflow_dispatch" && "$MANUAL_PUBLISH" == "true" ]]; then
+              if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+                echo "Publication requires a fresh workflow run, not a rerun." >&2
                 exit 1
               fi
+              if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
+                echo "Manual publication is restricted to main or matching version tags." >&2
+                exit 1
+              fi
+              git merge-base --is-ancestor "$SOURCE_SHA" origin/main
               echo "publish=true"
             else
               echo "publish=false"
@@ -542,6 +545,7 @@ jobs:
           Set-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Value "$hash  $name" -Encoding ascii
           $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
           if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
+          Set-Content -LiteralPath "dist\installer\windows-SOURCE-SHA.txt" -Value $env:GITHUB_SHA -Encoding ascii
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: needs.prepare.outputs.windows_signing != 'true'
         with:
@@ -549,6 +553,7 @@ jobs:
           path: |
             dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
             dist/installer/windows-SHA256SUMS.txt
+            dist/installer/windows-SOURCE-SHA.txt
           if-no-files-found: error
           retention-days: 7
       - name: Stage Windows app for isolated signing
@@ -754,21 +759,22 @@ jobs:
           Set-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Value "$hash  $name" -Encoding ascii
           $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
           if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
+          Set-Content -LiteralPath "dist\installer\windows-SOURCE-SHA.txt" -Value $env:GITHUB_SHA -Encoding ascii
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-installer
           path: |
             dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
             dist/installer/windows-SHA256SUMS.txt
+            dist/installer/windows-SOURCE-SHA.txt
           if-no-files-found: error
           retention-days: 7
 
-  publish:
-    name: Publish release
+  stage-candidate:
+    name: Stage exact release candidate
     needs: [prepare, build-macos, sign-macos, build-windows, finalize-windows-signed]
     if: >-
       ${{ always()
-      && needs.prepare.outputs.publish == 'true'
       && needs.build-macos.result == 'success'
       && (needs.sign-macos.result == 'success'
       || (needs.prepare.outputs.macos_signing != 'true'
@@ -779,8 +785,72 @@ jobs:
       && needs.finalize-windows-signed.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      manifest_sha256: ${{ steps.manifest.outputs.sha256 }}
     env:
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      APP_VERSION: ${{ needs.prepare.outputs.app_version }}
+      ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Download final macOS artifact only
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: macos-dmg
+          path: artifacts/macos
+      - name: Download final Windows artifact only
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-installer
+          path: artifacts/windows
+      - name: Verify producer identities and stage candidate
+        id: manifest
+        run: |
+          set -euo pipefail
+          DIGEST="$(python packaging/release_candidate.py prepare artifacts --output candidate)"
+          echo "sha256=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Candidate manifest SHA-256: $DIGEST"
+          {
+            echo '## Exact candidate awaiting acceptance (not a release)'
+            echo "Manifest SHA-256: $DIGEST"
+            echo '```json'
+            cat candidate/candidate.json
+            echo '```'
+            echo 'Follow packaging/RELEASE_ACCEPTANCE.md. Native acceptance is not established by this build.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        id: upload
+        with:
+          name: release-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Record immutable candidate download
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          echo "Artifact ID: $ARTIFACT_ID — $ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish accepted candidate
+    needs: [prepare, stage-candidate]
+    if: >-
+      ${{ needs.prepare.outputs.publish == 'true'
+      && needs.stage-candidate.result == 'success'
+      && github.run_attempt == 1 }}
+    runs-on: ubuntu-latest
+    environment: release-publication
+    permissions:
+      contents: write
+      checks: read
+    env:
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      APP_VERSION: ${{ needs.prepare.outputs.app_version }}
+      ASSET_TOKEN: ${{ needs.prepare.outputs.asset_token }}
+      MANIFEST_SHA256: ${{ needs.stage-candidate.outputs.manifest_sha256 }}
       # Hoisted to job env because the `secrets` context is NOT allowed in a
       # step `if:` (using it there makes the whole workflow invalid). `env` IS
       # allowed in a step `if:`, so the signing step gates on this instead.
@@ -792,24 +862,22 @@ jobs:
       WINDOWS_SIGNING_ACTIVE: ${{ needs.prepare.outputs.windows_signing }}
       WINDOWS_SIGNED: ${{ needs.prepare.outputs.windows_signing_public }}
     steps:
-      - name: Download final macOS artifact only
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Download accepted candidate by immutable ID
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: macos-dmg
-          path: artifacts/macos
-      - name: Download final Windows artifact only
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: windows-installer
-          path: artifacts/windows
-      - name: Assemble assets and checksums
+          artifact-ids: ${{ needs.stage-candidate.outputs.artifact_id }}
+          path: release
+          merge-multiple: true
+      - name: Verify accepted bytes and current source checks
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' \) -exec cp {} release/ \;
-          cd release
-          shasum -a 256 -- * > SHA256SUMS.txt
-          echo "Assets:"; ls -la
+          python packaging/release_candidate.py verify release --digest "$MANIFEST_SHA256"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?filter=latest&per_page=100" \
+            --jq '.check_runs[] | tojson' > "$RUNNER_TEMP/checks.jsonl"
+          python packaging/release_candidate.py checks "$RUNNER_TEMP/checks.jsonl"
 
       - name: Sign checksums (minisign)
         # Authenticity signature for SHA256SUMS.txt. Runs only once the signing
@@ -825,6 +893,8 @@ jobs:
           minisign -S -s minisign.key -m release/SHA256SUMS.txt
           rm -f minisign.key
           echo "Signed: $(ls release/SHA256SUMS.txt.minisig)"
+      - name: Recheck final allowlist and accepted bytes
+        run: python packaging/release_candidate.py verify release --digest "$MANIFEST_SHA256" --signed
       - name: Publish stable release
         if: needs.prepare.outputs.channel == 'stable'
         env:
@@ -832,15 +902,16 @@ jobs:
           TAG: ${{ needs.prepare.outputs.release_tag }}
         run: |
           set -euo pipefail
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$TAG" release/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "FolioOrb $TAG" \
-              --generate-notes \
-              --verify-tag
-          fi
+          git ls-remote origin "refs/tags/$TAG" "refs/tags/$TAG^{}" > "$RUNNER_TEMP/tag-refs.txt"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[].tag_name' > "$RUNNER_TEMP/release-tags.txt"
+          python packaging/release_candidate.py tag "$RUNNER_TEMP/tag-refs.txt" \
+            --releases "$RUNNER_TEMP/release-tags.txt"
+          gh release create "$TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "FolioOrb $TAG" \
+            --generate-notes \
+            --verify-tag
       - name: Refresh latest-main prerelease
         if: needs.prepare.outputs.channel == 'dev'
         env:
@@ -879,7 +950,7 @@ jobs:
           - Build: \`${TOKEN}\`
           - Built: ${BUILT}
 
-          > ⚠️ These builds come straight from the latest \`main\` merge and may be
+          > ⚠️ These builds are accepted candidates from \`main\` and may be
           > unstable. For everyday use, grab the [latest stable release](https://github.com/${GITHUB_REPOSITORY}/releases/latest).
           >
           > ${SECURITY_NOTE} See the install docs for the expected platform warnings

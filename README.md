@@ -230,11 +230,13 @@ Start with [CLAUDE.md](CLAUDE.md) for repository contracts and
 ## Release channels
 
 - **Stable:** versioned tags such as `v5.16.1`; used by the latest stable release link.
-- **latest-main:** rolling prerelease built from current `main`; useful for testing, never promoted
+- **latest-main:** rolling prerelease published from an accepted `main` candidate; useful for testing, never promoted
   as the stable download automatically. [Open the development build](https://github.com/udhawan97/FolioOrb/releases/tag/latest-main).
 
-Every channel builds macOS and Windows artifacts on native hosted runners, exercises frozen smoke
-tests, and publishes `SHA256SUMS.txt` only after both platform builds pass.
+Main and version-tag pushes build candidates without publishing. An explicit publication run
+stages both installers and waits for protected owner acceptance of those exact bytes, then
+publishes them with `SHA256SUMS.txt` without rebuilding. See
+[Release candidate acceptance](packaging/RELEASE_ACCEPTANCE.md).
 
 ## License
 

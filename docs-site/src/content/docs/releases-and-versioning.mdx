@@ -15,19 +15,20 @@ place — `app/version.py` — and flows into the app, the installers, and the r
 
 Pushing a `v*` tag (or merging to `main`) triggers a single GitHub Actions workflow. It runs
 the tests, builds both installers on their native runners, smoke-tests each frozen bundle,
-and only then publishes. If either build or smoke test fails, nothing is published and the
-previous release stays exactly as it was.
+and stages a checksummed candidate. Pushes never publish. An explicit manual publication run
+waits for owner acceptance, then publishes the exact staged bytes without rebuilding.
+If a build or acceptance gate fails, the previous release stays available.
 
-<Image src={pipeline} alt="Release pipeline from a main merge through tests, parallel macOS and Windows builds with smoke tests, to a GitHub Release feeding the website download buttons." />
+<Image src={pipeline} alt="Main merges build and stage candidates; explicit publication requires owner acceptance of the exact installer bytes." />
 
 ## Two channels
 
-<Image src={channels} alt="Stable releases come from version tags and are the default download; a rolling latest-main prerelease is refreshed on every merge and linked as a development build." />
+<Image src={channels} alt="Accepted version-tag candidates become stable releases; accepted main candidates update the rolling development prerelease." />
 
-- **Stable** — cut by pushing a version tag like `v5.16.1`. This is what the website, README,
+- **Stable** — published after acceptance of a version-tag candidate like `v5.16.1`. This is what the website, README,
   and download buttons point to by default. A tag whose number doesn't match
   `app/version.py` fails the build on purpose, so assets can never be mislabeled.
-- **latest-main** — a single rolling prerelease, refreshed on every merge to `main`. Always
+- **latest-main** — a single rolling prerelease, updated only after acceptance of a candidate from `main`. Always
   marked prerelease, so it never becomes the "latest" download by accident. Offered under
   a direct **Development build** link for anyone who wants to test the newest changes.
 
@@ -37,7 +38,11 @@ previous release stays exactly as it was.
 | --- | --- |
 | `FolioOrb-macOS-arm64-v5.16.1.dmg` | macOS Apple Silicon installer |
 | `FolioOrb-Windows-x64-v5.16.1-Setup.exe` | Windows per-user installer |
-| `SHA256SUMS.txt` | Checksums for every asset — see [verifying downloads](/FolioOrb/download/#verify-your-download) |
+| `SHA256SUMS.txt` | Checksums for both installers — see [verifying downloads](/FolioOrb/download/#verify-your-download) |
+
+New accepted candidates also publish `candidate.json`, recording source SHA, workflow identity,
+and installer hashes. Its digest is recorded in the staging summary; it is not an installer
+and is not listed in `SHA256SUMS.txt`.
 
 Development builds use the same names with `v5.16.1` replaced by `main-<short-sha>`.
 
@@ -63,7 +68,10 @@ detects mismatch against that manifest; it does not independently authenticate i
 Phase 2's fail-closed workflow support is checked in, but no public release is described as
 Developer ID signed until the certificate is configured and the exact downloaded app and DMG
 pass signature verification. The documented rehearsal keeps `publish=false`; a manual run can
-publish only when `publish=true` is explicitly selected from `main`.
+request publication only when `publish=true` is explicitly selected. The owner must then
+verify and accept that same run’s staged installers at the protected publication gate.
+A previous rehearsal does not approve a freshly rebuilt candidate. See the
+[release acceptance checklist](https://github.com/udhawan97/FolioOrb/blob/main/packaging/RELEASE_ACCEPTANCE.md).
 Phase 3's build-only rehearsal support is also checked in, but remains dormant until
 Developer ID signing is active in the same run and an App Store Connect API credential is
 configured. It submits and staples the app before assembling the DMG, then separately

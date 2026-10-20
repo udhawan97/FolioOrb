@@ -9,6 +9,17 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "monthly"
+    groups:
+      pydantic-runtime:
+        patterns:
+          - "pydantic"
+          - "pydantic-core"
+          - "pydantic_core"
+    ignore:
+      # NumPy 2.5+ requires Python 3.12; retain the supported Python 3.11 matrix.
+      # Revisit with an explicitly approved minimum-Python change.
+      - dependency-name: "numpy"
+        versions: [">=2.5"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

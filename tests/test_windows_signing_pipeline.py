@@ -152,7 +152,9 @@ def test_windows_artifacts_require_one_exact_named_installer():
 
 def test_publish_downloads_only_final_platform_artifacts():
     workflow = _text(".github/workflows/release.yml")
-    publish = workflow.split("\n  publish:\n", maxsplit=1)[1]
+    publish = workflow.split("\n  stage-candidate:\n", maxsplit=1)[1].split(
+        "\n  publish:\n", maxsplit=1
+    )[0]
 
     assert "Download final macOS artifact only" in publish
     assert "Download final Windows artifact only" in publish
