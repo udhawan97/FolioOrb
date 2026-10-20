@@ -239,7 +239,7 @@ jobs:
           shasum -a 256 --check macos-SHA256SUMS.txt
           printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
           test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: needs.prepare.outputs.macos_signing != 'true'
         with:
           name: macos-dmg
@@ -260,7 +260,7 @@ jobs:
           shasum -a 256 --check macos-app-SHA256SUMS.txt
           printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
           test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: needs.prepare.outputs.macos_signing == 'true'
         with:
           name: macos-app-for-signing
@@ -382,7 +382,7 @@ jobs:
           shasum -a 256 --check macos-SHA256SUMS.txt
           printf '%s\n' "${{ needs.prepare.outputs.source_sha }}" > macos-SOURCE-SHA.txt
           test "$(cat macos-SOURCE-SHA.txt)" = "$GITHUB_SHA"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: macos-dmg
           path: |
@@ -546,7 +546,7 @@ jobs:
           $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
           if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
           Set-Content -LiteralPath "dist\installer\windows-SOURCE-SHA.txt" -Value $env:GITHUB_SHA -Encoding ascii
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: needs.prepare.outputs.windows_signing != 'true'
         with:
           name: windows-installer
@@ -558,7 +558,7 @@ jobs:
           retention-days: 7
       - name: Stage Windows app for isolated signing
         if: needs.prepare.outputs.windows_signing == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-app-for-signing
           path: dist/FolioOrb
@@ -618,7 +618,7 @@ jobs:
           -Path dist\FolioOrb\FolioOrb.exe
           -ExpectedSubject $env:EXPECTED_SIGNER_SUBJECT
       - name: Stage signed Windows app outside the OIDC job
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-signed-app
           path: dist/FolioOrb
@@ -662,7 +662,7 @@ jobs:
           & $iscc "/DMyAppVersion=$env:APP_VERSION" "/DMyOutputName=$outputName" packaging\windows\installer.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Stage Windows installer for isolated signing
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-installer-for-signing
           path: dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
@@ -722,7 +722,7 @@ jobs:
           packaging\windows\verify_authenticode.ps1
           -Path "dist\installer\FolioOrb-Windows-x64-$env:ASSET_TOKEN-Setup.exe"
           -ExpectedSubject $env:EXPECTED_SIGNER_SUBJECT
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-signed-installer
           path: dist/installer/FolioOrb-Windows-x64-${{ needs.prepare.outputs.asset_token }}-Setup.exe
@@ -760,7 +760,7 @@ jobs:
           $recorded = (Get-Content -LiteralPath "dist\installer\windows-SHA256SUMS.txt" -Raw).Trim().Split()[0]
           if ($recorded -ne $hash) { throw "Recorded Windows checksum does not match the installer." }
           Set-Content -LiteralPath "dist\installer\windows-SOURCE-SHA.txt" -Value $env:GITHUB_SHA -Encoding ascii
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-installer
           path: |
@@ -820,7 +820,7 @@ jobs:
             echo '```'
             echo 'Follow packaging/RELEASE_ACCEPTANCE.md. Native acceptance is not established by this build.'
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         id: upload
         with:
           name: release-candidate-${{ github.run_id }}-${{ github.run_attempt }}
