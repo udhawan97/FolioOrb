@@ -15,7 +15,8 @@ place — `app/version.py` — and flows into the app, the installers, and the r
 
 Pushing a `v*` tag (or merging to `main`) triggers a single GitHub Actions workflow. It runs
 the tests, builds both installers on their native runners, smoke-tests each frozen bundle,
-and stages a checksummed candidate. Pushes never publish. An explicit manual publication run
+and stages a checksummed candidate. With this workflow version, pushes only stage candidates.
+An explicit manual publication run
 waits for owner acceptance, then publishes the exact staged bytes without rebuilding.
 If a build or acceptance gate fails, the previous release stays available.
 
