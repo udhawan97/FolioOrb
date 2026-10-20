@@ -22,7 +22,7 @@ multitasking==0.0.13
 numpy==2.4.6
 pandas==3.0.3
 peewee==4.5.3
-platformdirs==4.10.0
+platformdirs==4.13.3
 protobuf==7.35.0
 pycparser==3.0
 pydantic==2.13.5
