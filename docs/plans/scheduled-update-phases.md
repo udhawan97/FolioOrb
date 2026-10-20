@@ -4,7 +4,7 @@ Prepared October 20, 2026, America/Chicago. Planning baseline: `224fdac37b7860ce
 
 Advance FolioOrb through six bounded phases: compatibility, import preview, import confirmation, data-quality explanations, review comparison, and recovery acceptance. Scheduled runs should finish one useful slice at a time, preserve financial records, and leave reproducible evidence for the next run.
 
-This is the canonical implementation queue for this initiative. Existing shipped plans remain design history. Phase 1 now has an implementation candidate for source integration and acceptance-bound publication; later product phases remain unimplemented. This queue alone does not authorize a release. CAPO retains its existing repository-selection priorities and release authority, subject to all gates below.
+This is the canonical implementation queue for this initiative. Existing shipped plans remain design history. Phase 1 source integration and acceptance-bound publication controls landed in PR 99; later product phases remain unimplemented. See the exact integration and transport receipts below. This queue alone does not authorize a release. CAPO retains its existing repository-selection priorities and release authority, subject to all gates below.
 
 ## Planning baseline evidence
 
@@ -175,9 +175,9 @@ Update in place; use one row per bounded slice. Qualify recurring acceptance sli
 
 | Slice | State | Depends on | Next action |
 | --- | --- | --- | --- |
-| 1A | Implementation candidate under verification | None | Verify protected PR checks and real candidate transport before integration |
-| 1B | Implementation candidate under verification | 1A | Group coupled Pydantic updates and defer incompatible NumPy proposals |
-| 2 | Planned | 1A baseline disposition | Review strict local preview contract |
+| 1A | Source merged; transport verified | None | Preserve exact-artifact native acceptance before publication |
+| 1B | Source merged; incompatible upgrades deferred | 1A | Revisit NumPy only with a Python-minimum decision; validate grouped Pydantic proposals |
+| 2 | Ready for a bounded implementation run | 1A disposition satisfied | Review strict local preview contract on current main |
 | 3 | Planned | 2 | Review confirmation token, transaction, and reconciliation contract |
 | 4 | Planned | 1A baseline disposition | Run cross-surface synthetic quality matrix |
 | 5A | Planned | 4 | Establish fields safely comparable from v1 receipts |
@@ -217,6 +217,84 @@ signing protections remain unchanged. See the [acceptance checklist](../../packa
 for candidate identity, native evidence, rejection, expiry and retry. Automated workers must
 never approve the pending publication environment.
 
-The implementation design completed two four-role council rounds. Implementation review,
-full final-source checks, protected integration and actual candidate transport are pending.
-No product feature, native acceptance, software release or signing activation is claimed here.
+### Integration receipt
+
+The control commit is `75ef9d9d6d9aff730abe7067a9491f0192b58391`, merged through
+[PR 99](https://github.com/udhawan97/FolioOrb/pull/99) at `2026-10-20T05:33:29Z`.
+Local main was fast-forwarded to the verified remote commit. Future release candidates must
+descend from this control commit; historical commits can retain auto-publication behavior.
+The PR's final head was `adbcaa8d6efa3a9296432ab22d82a38f1563a83a`, with all eight
+required PR check names successful. All seven main-source check names also passed at the
+control commit: Python 3.11/3.12 tests, Dependency Audit, Python 3.11/3.12 Pylint builds,
+Analyze Python and repository hygiene. The publication verifier accepted their fresh
+GitHub check-run JSON. PR-only Dependency Review is separately covered by PR 99.
+Main CI run `39375535500`, Pylint `39375535396`, CodeQL `39375535412`, hygiene
+`39375535616` and Docs `39375535404` all completed successfully.
+
+Both design and implementation completed exactly two independent four-role council rounds,
+with no unresolved blockers. The implementation review covered
+`e6ba31dc88a37fb6375d7b1fdbc8d6704a28dfb5`; its baseline-to-candidate binary diff digest was
+`56e48b9b4dc0e9fc928ef91a8311e0f89cb0f5c7e34b1e54df3e95508b4bceb8`.
+The subsequent documentation-only correction qualified publication behavior by workflow version.
+This delivery record adds evidence and queue state, not new application or release behavior.
+
+PR 85 and PR 87 are closed with their incompatible upgrades deferred. Fresh diffs contained
+only their respective single dependency-pin change; neither included independent product work.
+The NumPy PR was already closed when explicit closure was attempted after integration.
+The Pydantic-core PR was then closed. No manual branch deletion was requested or performed.
+The four audits and ordinary required checks remain mandatory for future grouped proposals.
+
+### Validation receipt
+
+- Full offline `python -m pytest -q`: **1,980 passed** on Python 3.11 and again on 3.12,
+  with one pre-existing Starlette deprecation warning in each. Disposable profiles, blank AI
+  key, disabled updater scheduler and mocked market data were used.
+- `node --test tests/js/*.test.cjs`: **115 passed**.
+- `python -m compileall -q app run.py tests packaging/release_candidate.py`: passed.
+- Full tracked-source Pylint plus the new helper/tests: **10.00/10**, no messages.
+- `actionlint .github/workflows/release.yml` and `git diff --check`: passed.
+- `scripts/lock_desktop_dependencies.sh --check`: reproduced all locks without changes.
+- Four pinned-file dependency audits: no known vulnerabilities. The normal local
+  `pip-audit -r requirements.txt` encountered a managed-Python `ensurepip` subprocess failure;
+  the normal hosted audit and all lock audits subsequently passed in the required PR checks.
+- Docs `npm ci`, `npm run build` and `npm audit --audit-level=low`: passed, 23 pages and
+  zero reported vulnerabilities. The final wording correction was rebuilt successfully.
+- Graphify incremental refresh succeeded; the scoped `release_candidate verify_checks verify_tag`
+  query was corroborated against the helper. Generated graph files remain ignored.
+
+### Candidate transport receipt
+
+Build-only [run 39375069843](https://github.com/udhawan97/FolioOrb/actions/runs/39375069843)
+used source `e6ba31dc88a37fb6375d7b1fdbc8d6704a28dfb5`, attempt 1. Both native builds,
+the test gate and staging succeeded; signing and **publication were skipped**. The only later
+source change in PR 99 was the documentation qualification above. This receipt proves the
+transport path for that recorded candidate, not acceptance of newly rebuilt installers.
+
+The immutable candidate artifact ID is `12243565524`. It was downloaded by ID and verified
+against manifest digest `e9e3eb40f1d77f76b6259816a3049afdf88985278f2b1a7bf9a0e122caf6f47a`
+read independently from the staging job log. The verifier accepted the exact file allowlist,
+source/run identity, sizes, manifest, checksum list and both installer hashes:
+
+| Installer | SHA-256 | Bytes |
+| --- | --- | --- |
+| `FolioOrb-macOS-arm64-main-e6ba31d.dmg` | `e2d7a6d838ed61650f9efb207536b9b45138b06b2e5e7f4aacef93439ac4c7d7` | 43,871,073 |
+| `FolioOrb-Windows-x64-main-e6ba31d-Setup.exe` | `6cc9a1247b6c6043a0706ea5a3bda87d914bea277b18a2ecdad672b214e709b1` | 42,209,913 |
+
+Existing release IDs, publication timestamps, asset IDs and asset update timestamps were
+unchanged after the rehearsal. The artifact expires after its configured 30-day retention;
+this durable receipt does not grant acceptance to a future replacement.
+
+### Scheduled handoff and remaining gates
+
+The existing weekly CAPO FolioOrb appendix now records control commit
+`75ef9d9d6d9aff730abe7067a9491f0192b58391`, the historical-tag ancestry restriction,
+protected same-run acceptance and the prohibition on automatic deployment approval.
+Readback confirmed all saved fields except prompt/update timestamp were preserved, including
+Sunday-noon cadence, active state and target chat; other repository routing was preserved.
+The next ready slice is Phase 2, read-only CSV preview, subject to a fresh plan council and
+current-main checks. Phase 4 remains independently eligible under the queue's priorities.
+
+No Phase 2+ product feature, native installer acceptance, signing activation or software release
+was performed. The publication path is configured and its transport verified; actual publication
+has not been exercised. Native/OS/accessibility evidence and owner approval remain required
+for any intended release. A source merge never substitutes for those gates.
