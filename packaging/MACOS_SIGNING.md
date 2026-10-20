@@ -1,5 +1,10 @@
 # macOS Developer ID signing — activation
 
+Publication now follows [Release candidate acceptance](RELEASE_ACCEPTANCE.md). Main/tag
+pushes build only. A `publish=true` run waits for owner acceptance of its own staged
+installers; a prior rehearsal cannot approve newly rebuilt bytes. Never automatically
+approve the publication environment. Existing signing trust boundaries remain in force.
+
 FolioOrb's release pipeline includes dormant support for signing both the `.app`
 bundle and its `.dmg` with an Apple **Developer ID Application** certificate.
 Signing is deliberately disabled by default, so forks and ordinary `main` builds

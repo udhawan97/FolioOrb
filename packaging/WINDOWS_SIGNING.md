@@ -1,5 +1,10 @@
 # Windows Authenticode signing — activation
 
+Publication now follows [Release candidate acceptance](RELEASE_ACCEPTANCE.md). Main/tag
+pushes build only. A `publish=true` run waits for owner acceptance of its own staged
+installers; a prior rehearsal cannot approve newly rebuilt bytes. Never automatically
+approve the publication environment. Existing signing trust boundaries remain in force.
+
 FolioOrb's release pipeline includes dormant Phase 4 support for signing both
 the frozen application executable and the final Inno Setup installer with
 Azure Artifact Signing. Each signature uses SHA-256, receives an RFC 3161
@@ -174,7 +179,10 @@ gh workflow run release.yml \
 ```
 
 The repository variable makes that manual `main` run take the signed path even
-though the manual signing input is false. Download the newly published
+though the manual signing input is false. First download this run’s staged candidate, complete the native acceptance checklist in
+[Release candidate acceptance](RELEASE_ACCEPTANCE.md), and have the owner approve the
+`release-publication` environment. A prior rehearsal does not approve these new bytes.
+Only after that publication succeeds, download the newly published
 `latest-main` artifact, repeat the exact checksum, installer signature,
 installed-executable, and timestamp acceptance above, and confirm its source
 SHA. The release note remains pilot wording because the public switch is still

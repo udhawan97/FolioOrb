@@ -1,5 +1,10 @@
 # macOS notarization — activation
 
+Publication now follows [Release candidate acceptance](RELEASE_ACCEPTANCE.md). Main/tag
+pushes build only. A `publish=true` run waits for owner acceptance of its own staged
+installers; a prior rehearsal cannot approve newly rebuilt bytes. Never automatically
+approve the publication environment. Existing signing trust boundaries remain in force.
+
 FolioOrb's release pipeline includes dormant Phase 3 support for submitting the
 Developer ID-signed app and DMG to Apple's notary service, requiring an
 `Accepted` result, stapling both tickets, and checking the stapled artifacts
