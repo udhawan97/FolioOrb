@@ -84,7 +84,7 @@ def test_credentials_are_isolated_in_a_protected_fixed_logic_job():
     assert "secrets.MACOS_" not in build
     assert "environment: macos-signing" in signing
     assert "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" in signing
-    assert "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c" in signing
+    assert "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333" in signing
     verify = signing.index("Verify exact source and app before credential access")
     credentials = signing.index("Sign and verify Developer ID app bundle")
     assert verify < credentials
