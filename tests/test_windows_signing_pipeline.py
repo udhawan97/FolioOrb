@@ -72,7 +72,7 @@ def test_frozen_executable_and_final_installer_share_the_signing_gate():
     finalizer = workflow.index("finalize-windows-signed:")
     checksum = workflow.index("- name: Record signed Windows artifact checksum")
     upload = workflow.index(
-        "- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "- uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
         checksum,
     )
 

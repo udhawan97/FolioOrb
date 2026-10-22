@@ -147,7 +147,7 @@ def test_app_is_notarized_before_the_dmg_and_dmg_after_signing():
     notarize_dmg = workflow.index("- name: Notarize and staple DMG")
     verify_dmg = workflow.index("- name: Verify notarized DMG and embedded app")
     upload = workflow.index(
-        "- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "- uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
         notarize_dmg,
     )
 
@@ -179,7 +179,7 @@ def test_raw_dmg_checksum_is_recorded_and_uploaded_with_the_rehearsal():
 
     checksum = workflow.index("- name: Record macOS artifact checksum")
     upload = workflow.index(
-        "- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "- uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
         checksum,
     )
     assert checksum < upload
