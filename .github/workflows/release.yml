@@ -412,8 +412,15 @@ jobs:
           tests/test_source_installer_profile.py
       - name: Exercise Windows source installer and parser gate
         shell: pwsh
+        timeout-minutes: 10
+        env:
+          # The launcher defaults independently of actions/setup-python.
+          PY_PYTHON: "3.12"
+          PYTHON_MANAGER_DEFAULT: "3.12"
         run: |
           $ErrorActionPreference = "Stop"
+          py -c "import sys; print(sys.version); assert sys.version_info[:2] == (3, 12)"
+          if ($LASTEXITCODE -ne 0) { throw "Source installer must use the configured Python 3.12." }
           foreach ($script in @(
             "scripts/install-win.ps1",
             "scripts/setup.ps1",
