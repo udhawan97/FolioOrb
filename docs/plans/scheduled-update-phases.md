@@ -298,3 +298,8 @@ No Phase 2+ product feature, native installer acceptance, signing activation or 
 was performed. The publication path is configured and its transport verified; actual publication
 has not been exercised. Native/OS/accessibility evidence and owner approval remain required
 for any intended release. A source merge never substitutes for those gates.
+
+
+## Weekly CAPO security maintenance — October 25, 2026
+
+Owner `weekly-capo-2026-10-25`; scope Phase 1 baseline security follow-up; existing PR 110 held pending fresh audits. Base `df07636cb8b7c652679cf84e484db57877577cec`. Isolated worktree `/Users/umang/.codex/worktrees/capo-20261025/FolioOrb`. Plan: [2026-10-25-docs-security](2026-10-25-docs-security.md). Reviewed plan packet digest `6d2af17496fd24d3ec3f3bbeb495cdd6328642d769a8b9d719a0e1e5fe166496`; both council rounds complete, four actual independent roles per round, no remaining plan blockers. Implementation and final-candidate review pending. Native acceptance, software publication and deployed-site verification are not claimed.
