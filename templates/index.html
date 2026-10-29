@@ -2734,6 +2734,7 @@
     <script defer src="/static/js/analytics-charts.js?v=0"></script>
     <script defer src="/static/js/interaction-state.js?v=0"></script>
     <script defer src="/static/js/modal-surface.js?v=0"></script>
+    <script defer src="/static/js/csv-preview.js?v=0"></script>
     <script defer src="/static/js/dashboard.js?v=0"></script>
     <script defer src="/static/js/dca-workflow.js?v=0"></script>
     <script defer src="/static/js/updates.js?v=0"></script>
@@ -2969,13 +2970,38 @@
                         </p>
                     </div>
 
+                    <p class="import-mode-body">Immediate import saves valid rows as soon as you choose a file.</p>
+                    <div class="import-actions">
+                        <input type="file" id="csv-preview-input" accept=".csv,text/csv" hidden
+                               aria-label="Choose CSV for preview">
+                        <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-choose"
+                                aria-controls="csv-preview-result">Preview CSV…</button>
+                    </div>
+                    <p class="import-mode-body">Preview CSV only: template columns, up to 200 rows, nothing saved.
+                        Ticker symbols may be sent to Yahoo Finance for validation; the full CSV and notes
+                        are not sent to Yahoo or Claude. This uses existing import rules: unrecognized
+                        research flags become false, and finite amounts have no maximum magnitude limit.</p>
+                    <section id="csv-preview-result" class="csv-preview-result" hidden
+                             aria-labelledby="csv-preview-heading" aria-busy="false">
+                        <h4 id="csv-preview-heading" tabindex="-1">CSV preview — nothing saved</h4>
+                        <p id="csv-preview-status" role="status" aria-live="polite"></p>
+                        <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-close">Close preview</button>
+                        <div id="csv-preview-table" class="csv-preview-table" tabindex="0"
+                             role="region" aria-label="CSV preview rows"></div>
+                        <div id="csv-preview-paging" class="import-actions" hidden>
+                            <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-previous">Previous rows</button>
+                            <span id="csv-preview-range" role="status" aria-live="polite"></span>
+                            <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-next">Next rows</button>
+                        </div>
+                    </section>
+
                     <div class="import-actions">
                         <input type="file" id="import-csv-input" accept=".csv,text/csv"
                                aria-label="Choose a CSV file to import" hidden>
                         <button type="button" class="btn btn-success btn-sm import-choose-btn" id="import-choose-btn"
                                 onclick="document.getElementById('import-csv-input').click()">
                             <svg class="manage-lucide manage-lucide--btn" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg>
-                            Choose CSV…
+                            Import immediately…
                         </button>
                         <button type="button" class="btn btn-sm import-template-link" onclick="downloadHoldingsTemplate()">
                             Download template

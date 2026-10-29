@@ -13389,6 +13389,7 @@ function toggleCsvImportPanel() {
     panel.hidden = !open;
     btn?.setAttribute("aria-expanded", String(open));
     if (open) updateImportPanelMode();
+    else window.holdingsCsvPreview?.cancel(false);
 }
 
 // In the desktop WebView, target="_blank" links open a chrome-less frame (or
@@ -13548,6 +13549,7 @@ function initCsvImport() {
     const input = document.getElementById("import-csv-input");
     if (!input || input.dataset.bound) return;
     input.dataset.bound = "true";
+    window.holdingsCsvPreview = createCsvPreview({ document, workspace: PortfolioWorkspace });
     input.addEventListener("change", () => {
         const file = input.files && input.files[0];
         if (file) handleImportFile(file);

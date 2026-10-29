@@ -177,7 +177,7 @@ Update in place; use one row per bounded slice. Qualify recurring acceptance sli
 | --- | --- | --- | --- |
 | 1A | Source merged; transport verified | None | Preserve exact-artifact native acceptance before publication |
 | 1B | Source merged; incompatible upgrades deferred | 1A | Revisit NumPy only with a Python-minimum decision; validate grouped Pydantic proposals |
-| 2 | Ready for a bounded implementation run | 1A disposition satisfied | Review strict local preview contract on current main |
+| 2 | Implemented; integration gates pending | 1A disposition satisfied | Verify exact candidate, implementation council and hosted checks |
 | 3 | Planned | 2 | Review confirmation token, transaction, and reconciliation contract |
 | 4 | Planned | 1A baseline disposition | Run cross-surface synthetic quality matrix |
 | 5A | Planned | 4 | Establish fields safely comparable from v1 receipts |
@@ -318,3 +318,12 @@ Graphify AST refresh/query passed with generated output ignored; semantic docume
 ## Phase 2 claim — October29,2026
 
 Owner `capo-phase2-20261029`; branch `capo/2026-10-29-csv-preview`; base `82e6828fa0246cf2ec71a93ea88ccb2691ad8c0b`. Implement one read-only strict CSV preview slice from [reviewed plan](2026-10-29-csv-preview.md). Shared claim in Git common directory `folioorb-scheduled-claims/phase-2`; clean isolated worktree `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/folioorb-phase2-20261029/repo`. Other owned refinement work and the active read-only f18 audit are preserved. Baseline preview POST405; existing focused CSV tests69passed with disposable data. Plan council2rounds×4independent roles accepted; packet digest `9d13474e672a22a8b449fad043c3384e04edd217e9fc9099495fd8d59ed37664`. No product implementation, source integration, native acceptance or release claim yet. Phase3 remains separately planned.
+
+
+## Phase 2 implementation checkpoint — October 29, 2026
+
+Owner `capo-phase2-20261029`, base `82e6828fa0246cf2ec71a93ea88ccb2691ad8c0b`; [bounded source plan](2026-10-29-csv-preview.md). Two complete plan-council rounds, four independent roles each, no remaining blockers. Implemented strict read-only preview through the shared CSV row validator: selected portfolio and digest/mode contract, normalized rows/counts/reasons, no AI, no database writes or default-portfolio seeding. Separate immediate import remains explicit. All 200 rows are reachable in bounded 25-row pages; close, stale-response fencing, reload and portfolio identity are covered. No confirmation/apply or Phase3 token/persistence is implemented.
+
+Local verification on identical product source: baseline absent preview POST405 and69focused tests; final106focused tests,2013full Python3.12 tests,121Node tests, compileall, full Pylint10.00/10 and diff-check passed. Docs npm ci/build(23pages)/audit(0vulnerabilities) passed. Actual Safari26.5.2 used only fictional task-owned SQLite with blank AI key, disabled scheduler, fake quotes, denied external I/O and SQL-write guard. Valid/duplicate/invalid, malformed/provider-unavailable, all53rows pagination, cancel/reload, selected portfolio2 and390px same-origin narrow frame passed; pending fake-provider cancellation remained closed after completion. Every recorded preview whole-database digest remained unchanged. Physical keyboard, VoiceOver and native installer acceptance are unperformed. Graphify code update and scoped `prepare_preview process_import_rows` query passed; documentation semantic extraction/community labels remain unrefreshed and graph navigation is not behavior proof.
+
+Source candidate, hosted checks, implementation council and integration remain pending at this checkpoint. Evidence retained at `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/folioorb-phase2-20261029`. No dependencies, versions, signing flags, publication approvals, release tags or software releases changed. Current main push workflow stages candidates only; native/publication gates remain separate. After verified integration, Phase3 confirmation contract is the next ready product phase, with new plan/council and snapshot revalidation required.
