@@ -68,6 +68,45 @@ _INJECTION_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 # ── Decoding & parsing ──────────────────────────────────────────────────────────
 
+class ImportFileError(ValueError):
+    """A bounded upload could not be interpreted as holdings CSV."""
+
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+
+
+def parse_import_upload(raw: bytes, filename: str, content_type: str, *, strict=False):
+    """Prepare one bounded upload; strict preview rejects lossy CSV shapes."""
+    media_type = (content_type or "").split(";")[0].strip().lower()
+    if media_type not in {"text/csv", "application/vnd.ms-excel"} and not (
+        media_type in {"application/octet-stream", "text/plain", ""}
+        and (filename or "").lower().endswith(".csv")
+    ):
+        raise ImportFileError(415, "Please upload a .csv file.")
+    if len(raw) > MAX_IMPORT_BYTES:
+        raise ImportFileError(413, f"File is too large (limit {MAX_IMPORT_BYTES // 1024} KB).")
+    try:
+        text = decode_csv_bytes(raw)
+    except ValueError as exc:
+        raise ImportFileError(415, str(exc)) from exc
+    try:
+        header, rows = parse_csv_text(text, strict=strict)
+    except csv.Error as exc:
+        if not strict:
+            raise
+        raise ImportFileError(400, "Malformed CSV: check quoting and field sizes.") from exc
+    if not header or not rows:
+        raise ImportFileError(400, "The file has no data rows.")
+    if len(rows) > MAX_IMPORT_ROWS:
+        raise ImportFileError(400, f"Too many rows (limit {MAX_IMPORT_ROWS}).")
+    duplicates = duplicate_columns(header)
+    if duplicates:
+        raise ImportFileError(400, f"Duplicate column name(s): {', '.join(duplicates)}. "
+                              "Give each column a unique header.")
+    return header, rows
+
+
 def decode_csv_bytes(raw: bytes) -> str:
     """Decode an uploaded CSV, stripping a UTF-8 BOM; fall back to cp1252.
 
@@ -83,21 +122,27 @@ def decode_csv_bytes(raw: bytes) -> str:
     raise ValueError("Couldn't read the file as text — save it as UTF-8 CSV.")
 
 
-def parse_csv_text(text: str) -> tuple[list[str], list[dict]]:
+def parse_csv_text(text: str, *, strict=False) -> tuple[list[str], list[dict]]:
     """Parse CSV text into (header, rows). Blank lines are skipped.
 
     Header cells are trimmed and lower-cased so column *names* match the template
     case-insensitively; row values are returned verbatim for downstream cleaning.
     """
-    reader = csv.reader(io.StringIO(text))
+    reader = csv.reader(io.StringIO(text), strict=strict)
     header: list[str] = []
     rows: list[dict] = []
     for record in reader:
         if not any((cell or "").strip() for cell in record):
+            if strict and not header and len(record) > 1:
+                raise ImportFileError(400, "CSV header names must not be empty.")
             continue  # blank line
         if not header:
             header = [(cell or "").strip().lower() for cell in record]
+            if strict and any(not column for column in header):
+                raise ImportFileError(400, "CSV header names must not be empty.")
             continue
+        if strict and len(record) != len(header):
+            raise ImportFileError(400, "Every data row must match the number of CSV headers.")
         row = {
             header[i]: (record[i] if i < len(record) else "")
             for i in range(len(header))
@@ -449,6 +494,8 @@ def process_import_rows(
     raw_rows: list[dict],
     existing_tickers: set,
     validate_fn: Callable[[str], dict],
+    *,
+    include_values: bool = False,
 ) -> tuple[list[dict], list[HoldingCreate]]:
     """Validate template-shaped rows; return (per-row report, holdings to insert).
 
@@ -467,26 +514,30 @@ def process_import_rows(
     for offset, raw in enumerate(raw_rows):
         row_num = offset + 2  # header is row 1; first data row is row 2 (Excel-style)
         raw_ticker = (raw.get("ticker") or "").strip().upper()
+        detail = ({"values": {key: raw.get(key, "") for key in CSV_COLUMNS},
+                   "normalized": False} if include_values else {})
 
         try:
             create = HoldingCreate(**strict_row_to_create_kwargs(raw))
         except ValidationError as exc:
             report.append({
-                "row": row_num, "ticker": raw_ticker or None,
+                **detail, "row": row_num, "ticker": raw_ticker or None,
                 "status": "error", "reason": _validation_message(exc),
             })
             continue
 
+        if include_values:
+            detail = {"values": create.model_dump(include=set(CSV_COLUMNS)), "normalized": True}
         ticker = create.ticker
         if ticker in accepted:
             report.append({
-                "row": row_num, "ticker": ticker, "status": "skipped",
+                **detail, "row": row_num, "ticker": ticker, "status": "skipped",
                 "reason": f"duplicate of row {accepted[ticker]} in this file",
             })
             continue
         if ticker in existing_tickers:
             report.append({
-                "row": row_num, "ticker": ticker, "status": "skipped",
+                **detail, "row": row_num, "ticker": ticker, "status": "skipped",
                 "reason": "already in portfolio",
             })
             continue
@@ -494,7 +545,7 @@ def process_import_rows(
         validation = validate_fn(ticker)
         if not validation.get("valid"):
             report.append({
-                "row": row_num, "ticker": ticker,
+                **detail, "row": row_num, "ticker": ticker,
                 "status": "error", "reason": _ticker_error_reason(ticker, validation),
             })
             continue
@@ -502,7 +553,7 @@ def process_import_rows(
         accepted[ticker] = row_num
         to_insert.append(create)
         report.append({
-            "row": row_num, "ticker": ticker, "status": "added", "reason": None,
+            **detail, "row": row_num, "ticker": ticker, "status": "added", "reason": None,
         })
 
     return report, to_insert

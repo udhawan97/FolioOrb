@@ -108,11 +108,25 @@ CSV with six columns: `ticker, shares, avg_cost, is_watchlist, hold_class, notes
 opens correctly in Excel, and it *is* the import template, so whatever you export imports
 straight back in.
 
+**Current source builds — Preview CSV.** Open **Import CSV → Preview CSV…** to inspect
+up to 200 strict template rows for the selected portfolio. The table shows normalized
+values and any duplicate, validation or provider-availability reasons, 25 rows at a time.
+Use **Previous rows** / **Next rows** to inspect all rows. **Close preview** discards it;
+no holdings, trades, targets or snapshots are saved. Research flags that are not recognized
+normalize to false, so check the displayed values. Very large finite amounts can pass
+existing input rules; preview does not calculate or approve portfolio totals.
+
+Preview parses locally and never calls Claude. Ticker validation may send symbols to Yahoo
+Finance; the full CSV and notes are not sent there. A preview is a point-in-time snapshot.
+There is no confirm/apply action in this phase. **Import immediately…** remains separate
+and saves valid rows when a file is chosen. This preview UI is not in the existing v5.16.1
+installers; their existing file-choice action also imports immediately.
+
 **Import** reads holdings back in, and how forgiving it is depends on whether Claude is
 connected — the panel tells you which mode you're in:
 
 - **Local mode (no API key needed).** Uses the exact template above: plain numbers, the
-  six known columns, up to 200 rows. Predictable and completely offline. If your file
+  six known columns, up to 200 rows. Parsing is local; ticker validation can contact Yahoo Finance. If your file
   has columns it doesn't recognize, it says so plainly and points you at the template —
   it never fails silently.
 - **Claude assist (when a key is configured).** Drop in almost any brokerage export —

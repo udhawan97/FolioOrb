@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from app.database import get_db
-from app.models import Holding, RealizedTrade
+from app.models import Holding, Portfolio, RealizedTrade
 from app.routers.deps import require_portfolio
 from app.schemas import (
     HoldingCreate,
@@ -25,6 +25,7 @@ from app.services.stock_service import (
 from app.services import dividend_calendar
 from app.services import financial_currency
 from app.services import holdings_csv
+from app.services import holdings_preview
 from app.services import holdings_repository
 from app.services import portfolio_lifecycle
 from app.services import portfolio_valuation
@@ -240,12 +241,6 @@ def add_holding(
 # Defined above the parameterized /holdings/{holding_id} routes so the static
 # "export"/"import" paths are never shadowed by the {holding_id} matcher.
 
-# Content types accepted outright, and those accepted only with a .csv filename
-# (browsers/tools often send these — or nothing at all — for a genuine .csv).
-_CSV_CONTENT_TYPES_DIRECT = {"text/csv", "application/vnd.ms-excel"}
-_CSV_CONTENT_TYPES_WITH_EXT = {"application/octet-stream", "text/plain", ""}
-
-
 @router.get("/holdings/export")
 def export_holdings(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Stream the portfolio's active holdings as a clean CSV.
@@ -338,6 +333,32 @@ def _prepare_import_external(header, data_rows, force_local, existing_tickers):
     return report_rows, to_insert, mode, column_mapping
 
 
+@router.post("/holdings/preview")
+async def preview_holdings(
+    file: UploadFile = File(...), portfolio_id: int = 1, db: Session = Depends(get_db)
+):
+    """Inspect a strict CSV against a point-in-time portfolio; never save rows."""
+    raw = await file.read(holdings_csv.MAX_IMPORT_BYTES + 1)
+    # The lifecycle guard seeds portfolio 1. Preview must use SELECT only.
+    with db.no_autoflush:
+        portfolio = db.get(Portfolio, portfolio_id)
+        if portfolio is None:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        identity = {"id": portfolio.id, "name": portfolio.name}
+        existing = set(holdings_repository.active_tickers(db, portfolio_id))
+    db.rollback()
+    snapshot_at = datetime.now(timezone.utc).isoformat()
+    try:
+        result = await run_in_threadpool(
+            holdings_preview.prepare_preview, raw, file.filename, file.content_type,
+            existing, validate_ticker_symbol,
+        )
+    except holdings_csv.ImportFileError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return {"portfolio_id": portfolio_id, "portfolio": identity,
+            "snapshot_at": snapshot_at, **result}
+
+
 @router.post("/holdings/import")
 async def import_holdings(
     file: UploadFile = File(...),
@@ -354,44 +375,13 @@ async def import_holdings(
 
     Returns a per-row report (added/skipped/error). Bad rows never block good rows.
     """
-    # Content-type allowlist; the ambiguous types only pass with a .csv filename.
-    content_type = (file.content_type or "").split(";")[0].strip().lower()
-    filename = (file.filename or "").lower()
-    csv_named = filename.endswith(".csv")
-    if content_type not in _CSV_CONTENT_TYPES_DIRECT and not (
-        content_type in _CSV_CONTENT_TYPES_WITH_EXT and csv_named
-    ):
-        raise HTTPException(status_code=415, detail="Please upload a .csv file.")
-
     raw = await file.read(holdings_csv.MAX_IMPORT_BYTES + 1)
-    if len(raw) > holdings_csv.MAX_IMPORT_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File is too large (limit {holdings_csv.MAX_IMPORT_BYTES // 1024} KB).",
-        )
-
     try:
-        text = holdings_csv.decode_csv_bytes(raw)
-    except ValueError as exc:
-        raise HTTPException(status_code=415, detail=str(exc)) from exc
-
-    header, data_rows = holdings_csv.parse_csv_text(text)
-    if not header or not data_rows:
-        raise HTTPException(status_code=400, detail="The file has no data rows.")
-    if len(data_rows) > holdings_csv.MAX_IMPORT_ROWS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Too many rows (limit {holdings_csv.MAX_IMPORT_ROWS}).",
+        header, data_rows = holdings_csv.parse_import_upload(
+            raw, file.filename, file.content_type
         )
-    dupes = holdings_csv.duplicate_columns(header)
-    if dupes:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Duplicate column name(s): {', '.join(dupes)}. "
-                "Give each column a unique header."
-            ),
-        )
+    except holdings_csv.ImportFileError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     # Preserve the established import contract: reject a missing Portfolio and
     # skip symbols it already owns before doing provider or Claude work. Close

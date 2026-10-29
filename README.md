@@ -69,6 +69,15 @@ The desktop and browser paths run the same FastAPI + SQLite dashboard on your ma
   <sub>The current dashboard with fictional demo holdings. Values are illustrative; missing data remains explicit.</sub>
 </p>
 
+### Inspect a CSV first (current source builds)
+
+In **Manage → Import CSV**, choose **Preview CSV…** to inspect up to 200 template rows
+without saving. Review normalized values, duplicates and errors; **Close preview** discards
+it. **Import immediately…** is a separate action that saves valid rows. Preview uses no
+Claude, but ticker validation may send symbols to Yahoo Finance; the full CSV and notes
+are not sent there. Preview is a snapshot, not a promise that later import will be identical.
+This source feature is not included in the existing v5.16.1 installers.
+
 ## What FolioOrb helps you answer
 
 | Question | FolioOrb surface |
