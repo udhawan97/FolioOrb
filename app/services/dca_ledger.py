@@ -205,8 +205,8 @@ class DcaLedger:
             self.db.query(
                 DcaContribution.status,
                 func.count(DcaContribution.id),
-                func.coalesce(func.sum(DcaContribution.amount), 0.0),
-                func.coalesce(func.sum(DcaContribution.shares), 0.0),
+                func.sum(DcaContribution.amount),
+                func.sum(DcaContribution.shares),
             )
             .filter(DcaContribution.plan_id == plan.id)
             .group_by(DcaContribution.status)
@@ -402,8 +402,8 @@ class DcaLedger:
         """Reject overflowing ledger/portfolio totals inside the caller's write."""
         totals = (
             self.db.query(
-                func.coalesce(func.sum(DcaContribution.amount), 0.0),
-                func.coalesce(func.sum(DcaContribution.shares), 0.0),
+                func.sum(DcaContribution.amount),
+                func.sum(DcaContribution.shares),
             )
             .filter(DcaContribution.plan_id == plan.id)
             .group_by(DcaContribution.status)

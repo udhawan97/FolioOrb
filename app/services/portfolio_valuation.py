@@ -34,7 +34,7 @@ class FinancialArithmeticError(ArithmeticError):
 
 def require_finite_amounts(*values: float) -> None:
     """Refuse overflow in derived facts and aggregates without imposing value caps."""
-    if not all(math.isfinite(value) for value in values):
+    if not all(value is not None and math.isfinite(value) for value in values):
         raise FinancialArithmeticError(
             "Financial totals exceed finite numeric arithmetic. "
             "Review the position or sale amounts."
@@ -132,8 +132,8 @@ def _realized_stats(db: Session, portfolio_id: int) -> dict[str, dict]:
 
 
 def _realized_gain(db: Session, portfolio_id: int) -> float:
-    total = (
-        db.query(func.coalesce(func.sum(RealizedTrade.realized_gain), 0.0))
+    count, total = (
+        db.query(func.count(RealizedTrade.id), func.sum(RealizedTrade.realized_gain))
         .filter(
             RealizedTrade.portfolio_id == portfolio_id,
             financial_currency.trusted_reporting_fact_clause(
@@ -141,11 +141,14 @@ def _realized_gain(db: Session, portfolio_id: int) -> float:
                 RealizedTrade.sale_price_source,
             ),
         )
-        .scalar()
+        .one()
     )
-    amount = float(total or 0.0)
-    require_finite_amounts(amount)
-    return round(amount, 2)
+    # Empty input is zero; NULL from populated financial data can mean overflow
+    # on SQLite and must not be mistaken for an empty ledger.
+    if count == 0:
+        return 0.0
+    require_finite_amounts(total)
+    return round(float(total), 2)
 
 
 def validate_stored_financial_totals(db: Session, portfolio_id: int) -> None:

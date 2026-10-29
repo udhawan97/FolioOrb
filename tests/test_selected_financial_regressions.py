@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 import csv
 import io
 import json
+import math
 from zipfile import ZipFile
 
 import pytest
@@ -113,6 +114,27 @@ def _ledger(db, amount=1e308, price=0.1):
     }
 
 
+def _null_overflow_sum(db):
+    """Model SQLite versions that return NULL rather than infinity on SUM overflow."""
+    class NullOverflowSum:
+        def __init__(self):
+            self.total = 0.0
+
+        def step(self, value):
+            if value is not None:
+                self.total += value
+
+        def finalize(self):
+            return self.total if math.isfinite(self.total) else None
+
+    connection = db.connection().connection.driver_connection
+    connection.create_aggregate("sum", 1, NullOverflowSum)
+    assert connection.execute(
+        "SELECT sum(value), coalesce(sum(value), 0) "
+        "FROM (SELECT 1e308 value UNION ALL SELECT 1e308)"
+    ).fetchone() == (None, 0)
+
+
 def test_dca_create_refuses_finite_division_overflow_before_any_write(db):
     ledger, arguments = _ledger(db)
     with pytest.raises(DcaConflictError, match="finite"):
@@ -165,6 +187,45 @@ def test_dca_catchup_aggregate_overflow_rolls_back_new_contributions(db):
     assert db.query(DcaPlan).count() == 1
     assert db.query(DcaContribution).count() == 1
     assert db.query(Holding).count() == 0
+
+
+def test_dca_catchup_null_overflow_rolls_back_new_contributions(db):
+    _null_overflow_sum(db)
+    test_dca_catchup_aggregate_overflow_rolls_back_new_contributions(db)
+
+
+def test_existing_dca_null_overflow_does_not_become_zero_in_summary(db):
+    _null_overflow_sum(db)
+    ledger, arguments = _ledger(db, amount=1e308, price=1e308)
+    ledger.create_plan(**arguments)
+    first = db.query(DcaContribution).one()
+    db.add(DcaContribution(
+        plan_id=first.plan_id, scheduled_date="2026-06-13", exec_date="2026-06-13",
+        amount=1e308, price=1e308, shares=1, status="pending", price_currency="USD",
+        price_currency_source="validated_plan",
+    ))
+    db.commit()
+    with pytest.raises(DcaConflictError, match="finite"):
+        ledger.list_plans(1)
+    assert db.query(DcaContribution).count() == 2
+
+
+def test_realized_null_overflow_is_not_reported_as_zero_and_empty_stays_zero(db):
+    _null_overflow_sum(db)
+    assert portfolio_valuation.load_performance(db, 1).realized_gain == 0
+    db.add_all([
+        RealizedTrade(
+            portfolio_id=1, ticker=ticker, shares_sold=1, sale_price=1.5e308,
+            avg_cost=5e307, realized_gain=1e308, sale_currency="USD",
+            sale_price_source="manual_entry",
+        )
+        for ticker in ("LEFT", "RIGHT")
+    ])
+    db.commit()
+    with pytest.raises(portfolio_valuation.FinancialArithmeticError, match="finite"):
+        portfolio_valuation.load_performance(db, 1)
+    assert db.query(RealizedTrade).count() == 2
+    assert db.query(PortfolioSnapshot).count() == 0
 
 
 def test_dca_bulk_apply_overflow_rolls_back_earlier_safe_apply(db):
