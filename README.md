@@ -178,9 +178,13 @@ irm https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-wi
 
 Set `FOLIO_REF` to pin a stable tag from `v5.16.0` onward or use the `latest-main`
 development channel.
+If the latest stable release cannot be resolved, the scripts stop before replacing code or
+changing the profile. Retry or choose an explicit supported ref; a failed lookup does not
+silently select development code.
 One-line installs keep SQLite, `.env`, backups, settings, and update state in a durable per-user
-profile outside the replaceable source tree. The first upgrade from an older layout performs a
-verified migration and retains the prior install as a recovery copy.
+profile outside the replaceable source tree. Automatic migration requires FolioOrb to be
+quit and a supported source launcher; the prior install remains a recovery copy. An unsupported
+legacy launcher requires a verified manual backup/profile migration before replacing code.
 
 </details>
 
@@ -198,6 +202,12 @@ verified migration and retains the prior install as a recovery copy.
 See [Updating](https://udhawan97.github.io/FolioOrb/updating/),
 [Review Orbit](https://udhawan97.github.io/FolioOrb/dashboard/review-orbit/), and
 [Troubleshooting](https://udhawan97.github.io/FolioOrb/troubleshooting/) for the complete workflows.
+
+**Source candidate, proposed for the next release:** saved holdings remain visible when quotes
+fail. Incomplete valuation shows a labelled known USD subtotal and withholds whole-portfolio
+returns and allocation comparisons. Foreign rows keep their native currency; no FX conversion
+is performed. Review Packs preserve unknown values and count every eligible sale in the period.
+See [proposed release notes](RELEASE_NOTES.md).
 
 ## Limitations worth knowing
 

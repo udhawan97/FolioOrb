@@ -28,6 +28,8 @@ window.ReviewOrbit = (() => {
         inbox: null,
         trust: null,
         report: null,
+        reportRequestId: 0,
+        reportDataPeriod: null,
         reportPeriod: savedChoice(REVIEW_PERIOD_KEY, REVIEW_PERIODS, "month"),
         inboxFilter: savedChoice(REVIEW_INBOX_FILTER_KEY, REVIEW_INBOX_FILTERS, "all"),
         watchlist: null,
@@ -357,15 +359,19 @@ window.ReviewOrbit = (() => {
         if (!data) return;
         const current = data.current;
         const activity = data.period_activity;
+        const missing = data.data_quality.missing_prices || [];
+        const foreign = data.foreign_currency_tickers || [];
         $("review-report-summary").innerHTML = html`
             <article class="review-report-card"><span>Current value</span><strong>${money(current.total_value)}</strong></article>
+            ${current.total_value === null ? html`<article class="review-report-card"><span>Known USD subtotal · incomplete</span><strong>${money(current.known_value)}</strong></article>` : ""}
             <article class="review-report-card"><span>Total return</span><strong>${money(current.total_return)} · ${pct(current.total_return_pct)}</strong></article>
             <article class="review-report-card"><span>Value change since ${data.observed_start || "no stored start"}</span><strong>${money(activity.value_change)}</strong></article>
             <article class="review-report-card"><span>Realized this period</span><strong>${money(activity.realized_gain)}</strong></article>
             <article class="review-report-card"><span>Stored snapshots</span><strong>${data.snapshot_count}</strong></article>
             <article class="review-report-card"><span>History coverage</span><strong>${data.data_quality.history}</strong></article>
             <article class="review-report-card"><span>Theses needing attention</span><strong>${data.thesis_attention.length}</strong></article>
-            <article class="review-report-card"><span>Price coverage</span><strong>${data.data_quality.valuation}</strong></article>`;
+            <article class="review-report-card"><span>Price coverage</span><strong>${data.data_quality.valuation}</strong></article>
+            ${missing.length || foreign.length ? html`<p class="review-disclosure">${missing.length ? `Missing prices: ${missing.join(", ")}. ` : ""}${foreign.length ? `Foreign-priced, excluded from USD: ${foreign.join(", ")}.` : ""}</p>` : ""}`;
     }
 
     function syncReportPeriodUi() {
@@ -384,17 +390,27 @@ window.ReviewOrbit = (() => {
 
     async function loadReport(force = false) {
         if (!force && state.loaded.has("report")) return Logic.refreshOutcome("report", 1);
+        const period = state.reportPeriod;
+        const requestId = ++state.reportRequestId;
         const hadData = Boolean(state.report);
         beginLoad("review-report-summary", "Building the review pack from stored history…", hadData);
+        if (hadData && state.reportDataPeriod !== period) {
+            $("review-report-summary").insertAdjacentHTML("afterbegin", html`
+                <p class="review-refresh-notice" role="status">Showing the previous ${state.reportDataPeriod} report while the ${period} report loads.</p>`);
+        }
         try {
-            state.report = await PortfolioWorkspace.json(`/api/review/report?period=${encodeURIComponent(state.reportPeriod)}`);
+            const report = await PortfolioWorkspace.json(`/api/review/report?period=${encodeURIComponent(period)}`);
+            if (requestId !== state.reportRequestId || period !== state.reportPeriod) return Logic.refreshOutcome("report", 0);
+            state.report = report;
+            state.reportDataPeriod = period;
             state.loaded.add("report");
             renderReport();
             clearRefreshState("review-report-summary");
             return Logic.refreshOutcome("report", 1);
         } catch (error) {
+            if (requestId !== state.reportRequestId || period !== state.reportPeriod) return Logic.refreshOutcome("report", 0);
             state.loaded.delete("report");
-            if (hadData) markStale("review-report-summary", error);
+            if (hadData) markStale("review-report-summary", error, `Showing the last successful ${state.reportDataPeriod} report.`);
             else setError("review-report-summary", error);
             return Logic.refreshOutcome("report", 0);
         }
@@ -654,6 +670,7 @@ window.ReviewOrbit = (() => {
 
     function displayMetric(key, value) {
         if (value === null || value === undefined || value === "") return "Unavailable";
+        if (key === "category" || key === "concentration") return String(value);
         if (key === "market_cap" || key === "aum") {
             return new Intl.NumberFormat("en-US", {
                 notation: "compact", maximumFractionDigits: 1,
@@ -668,6 +685,11 @@ window.ReviewOrbit = (() => {
         return number(value);
     }
 
+    function comparisonPrice(item) {
+        if (!item.currency) return "Unavailable (quote currency unknown)";
+        return formatHoldingMoney(item, item.current_price);
+    }
+
     function metricLabel(key) {
         return key.replaceAll("_", " ").replace(/\b\w/g, char => char.toUpperCase());
     }
@@ -678,7 +700,7 @@ window.ReviewOrbit = (() => {
             <article class="review-compare-card">
                 <header class="review-compare-card-head">
                     <h4>${item.ticker}</h4>
-                    <span>${item.name} · ${money(item.current_price)} · ${pct(item.day_change_pct)} today</span>
+                    <span>${item.name} · ${comparisonPrice(item)} · ${pct(item.day_change_pct)} today</span>
                 </header>
                 <dl class="review-compare-metrics">
                     ${Object.entries(item.metrics).map(([key, value]) => html`
@@ -686,6 +708,7 @@ window.ReviewOrbit = (() => {
                     `)}
                     <div><dt>Thesis</dt><dd>${item.thesis.status.replace("_", " ")}</dd></div>
                 </dl>
+                <p class="review-table-note">Prices retain their quote currency; GBp means pence. Market cap and AUM, when present, are provider magnitudes with currency unverified. No currency conversion.</p>
             </article>`).join("");
         if (data.overlap) {
             target.insertAdjacentHTML("beforeend", String(html`

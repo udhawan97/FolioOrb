@@ -6,6 +6,7 @@ without the network; subprocess and the exit hook are stubbed so the handoff is
 asserted without launching anything or quitting the process.
 """
 from pathlib import Path
+import hashlib
 
 import pytest
 
@@ -46,7 +47,18 @@ def _stub_download(monkeypatch, contents=b"data"):
         return Path(dest)
 
     monkeypatch.setattr(update_downloader, "download_update", fake_dl)
-    monkeypatch.setattr(update_downloader, "fetch_text", lambda url: "sums-text")
+    monkeypatch.setattr(update_downloader, "fetch_text", lambda url:
+                        f"{hashlib.sha256(contents).hexdigest()}  {_info()['asset_name']}")
+
+
+def _ready_installer(tmp_path):
+    installer = tmp_path / "Setup.exe"
+    installer.write_bytes(b"installer")
+    update_installer._rt.update(
+        path=installer, sha256=update_downloader.compute_sha256(installer),
+    )
+    update_service.mark(UpdateStatus.READY)
+    return installer
 
 
 def test_run_success_reaches_ready(monkeypatch):
@@ -101,44 +113,49 @@ def test_run_cancel_returns_to_available(monkeypatch):
     assert update_service.get_state()["status"] == "available"
 
 
-def test_launch_installer_windows_is_silent(monkeypatch):
+def test_launch_installer_windows_is_silent(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k: calls.append((a, k)))
     monkeypatch.setattr(update_service, "current_platform_key", lambda: "windows")
 
-    update_installer._launch_installer(Path("C:/x/Setup.exe"))
+    installer = _ready_installer(tmp_path)
+    update_installer._launch_installer(installer, update_installer._rt["sha256"])
 
     args = calls[0][0][0]
     assert "/VERYSILENT" in args and "/SUPPRESSMSGBOXES" in args
 
 
-def test_launch_installer_macos_uses_bundle_swap(monkeypatch):
+def test_launch_installer_macos_uses_bundle_swap(tmp_path, monkeypatch):
     """When running as a real .app, macOS installs via the bundle swap — it must
     NOT degrade to merely opening the DMG / releases page."""
     from app.services import macos_updater
 
     swapped = []
-    monkeypatch.setattr(macos_updater, "launch_swap", lambda dmg: swapped.append(dmg) or True)
+    monkeypatch.setattr(macos_updater, "launch_swap", lambda dmg, digest:
+                        swapped.append((dmg, digest)) or True)
     opened = []
     monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k: opened.append(a))
     monkeypatch.setattr(update_service, "current_platform_key", lambda: "macos")
 
-    update_installer._launch_installer(Path("/x/app.dmg"))
+    installer = _ready_installer(tmp_path)
+    digest = update_installer._rt["sha256"]
+    update_installer._launch_installer(installer, digest)
 
-    assert swapped == [Path("/x/app.dmg")]
+    assert swapped == [(installer, digest)]
     assert not opened  # did not fall back to `open`
 
 
-def test_launch_installer_macos_falls_back_when_not_a_bundle(monkeypatch):
+def test_launch_installer_macos_falls_back_when_not_a_bundle(tmp_path, monkeypatch):
     """Dev/source run (not a .app): fall back to opening the DMG for manual install."""
     from app.services import macos_updater
 
-    monkeypatch.setattr(macos_updater, "launch_swap", lambda dmg: False)
+    monkeypatch.setattr(macos_updater, "launch_swap", lambda dmg, digest: False)
     calls = []
     monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k: calls.append((a, k)))
     monkeypatch.setattr(update_service, "current_platform_key", lambda: "macos")
 
-    update_installer._launch_installer(Path("/x/app.dmg"))
+    installer = _ready_installer(tmp_path)
+    update_installer._launch_installer(installer, update_installer._rt["sha256"])
 
     assert calls[0][0][0][0] == "open"
 
@@ -154,7 +171,7 @@ def test_install_refuses_when_not_frozen(monkeypatch):
     update_service.mark(UpdateStatus.READY)
     update_installer._rt["path"] = Path("/x/Setup.exe")
     launched = []
-    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p, digest: launched.append(p))
 
     st = update_installer.install()
 
@@ -184,12 +201,8 @@ def test_install_creates_verified_backup_and_rollback_point(tmp_path, monkeypatc
 
     _setup_file_db(tmp_path, monkeypatch)
     (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=sk-test\n", encoding="utf-8")
-    installer = tmp_path / "Setup.exe"
-    installer.write_text("x")
-
-    update_service.mark(UpdateStatus.READY)
-    update_installer._rt["path"] = installer
-    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: None)
+    _ready_installer(tmp_path)
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p, digest: None)
 
     st = update_installer.install()
 
@@ -217,12 +230,9 @@ def test_install_rejects_backup_that_silently_lost_holdings(tmp_path, monkeypatc
     from app.services import backup_service
 
     _setup_file_db(tmp_path, monkeypatch)
-    installer = tmp_path / "Setup.exe"
-    installer.write_text("x")
-    update_service.mark(UpdateStatus.READY)
-    update_installer._rt["path"] = installer
+    _ready_installer(tmp_path)
     launched = []
-    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p, digest: launched.append(p))
 
     def _empty_backup(
         source_db, label, dest_dir=None, ts=None, expected_min_holdings=None
@@ -251,15 +261,14 @@ def test_install_aborts_when_backup_fails(tmp_path, monkeypatch):
     from app.services import backup_service
 
     _setup_file_db(tmp_path, monkeypatch)
-    update_service.mark(UpdateStatus.READY)
-    update_installer._rt["path"] = tmp_path / "Setup.exe"
+    _ready_installer(tmp_path)
 
     def boom(*a, **k):
         raise OSError("disk full")
 
     monkeypatch.setattr(backup_service, "create_backup", boom)
     launched = []
-    monkeypatch.setattr(update_installer, "_launch_installer", lambda p: launched.append(p))
+    monkeypatch.setattr(update_installer, "_launch_installer", lambda p, digest: launched.append(p))
 
     st = update_installer.install()
 
@@ -267,15 +276,29 @@ def test_install_aborts_when_backup_fails(tmp_path, monkeypatch):
     assert not launched  # never hand off without a verified backup
 
 
-def test_install_launches_and_schedules_exit(monkeypatch):
-    update_service.mark(UpdateStatus.READY)
-    update_installer._rt["path"] = Path("/x/Setup.exe")
+def test_install_aborts_when_rollback_point_cannot_be_recorded(tmp_path, monkeypatch):
+    from app import app_settings
+
+    _setup_file_db(tmp_path, monkeypatch)
+    _ready_installer(tmp_path)
+
+    def refuse_settings(_changes):
+        raise OSError("Fixture settings disk full")
+
+    monkeypatch.setattr(app_settings, "save_settings", refuse_settings)
+    monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k:
+                        pytest.fail("No installation without a recorded recovery point"))
+    assert update_installer.install()["status"] == "error"
+
+
+def test_install_launches_and_schedules_exit(tmp_path, monkeypatch):
+    installer = _ready_installer(tmp_path)
     # Focus on handoff + exit scheduling; backup is covered by its own tests.
     monkeypatch.setattr(update_installer, "_create_rollback_point", lambda: {"version": "4.3.4"})
 
     launched = {}
     monkeypatch.setattr(
-        update_installer, "_launch_installer", lambda p: launched.setdefault("p", p)
+        update_installer, "_launch_installer", lambda p, digest: launched.setdefault("p", p)
     )
 
     fired = {}
@@ -294,8 +317,36 @@ def test_install_launches_and_schedules_exit(monkeypatch):
     st = update_installer.install()
 
     assert st["status"] == "installing"
-    assert launched["p"] == Path("/x/Setup.exe")
+    assert launched["p"] == installer
     assert fired["started"] is True
     # The scheduled callback is the registered exit hook.
     fired["func"]()
     assert quit_calls == [1]
+
+
+@pytest.mark.parametrize("change", ["replace", "delete"])
+def test_install_refuses_changed_ready_bytes(tmp_path, monkeypatch, change):
+    installer = _ready_installer(tmp_path)
+    if change == "replace":
+        installer.write_bytes(b"changed after verification")
+    else:
+        installer.unlink()
+    monkeypatch.setattr(update_installer, "_create_rollback_point", lambda:
+                        pytest.fail("Changed bytes must be refused before backup"))
+    monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k:
+                        pytest.fail("Changed bytes must never be launched"))
+    assert update_installer.install()["status"] == "error"
+    assert update_installer._rt["path"] is None
+
+
+def test_install_rechecks_after_backup(tmp_path, monkeypatch):
+    installer = _ready_installer(tmp_path)
+
+    def backup_changes_file():
+        installer.write_bytes(b"changed during backup")
+        return {"version": "4.3.4"}
+
+    monkeypatch.setattr(update_installer, "_create_rollback_point", backup_changes_file)
+    monkeypatch.setattr(update_installer.subprocess, "Popen", lambda *a, **k:
+                        pytest.fail("Changed bytes must never be launched"))
+    assert update_installer.install()["status"] == "error"

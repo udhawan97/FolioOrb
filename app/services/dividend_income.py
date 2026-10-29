@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from app.services import financial_currency
 # A dividend can't exceed the share price in a year; beyond this it's bad data.
 _MAX_PLAUSIBLE_YIELD = 1.0  # 100%
 
@@ -28,6 +29,7 @@ def compute_portfolio_income(holdings_with_data: list[dict]) -> dict:
     """Annual dividend income and yield for a portfolio's paying holdings."""
     payers: list[dict] = []
     non_payers: list[str] = []
+    excluded: list[str] = []
     total_value = 0.0
 
     for item in holdings_with_data:
@@ -35,6 +37,9 @@ def compute_portfolio_income(holdings_with_data: list[dict]) -> dict:
             continue
         ticker = str(item.get("ticker") or "").upper()
         if not ticker:
+            continue
+        if not financial_currency.eligible_valuation_row(item):
+            excluded.append(ticker)
             continue
 
         value = float(item.get("current_value") or 0.0)
@@ -76,6 +81,7 @@ def compute_portfolio_income(holdings_with_data: list[dict]) -> dict:
             "payer_count": len(payers),
             "non_payer_count": len(non_payers),
             "non_payers": non_payers,
+            "excluded_tickers": excluded,
         },
-        "data_quality": "live",
+        "data_quality": "partial" if excluded else "live",
     }

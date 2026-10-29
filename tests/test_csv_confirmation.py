@@ -692,3 +692,23 @@ def test_initialized_engine_read_does_not_wait_for_csv_guard(factory):
             completed_without_guard = finished.wait(5)
         future.result(5)
     assert completed_without_guard, "origin stamping must not serialize later unrelated reads"
+
+
+@pytest.mark.parametrize("large_existing", [False, True])
+def test_confirm_preserves_current_main_aggregate_guard(api_client, db, state, large_existing):
+    existing = Holding(portfolio_id=1, ticker="OLD", shares=1e308 if large_existing else 5,
+                       avg_cost=1 if large_existing else 10, notes="Existing financial fact")
+    db.add(existing)
+    db.commit()
+    raw = "ticker,shares,avg_cost\nFIRST,1e308,1\n"
+    if not large_existing:
+        raw += "SECOND,1e308,1\n"
+    report = preview(api_client, raw)
+    assert report["would_add"] == (1 if large_existing else 2)
+    before = snapshot(db)
+    response = confirm(api_client, report)
+    assert response.status_code != 200, "aggregate overflow must not commit through confirmation"
+    assert snapshot(db) == before
+    token = report["confirmation"]["token"]
+    assert token not in state[0].pending and token not in state[0].receipts
+    assert confirm(api_client, report).json()["detail"]["code"] == "reconcile"

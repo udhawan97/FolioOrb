@@ -68,7 +68,12 @@ def rollback_env(tmp_path, monkeypatch):
     monkeypatch.setattr(signature_service, "is_configured", lambda: False)
     update_service._reset_for_tests()
     launched = []
-    monkeypatch.setattr(update_installer, "launch_installer", lambda p: launched.append(p))
+
+    def launch(path, expected_digest):
+        assert expected_digest == digest
+        launched.append(Path(path))
+
+    monkeypatch.setattr(update_installer, "launch_installer", launch)
     yield {"live": live, "archived": archived, "launched": launched, "tmp": tmp_path}
     handle = backup_service._profile_lock_handles.pop(tmp_path / ".runtime.lock", None)
     if handle is not None:
@@ -127,14 +132,42 @@ def test_rollback_refuses_while_update_in_progress(rollback_env):
     updates. The rollback point remains untouched and nothing is launched.
     """
     for busy_status in (
-        UpdateStatus.DOWNLOADING, UpdateStatus.VERIFYING,
+        UpdateStatus.CHECKING, UpdateStatus.DOWNLOADING, UpdateStatus.VERIFYING,
         UpdateStatus.BACKING_UP, UpdateStatus.INSTALLING,
+        UpdateStatus.ROLLBACK_PENDING,
     ):
         update_service.mark(busy_status)
-        result = rollback_service.rollback(restore_data=False)
-        assert result["status"] == "error"
-        assert "already in progress" in result["error"].lower()
+        before = update_service.get_state()
+        assert rollback_service.rollback(restore_data=False) == before
+        assert rollback_service.rollback(restore_data=False) == before
+        assert update_service.check_for_updates(force=True) == before
     assert rollback_env["launched"] == []
+
+
+def test_explicit_rollback_can_replace_ready_update_without_competing_handoff(
+    rollback_env, monkeypatch
+):
+    pending = rollback_env["tmp"] / "pending.dmg"
+    pending.write_bytes(b"pending update")
+    monkeypatch.setitem(update_installer._rt, "path", pending)
+    monkeypatch.setitem(update_installer._rt, "sha256", update_downloader.compute_sha256(pending))
+    update_service.mark(UpdateStatus.READY)
+    assert update_service.check_for_updates()["status"] == "ready"
+    resolve = rollback_service._resolve_previous_installer
+
+    def resolve_while_install_contends(point):
+        before = update_service.get_state()
+        assert before["status"] == "backing_up"
+        assert update_installer.install() == before
+        assert update_service.check_for_updates(force=True) == before
+        return resolve(point)
+
+    monkeypatch.setattr(
+        rollback_service, "_resolve_previous_installer", resolve_while_install_contends,
+    )
+    assert rollback_service.rollback()["status"] == "installing"
+    assert rollback_env["launched"] == [rollback_env["archived"]]
+    assert pending.read_bytes() == b"pending update"
 
 
 def test_rollback_safety_backup_rejects_lost_holdings(rollback_env, monkeypatch):
@@ -217,7 +250,7 @@ def test_queued_rollback_missing_installer_retains_current_profile(rollback_env)
 
 def test_queued_rollback_launch_failure_records_restored_data(rollback_env, monkeypatch):
     assert rollback_service.rollback(restore_data=True)["status"] == "rollback_pending"
-    monkeypatch.setattr(update_installer, "launch_installer", lambda path:
+    monkeypatch.setattr(update_installer, "launch_installer", lambda path, digest:
                         (_ for _ in ()).throw(OSError("launch refused")))
     result = backup_service.apply_pending_restore()
     assert result["status"] == "restored"

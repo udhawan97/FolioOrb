@@ -180,6 +180,11 @@ class _State:  # pylint: disable=too-many-instance-attributes
 
 _state = _State()
 _state_lock = threading.Lock()
+_BUSY_STATUSES = frozenset({
+    UpdateStatus.CHECKING, UpdateStatus.DOWNLOADING, UpdateStatus.VERIFYING,
+    UpdateStatus.BACKING_UP, UpdateStatus.READY, UpdateStatus.INSTALLING,
+    UpdateStatus.ROLLBACK_PENDING,
+})
 _cache: dict[str, Any] = {"etag": None, "fetched_at": 0.0, "payload": None}
 _cache_lock = threading.Lock()
 # Set once per process at startup: whether this launch is the first run on a
@@ -443,6 +448,27 @@ def mark(status: "UpdateStatus", **fields: Any) -> dict[str, Any]:
     return _set_state(status=status, **fields)
 
 
+def claim(
+    status: UpdateStatus, *, expected: UpdateStatus | None = None, **fields: Any
+) -> tuple[bool, dict[str, Any]]:
+    """Atomically start one lifecycle operation, preserving an existing owner.
+
+    READY remains reserved until install or rollback explicitly consumes it. A
+    failed claim preserves the current status, progress and error.
+    """
+    with _state_lock:
+        if (expected is not None and _state.status != expected) or (
+            expected is None and _state.status in _BUSY_STATUSES
+        ):
+            return False, _state.snapshot()
+        _state.status = status
+        _state.error = None
+        _state.reason = None
+        for key, value in fields.items():
+            setattr(_state, key, value)
+        return True, _state.snapshot()
+
+
 # Friendly, non-technical copy per failure reason. The reason code is also
 # returned so the UI/diagnostics can distinguish cases; the message is what a
 # user reads if the UI shows it.
@@ -466,7 +492,9 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
     """
     from app.services import update_log
 
-    _set_state(status=UpdateStatus.CHECKING, error=None, reason=None)
+    claimed, state = claim(UpdateStatus.CHECKING)
+    if not claimed:
+        return state
     try:
         payload = _fetch_latest_release(force)
         info = _release_to_info(payload)

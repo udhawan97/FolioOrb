@@ -58,7 +58,24 @@ const formatPct = (n) => {
 };
 const isFiniteNumber = (n) => n !== null && n !== "" && Number.isFinite(Number(n));
 const formatOptionalPct = (n) => isFiniteNumber(n) ? formatPct(Number(n)) : "—";
-const formatAllocationPct = (n) => `${toNumber(n).toFixed(1)}%`;
+const formatAllocationPct = (n) => isFiniteNumber(n) ? `${Number(n).toFixed(1)}%` : "Unavailable";
+
+function isReportingHolding(holding) {
+    return !holding.is_watchlist && holding.reporting_eligible !== false && holding.quote_available !== false
+        && (!holding.currency || String(holding.currency).toUpperCase() === "USD")
+        && isFiniteNumber(holding.current_value) && Number(holding.current_value) > 0;
+}
+
+function formatHoldingMoney(holding, value) {
+    if (holding?.quote_available === false || !isFiniteNumber(value)) return "Unavailable";
+    const currency = holding?.currency || "USD";
+    return String(currency).toUpperCase() === "USD" ? formatCurrency(value)
+        : `${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function portfolioCoverageComplete(data = latestPortfolioValueData) {
+    return !data?.degraded && (!data?.data_quality || data.data_quality === "complete");
+}
 const TICKER_PATTERN = /^[A-Z0-9.^-]{1,10}$/;
 // apiErrorMessage lives in core.js, which loads first.
 const formatPercentilePct = (n) => {
@@ -496,7 +513,7 @@ function renderHeroPnl(data = latestPortfolioValueData) {
 
     renderHeroPnlLabel();
 
-    if (!data) {
+    if (!data || !portfolioCoverageComplete(data)) {
         el.textContent = "--";
         return;
     }
@@ -1132,13 +1149,13 @@ function _emitScanChips(rowEl) {
 
     const chips = [];
     if (isFiniteNumber(h.current_price)) {
-        chips.push({ text: formatCurrency(h.current_price), cls: "chip-price" });
+        chips.push({ text: formatHoldingMoney(h, h.current_price), cls: "chip-price" });
     }
     if (isFiniteNumber(h.day_change_pct)) {
         const pct = Number(h.day_change_pct);
         chips.push({ text: `${pct >= 0 ? "+" : ""}${formatPct(pct)}`, cls: pct >= 0 ? "chip-up" : "chip-dn" });
     }
-    if (isFiniteNumber(h.allocation_pct)) {
+    if (portfolioCoverageComplete() && isFiniteNumber(h.allocation_pct)) {
         chips.push({ text: `${Number(h.allocation_pct).toFixed(1)}%`, cls: "chip-alloc" });
     }
 
@@ -1262,7 +1279,8 @@ let _portfolioValuePromise = null;
 // prices fetch in the background.
 // Keyed per portfolio so switching never paints the previous portfolio's value.
 function _portfolioValueCacheKey() {
-    return `folioorb-portfolio-value-v1:${PortfolioWorkspace.id}`;
+    // Older payloads omitted unpriced saved rows and cannot safely hydrate this view.
+    return `folioorb-portfolio-value-v2:${PortfolioWorkspace.id}`;
 }
 
 function persistPortfolioValueCache(data) {
@@ -1289,8 +1307,17 @@ function readPortfolioValueCache() {
 // Render a portfolio /value payload into the hero cards + holdings table.
 // Shared by the live fetch and the instant cache hydration path.
 function renderPortfolioValueData(data) {
+    const complete = portfolioCoverageComplete(data);
+    const unavailable = data.data_quality === "unavailable" && data.holdings.some(h => !h.is_watchlist && Number(h.shares) > 0);
     document.getElementById("total-value").textContent =
-        formatCompact(data.total_value);
+        unavailable ? "Unavailable" : formatCompact(data.total_value);
+    const valueLabel = document.getElementById("total-value-label");
+    if (valueLabel) valueLabel.textContent = complete ? "Total value" : "Known USD value";
+    const notice = document.getElementById("portfolio-coverage-notice");
+    if (notice) {
+        notice.hidden = complete;
+        notice.textContent = complete ? "" : `${describePortfolioSyncQuality(data).text}. Portfolio allocation, return and change percentages are unavailable.`;
+    }
     document.getElementById("holding-count").textContent =
         data.holdings.filter(h => !h.is_watchlist).length;
     latestPortfolioValueData = data;
@@ -1298,10 +1325,10 @@ function renderPortfolioValueData(data) {
 
     renderTotalReturn(data);
 
-    latestPortfolioDailyChange = isFiniteNumber(data.total_daily_change)
+    latestPortfolioDailyChange = complete && isFiniteNumber(data.total_daily_change)
         ? Number(data.total_daily_change)
         : null;
-    const prevTickers = (latestHoldings || []).map(h => h.ticker).sort().join(",");
+    const prevTickers = (latestHoldings || []).map(h => `${h.ticker}:${h.shares}:${h.reporting_eligible}:${h.quote_available}`).sort().join(",");
     latestHoldings = data.holdings;
     updateHoldingsFilterCounts();
 
@@ -1315,25 +1342,25 @@ function renderPortfolioValueData(data) {
         // These hero tiles must be *cleared* when the portfolio is empty, not left
         // showing yesterday's winner next to a $0 total (an internal contradiction).
         const bestEl = document.getElementById("best-performer");
-        if (data.best_performer) {
+        if (complete && data.best_performer) {
             bestEl.dataset.ticker = data.best_performer.ticker;
             bestEl.innerHTML = html`${data.best_performer.ticker} <span style="font-size:.85em;opacity:.8">${formatPct(data.best_performer.day_change_pct)}</span>`;
         } else if (bestEl) {
             bestEl.dataset.ticker = "";
-            bestEl.textContent = "--";
+            bestEl.textContent = complete ? "--" : "Unavailable";
         }
         const worstEl = document.getElementById("worst-performer");
-        if (data.worst_performer) {
+        if (complete && data.worst_performer) {
             worstEl.dataset.ticker = data.worst_performer.ticker;
             worstEl.innerHTML = html`${data.worst_performer.ticker} <span style="font-size:.85em;opacity:.8">${formatPct(data.worst_performer.day_change_pct)}</span>`;
         } else if (worstEl) {
             worstEl.dataset.ticker = "";
-            worstEl.textContent = "--";
+            worstEl.textContent = complete ? "--" : "Unavailable";
         }
         const largestEl = document.getElementById("largest-holding");
-        const investedHoldings = data.holdings.filter(h =>
-            !h.is_watchlist && toNumber(h.shares) > 0
-        );
+        const investedHoldings = data.holdings.filter(isReportingHolding);
+        const largestLabel = document.getElementById("largest-holding-label");
+        if (largestLabel) largestLabel.textContent = complete ? "Largest holding" : "Largest known USD";
         if (investedHoldings.length) {
             const largest = investedHoldings.reduce((a, b) =>
                 a.current_value > b.current_value ? a : b);
@@ -1341,7 +1368,7 @@ function renderPortfolioValueData(data) {
             largestEl.innerHTML = html`${largest.ticker} <span style="font-size:.85em;opacity:.8">${formatCompact(largest.current_value)}</span>`;
         } else if (largestEl) {
             largestEl.dataset.ticker = "";
-            largestEl.textContent = "--";
+            largestEl.textContent = unavailable ? "Unavailable" : "--";
         }
 
         // Show holdings immediately; sparklines fill in when trend data arrives.
@@ -1357,7 +1384,7 @@ function renderPortfolioValueData(data) {
                 scheduleAllocationFocusPanelRefresh();
             });
 
-        const nextTickers = data.holdings.map(h => h.ticker).sort().join(",");
+        const nextTickers = data.holdings.map(h => `${h.ticker}:${h.shares}:${h.reporting_eligible}:${h.quote_available}`).sort().join(",");
         if (prevTickers !== nextTickers) {
             latestProjectionData = null;
             projectionLoadPromise = null;
@@ -1440,35 +1467,6 @@ async function loadPortfolioValue() {
     _portfolioValuePromise = (async () => {
     try {
         const data = await PortfolioWorkspace.json("/api/portfolio/value");
-
-        if (data.degraded) {
-            // The local server answered, but market data is unreachable, so the
-            // totals collapse to a misleading $0. Don't render $0 with a green
-            // "synced" check, and don't cache it — keep the last-known values and
-            // show an honest "unavailable" status instead.
-            const subEl = document.getElementById("hud-pop-sync-sub");
-            const iconEl = document.getElementById("hud-sync-icon");
-            if (_hasLoadedOnce) {
-                if (subEl) subEl.textContent = "Market data unavailable — showing last known prices";
-                if (iconEl) iconEl.innerHTML = `<i class="bi bi-exclamation-circle" style="color:var(--bs-warning)"></i>`;
-            } else {
-                _lastDashboardSyncText = "Prices unavailable";
-                const popUpdatedEl = document.getElementById("hud-pop-updated");
-                if (popUpdatedEl) popUpdatedEl.textContent = _lastDashboardSyncText;
-                if (subEl) subEl.textContent = "Couldn't reach market data";
-                if (iconEl) iconEl.innerHTML = `<i class="bi bi-exclamation-circle" style="color:var(--bs-warning)"></i>`;
-                const tbody = document.getElementById("holdings-table");
-                if (tbody) {
-                    tbody.querySelectorAll("tr[data-empty-state]").forEach(r => r.remove());
-                    const tr = tbody.insertRow();
-                    tr.dataset.emptyState = "degraded";
-                    tr.innerHTML = `<td colspan="9" class="text-center py-4 text-secondary">
-                        <i class="bi bi-exclamation-circle me-2"></i>Couldn't reach market data — check your connection and refresh.
-                    </td>`;
-                }
-            }
-            return; // skip rendering $0 and skip caching
-        }
 
         // Data arrived — record the sync time and mark success before any rendering
         // that could throw. The catch block only fires for actual network/API failures.
@@ -1577,6 +1575,7 @@ function selectAllocationTicker(ticker) {
 }
 
 function allocationImpactForHolding(holding) {
+    if (!isReportingHolding(holding)) return null;
     if (isFiniteNumber(holding?.daily_value_change)) {
         return Number(holding.daily_value_change);
     }
@@ -1708,7 +1707,8 @@ function validateAllocationPortfolioMath(portfolioImpactToday, grossPortfolioMov
 }
 
 function allocationTooltipMetrics(ticker, value) {
-    const portfolioHoldings = latestHoldings.filter(h => !h.is_watchlist);
+    if (!portfolioCoverageComplete()) return null;
+    const portfolioHoldings = latestHoldings.filter(isReportingHolding);
     const holding = portfolioHoldings.find(h => h.ticker === ticker);
     const holdingsCount = portfolioHoldings.length;
     if (!holding || !holdingsCount) return null;
@@ -1892,12 +1892,14 @@ function setAllocationFocus(chart, activeIndex = -1) {
 }
 
 function allocationFocusDefaultTicker(sorted = null) {
-    const holdings = sorted || sortedByAllocation(latestHoldings.filter(h => !h.is_watchlist));
+    const holdings = sorted || sortedByAllocation(latestHoldings.filter(isReportingHolding));
     return holdings[0]?.ticker || null;
 }
 
 function allocationFocusTicker(ticker = null, sorted = null) {
-    return ticker || selectedAllocationTicker || allocationFocusDefaultTicker(sorted);
+    const requested = ticker || selectedAllocationTicker;
+    return latestHoldings.some(h => h.ticker === requested && isReportingHolding(h))
+        ? requested : allocationFocusDefaultTicker(sorted);
 }
 
 function allocationFocusShortText(text, max = 132) {
@@ -2025,7 +2027,7 @@ function allocationFocusTrendMeta(ticker, holding, verdict) {
 
     return {
         label: "Price path",
-        value: isFiniteNumber(holding?.current_price) ? formatCurrency(holding.current_price) : "—",
+        value: formatHoldingMoney(holding, holding?.current_price),
         note: "Trend loading",
         tone: "neutral",
     };
@@ -2058,16 +2060,16 @@ function renderAllocationFocusPanel(ticker = null, sorted = null, options = {}) 
     const activeTicker = allocationFocusTicker(ticker, sorted);
     if (activeTicker && !options.force && allocationFocusPanelTicker === activeTicker) return;
     allocationFocusPanelTicker = activeTicker;
-    const holding = latestHoldings.find(h => h.ticker === activeTicker && !h.is_watchlist);
+    const holding = latestHoldings.find(h => h.ticker === activeTicker && isReportingHolding(h));
     if (!activeTicker || !holding) {
         panel.innerHTML = `<div class="allocation-focus-empty">
             <i class="bi bi-pie-chart-fill"></i>
-            <span>Add holdings to unlock allocation insight.</span>
+            <span>${latestHoldings.some(h => !h.is_watchlist) ? "Allocation unavailable — no usable USD position values." : "Add holdings to unlock allocation insight."}</span>
         </div>`;
         return;
     }
 
-    const sortedHoldings = sorted || sortedByAllocation(latestHoldings.filter(h => !h.is_watchlist));
+    const sortedHoldings = sorted || sortedByAllocation(latestHoldings.filter(isReportingHolding));
     const colorIndex = Math.max(0, sortedHoldings.findIndex(h => h.ticker === activeTicker));
     const color = allocColor(colorIndex);
     const metrics = allocationTooltipMetrics(activeTicker, holding.current_value);
@@ -2095,7 +2097,7 @@ function renderAllocationFocusPanel(ticker = null, sorted = null, options = {}) 
         ? (metrics.equalWeightDrift >= 0
             ? `${formatCompact(Math.abs(metrics.equalWeightDrift))} over equal-weight`
             : `${formatCompact(Math.abs(metrics.equalWeightDrift))} under equal-weight`)
-        : "Allocation read";
+        : "Portfolio allocation unavailable";
 
     panel.innerHTML = html`<div class="alloc-focus-inner" data-ticker="${activeTicker}">
         <div class="alloc-focus-head">
@@ -2106,7 +2108,7 @@ function renderAllocationFocusPanel(ticker = null, sorted = null, options = {}) 
                     <span class="alloc-focus-ticker">${activeTicker}</span>
                     <span class="alloc-focus-name">${holding.name || intel?.coverage_label || ""}</span>
                 </div>
-                <p class="alloc-focus-sub">${formatCurrency(holding.current_value)} · ${formatAllocationPct(holding.allocation_pct)} of portfolio · ${concentrationNote}</p>
+                <p class="alloc-focus-sub">${formatHoldingMoney(holding, holding.current_value)} · ${portfolioCoverageComplete() ? `${formatAllocationPct(holding.allocation_pct)} of portfolio` : "Known USD subtotal only"} · ${concentrationNote}</p>
             </div>
             <div class="alloc-focus-day">
                 <span>${timeRangeConfig().label}</span>
@@ -2158,7 +2160,11 @@ function renderAllocationFocusPanel(ticker = null, sorted = null, options = {}) 
 }
 
 function renderAllocation() {
-    const sorted = sortedByAllocation(latestHoldings.filter(h => !h.is_watchlist));
+    const sorted = sortedByAllocation(latestHoldings.filter(isReportingHolding));
+    if (!sorted.some(h => h.ticker === selectedAllocationTicker)) selectedAllocationTicker = null;
+    if (!sorted.some(h => h.ticker === hoveredCenterLabel)) {
+        hoveredCenterLabel = hoveredCenterValue = hoveredCenterPct = null;
+    }
 
     const allocTable = document.getElementById("allocation-table");
     allocTable.innerHTML = "";
@@ -2173,7 +2179,7 @@ function renderAllocation() {
                 ${h.ticker}</td>
             <td>${h.shares}</td>
             <td class="text-end">${formatCurrency(h.current_value)}</td>
-            <td class="text-end">${formatAllocationPct(h.allocation_pct)}</td>
+            <td class="text-end">${portfolioCoverageComplete() ? formatAllocationPct(h.allocation_pct) : "Unavailable"}</td>
         `;
         row.addEventListener("click", () => selectAllocationTicker(h.ticker));
         row.addEventListener("mouseenter", () => renderAllocationFocusPanel(h.ticker, sorted));
@@ -2239,7 +2245,7 @@ function renderAllocation() {
 	                        const val = toNumber(allocationChart.data.datasets[0].data[idx]);
 	                        const pct = allocationTotal > 0 ? (val / allocationTotal * 100).toFixed(1) : "0.0";
 	                        hoveredCenterValue = formatCurrency(val);
-	                        hoveredCenterPct = `${pct}%`;
+	                        hoveredCenterPct = portfolioCoverageComplete() ? `${pct}%` : "Known USD only";
 	                        setAllocationFocus(allocationChart, idx);
 	                    } else {
 	                        hoveredCenterLabel = null;
@@ -2318,7 +2324,7 @@ function snapshotSectorTheme(name) {
 
 function snapshotActiveHoldings() {
     return latestHoldings
-        .filter(h => !h.is_watchlist && toNumber(h.current_value) > 0)
+        .filter(isReportingHolding)
         .sort((a, b) => toNumber(b.allocation_pct) - toNumber(a.allocation_pct));
 }
 
@@ -2392,6 +2398,10 @@ function renderSnapshotSectors(active) {
     const strip = document.getElementById("snapshot-sector-strip");
     const list = document.getElementById("snapshot-sector-list");
     if (!strip || !list) return;
+    if (!portfolioCoverageComplete()) {
+        renderSnapshotSectorEmpty("Sector mix unavailable — portfolio USD coverage is incomplete", "bi-exclamation-circle");
+        return;
+    }
 
     const sectors = (cachedPortfolioExposure?.sector_exposure || [])
         .filter(s => toNumber(s.weight_pct) > 0)
@@ -2399,7 +2409,8 @@ function renderSnapshotSectors(active) {
         .slice(0, 7);
 
     if (!active.length) {
-        renderSnapshotSectorEmpty("Add holdings to see sector mix", "bi-plus-circle");
+        renderSnapshotSectorEmpty(latestHoldings.some(h => !h.is_watchlist)
+            ? "Sector mix unavailable — no usable USD position values" : "Add holdings to see sector mix", "bi-plus-circle");
         return;
     }
 
@@ -2533,7 +2544,7 @@ function renderSnapshotIntel(rows, net, pct) {
         .filter(s => toNumber(s.weight_pct) > 0)
         .sort((a, b) => toNumber(b.weight_pct) - toNumber(a.weight_pct));
 
-    if (!rows.length) {
+    if (!rows.length || !portfolioCoverageComplete()) {
         wrap.innerHTML = "";
         return;
     }
@@ -2617,7 +2628,7 @@ function renderSnapshotMoves(active) {
     const dayPct = latestPortfolioValueData && isFiniteNumber(latestPortfolioValueData.total_daily_change_pct)
         ? Number(latestPortfolioValueData.total_daily_change_pct)
         : null;
-    const pct = isDay
+    const pct = !portfolioCoverageComplete() ? null : isDay
         ? dayPct
         : (isFiniteNumber(group?.net_change_pct) ? Number(group.net_change_pct) : null);
     const totalAbs = grossGain + grossLoss;
@@ -2626,7 +2637,7 @@ function renderSnapshotMoves(active) {
     const tone = portfolioSnapshotTone(net);
 
     if (!active.length) {
-        summary.innerHTML = `<div class="snapshot-empty-state">No active holdings yet.</div>`;
+        summary.innerHTML = `<div class="snapshot-empty-state">${latestHoldings.some(h => !h.is_watchlist) ? "USD impact unavailable — saved positions remain in Holdings." : "No active holdings yet."}</div>`;
         stack.innerHTML = "";
         list.innerHTML = "";
         renderSnapshotIntel([], 0, pct);
@@ -2640,7 +2651,7 @@ function renderSnapshotMoves(active) {
     }
 
     summary.innerHTML = `<div class="snapshot-net is-${tone}">
-        <span class="snapshot-net-label">${escapeHtml(config.pnlLabel)}</span>
+        <span class="snapshot-net-label">${portfolioCoverageComplete() ? "" : "Known USD · "}${escapeHtml(config.pnlLabel)}</span>
         <strong>${formatSignedCurrency(net)}</strong>
         ${pct !== null ? `<span class="snapshot-net-pct">${formatPct(pct)}</span>` : ""}
     </div>
@@ -2930,7 +2941,7 @@ const centerTotalPlugin = {
                 const sv = toNumber(chart.data.datasets[0].data[sidx]);
                 const sp = allocationTotal > 0 ? (sv / allocationTotal * 100).toFixed(1) : "0.0";
                 displayValue = formatCompact(sv);
-                displayPct = `${sp}%`;
+                displayPct = portfolioCoverageComplete() ? `${sp}%` : "Known USD only";
             }
         }
 
@@ -2996,7 +3007,7 @@ const centerTotalPlugin = {
             // Default: compact "TOTAL" label + compact value that fits the hole
             ctx.fillStyle = cssVar("--text-tertiary") || "rgba(235,235,245,0.42)";
             ctx.font = `600 ${9.5 * scale}px -apple-system, 'SF Pro Text', sans-serif`;
-            ctx.fillText("TOTAL", x, y - (15 * scale) + yShift);
+            ctx.fillText(portfolioCoverageComplete() ? "TOTAL" : "KNOWN USD", x, y - (15 * scale) + yShift);
 
             ctx.fillStyle = cssVar("--text-primary") || "#f5f5f7";
             ctx.font = `700 ${20 * scale}px -apple-system, 'SF Pro Display', sans-serif`;
@@ -3335,6 +3346,12 @@ function renderTotalReturn(data) {
         const el = document.getElementById(id);
         if (el) el.innerHTML = html;
     };
+    if (!portfolioCoverageComplete(data)) {
+        ["total-return", "total-return-pct", "unrealized-gain"].forEach(id => set(id, "Unavailable"));
+        set("realized-gain", isFiniteNumber(data.realized_gain)
+            ? `<span class="${colorClass(data.realized_gain)}">${formatSignedCurrency(data.realized_gain)}</span>` : "Unavailable");
+        return;
+    }
     set("total-return", `<span class="${cls}">${formatSignedCurrency(tr)}</span>`);
     set("total-return-pct", `<span class="${cls}">${formatPct(data.total_return_pct)} all-time</span>`);
     set("unrealized-gain",
@@ -3902,6 +3919,14 @@ async function loadProjection() {
 
         const callout = document.getElementById("projection-empty-callout");
         if (callout) callout.style.display = latestProjectionData.has_holdings ? "none" : "";
+        if (callout) {
+            const saved = latestHoldings.some(h => !h.is_watchlist && Number(h.shares) > 0);
+            callout.querySelector(".perf-callout-title").textContent = saved
+                ? "USD projection unavailable" : "Add holdings to project growth";
+            callout.querySelector(".perf-callout-body").textContent = saved
+                ? "No usable USD position values. Saved holdings remain unchanged; showing the S&P 500 index only."
+                : "Set share counts to see personalized scenarios. Showing S&P 500 as an index (100 = start), not a dollar portfolio.";
+        }
         const summary = document.getElementById("projection-summary-row");
         if (summary) summary.hidden = !latestProjectionData.has_holdings;
         const legend = document.getElementById("projection-legend");
@@ -3912,7 +3937,8 @@ async function loadProjection() {
         }
 
         const disclaimer = document.getElementById("projection-disclaimer");
-        if (disclaimer) disclaimer.textContent = latestProjectionData.disclaimer || "";
+        if (disclaimer) disclaimer.textContent = (portfolioCoverageComplete() ? ""
+            : "Known USD positions only; unavailable and foreign-priced positions are excluded. ") + (latestProjectionData.disclaimer || "");
 
         if (dashboardZone === "analytics") {
             renderProjectionChart(latestProjectionData);
@@ -4023,6 +4049,7 @@ function ensureIncomeLoaded() {
 // Dividend yield is a fraction (0.0032 = 0.32%); one ×100 turns it into a
 // percent, done in exactly one place so a percent-of-a-percent can't creep in.
 function _yieldPct(fraction) {
+    if (!isFiniteNumber(fraction)) return "";
     const value = Number(fraction);
     if (!Number.isFinite(value)) return "";
     return `${(value * 100).toFixed(2)}%`;
@@ -4048,14 +4075,17 @@ function renderIncome(data) {
 
     const coverage = data?.coverage || {};
     const nonPayers = coverage.non_payers || [];
+    const excluded = coverage.excluded_tickers || [];
+    const exclusionNote = excluded.length
+        ? `USD income unavailable for ${excluded.join(", ")} — missing or foreign-priced positions are excluded.` : "";
 
     // Nothing paying is not nothing held — say which. Non-payers are named,
     // never folded into the total as $0 income.
     if (!data?.has_data) {
         body.replaceChildren();
-        _cardEmpty("income-empty", true, nonPayers.length
+        _cardEmpty("income-empty", true, exclusionNote || (nonPayers.length
             ? `None of your holdings pay a dividend right now (${nonPayers.join(", ")}). Add a dividend-paying stock or fund to see income here.`
-            : "None of your holdings pay a dividend. Add a dividend-paying stock or fund to see the income here.");
+            : "None of your holdings pay a dividend. Add a dividend-paying stock or fund to see the income here."));
         return;
     }
     _cardEmpty("income-empty", false);
@@ -4081,11 +4111,12 @@ function renderIncome(data) {
 
     body.innerHTML = `<div class="income-headline">
             <span class="income-annual-total">${escapeHtml(formatCurrency(data.total_annual_income))}</span>
-            <span class="income-annual-label">a year</span>
+            <span class="income-annual-label">${excluded.length ? "known USD a year" : "a year"}</span>
         </div>
         ${blended ? `<p class="income-blended">${escapeHtml(blended)}</p>` : ""}
         <div class="income-rows">${rows}</div>
         ${nonPayerNote}
+        ${exclusionNote ? `<p class="income-note">${escapeHtml(exclusionNote)}</p>` : ""}
         <div id="income-calendar"></div>`;
 }
 
@@ -4174,6 +4205,7 @@ async function loadIncome() {
 // form is read straight off the payload, never derived here — one conversion,
 // in one place, so a percent-of-a-percent has nowhere to creep in.
 function _feePct(fraction) {
+    if (!isFiniteNumber(fraction)) return "";
     const value = Number(fraction);
     if (!Number.isFinite(value)) return "";
     return `${(value * 100).toFixed(2)}%`;
@@ -4191,7 +4223,7 @@ function renderFeeDrag(data) {
     if (!data?.has_data) {
         body.replaceChildren();
         _cardEmpty("fee-drag-empty", true, uncovered.length
-            ? `Fee unknown for ${uncovered.join(", ")} — no expense ratio published, so there is nothing to total.`
+            ? `Fee unknown for ${uncovered.join(", ")} — usable USD value or expense ratio unavailable. ${(data.flags || []).join(" ")}`
             : "Expense ratios come from funds. Add one to see what it costs you.");
         return;
     }
@@ -4211,13 +4243,13 @@ function renderFeeDrag(data) {
     // A fund left out of the list would read as a fund with no fee. Each one we
     // couldn't price gets a row too, with the cost column explicitly unknown —
     // an em dash, never a zero. flags[] carries the backend's reason why.
-    const unknownRows = uncovered.map(ticker => `<div class="fee-drag-row fee-drag-row--unknown" title="${escapeHtml(`${ticker}: no expense ratio published`)}">
+    const unknownRows = uncovered.map(ticker => `<div class="fee-drag-row fee-drag-row--unknown" title="${escapeHtml(`${ticker}: usable USD value or expense ratio unavailable`)}">
             <span class="fee-drag-ticker">${escapeHtml(ticker)}</span>
             <span class="fee-drag-bps">Fee unknown</span>
             <span class="fee-drag-annual">—</span>
         </div>`).join("");
 
-    const blendedBps = Number(data.blended_expense_ratio_bps);
+    const blendedBps = isFiniteNumber(data.blended_expense_ratio_bps) ? Number(data.blended_expense_ratio_bps) : NaN;
     const blendedPct = _feePct(data.blended_expense_ratio);
     const blended = Number.isFinite(blendedBps)
         ? `${blendedBps} bps${blendedPct ? ` (${blendedPct})` : ""} blended across ${formatCurrency(data.covered_value)} of funds`
@@ -4235,7 +4267,7 @@ function renderFeeDrag(data) {
 
     const notes = [];
     if (data.data_quality === "partial") {
-        notes.push(`Partial coverage — ${coverage.covered_count} of ${coverage.fund_count} funds have a readable expense ratio.`);
+        notes.push(`Partial coverage — ${coverage.covered_count} of ${coverage.fund_count} funds have usable USD value and a readable expense ratio.`);
     }
     const stocks = Number(coverage.stock_count) || 0;
     if (stocks > 0) {
@@ -4699,8 +4731,10 @@ function trendSignature(history = []) {
 }
 
 function holdingBadgeHtml(h) {
+    const unavailable = h.quote_available === false
+        ? html`<span class="badge watchlist-badge ms-1" title="Saved holding — current price unavailable">Price unavailable</span>` : "";
     if (h.is_watchlist) {
-        return html`<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask me-1"></i>Research</span>`;
+        return html`<span class="badge watchlist-badge ms-1" title="Research mode — excluded from P&L"><i class="bi bi-flask me-1"></i>Research</span>${unavailable}`;
     }
     // Yahoo prices a foreign listing in its home market's currency — London in
     // pence, not even pounds — so this row's figures are not dollars and the
@@ -4708,7 +4742,7 @@ function holdingBadgeHtml(h) {
     if (h.currency && h.currency.toUpperCase() !== "USD") {
         return html`<span class="badge watchlist-badge ms-1" title="Priced in ${h.currency} — excluded from your dollar total"><i class="bi bi-globe2 me-1"></i>${h.currency}</span>`;
     }
-    return "";
+    return unavailable;
 }
 
 function moveBadgeHtml(ticker) {
@@ -4785,11 +4819,11 @@ function updateHoldingRow(row, h, index, trendData = {}) {
 
     setCellHtml(row.querySelector('[data-field="ticker"]'), tickerHtml);
     setCellHtml(row.querySelector('[data-field="name"]'), escapeHtml((h.name || h.ticker).substring(0, 34)));
-    setCellHtml(row.querySelector('[data-field="price"]'), formatCurrency(h.current_price));
+    setCellHtml(row.querySelector('[data-field="price"]'), escapeHtml(formatHoldingMoney(h, h.current_price)));
     setCellHtml(row.querySelector('[data-field="day"]'), dayChangeHtml(h));
-    setCellHtml(row.querySelector('[data-field="value"]'), formatCurrency(h.current_value));
-    setCellHtml(row.querySelector('[data-field="allocation"]'), formatAllocationPct(h.allocation_pct));
-    setCellHtml(row.querySelector('[data-field="target"]'), renderTargetCell(rec));
+    setCellHtml(row.querySelector('[data-field="value"]'), escapeHtml(formatHoldingMoney(h, h.current_value)));
+    setCellHtml(row.querySelector('[data-field="allocation"]'), portfolioCoverageComplete() ? formatAllocationPct(h.allocation_pct) : "Unavailable");
+    setCellHtml(row.querySelector('[data-field="target"]'), renderTargetCell(rec, h));
     setCellHtml(row.querySelector('[data-field="rec"]'), renderAnalystRecCell(rec));
 
     const trendCell = row.querySelector(".trend-cell");
@@ -5518,9 +5552,19 @@ function renderMoveExplainer(section, data, coverageData = null) {
     if (!data) { renderMoveExplainerFallback(section); return; }
 
     const ticker = coverageData?.ticker || data.ticker || "";
-    const drivers = data.drivers || [];
+    const holding = latestHoldings.find(h => h.ticker === ticker);
+    const quoteUnavailable = (holding || data).quote_available === false;
+    data = { ...data,
+        day_change_pct: quoteUnavailable ? null : holding ? holding.day_change_pct : data.day_change_pct,
+        day_change_dollar: quoteUnavailable ? null : holding ? holding.day_change : data.day_change_dollar,
+    };
+    const moveAvailable = isFiniteNumber(data.day_change_pct);
+    const drivers = moveAvailable ? data.drivers || [] : [];
     const macro   = data.macro_context;
-    const isPos      = (data.day_change_pct || 0) >= 0;
+    const moveTone = !moveAvailable ? "" : Number(data.day_change_pct) >= 0 ? "positive" : "negative";
+    const perShare = isFiniteNumber(data.day_change_dollar)
+        ? `${Number(data.day_change_dollar) >= 0 ? "+" : "-"}${formatHoldingMoney(holding || data, Math.abs(Number(data.day_change_dollar)))}/share`
+        : "Unavailable";
 
     // Build context pills — use holding-specific benchmark first, then SPY/QQQ if relevant
     const macroPills = [];
@@ -5562,16 +5606,16 @@ function renderMoveExplainer(section, data, coverageData = null) {
             html`<span class="macro-pill ${p.pos ? "positive" : "negative"}">${p.label}</span>`
           )}</div>`
         : "";
-    const keyDriversHtml = renderKeyDriversSpecRows(coverageData?.key_drivers || []);
+    const keyDriversHtml = moveAvailable ? renderKeyDriversSpecRows(coverageData?.key_drivers || []) : "";
     const moveStatStripHtml = renderMoveStatStrip(data);
-    const contributionHtml = renderContributionBreakdown(
+    const contributionHtml = moveAvailable ? renderContributionBreakdown(
         coverageData?.contribution_breakdown,
         data.day_change_pct,
         coverageData?.ticker,
         coverageData?.coverage_type,
         coverageData?.top_holdings,
         coverageData?.holdings_estimated
-    );
+    ) : "";
 
     const verdict = cachedVerdicts[ticker] || {};
     const timing  = verdict.timing || {};
@@ -5594,11 +5638,11 @@ function renderMoveExplainer(section, data, coverageData = null) {
             </div>
             <div class="move-explainer-header">
                 <div class="move-hero">
-                    <span class="move-hero-number ${isPos ? "positive" : "negative"}">${formatPct(data.day_change_pct)}</span>
-                    <span class="move-hero-sub">${formatSignedCurrency(data.day_change_dollar || 0)}/share</span>
+                    <span class="move-hero-number ${moveTone}">${moveAvailable ? formatPct(data.day_change_pct) : "Unavailable"}</span>
+                    <span class="move-hero-sub">${perShare}</span>
                 </div>
             </div>
-            <p class="move-explanation-text">${data.explanation_text || ""}</p>
+            <p class="move-explanation-text">${moveAvailable ? data.explanation_text || "" : "Current price move unavailable. Saved position details remain available."}</p>
             ${driversHtml.length ? html`<div class="move-drivers">${driversHtml}</div>` : ""}
             ${macroPillsHtml}
             ${raw(keyDriversHtml)}
@@ -6196,7 +6240,7 @@ function buildMoveStatItems(data) {
     const pressureType  = dayChange === null ? "neutral" : dayChange >= 0 ? "positive" : "negative";
     const pressureLabel = dayChange === null ? "Flow Unclear" : dayChange >= 0 ? "Buyers in Control" : "Sellers in Control";
     const pressureDetail = dayChange === null
-        ? "No live price move"
+        ? "Live price move unavailable"
         : `${formatPct(dayChange)}${volRatio !== null ? ` · ${volRatio.toFixed(1)}x vol` : ""}`;
 
     items.push({
@@ -6561,6 +6605,10 @@ function _buildEquityFundamentals(data, rating, aiMode) {
 }
 
 function _buildEquityValueBlock(data, rating, timing) {
+    const holding = latestHoldings.find(h => h.ticker === data.ticker) || data;
+    if (holding.quote_available === false) {
+        return '<div class="coverage-section"><p class="intel-na">Current price comparison unavailable.</p></div>';
+    }
     const watchLevels = timing.watch_levels || {};
     const posPct = isFiniteNumber(timing.range_position_pct) ? Number(timing.range_position_pct) : null;
     const low = isFiniteNumber(watchLevels.fifty_two_week_low) ? Number(watchLevels.fifty_two_week_low) : null;
@@ -6592,9 +6640,9 @@ function _buildEquityValueBlock(data, rating, timing) {
         rangeBarHtml = `
             <div class="eq-range-bar-wrap">
                 <div class="eq-range-bar-labels">
-                    <span class="eq-range-edge">${escapeHtml(formatCurrency(low))}</span>
+                    <span class="eq-range-edge">${escapeHtml(formatHoldingMoney(holding, low))}</span>
                     <span class="eq-range-zone ${escapeHtml(zoneTone)}">${escapeHtml(zoneLabel)} ${rangeTip}</span>
-                    <span class="eq-range-edge">${escapeHtml(formatCurrency(high))}</span>
+                    <span class="eq-range-edge">${escapeHtml(formatHoldingMoney(holding, high))}</span>
                 </div>
                 <div class="eq-range-bar-track">
                     <div class="eq-range-bar-fill ${escapeHtml(zoneTone)}" style="width:${pct.toFixed(1)}%"></div>
@@ -6619,7 +6667,7 @@ function _buildEquityValueBlock(data, rating, timing) {
                     title: "Analyst price target",
                     body: "The average price Wall Street analysts think this stock is worth 12 months from now.",
                 })}</span>
-                <strong>${escapeHtml(formatCurrency(rating.target_price))}${upsideSpan}</strong>
+                <strong>${escapeHtml(formatHoldingMoney(holding, rating.target_price))}${holding.quote_available === false ? "" : upsideSpan}</strong>
             </div>`);
         }
         if (rating.analyst_count && rating.label) {
@@ -7016,7 +7064,8 @@ function renderTargetTrendLine(label, value) {
             </div>`;
 }
 
-function renderTargetCell(rec) {
+function renderTargetCell(rec, holding = null) {
+    if (holding?.quote_available === false) return html`<span class="text-secondary">Unavailable</span>`;
     if (!rec) {
         return html`<div class="shimmer-line" style="width:56px;height:12px;border-radius:4px;margin:0 auto .25rem"></div>
                 <div class="shimmer-line" style="width:38px;height:9px;border-radius:4px;margin:0 auto"></div>`;
@@ -7054,7 +7103,7 @@ function renderTargetCell(rec) {
         const upside = rec.target_upside_pct;
         const tone = signalTone(upside);
         return html`<div class="target-signal-stack target-stock-stack">
-                    <div class="target-price-value target-stock-value">${formatCurrency(rec.target_price)}</div>
+                    <div class="target-price-value target-stock-value">${formatHoldingMoney(holding || rec, rec.target_price)}</div>
                     <div class="target-stock-upside ${tone}">${formatSignalPct(upside)}</div>
                     ${renderTargetKind("stock", "bi-bullseye", "Stock target")}
                 </div>`;
@@ -7100,7 +7149,7 @@ async function loadAnalystRecommendations() {
             const cell = document.getElementById(`rec-cell-${ticker}`);
             if (cell) cell.innerHTML = renderAnalystRecCell(rec);
             const targetCell = document.getElementById(`target-cell-${ticker}`);
-            if (targetCell) targetCell.innerHTML = renderTargetCell(rec);
+            if (targetCell) targetCell.innerHTML = renderTargetCell(rec, latestHoldings.find(h => h.ticker === ticker));
             if (intelligenceLoaded && cachedIntelligence[ticker]) {
                 const row = holdingTableRow(ticker);
                 const expandRow = row?.nextElementSibling;
@@ -7945,7 +7994,8 @@ function _syncManageHoldModeCard(holdingId, holdClass) {
 
 function _shouldShowBookExposure(ticker) {
     if (!cachedPortfolioExposure?.sector_exposure?.length) return false;
-    const live = latestHoldings.filter(h => !h.is_watchlist);
+    if (!portfolioCoverageComplete()) return false;
+    const live = latestHoldings.filter(isReportingHolding);
     if (!live.length) return false;
     const top = live.reduce((a, b) =>
         (Number(a.allocation_pct) || 0) >= (Number(b.allocation_pct) || 0) ? a : b
@@ -8128,7 +8178,7 @@ function _collectVerdictContextChips(verdict, ticker) {
             tipBody: "You marked this as a core anchor — trim calls are suppressed unless risk is extreme.",
             cls: "verdict-position-chip",
         });
-    } else if (holding && !holding.is_watchlist) {
+    } else if (holding && isReportingHolding(holding) && portfolioCoverageComplete()) {
         const alloc = Number(holding.allocation_pct);
         if (alloc >= 12) {
             chips.push({
@@ -8497,16 +8547,18 @@ function _injectDeepIntelSection(section, deepData) {
     host.appendChild(wrap);
 }
 
-function _renderFlipTriggers(verdict) {
+function _renderFlipTriggers(verdict, ticker) {
     const flips = verdict?.flip_triggers;
     if (!flips?.add_price || !flips?.trim_price) return "";
+    const holding = latestHoldings.find(h => h.ticker === ticker) || verdict;
+    if (holding.quote_available === false) return "";
     return `<div class="verdict-insight-row verdict-flip-line">
         <span class="verdict-row-icon"><i class="bi bi-signpost-split" aria-hidden="true"></i></span>
         <span class="verdict-row-copy verdict-flip-copy">
             <span class="verdict-price-pair">
-                <span><i class="bi bi-arrow-up-right" aria-hidden="true"></i> Add near ${escapeHtml(formatCurrency(flips.add_price))}</span>
+                <span><i class="bi bi-arrow-up-right" aria-hidden="true"></i> Add near ${escapeHtml(formatHoldingMoney(holding, flips.add_price))}</span>
                 <span class="verdict-price-sep" aria-hidden="true"></span>
-                <span><i class="bi bi-arrow-down-right" aria-hidden="true"></i> Trim near ${escapeHtml(formatCurrency(flips.trim_price))}</span>
+                <span><i class="bi bi-arrow-down-right" aria-hidden="true"></i> Trim near ${escapeHtml(formatHoldingMoney(holding, flips.trim_price))}</span>
             </span>
         </span>
         ${_verdictTip({
@@ -9007,7 +9059,7 @@ function _renderBriefingReasoning(verdict, ticker, variant = "ai") {
 
     const peerHtml = _renderPeerRelativeLine(verdict);
     const sparkHtml = _renderVerdictSparkline(verdict, ticker);
-    const flipHtml = _renderFlipTriggers(verdict);
+    const flipHtml = _renderFlipTriggers(verdict, ticker);
     const timingHtml = _renderTimingLine(verdict);
     const metaChips = [_renderSinceLastScan(verdict), _renderFreshness(verdict)]
         .filter(Boolean)
@@ -11959,6 +12011,8 @@ async function loadHoldingIntelligence(options = {}) {
 let manageHoldingsRequestId = 0;
 let manageHoldingsCache = [];
 const manageAutoSaveTimers = new Map();
+const manageHoldingSaves = new Map();
+const manageUnknownEdits = new Map();
 const MANAGE_AUTOSAVE_MS = 400;
 
 const MANAGE_LUCIDE_SVG = {
@@ -12399,6 +12453,16 @@ function setManageSaveStatus(holdingId, state) {
     const el = document.querySelector(`#manage-row-${holdingId} .manage-save-status`);
     if (!el) return;
     el.classList.remove("is-visible", "is-saving", "is-saved", "is-error");
+    el.dataset.saveState = state;
+    el.title = "";
+    const feedback = document.getElementById(`manage-edit-feedback-${holdingId}`);
+    if (feedback) {
+        feedback.hidden = !["unknown", "error", "draft"].includes(state);
+        feedback.textContent = state === "unknown"
+            ? "Status unknown. Edit again to check saved holdings before another change."
+            : state === "draft" ? "Unsaved changes remain. Review the inputs before saving."
+            : state === "error" ? "Not saved. Review the inputs and try again." : "";
+    }
     if (state === "idle") {
         el.innerHTML = "";
         return;
@@ -12406,14 +12470,18 @@ function setManageSaveStatus(holdingId, state) {
     el.classList.add("is-visible");
     if (state === "saving") {
         el.classList.add("is-saving");
-        el.innerHTML = manageLucide("loader-2", "manage-lucide manage-lucide--spin");
+        el.innerHTML = manageLucide("loader-2", "manage-lucide manage-lucide--spin") + '<span class="visually-hidden">Saving</span>';
     } else if (state === "saved") {
         el.classList.add("is-saved");
-        el.innerHTML = manageLucide("check");
-        window.setTimeout(() => setManageSaveStatus(holdingId, "idle"), 1500);
-    } else if (state === "error") {
+        el.innerHTML = manageLucide("check") + '<span class="visually-hidden">Saved</span>';
+        window.setTimeout(() => {
+            if (el.dataset.saveState === "saved") setManageSaveStatus(holdingId, "idle");
+        }, 1500);
+    } else if (state === "error" || state === "unknown" || state === "draft") {
         el.classList.add("is-error");
+        const label = state === "unknown" ? "Save status unknown; edit again to check saved holdings" : state === "draft" ? "Unsaved changes" : "Not saved";
         el.innerHTML = manageLucide("x");
+        el.title = label;
     }
 }
 
@@ -12483,6 +12551,7 @@ function renderManageHoldingCard(h) {
                            class="form-control form-control-sm" id="cost-${h.id}" placeholder="—">
                 </label>
             </div>
+            <p class="small text-secondary mb-0" id="manage-edit-feedback-${h.id}" role="status" hidden></p>
             <div class="manage-card-footer">
                 ${_renderManageHoldModeSection(h)}
             </div>
@@ -12512,6 +12581,12 @@ function renderManageHoldingsData(holdings) {
     updateManageStatsPill(manageHoldingsCache);
     if (!list) return;
 
+    const drafts = new Map();
+    const focused = document.activeElement;
+    list.querySelectorAll(".manage-holding-card[data-ticker]").forEach(card => {
+        const id = Number(card.id.replace("manage-row-", ""));
+        if (holdingEditHasDraft(id) || manageHoldingSaves.has(id) || manageUnknownEdits.has(id)) drafts.set(id, card);
+    });
     list.innerHTML = "";
     if (!manageHoldingsCache.length) {
         list.hidden = true;
@@ -12523,10 +12598,19 @@ function renderManageHoldingsData(holdings) {
     if (empty) empty.hidden = true;
     list.hidden = false;
     manageHoldingsCache.forEach(h => {
-        list.insertAdjacentHTML("beforeend", renderManageHoldingCard(h));
-        bindManageHoldingInputs(document.getElementById(`manage-row-${h.id}`), h.id);
+        if (drafts.has(h.id)) list.appendChild(drafts.get(h.id));
+        else {
+            list.insertAdjacentHTML("beforeend", renderManageHoldingCard(h));
+            bindManageHoldingInputs(document.getElementById(`manage-row-${h.id}`), h.id);
+        }
     });
+    if (focused && Array.from(drafts.values()).some(card => card.contains(focused))) focused.focus({ preventScroll: true });
     filterManageHoldings(document.getElementById("manage-holdings-search")?.value || "");
+}
+
+function invalidateManageHoldingsLoad() {
+    manageHoldingsRequestId += 1;
+    document.getElementById("portfolioModal")?.classList.remove("is-loading");
 }
 
 async function loadManageHoldings({ preserveExisting = false } = {}) {
@@ -12648,100 +12732,196 @@ function promptSaleDetails({
 
 
 async function updateHolding(holdingId, options = {}) {
-    const silent = options.silent === true;
+    const running = manageHoldingSaves.get(holdingId);
+    if (running) {
+        running.queued = { ...options, viaBlur: options.viaBlur || running.queued?.viaBlur };
+        return running.promise;
+    }
+    const operation = { queued: options, promise: null };
+    manageHoldingSaves.set(holdingId, operation);
+    operation.promise = (async () => {
+        try {
+            while (operation.queued) {
+                const next = operation.queued;
+                operation.queued = null;
+                if (!await saveHoldingEdit(holdingId, next)) break;
+            }
+        } catch (error) {
+            console.warn("Holding edit failed:", error);
+            setManageSaveStatus(holdingId, "error");
+            showToast("Holding edit could not finish. Review saved holdings before retrying.", "danger");
+        } finally {
+            document.getElementById(`manage-row-${holdingId}`)?.classList.remove("is-saving");
+            manageHoldingSaves.delete(holdingId);
+        }
+    })();
+    return operation.promise;
+}
+
+function holdingEditHasDraft(holdingId) {
+    return ["shares", "cost"].some(field => {
+        const input = document.getElementById(`${field}-${holdingId}`);
+        return input && input.value !== input.defaultValue;
+    });
+}
+
+function rebaseHoldingEdit(holdingId, holding) {
+    const shares = document.getElementById(`shares-${holdingId}`);
+    const cost = document.getElementById(`cost-${holdingId}`);
+    // defaultValue can change value on a pristine input; always retain the visible draft.
+    for (const [input, value] of [[shares, String(holding.shares)], [cost, holding.avg_cost ? String(holding.avg_cost) : ""]]) {
+        if (!input) continue;
+        const draft = input.value;
+        input.defaultValue = value;
+        input.value = draft;
+    }
+    manageHoldingsCache = manageHoldingsCache.map(row => row.id === holdingId ? { ...row, ...holding } : row);
+}
+
+async function readBackHoldingEdit(holdingId, needsRealized) {
+    try {
+        PortfolioWorkspace.invalidate();
+        const [rows, pnl] = await Promise.allSettled([
+            PortfolioWorkspace.json("/api/portfolio/holdings"),
+            needsRealized ? PortfolioWorkspace.json("/api/portfolio/pnl") : Promise.resolve(null),
+        ]);
+        if (rows.status !== "fulfilled" || !Array.isArray(rows.value?.holdings)) return null;
+        const holding = rows.value.holdings.find(row => row.id === holdingId);
+        if (!holding) return null;
+        rebaseHoldingEdit(holdingId, holding);
+        if (needsRealized) {
+            if (pnl.status !== "fulfilled") return null;
+            await renderPnlData(pnl.value);
+        }
+        manageUnknownEdits.delete(holdingId);
+        return holding;
+    } finally {
+        invalidateManageHoldingsLoad();
+    }
+}
+
+async function saveHoldingEdit(holdingId, options) {
     const card = document.getElementById(`manage-row-${holdingId}`);
     const sharesInput = document.getElementById(`shares-${holdingId}`);
     const costInput = document.getElementById(`cost-${holdingId}`);
-    const isWatchlist = sharesInput?.dataset.watchlist === "true";
-    const sharesRaw = sharesInput?.value?.trim() ?? "";
+    if (!card || !sharesInput || !costInput) return false;
+    const ticker = card.dataset.ticker || "this holding";
+    if (manageUnknownEdits.has(holdingId)) {
+        let holding = null;
+        try { holding = await readBackHoldingEdit(holdingId, manageUnknownEdits.get(holdingId)); }
+        catch (error) { console.warn("Holding edit readback failed:", error); }
+        if (!holding) {
+            setManageSaveStatus(holdingId, "unknown");
+            showToast(`Could not confirm the saved state of ${ticker}. No further edit was sent. Edit again to check saved holdings.`, "warning");
+            return false;
+        }
+    }
+    if (!holdingEditHasDraft(holdingId)) {
+        setManageSaveStatus(holdingId, "saved");
+        return true;
+    }
+    const isWatchlist = sharesInput.dataset.watchlist === "true";
+    const sharesRaw = sharesInput.value.trim();
     const shares = Number(sharesRaw);
-    const costRaw = costInput?.value?.trim() ?? "";
+    const costRaw = costInput.value.trim();
     const avgCost = costRaw ? Number(costRaw) : null;
-    const holdClass = card?.dataset.holdMode
-        || card?.querySelector(".manage-hold-mode-box.is-active")?.dataset.holdMode
-        || "auto";
-
-    // Reducing a real position books a realized sale on the backend. Defer that to
-    // blur (the final value), so intermediate keystrokes while typing a smaller
-    // number — e.g. "1" on the way to "10" — never book a phantom sale, and confirm
-    // once on blur so a typo-correction isn't silently recorded as a sale.
-    const originalShares = Number(sharesInput?.defaultValue);
-    const isReduction = !isWatchlist
-        && Number.isFinite(originalShares)
-        && Number.isFinite(shares)
-        && shares < originalShares;
-    if (isReduction && !options.viaBlur) {
-        return; // wait for blur to resolve the final value
+    if ((!isWatchlist && (!sharesRaw || !Number.isFinite(shares) || shares <= 0))
+        || (isWatchlist && sharesRaw && (!Number.isFinite(shares) || shares < 0))) {
+        setManageSaveStatus(holdingId, "error");
+        showToast(isWatchlist ? "Research shares must be zero or greater" : "Shares must be a positive number", "danger");
+        return false;
     }
-
-    if (!isWatchlist && (!Number.isFinite(shares) || shares <= 0)) {
-        if (silent) setManageSaveStatus(holdingId, "error");
-        else showToast("Shares must be a positive number", "danger");
-        return;
+    if (costRaw && (!Number.isFinite(avgCost) || avgCost <= 0)) {
+        setManageSaveStatus(holdingId, "error");
+        showToast("Average cost must be a positive number", "danger");
+        return false;
     }
+    const originalShares = Number(sharesInput.defaultValue);
+    const isReduction = !isWatchlist && Number.isFinite(originalShares) && shares < originalShares;
+    if (isReduction && !options.viaBlur) return true;
 
     let saleDetails = null;
     if (isReduction) {
-        const soldQty = Number((originalShares - shares).toFixed(4));
-        const ticker = card?.dataset.ticker || "this holding";
         saleDetails = await promptSaleDetails({
-            ticker, soldQty, fromShares: originalShares, toShares: shares,
+            ticker, soldQty: Number((originalShares - shares).toFixed(4)),
+            fromShares: originalShares, toShares: shares,
         });
-        if (!saleDetails) {  // cancelled → revert, book nothing
-            if (sharesInput) sharesInput.value = sharesInput.defaultValue;
-            setManageSaveStatus(holdingId, "saved");
-            card?.classList.remove("is-saving");
-            return;
+        if (!saleDetails) {
+            if (sharesInput.value === sharesRaw) sharesInput.value = sharesInput.defaultValue;
+            setManageSaveStatus(holdingId, holdingEditHasDraft(holdingId) ? "draft" : "saved");
+            return true;
+        }
+        if (sharesInput.value.trim() !== sharesRaw || costInput.value.trim() !== costRaw) {
+            setManageSaveStatus(holdingId, "draft");
+            showToast("Inputs changed during sale confirmation. Review them before saving.", "warning");
+            return false;
         }
     }
-    if (isWatchlist && sharesRaw && (!Number.isFinite(shares) || shares < 0)) {
-        if (silent) setManageSaveStatus(holdingId, "error");
-        else showToast("Research shares must be zero or greater", "danger");
-        return;
-    }
-    if (costRaw && (!Number.isFinite(avgCost) || avgCost <= 0)) {
-        if (silent) setManageSaveStatus(holdingId, "error");
-        else showToast("Average cost must be a positive number", "danger");
-        return;
-    }
-
-    if (silent) {
-        setManageSaveStatus(holdingId, "saving");
-        card?.classList.add("is-saving");
-    }
-
-    const payload = { avg_cost: avgCost, hold_class: holdClass };
+    const payload = {
+        expected_shares: originalShares,
+        expected_avg_cost: Number(costInput.defaultValue || 0),
+    };
+    // Empty average cost has always meant no change on this endpoint.
+    if (avgCost !== null) payload.avg_cost = avgCost;
     if (!isWatchlist || (Number.isFinite(shares) && shares > 0)) payload.shares = shares;
-    if (saleDetails) {
-        if (saleDetails.sale_price) payload.sale_price = saleDetails.sale_price;
-        if (saleDetails.sale_date) payload.sale_date = saleDetails.sale_date;
-    }
-
-    const res = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
-    card?.classList.remove("is-saving");
-    if (res.ok) {
-        // Re-baseline the inputs so a subsequent edit compares against the value we
-        // just saved, not the original render value (keeps reduction detection correct).
-        if (sharesInput && payload.shares !== undefined) sharesInput.defaultValue = String(shares);
-        if (costInput) costInput.defaultValue = costInput.value;
-        if (silent) setManageSaveStatus(holdingId, "saved");
-        else showToast("Holding updated!", "success");
-        if (isReduction) {
-            const soldQty = Number((originalShares - shares).toFixed(4));
-            const at = saleDetails?.sale_price ? ` @ ${formatCurrency(saleDetails.sale_price)}` : "";
-            showToast(`Recorded a sale of ${soldQty} ${card?.dataset.ticker || ""}${at} — adjust it in the P&L tab`, "warning");
+    if (saleDetails?.sale_price) payload.sale_price = saleDetails.sale_price;
+    if (saleDetails?.sale_date) payload.sale_date = saleDetails.sale_date;
+    setManageSaveStatus(holdingId, "saving");
+    card.classList.add("is-saving");
+    invalidateManageHoldingsLoad();
+    let response;
+    let responseError = null;
+    try {
+        response = await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            responseError = await response.json().catch(() => ({}));
+            if (["holding_changed", "holding_archived"].includes(responseError.detail?.code)) {
+                throw Object.assign(new Error("Saved holding changed"), { code: "holding_changed" });
+            }
+            if (response.status >= 500) throw new Error(`HTTP ${response.status}`);
         }
-        refreshPortfolioMutationInBackground();
-        refreshAiVerdicts();
-    } else {
-        const err = await res.json().catch(() => ({}));
-        if (silent) setManageSaveStatus(holdingId, "error");
-        showToast(apiErrorMessage(err, "Update failed"), "danger");
+    } catch (error) {
+        const changed = error.code === "holding_changed";
+        console.warn("Holding edit needs readback:", error);
+        manageUnknownEdits.set(holdingId, isReduction || changed);
+        let holding = null;
+        try { holding = await readBackHoldingEdit(holdingId, isReduction || changed); }
+        catch (readError) { console.warn("Holding edit readback failed:", readError); }
+        setManageSaveStatus(holdingId, holding ? (holdingEditHasDraft(holdingId) ? "draft" : "saved") : "unknown");
+        showToast(holding
+            ? `${ticker} saved state was read back ${changed ? "because the holding changed before this edit" : "after the connection error"}. ${holdingEditHasDraft(holdingId) ? "Your unsaved inputs remain; review them before retrying." : "No retry was sent."}`
+            : `Could not confirm whether ${ticker} was updated. No retry was sent; edit again to check saved holdings.`, "warning");
+        const feedback = document.getElementById(`manage-edit-feedback-${holdingId}`);
+        if (holding && feedback && holdingEditHasDraft(holdingId)) {
+            feedback.textContent = `Saved: ${holding.shares} shares; average cost ${holding.avg_cost || 0}. Your inputs remain unsaved; review them before retrying.`;
+        }
+        refreshPortfolioMutationInBackground({ includeManageHoldings: false });
+        return false;
+    } finally {
+        card.classList.remove("is-saving");
     }
+    if (!response.ok) {
+        setManageSaveStatus(holdingId, "error");
+        showToast(apiErrorMessage(responseError, "Update rejected; saved holding unchanged"), "danger");
+        return false;
+    }
+    const saved = {
+        shares: payload.shares ?? originalShares,
+        avg_cost: avgCost ?? Number(costInput.defaultValue || 0),
+    };
+    invalidateManageHoldingsLoad();
+    rebaseHoldingEdit(holdingId, saved);
+    // A blank field did not clear an existing cost; show the saved fact unless a newer draft arrived.
+    if (!costRaw && !costInput.value.trim()) costInput.value = costInput.defaultValue;
+    setManageSaveStatus(holdingId, holdingEditHasDraft(holdingId) ? "draft" : "saved");
+    if (isReduction) {
+        showToast(`Recorded a sale of ${Number((originalShares - shares).toFixed(4))} ${ticker} — review it in the P&L tab`, "warning");
+    } else if (!options.silent) showToast("Holding updated!", "success");
+    refreshPortfolioMutationInBackground();
+    refreshAiVerdicts();
+    return true;
 }
 
 async function refreshAiVerdicts(options = {}) {
@@ -12971,10 +13151,23 @@ function describeHoldingRemovalOutcome(ticker, outcome = {}) {
 
 
 async function removeHolding(holdingId, ticker, isWatchlist = false) {
+    if (manageHoldingSaves.has(holdingId)) {
+        showToast(`Wait for the ${ticker} edit to finish before removing it.`, "warning");
+        return;
+    }
+    if (manageUnknownEdits.has(holdingId)) {
+        showToast(`Check the interrupted ${ticker} edit in Manage before removing it. Edit again to read back saved facts. No removal was sent.`, "warning");
+        return;
+    }
     const holding = manageHoldingsCache.find(h => h.id === holdingId)
         || latestHoldings.find(h => h.id === holdingId)
         || {};
     const fromShares = Number(holding.shares);
+    const fromCost = Number(holding.avg_cost || 0);
+    if (!Number.isFinite(fromShares) || fromShares < 0 || !Number.isFinite(fromCost) || fromCost < 0) {
+        showToast(`Reload the saved ${ticker} holding before removing it.`, "warning");
+        return;
+    }
     let saleDetails = await promptSaleDetails({
         ticker,
         soldQty: Number.isFinite(fromShares) ? fromShares : "all",
@@ -12986,11 +13179,17 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
     if (saleDetails === null) return;
 
     async function requestRemoval(details) {
-        return PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(HoldingRemovalLogic.buildPayload(details)),
-        });
+        invalidateManageHoldingsLoad();
+        try {
+            return await PortfolioWorkspace.response(`/api/portfolio/holdings/${holdingId}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...HoldingRemovalLogic.buildPayload(details),
+                    expected_shares: fromShares, expected_avg_cost: fromCost }),
+            });
+        } finally {
+            invalidateManageHoldingsLoad();
+        }
     }
 
     async function reportAmbiguousRemoval(error) {
@@ -13033,6 +13232,18 @@ async function removeHolding(holdingId, ticker, isWatchlist = false) {
     }
     if (!res.ok && res.status >= 500) {
         await reportAmbiguousRemoval(new Error(`Removal returned HTTP ${res.status}`));
+        return;
+    }
+    if (!res.ok && res.status === 409 && ["holding_changed", "holding_archived"].includes(err.detail?.code)) {
+        manageUnknownEdits.set(holdingId, true);
+        let saved = null;
+        try { saved = await readBackHoldingEdit(holdingId, true); }
+        catch (error) { console.warn("Removal conflict readback failed:", error); }
+        setManageSaveStatus(holdingId, saved ? (holdingEditHasDraft(holdingId) ? "draft" : "saved") : "unknown");
+        showToast(saved
+            ? `${ticker} changed before removal. Saved: ${saved.shares} shares; average cost ${saved.avg_cost || 0}. Review it and confirm again. No removal was retried.`
+            : `Could not confirm the changed ${ticker} holding. No removal was retried; check saved holdings before another change.`, "warning");
+        refreshPortfolioMutationInBackground({ includeManageHoldings: false });
         return;
     }
     if (res.ok) {
@@ -13554,8 +13765,11 @@ function initCsvImport() {
     window.holdingsCsvPreview = createCsvPreview({
         document, workspace: PortfolioWorkspace, storage: csvRecoveryStorage,
         refresh: async portfolioId => {
+            invalidateManageHoldingsLoad();
+            const requestId = manageHoldingsRequestId;
             const data = await PortfolioWorkspace.json("/api/portfolio/holdings");
-            if (PortfolioWorkspace.id !== portfolioId || data.portfolio_id !== portfolioId
+            if (requestId !== manageHoldingsRequestId || PortfolioWorkspace.id !== portfolioId
+                || data.portfolio_id !== portfolioId
                 || !Array.isArray(data.holdings)) throw new Error("Portfolio refresh could not be verified");
             renderManageHoldingsData(data.holdings);
             refreshPortfolioMutationInBackground();
@@ -13569,7 +13783,29 @@ function initCsvImport() {
 }
 
 
+let _toastStatusRegion = null;
+
+function announceToast(message) {
+    const status = document.getElementById("toast-status") || _toastStatusRegion;
+    if (!status) return;
+    _toastStatusRegion = status;
+    // Keep the single live region inside the active modal's non-inert surface.
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]'));
+    const activeDialog = dialogs.reverse().find(dialog => !dialog.hidden
+        && dialog.getAttribute("aria-hidden") !== "true" && !dialog.closest("[inert]"));
+    const parent = activeDialog || document.body;
+    if (status.parentNode !== parent) parent.appendChild(status);
+    status.inert = false;
+    const sequence = String((Number(status.dataset.sequence) || 0) + 1);
+    status.dataset.sequence = sequence;
+    status.textContent = "";
+    requestAnimationFrame(() => {
+        if (status.dataset.sequence === sequence) status.textContent = message;
+    });
+}
+
 function showToast(message, type = "success") {
+    announceToast(message);
     document.querySelectorAll(".toast-apple").forEach(t => t.remove());
     const icons = {
         success: "bi-check-circle-fill",
@@ -13579,6 +13815,7 @@ function showToast(message, type = "success") {
     };
     const toast = document.createElement("div");
     toast.className = `toast-apple toast-${type}`;
+    toast.setAttribute("aria-hidden", "true");
     toast.innerHTML = `<i class="bi ${icons[type] || icons.info} toast-icon"></i><span>${escapeHtml(message)}</span>`;
     document.body.appendChild(toast);
     void toast.offsetWidth;

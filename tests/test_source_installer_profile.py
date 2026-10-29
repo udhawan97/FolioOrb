@@ -3,19 +3,80 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parent.parent
 MIGRATOR = ROOT / "scripts" / "migrate_source_profile.py"
+POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="Requires a compatible PowerShell runtime")
+@pytest.mark.parametrize("explicit", [None, "main"])
+@pytest.mark.parametrize("relative", [False, True])
+def test_windows_extraction_is_install_sibling_only_after_metadata_acceptance(
+    tmp_path, explicit, relative,
+):
+    """System TEMP may be a different drive; no parent exists on metadata refusal."""
+    log = tmp_path / "archive-path.txt"
+    wrapper = tmp_path / "layout-fixture.ps1"
+    wrapper.write_text("""$ErrorActionPreference = 'Stop'
+function Invoke-RestMethod { param($Uri, [switch] $UseBasicParsing); throw 'metadata unavailable' }
+function Invoke-WebRequest {
+    param($Uri, $OutFile, [switch] $UseBasicParsing)
+    Set-Content -LiteralPath $env:REQUEST_LOG -Value $OutFile
+    throw 'Fixture stops archive I/O'
+}
+function py { & $env:FIXTURE_PYTHON @args }
+& $env:FIXTURE_INSTALLER
+""", encoding="utf-8")
+    install = tmp_path / "install" if relative else tmp_path / "new install parent" / "install"
+    other_temp = tmp_path / "unrelated system temp"
+    other_temp.mkdir()
+    profile = tmp_path / "other profile"
+    env = dict(os.environ)
+    env.pop("FOLIO_REF", None)
+    env.setdefault("LOCALAPPDATA", str(tmp_path / "unused default"))
+    env.update(
+        TEMP=str(other_temp), TMP=str(other_temp), REQUEST_LOG=str(log),
+        FIXTURE_PYTHON=sys.executable, FIXTURE_INSTALLER=str(ROOT / "scripts" / "install-win.ps1"),
+        FOLIOORB_INSTALL_DIR="install" if relative else str(install),
+        FOLIOORB_DATA_DIR=str(profile),
+        FOLIOORB_SHORTCUT=str(tmp_path / "shortcut.lnk"), FOLIOORB_INSTALL_NO_START="1",
+    )
+    if explicit:
+        env["FOLIO_REF"] = explicit
+    result = subprocess.run(
+        [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+         "-File", str(wrapper)],
+        env=env, cwd=tmp_path, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode != 0  # Archive I/O is deliberately stopped before cutover.
+    if explicit:
+        archive = Path(log.read_text(encoding="utf-8-sig").strip())
+        assert archive.parent.parent == install.parent
+        assert archive.parent.name.startswith(".folioorb-install-")
+        assert not archive.parent.exists()
+    else:
+        if not relative:
+            assert not install.parent.exists()
+        assert not log.exists()
+    assert not install.exists() and not profile.exists()
+    assert not list(other_temp.iterdir())
 
 
 def _run_migrator(
     source: Path, destination: Path, *, database_url: str | None = None
 ) -> subprocess.CompletedProcess[str]:
+    # These fixtures model the current lease-aware launcher; legacy refusal is tested separately.
+    if source.is_dir():
+        (source / "run.py").write_text("backup_service.acquire_profile_lock()\n", encoding="utf-8")
     environment = os.environ.copy()
     environment.pop("DATABASE_URL", None)
     if database_url is not None:
@@ -216,15 +277,16 @@ def test_installers_and_launchers_share_the_external_profile_contract():
     windows_installer = (ROOT / "scripts" / "install-win.ps1").read_text(encoding="utf-8")
     for content in (mac_installer, windows_installer):
         assert "migrate_source_profile.py" in content
-        assert ".source-profile-path" in content
+        assert "--replace-source" in content
         assert ".source-install-migration-complete" in content
         assert "FOLIOORB_DATA_DIR" in content
         assert "v5.16.0" in content
         assert "main/scripts/migrate_source_profile.py" in content
+    assert ".source-profile-path" in MIGRATOR.read_text(encoding="utf-8")
 
-    assert 'mv "$INSTALL_DIR" "$ROLLBACK_DIR"' in mac_installer
+    assert '--replace-source "$EXTRACTED"' in mac_installer
     assert "prior source install was restored" in mac_installer.lower()
-    assert "Move-Item $installDir $rollbackDir" in windows_installer
+    assert "--replace-source $extracted.FullName" in windows_installer
     assert "prior source install was restored" in windows_installer.lower()
     assert "FolioOrb-source.cmd" in windows_installer
 
@@ -236,3 +298,72 @@ def test_installers_and_launchers_share_the_external_profile_contract():
 
     for relative in ("FolioOrb.command", "FolioOrb.bat", "scripts/start.sh", "scripts/start.ps1"):
         assert ".source-profile-path" in (ROOT / relative).read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="Requires a compatible PowerShell runtime")
+@pytest.mark.parametrize("metadata", [
+    "failure", "empty", "malformed", "main", "latest-main", "unsupported", "badref", "stable",
+])
+@pytest.mark.parametrize("explicit", [None, "main", "latest-main", "v5.16.1"])
+def test_windows_installer_channel_resolution(tmp_path, metadata, explicit):
+    """CI Windows runs the actual script with metadata/archive I/O denied by stubs."""
+    wrapper = tmp_path / "fixture.ps1"
+    wrapper.write_text("""$ErrorActionPreference = 'Stop'
+function Invoke-RestMethod {
+    param($Uri, [switch] $UseBasicParsing)
+    Add-Content -LiteralPath $env:REQUEST_LOG -Value "metadata:$Uri"
+    if ($env:METADATA -eq 'failure') { throw 'Fixture metadata failure' }
+    if ($env:METADATA -eq 'empty') { return @{} }
+    if ($env:METADATA -eq 'malformed') { return 'broken metadata' }
+    if ($env:METADATA -eq 'main') { return @{ tag_name = 'main' } }
+    if ($env:METADATA -eq 'latest-main') { return @{ tag_name = 'latest-main' } }
+    if ($env:METADATA -eq 'unsupported') { return @{ tag_name = 'v5.15.0' } }
+    if ($env:METADATA -eq 'badref') { return @{ tag_name = 'not-a-tag' } }
+    return @{ tag_name = 'v5.16.1' }
+}
+function Invoke-WebRequest {
+    param($Uri, $OutFile, [switch] $UseBasicParsing)
+    Add-Content -LiteralPath $env:REQUEST_LOG -Value "archive:$Uri"
+    throw 'Fixture refuses archive download'
+}
+function py { & $env:FIXTURE_PYTHON @args }
+& $env:FIXTURE_INSTALLER
+""", encoding="utf-8")
+    install, profile = tmp_path / "install", tmp_path / "profile"
+    install.mkdir()
+    profile.mkdir()
+    (install / "keep.txt").write_bytes(b"existing code")
+    (profile / "keep.txt").write_bytes(b"existing profile")
+    shortcut, log = tmp_path / "shortcut.lnk", tmp_path / "requests.log"
+    env = dict(os.environ)
+    env.pop("FOLIO_REF", None)
+    env.setdefault("LOCALAPPDATA", str(tmp_path / "unused-default"))
+    env.update(
+        REQUEST_LOG=str(log), METADATA=metadata, FIXTURE_PYTHON=sys.executable,
+        FIXTURE_INSTALLER=str(ROOT / "scripts" / "install-win.ps1"),
+        FOLIOORB_INSTALL_DIR=str(install), FOLIOORB_DATA_DIR=str(profile),
+        FOLIOORB_SHORTCUT=str(shortcut), FOLIOORB_INSTALL_NO_START="1",
+    )
+    if explicit:
+        env["FOLIO_REF"] = explicit
+    result = subprocess.run(
+        [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+         "-File", str(wrapper)],
+        env=env, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode != 0  # Archive download is always refused.
+    requests = log.read_text(encoding="utf-8-sig").splitlines()
+    if explicit is None and metadata != "stable":
+        assert len(requests) == 1
+        assert ("latest stable release" in result.stderr or
+                "Source installs support stable tags" in result.stderr)
+    else:
+        selected = explicit or "v5.16.1"
+        archive = "heads/main" if selected == "main" else f"tags/{selected}"
+        assert f"archive/refs/{archive}.zip" in requests[-1]
+        assert len(requests) == (1 if explicit else 2)
+    assert sorted(path.name for path in install.iterdir()) == ["keep.txt"]
+    assert sorted(path.name for path in profile.iterdir()) == ["keep.txt"]
+    assert (install / "keep.txt").read_bytes() == b"existing code"
+    assert (profile / "keep.txt").read_bytes() == b"existing profile"
+    assert not shortcut.exists()

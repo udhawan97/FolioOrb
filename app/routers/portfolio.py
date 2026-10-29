@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 from datetime import date, datetime, timezone
+import math
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
@@ -66,6 +67,26 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 # Shared with the review router, which used to keep its own divergent copy.
 _require_portfolio = require_portfolio
+
+
+def _require_finite_position(
+    db: Session, shares: float, avg_cost: float, current_price: float | None = None
+) -> None:
+    values = [shares, avg_cost, shares * avg_cost]
+    if current_price is not None:
+        values.append(shares * current_price)
+    if not all(math.isfinite(value) for value in values):
+        db.rollback()
+        raise HTTPException(status_code=422, detail="Position amounts must produce finite values")
+
+
+def _require_finite_portfolio_totals(db: Session, portfolio_id: int) -> None:
+    try:
+        db.flush()
+        portfolio_valuation.validate_stored_financial_totals(db, portfolio_id)
+    except portfolio_valuation.FinancialArithmeticError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _holdings_with_quote_data(holdings: list[dict]) -> list[dict]:
@@ -216,6 +237,10 @@ def add_holding(
             },
         )
 
+    _require_finite_position(
+        db, data.shares or 0.0, data.avg_cost or 0.0,
+        (validation.get("quote") or {}).get("current_price"),
+    )
     holding = Holding(
         portfolio_id=portfolio_id,
         ticker=data.ticker,
@@ -226,10 +251,12 @@ def add_holding(
         is_watchlist=data.is_watchlist or False,
         hold_class=data.hold_class or "auto",
     )
+    write_serialization.begin_financial_write(db)
     if holdings_repository.add_active(db, holding) is None:
         raise HTTPException(
             status_code=400, detail=f"{data.ticker} already in portfolio"
         )
+    _require_finite_portfolio_totals(db, portfolio_id)
     db.commit()
     db.refresh(holding)
     return {
@@ -443,6 +470,7 @@ async def import_holdings(
         report_rows, to_insert, existing_tickers
     )
 
+    write_serialization.begin_financial_write(db)
     inserted = False
     for create in to_insert:
         holding = Holding(
@@ -460,6 +488,7 @@ async def import_holdings(
         else:
             inserted = True
     if inserted:
+        _require_finite_portfolio_totals(db, portfolio_id)
         db.commit()
     # The post-provider reconciliation reads open a transaction even when every
     # row is skipped. End it before Claude narration so no database transaction
@@ -510,6 +539,7 @@ def _commit_holding_update(db: Session, holding: Holding) -> None:
     """Commit an edit and translate a concurrent reactivation race."""
     ticker = holding.ticker
     try:
+        _require_finite_portfolio_totals(db, holding.portfolio_id)
         db.commit()
     except IntegrityError as exc:
         if holdings_repository.is_active_ticker_conflict(exc):
@@ -571,7 +601,7 @@ def _require_editable_holding(
     """
     state_only_watchlist_change = bool(
         holding.is_watchlist
-        and data.model_fields_set == {"is_active"}
+        and data.model_fields_set - {"expected_shares", "expected_avg_cost"} == {"is_active"}
     )
     if state_only_watchlist_change:
         return
@@ -597,6 +627,30 @@ def _require_editable_holding(
     )
 
 
+def _require_holding_preconditions(
+    db: Session, holding: Holding, data: HoldingUpdate | HoldingRemoval
+) -> None:
+    """Check the client's saved baseline while the financial writer is reserved."""
+    if any(
+        expected is not None and expected != float(stored or 0.0)
+        for expected, stored in (
+            (data.expected_shares, holding.shares),
+            (data.expected_avg_cost, holding.avg_cost),
+        )
+    ):
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "holding_changed",
+                "message": (
+                    "This holding changed after you loaded it. No edit or sale was saved; "
+                    "refresh its saved values and review your changes again."
+                ),
+            },
+        )
+
+
 @router.put("/holdings/{holding_id}")
 def update_holding(
     holding_id: int,
@@ -619,8 +673,14 @@ def update_holding(
         db.rollback()
         raise HTTPException(status_code=404, detail="Holding not found")
 
+    _require_holding_preconditions(db, holding, data)
     _require_editable_holding(db, holding, data)
     _ensure_reactivation_available(db, portfolio_id, holding, data.is_active)
+    _require_finite_position(
+        db,
+        data.shares if data.shares is not None else float(holding.shares or 0.0),
+        data.avg_cost if data.avg_cost is not None else float(holding.avg_cost or 0.0),
+    )
 
     # A drop in share count is a sale → record the realized gain/loss first,
     # while we still know the old share count and avg cost. Watchlist (research
@@ -639,6 +699,9 @@ def update_holding(
                 holding, data.shares,
                 sale_price=data.sale_price, sale_date=data.sale_date,
             )
+        except realized_sales.FinancialArithmeticError as exc:
+            db.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except realized_sales.SalePriceUnavailable as exc:
             db.rollback()
             raise HTTPException(
@@ -714,6 +777,7 @@ def remove_holding(
         raise HTTPException(status_code=404, detail="Holding not found")
 
     # Watchlist (research-mode) holdings are discarded silently — no realized gain recorded.
+    _require_holding_preconditions(db, holding, removal)
     try:
         realized_sales.RealizedSaleLedger(
             db,
@@ -725,6 +789,9 @@ def remove_holding(
             sale_price=removal.sale_price,
             sale_date=removal.sale_date,
         )
+    except realized_sales.FinancialArithmeticError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except realized_sales.SalePriceUnavailable as exc:
         db.rollback()
         raise HTTPException(
@@ -740,6 +807,7 @@ def remove_holding(
         ) from exc
 
     holding.is_active = False
+    _require_finite_portfolio_totals(db, portfolio_id)
     db.commit()
     return {
         "ticker": holding.ticker,
@@ -780,6 +848,8 @@ def update_realized_trade(
                 sale_date=data.sale_date,
             ),
         )
+    except realized_sales.FinancialArithmeticError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except realized_sales.RealizedSaleNotFound as exc:
         raise HTTPException(
             status_code=404, detail="Realized trade not found"
@@ -836,6 +906,12 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id, record_snapshot=True)
     result = valuation.holdings
+    daily_ranked = [
+        holding for holding in result
+        if financial_currency.eligible_valuation_row(holding)
+        and isinstance(holding.get("day_change_pct"), (int, float))
+        and math.isfinite(holding["day_change_pct"])
+    ]
 
     return {
         "degraded": valuation.degraded,
@@ -855,7 +931,7 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
                     / (valuation.total_value - valuation.total_daily_change)
                 )
                 * 100
-                if valuation.total_value > 0
+                if valuation.total_value - valuation.total_daily_change != 0
                 else 0
             ),
             2,
@@ -868,14 +944,14 @@ def get_portfolio_value(portfolio_id: int = 1, db: Session = Depends(get_db)):
         "total_return_pct": valuation.total_return_pct,
         "best_performer": (
             max(
-                (h for h in result if not h.get("is_watchlist")),
+                daily_ranked,
                 key=lambda x: x["day_change_pct"],
                 default=None,
             )
         ),
         "worst_performer": (
             min(
-                (h for h in result if not h.get("is_watchlist")),
+                daily_ranked,
                 key=lambda x: x["day_change_pct"],
                 default=None,
             )
@@ -948,7 +1024,10 @@ def get_portfolio_projection(portfolio_id: int = 1, db: Session = Depends(get_db
     """
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id)
-    return get_cached_projection(valuation.holdings, valuation.total_value)
+    return get_cached_projection(
+        valuation.reporting_holdings,
+        valuation.total_value,
+    )
 
 
 @router.get("/risk-metrics")
@@ -956,7 +1035,7 @@ def get_portfolio_risk_metrics(portfolio_id: int = 1, db: Session = Depends(get_
     """Annualized return/volatility per holding plus portfolio and S&P 500 points."""
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id)
-    return compute_risk_metrics(valuation.holdings, valuation.total_value)
+    return compute_risk_metrics(valuation.reporting_holdings, valuation.total_value)
 
 
 @router.get("/correlation")
@@ -964,7 +1043,7 @@ def get_portfolio_correlation(portfolio_id: int = 1, db: Session = Depends(get_d
     """Daily-return correlation matrix for current holdings."""
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id)
-    return compute_correlation_matrix(valuation.holdings)
+    return compute_correlation_matrix(valuation.reporting_holdings)
 
 
 @router.get("/drawdown")
@@ -983,7 +1062,7 @@ def get_portfolio_contribution(
     """Per-holding contribution to portfolio P&L (day, week, or month)."""
     _require_portfolio(portfolio_id, db)
     valuation = portfolio_valuation.evaluate(db, portfolio_id)
-    return compute_contribution(valuation.holdings, period=period)
+    return compute_contribution(valuation.reporting_holdings, period=period)
 
 
 @router.get("/range-performance")
@@ -1008,7 +1087,7 @@ def get_portfolio_range_performance(
 def get_portfolio_market_context(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """World indices enriched with portfolio correlation and geographic alignment."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     return compute_market_context(result, get_world_markets_cached())
 
 
@@ -1016,7 +1095,7 @@ def get_portfolio_market_context(portfolio_id: int = 1, db: Session = Depends(ge
 def get_benchmark_comparison(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Portfolio vs S&P 500 cumulative return and alpha by range."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     return compute_benchmark_comparison(
         result,
         portfolio_valuation.snapshot_history(db, portfolio_id),
@@ -1034,7 +1113,7 @@ def get_return_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def get_portfolio_beta(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Portfolio beta vs S&P 500."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     return compute_portfolio_beta(result)
 
 
@@ -1042,7 +1121,7 @@ def get_portfolio_beta(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def get_rolling_volatility(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Trailing 30-day annualized volatility series."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     return compute_rolling_volatility(result)
 
 
@@ -1050,7 +1129,7 @@ def get_rolling_volatility(portfolio_id: int = 1, db: Session = Depends(get_db))
 def get_sector_tilt(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Sector overweight / underweight vs S&P 500."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     return compute_sector_tilt(result)
 
 
@@ -1058,7 +1137,7 @@ def get_sector_tilt(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def get_conviction_gaps(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Verdict vs position-size mismatches."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     scan = verdict_pipeline.scan_portfolio(db, portfolio_id, force_local=True)
     return compute_conviction_gaps(result, scan.signals or {})
 
@@ -1067,7 +1146,7 @@ def get_conviction_gaps(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def get_confidence_spectrum(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Allocation-weighted confidence distribution."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     scan = verdict_pipeline.scan_portfolio(db, portfolio_id, force_local=True)
     return compute_confidence_spectrum(result, scan.signals or {})
 
@@ -1144,5 +1223,5 @@ def get_income_calendar(portfolio_id: int = 1, db: Session = Depends(get_db)):
 def get_macro_alignment(portfolio_id: int = 1, db: Session = Depends(get_db)):
     """Index correlation vs geographic exposure scatter data."""
     _require_portfolio(portfolio_id, db)
-    result = portfolio_valuation.evaluate(db, portfolio_id).holdings
+    result = portfolio_valuation.evaluate(db, portfolio_id).reporting_holdings
     return compute_macro_alignment(result, get_world_markets_cached())

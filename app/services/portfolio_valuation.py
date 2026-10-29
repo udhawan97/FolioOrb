@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import math
 from typing import Callable
 
 from sqlalchemy import func
@@ -25,6 +26,19 @@ QuoteLoader = Callable[[list[str]], list[dict]]
 # foreign listing in its home currency — and London quotes in *pence*, not
 # pounds — so a quote that says anything else is not addable here.
 REPORTING_CURRENCY = financial_currency.REPORTING_CURRENCY
+
+
+class FinancialArithmeticError(ArithmeticError):
+    """Financial facts cannot be represented by finite reporting arithmetic."""
+
+
+def require_finite_amounts(*values: float) -> None:
+    """Refuse overflow in derived facts and aggregates without imposing value caps."""
+    if not all(value is not None and math.isfinite(value) for value in values):
+        raise FinancialArithmeticError(
+            "Financial totals exceed finite numeric arithmetic. "
+            "Review the position or sale amounts."
+        )
 
 
 @dataclass
@@ -54,6 +68,11 @@ class PortfolioValuation:  # pylint: disable=too-many-instance-attributes
     def degraded(self) -> bool:
         """Compatibility flag for the existing all-quotes-unavailable state."""
         return self.data_quality == "unavailable"
+
+    @property
+    def reporting_holdings(self) -> list[dict]:
+        """Priced USD positions for dollar consumers; ``holdings`` retains identity."""
+        return [row for row in self.holdings if financial_currency.eligible_valuation_row(row)]
 
 
 @dataclass
@@ -98,6 +117,7 @@ def _realized_stats(db: Session, portfolio_id: int) -> dict[str, dict]:
         item["realized_gain"] += float(trade.realized_gain or 0.0)
 
     for item in stats.values():
+        require_finite_amounts(*item.values())
         shares_sold = item["shares_sold"]
         cost_basis = item["cost_basis"]
         item["avg_sell_price"] = (
@@ -107,12 +127,13 @@ def _realized_stats(db: Session, portfolio_id: int) -> dict[str, dict]:
         item["total_return_pct"] = (
             item["realized_gain"] / cost_basis * 100 if cost_basis > 0 else None
         )
+        require_finite_amounts(*(value for value in item.values() if value is not None))
     return stats
 
 
 def _realized_gain(db: Session, portfolio_id: int) -> float:
-    total = (
-        db.query(func.coalesce(func.sum(RealizedTrade.realized_gain), 0.0))
+    count, total = (
+        db.query(func.count(RealizedTrade.id), func.sum(RealizedTrade.realized_gain))
         .filter(
             RealizedTrade.portfolio_id == portfolio_id,
             financial_currency.trusted_reporting_fact_clause(
@@ -120,9 +141,28 @@ def _realized_gain(db: Session, portfolio_id: int) -> float:
                 RealizedTrade.sale_price_source,
             ),
         )
-        .scalar()
+        .one()
     )
-    return round(float(total or 0.0), 2)
+    # Empty input is zero; NULL from populated financial data can mean overflow
+    # on SQLite and must not be mistaken for an empty ledger.
+    if count == 0:
+        return 0.0
+    require_finite_amounts(total)
+    return round(float(total), 2)
+
+
+def validate_stored_financial_totals(db: Session, portfolio_id: int) -> None:
+    """Validate pending stored facts before their transaction can commit."""
+    costs = [
+        float(holding.shares or 0.0) * float(holding.avg_cost or 0.0)
+        for holding in holdings_repository.active(db, portfolio_id)
+        if not holding.is_watchlist
+    ]
+    realized = _realized_stats(db, portfolio_id)
+    require_finite_amounts(
+        *costs, sum(costs) + sum(item["cost_basis"] for item in realized.values()),
+        _realized_gain(db, portfolio_id),
+    )
 
 
 def _excluded_realized_trade_count(db: Session, portfolio_id: int) -> int:
@@ -201,6 +241,10 @@ def _apply_snapshot(target: PortfolioSnapshot, valuation: PortfolioValuation) ->
 
 def stage_today_snapshot(db: Session, valuation: PortfolioValuation) -> PortfolioSnapshot:
     """Stage today's derived valuation without committing the caller's transaction."""
+    require_finite_amounts(
+        valuation.total_value, valuation.total_cost_basis, valuation.total_unrealized_gain,
+        valuation.realized_gain, valuation.total_return,
+    )
     snapshot = _today_snapshot(db, valuation.portfolio_id)
     if snapshot is None:
         snapshot = PortfolioSnapshot(
@@ -250,6 +294,7 @@ def evaluate(
     holdings = holdings_repository.active(db, portfolio_id)
     by_ticker = {str(holding.ticker): holding for holding in holdings}
     quotes = (quote_loader or get_portfolio_quotes)(list(by_ticker))
+    quotes_by_ticker = {str(quote.get("ticker") or ""): quote for quote in quotes}
     realized_stats = _realized_stats(db, portfolio_id)
     excluded_realized_trade_count = _excluded_realized_trade_count(
         db, portfolio_id
@@ -265,36 +310,60 @@ def evaluate(
     priced_tickers: set[str] = set()
     foreign_tickers: set[str] = set()
 
-    for quote in quotes:
-        if quote.get("error"):
-            continue
-        ticker = str(quote.get("ticker") or "")
-        holding = by_ticker.get(ticker)
-        if holding is None:
-            continue
-        current_price = _current_price(quote)
-        if current_price is None:
-            continue
+    for ticker, holding in by_ticker.items():
+        quote = quotes_by_ticker.get(ticker, {})
+        current_price = None if quote.get("error") else _current_price(quote)
         shares = float(holding.shares or 0.0)
         avg_cost = float(holding.avg_cost or 0.0)
         is_watchlist = bool(holding.is_watchlist)
-        currency = _quote_currency(quote)
+        currency = _quote_currency(quote) if current_price is not None else None
         # A price in another currency is not a dollar figure, so it cannot join
         # a dollar sum. The row is still built — the user owns the position and
         # should see it, priced as its own market prices it — but it stays out
         # of every total, exactly as an unpriceable quote does.
         addable = _is_reporting_currency(currency)
-        current_value = shares * current_price
-        daily_value_change = shares * float(quote.get("day_change") or 0.0)
+        current_value = shares * current_price if current_price is not None else None
         cost_basis = shares * avg_cost
-        unrealized_gain = current_value - cost_basis if cost_basis > 0 else 0.0
-        unrealized_gain_pct = unrealized_gain / cost_basis * 100 if cost_basis > 0 else 0.0
-        realized = realized_stats.get(ticker, {})
-        combined_cost_basis = cost_basis + float(realized.get("cost_basis") or 0.0)
-        combined_gain = unrealized_gain + float(realized.get("realized_gain") or 0.0)
-        total_return_pct = (
-            combined_gain / combined_cost_basis * 100 if combined_cost_basis > 0 else None
+        # Finite operands can still overflow; legacy rows and bad quotes must not
+        # poison JSON or create a nonfinite daily snapshot.
+        if not math.isfinite(cost_basis):
+            cost_basis = None
+        if current_value is not None and not math.isfinite(current_value):
+            current_price = current_value = currency = None
+            addable = False
+        day_change = float(quote.get("day_change") or 0.0)
+        day_change_pct = float(quote.get("day_change_pct") or 0.0)
+        day_change = day_change if current_price is not None and math.isfinite(day_change) else None
+        day_change_pct = (
+            day_change_pct
+            if current_price is not None and math.isfinite(day_change_pct) else None
         )
+        daily_value_change = shares * day_change if day_change is not None else None
+        if daily_value_change is not None and not math.isfinite(daily_value_change):
+            daily_value_change = None
+        addable = bool(addable and cost_basis is not None and daily_value_change is not None)
+        unrealized_gain = (
+            current_value - cost_basis if addable and cost_basis > 0 else
+            0.0 if addable else None
+        )
+        unrealized_gain_pct = (
+            unrealized_gain / cost_basis * 100 if addable and cost_basis > 0 else
+            0.0 if addable else None
+        )
+        realized = realized_stats.get(ticker, {})
+        combined_cost_basis = (cost_basis or 0.0) + float(realized.get("cost_basis") or 0.0)
+        combined_gain = (unrealized_gain or 0.0) + float(realized.get("realized_gain") or 0.0)
+        total_return_pct = (
+            combined_gain / combined_cost_basis * 100
+            if addable and combined_cost_basis > 0 else None
+        )
+
+        if any(value is not None and not math.isfinite(value) for value in (
+            unrealized_gain, unrealized_gain_pct, combined_cost_basis,
+            combined_gain, total_return_pct,
+        )):
+            addable = False
+            unrealized_gain = unrealized_gain_pct = total_return_pct = None
 
         if not is_watchlist and addable:
             total_value += current_value
@@ -302,7 +371,7 @@ def evaluate(
             total_cost_basis += cost_basis
             if shares > 0:
                 priced_tickers.add(ticker)
-        elif not is_watchlist and shares > 0:
+        elif not is_watchlist and shares > 0 and currency and not _is_reporting_currency(currency):
             foreign_tickers.add(ticker)
 
         rows.append(
@@ -310,21 +379,25 @@ def evaluate(
                 "ticker": ticker,
                 "id": holding.id,
                 "name": quote.get("name") or ticker,
-                "shares": shares,
+                "shares": shares if math.isfinite(shares) else None,
                 "current_price": current_price,
-                "avg_cost": round(avg_cost, 2),
-                "current_value": round(current_value, 2),
-                "cost_basis": round(cost_basis, 2),
-                "unrealized_gain": round(unrealized_gain, 2),
-                "unrealized_gain_pct": round(unrealized_gain_pct, 2),
+                "avg_cost": round(avg_cost, 2) if math.isfinite(avg_cost) else None,
+                "current_value": round(current_value, 2) if current_value is not None else None,
+                "cost_basis": round(cost_basis, 2) if cost_basis is not None else None,
+                "unrealized_gain": round(unrealized_gain, 2) if addable else None,
+                "unrealized_gain_pct": round(unrealized_gain_pct, 2) if addable else None,
                 "total_return_pct": (
                     round(total_return_pct, 2) if total_return_pct is not None else None
                 ),
-                "day_change": float(quote.get("day_change") or 0.0),
-                "day_change_pct": float(quote.get("day_change_pct") or 0.0),
-                "daily_value_change": round(daily_value_change, 2),
-                "allocation_pct": 0,
+                "day_change": day_change,
+                "day_change_pct": day_change_pct,
+                "daily_value_change": (
+                    round(daily_value_change, 2) if daily_value_change is not None else None
+                ),
+                "allocation_pct": 0 if addable else None,
                 "currency": currency,
+                "quote_available": current_price is not None,
+                "reporting_eligible": addable and not is_watchlist,
                 "is_watchlist": is_watchlist,
                 "hold_class": str(holding.hold_class or "auto"),
                 "notes": holding.notes,
@@ -338,7 +411,9 @@ def evaluate(
 
     def counts_toward_totals(row: dict) -> bool:
         """A row is part of the dollar totals only if it is priced in dollars."""
-        return not row["is_watchlist"] and _is_reporting_currency(row["currency"])
+        return financial_currency.eligible_valuation_row(row)
+
+    require_finite_amounts(total_value, total_daily_change, total_cost_basis)
 
     for row in rows:
         if total_value > 0 and counts_toward_totals(row):
@@ -374,6 +449,13 @@ def evaluate(
     )
     total_return_cost_basis = round(total_cost_basis + realized_cost_basis, 2)
     total_return = round(total_unrealized_gain + realized_gain, 2)
+    total_return_pct = (
+        total_return / total_return_cost_basis * 100 if total_return_cost_basis > 0 else 0.0
+    )
+    require_finite_amounts(
+        total_unrealized_gain, realized_gain, realized_cost_basis,
+        total_return_cost_basis, total_return, total_return_pct,
+    )
     valuation = PortfolioValuation(
         portfolio_id=portfolio_id,
         holdings=rows,
@@ -384,12 +466,7 @@ def evaluate(
         total_unrealized_gain=total_unrealized_gain,
         realized_gain=realized_gain,
         total_return=total_return,
-        total_return_pct=round(
-            total_return / total_return_cost_basis * 100
-            if total_return_cost_basis > 0
-            else 0.0,
-            2,
-        ),
+        total_return_pct=round(total_return_pct, 2),
         data_quality=data_quality,
         missing_tickers=missing_tickers,
         foreign_currency_tickers=foreign_currency_tickers,
@@ -408,7 +485,7 @@ def load_performance(
     db: Session,
     portfolio_id: int,
     *,
-    trade_limit: int = 100,
+    trade_limit: int | None = 100,
 ) -> PortfolioPerformance:
     """Load stored realized returns and daily history without fetching quotes."""
     realized_stats = _realized_stats(db, portfolio_id)
@@ -435,6 +512,12 @@ def load_performance(
         .order_by(PortfolioSnapshot.snapshot_date.asc())
         .all()
     )
+    for snapshot in snapshots:
+        require_finite_amounts(
+            float(snapshot.total_value or 0.0), float(snapshot.total_cost_basis or 0.0),
+            float(snapshot.unrealized_gain or 0.0), float(snapshot.realized_gain or 0.0),
+            float(snapshot.total_return or 0.0),
+        )
     return PortfolioPerformance(
         realized_gain=_realized_gain(db, portfolio_id),
         realized_by_ticker=realized_stats,
@@ -482,6 +565,7 @@ def snapshot_history(db: Session, portfolio_id: int) -> list[dict]:
         .order_by(PortfolioSnapshot.snapshot_date.asc())
         .all()
     )
+    require_finite_amounts(*(float(snapshot.total_value or 0.0) for snapshot in snapshots))
     return [
         {
             "date": snapshot.snapshot_date,

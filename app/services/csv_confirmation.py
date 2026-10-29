@@ -13,7 +13,10 @@ from sqlalchemy.exc import OperationalError
 
 from app.models import Holding, Portfolio
 from app.schemas import HoldingCreate
-from app.services import database_generation, holdings_csv, holdings_repository, write_serialization
+from app.services import (
+    database_generation, holdings_csv, holdings_repository, portfolio_valuation,
+    write_serialization,
+)
 
 TTL_SECONDS = 15 * 60
 MAX_PREVIEWS = 16
@@ -260,6 +263,7 @@ class PreviewStore:
             db.refresh(holding)
             if _values(holding) != row["values"]:
                 raise ValueError("Persisted fields differ from reviewed values")
+        portfolio_valuation.validate_stored_financial_totals(db, record["portfolio"]["id"])
         with self._context(db):
             pass  # fail closed on an observed file replacement before commit
         result = deepcopy(record["report"])

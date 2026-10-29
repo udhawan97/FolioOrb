@@ -25,6 +25,21 @@ keeps prices current without a manual reload.
 At phone widths the filter and action controls stack into a content-sized header, so the
 first holding row remains reachable without scrolling through a desktop-sized spacer.
 
+### Source candidate: incomplete prices
+
+Proposed for the next release: every saved row remains available through a price outage,
+including its details and management controls. Unknown prices and price comparisons say
+**Unavailable**. A partial book shows **Known USD value**; whole-portfolio return and
+allocation comparisons wait for complete coverage. Foreign price and value cells retain
+native units such as `GBp` or `CAD` and stay out of USD comparisons. A recovered quote
+updates the same holding rather than creating another row.
+
+In the same source candidate, holding edits save one request at a time. If a connection
+fails, FolioOrb reads back the saved holding and any affected realized history before a
+dependent edit or removal. Newer input stays on screen as an unsaved draft. If readback is
+unreachable, the save remains **Status unknown**; editing again checks the saved facts before
+sending another change. Cancelling a sale confirmation sends no sale request.
+
 <SenpaiTip>
 	Toggle Research mode when adding a ticker to follow the idea without treating it as money
 	you own — it stays out of P&L, allocation, largest-holding stats, briefings, and action-plan
@@ -112,8 +127,9 @@ straight back in.
 inspect up to 200 strict template rows for the selected portfolio, 25 rows per page. The table
 shows proposed persisted values and duplicate/validation/provider reasons. Cost 0 means an
 unknown cost under the existing storage convention; unset thesis cadence is shown as —.
-Unrecognized research flags still become false, and very large finite inputs can pass the
-existing rules. Preview does not calculate or approve portfolio totals.
+Unrecognized research flags still become false. Entered shares and costs, and shares
+multiplied by average cost, must be finite. Confirmation also checks stored financial totals
+before committing. Preview does not calculate or approve portfolio totals.
 
 **Confirm N additions** saves exactly the reviewed valid additions in one transaction;
 invalid/skipped rows stay excluded. A preview expires after 15 minutes, and the process keeps

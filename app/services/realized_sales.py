@@ -48,6 +48,9 @@ class RealizedSaleNotFound(LookupError):
     """The requested sale does not belong to the active portfolio."""
 
 
+FinancialArithmeticError = portfolio_valuation.FinancialArithmeticError
+
+
 class SalePriceUnavailable(ValueError):
     """A reduction cannot be priced as a trustworthy USD sale."""
 
@@ -146,18 +149,38 @@ class RealizedSaleLedger:
 
         stored_price = round(price, 2)
         stored_basis = round(basis, 2)
+        gain = (stored_price - stored_basis) * sold
+        if not all(math.isfinite(value) for value in (
+            sold * stored_price, sold * stored_basis, gain,
+        )):
+            raise FinancialArithmeticError(
+                "Sale amounts must produce finite proceeds, basis and gain"
+            )
         trade = RealizedTrade(
             portfolio_id=holding.portfolio_id,
             ticker=holding.ticker,
             shares_sold=sold,
             sale_price=stored_price,
             avg_cost=stored_basis,
-            realized_gain=round((stored_price - stored_basis) * sold, 2),
+            realized_gain=round(gain, 2),
             sale_currency=sale_currency,
             sale_price_source=sale_price_source,
         )
         if sale_date:
             trade.created_at = self._noon(sale_date)
+        performance = portfolio_valuation.load_performance(
+            self.db, self.portfolio_id, trade_limit=0
+        )
+        previous = performance.realized_by_ticker.get(str(holding.ticker), {})
+        portfolio_valuation.require_finite_amounts(
+            performance.realized_gain + gain,
+            sum(item["cost_basis"] for item in performance.realized_by_ticker.values())
+            + sold * stored_basis,
+            previous.get("shares_sold", 0.0) + sold,
+            previous.get("sale_proceeds", 0.0) + sold * stored_price,
+            previous.get("cost_basis", 0.0) + sold * stored_basis,
+            previous.get("realized_gain", 0.0) + gain,
+        )
         self.db.add(trade)
         return trade
 
@@ -207,6 +230,7 @@ class RealizedSaleLedger:
         # deletion visible to valuation before deriving today's snapshot, while
         # keeping both changes inside the same transaction.
         self.db.flush()
+        portfolio_valuation.validate_stored_financial_totals(self.db, self.portfolio_id)
         current_holdings = holdings_repository.active(self.db, self.portfolio_id)
         if (
             prefetched_quotes is None
@@ -222,6 +246,8 @@ class RealizedSaleLedger:
                 quote_loader=lambda _tickers: prefetched_quotes,
                 record_snapshot=False,
             )
+        except FinancialArithmeticError:
+            raise
         except Exception:  # pylint: disable=broad-except
             if not self.db.is_active:
                 raise
@@ -262,6 +288,14 @@ class RealizedSaleLedger:
                 * float(trade.shares_sold),
                 2,
             )
+            if not all(math.isfinite(value) for value in (
+                trade.shares_sold * trade.sale_price,
+                trade.shares_sold * trade.avg_cost,
+                trade.realized_gain,
+            )):
+                raise FinancialArithmeticError(
+                    "Sale amounts must produce finite proceeds, basis and gain"
+                )
             self._commit_with_today_snapshot(expected_holdings, quotes)
             return trade
         except Exception:

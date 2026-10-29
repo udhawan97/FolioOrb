@@ -213,11 +213,21 @@ def test_note_length_boundary(api_client, db, length, errors):
 
 def test_inherited_normalization_is_displayed(api_client, db):
     data = preview(
-        api_client, db, "ticker,shares,avg_cost,is_watchlist\nSYN,1e308,1e308,nonsense\n"
+        api_client, db, "ticker,shares,avg_cost,is_watchlist\nSYN,1e150,1e150,nonsense\n"
     ).json()
     assert data["would_add"] == 1
-    assert data["rows"][0]["values"]["shares"] == 1e308
+    assert data["rows"][0]["values"]["shares"] == 1e150
     assert data["rows"][0]["values"]["is_watchlist"] is False
+
+
+def test_preview_rejects_position_product_overflow_before_provider(api_client, db, validator):
+    response = preview(api_client, db, "ticker,shares,avg_cost\nSYN,1e308,1e308\n")
+    assert response.status_code == 200
+    data = response.json()
+    assert (data["would_add"], data["skipped"], data["errors"]) == (0, 0, 1)
+    assert data["rows"][0]["status"] == "error"
+    assert "finite" in data["rows"][0]["reason"]
+    assert validator == []
 
 
 @pytest.mark.parametrize(

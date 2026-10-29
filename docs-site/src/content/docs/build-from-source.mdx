@@ -71,12 +71,20 @@ Set `FOLIO_REF` to install a specific `v5.16.0` or newer tag, or the dev channel
 `curl -fsSL https://raw.githubusercontent.com/udhawan97/FolioOrb/main/scripts/install-mac.sh | FOLIO_REF=latest-main bash`
 on macOS/Linux, or `$env:FOLIO_REF = "latest-main"` before the Windows command.
 
+If the latest stable release lookup fails or returns no tag, the scripts stop before
+downloading a source archive, changing the profile, or replacing existing code. Retry or
+set an explicit supported `FOLIO_REF`. Development code is selected only when you choose
+its ref explicitly.
+
 Unlike a manual clone, a one-line install stores its entire writable profile outside the
 replaceable source directory. When upgrading an older source install, the installer uses
 SQLite's backup API to migrate the database together with `.env`, Backup Vault, settings,
 backup policy, update state, and logs. It also retains the prior install as a recovery copy;
 if both old and new profile locations already contain data, it stops without choosing or
-overwriting either one.
+overwriting either one. Quit the source app before upgrading: the installer holds exclusive
+profile ownership through the snapshot and code replacement. Launchers too old to honor that
+ownership are refused; keep the original source/profile intact and use a verified manual
+backup/profile migration before replacement.
 
 ## Build the desktop installers
 

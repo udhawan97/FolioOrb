@@ -77,6 +77,20 @@ that number; it is not mislabeled as a time-weighted investment return. The exac
 opening-snapshot date appears beside the comparison, and history is marked partial when that
 snapshot is more than three days from the requested month or quarter boundary.
 
+### Source candidate: incomplete valuation
+
+Proposed for the next release: when required USD prices are missing or foreign-priced,
+the full current value, return, and value change remain **Unavailable** beside a labelled
+known USD subtotal. Missing and foreign-priced tickers are named. Independent realized
+facts remain available, including a genuine zero; an empty portfolio also retains its
+legitimate zero. Period accounting includes every eligible sale, even when the ordinary
+trade display is limited to its latest 100 rows. HTML, CSV, and Review Bundle exports use
+the same report values and exclusions.
+
+Month and Quarter requests keep the newest selection in control. While another period loads
+or fails, retained data identifies its actual period; an older response cannot replace the
+latest report.
+
 ### Review Bundle with a manifest
 
 <Aside type="note" title="Shipped in v5.16.0">
@@ -220,6 +234,11 @@ Compare is deliberately limited to active **Research mode** rows:
 
 Mixed stock/ETF selections and owned-position tickers are rejected instead of being forced
 into one misleading table. Missing provider fields render as unavailable.
+
+**Source candidate, proposed for the next release:** Compare retains native quote units,
+including `GBp` for pence and `CAD` for Canadian dollars. It shows ETF category and concentration
+as text. Market cap and AUM remain provider magnitudes with currency unverified, so those
+figures are not labelled as USD or converted.
 
 ## Local Backup Vault
 

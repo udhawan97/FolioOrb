@@ -34,19 +34,6 @@ from app.services.update_service import UpdateStatus
 
 logger = logging.getLogger(__name__)
 
-# Statuses that mean an update download/verify/backup/install is actively in
-# flight. Rollback refuses to start while one of these is active — running
-# both at once would interleave writes to update_service's shared state and
-# could overlap two OS-level install handoffs.
-_BUSY_STATUSES = {
-    UpdateStatus.DOWNLOADING.value,
-    UpdateStatus.VERIFYING.value,
-    UpdateStatus.BACKING_UP.value,
-    UpdateStatus.INSTALLING.value,
-    UpdateStatus.ROLLBACK_PENDING.value,
-}
-
-
 def _rollback_point() -> dict | None:
     from app import app_settings
 
@@ -65,21 +52,18 @@ def can_rollback() -> bool:
 
 def rollback(restore_data: bool = False) -> dict:  # pylint: disable=too-many-return-statements
     """Roll back to the previous version. See module docstring for the contract."""
-    current = update_service.get_state()
-    if current.get("status") in _BUSY_STATUSES:
-        return update_service.mark(
-            UpdateStatus.ERROR,
-            error="An update is already in progress. Wait for it to finish before restoring "
-            "a previous version.",
-        )
+    # An explicit rollback may replace a downloaded update; checks may not.
+    claimed, state = update_service.claim(UpdateStatus.BACKING_UP, expected=UpdateStatus.READY)
+    if not claimed:
+        claimed, state = update_service.claim(UpdateStatus.BACKING_UP)
+    if not claimed:
+        return state
 
     rollback_point = _rollback_point()
     if not rollback_point or not rollback_point.get("db_backup"):
         return update_service.mark(
             UpdateStatus.ERROR, error="There's no previous version to restore."
         )
-
-    update_service.mark(UpdateStatus.BACKING_UP)
 
     # 1. Always snapshot current data first — nothing newer is ever lost.
     try:
@@ -110,7 +94,7 @@ def rollback(restore_data: bool = False) -> dict:  # pylint: disable=too-many-re
     try:
         if update_downloader.compute_sha256(installer) != installer_digest:
             raise ValueError("Verified installer changed before handoff")
-        update_installer.launch_installer(installer)
+        update_installer.launch_installer(installer, installer_digest)
     except Exception:  # pylint: disable=broad-except
         logger.exception("Failed to launch rollback installer")
         return update_service.mark(
