@@ -61,6 +61,10 @@
         if (storage.getItem(KEY) !== null) throw new Error("Recovery metadata could not be cleared.");
         recovery = null;
     }
+    function comparisonIsKnown() {
+        return comparison && comparison.unknown === 0
+            && comparison.rows.every(row => ["matching", "mismatching"].includes(row.status));
+    }
     function syncControls() {
         choose.disabled = working || confirming || invalidMarker;
         choose.textContent = recovery ? "Choose reviewed CSV…" : "Preview CSV…";
@@ -74,8 +78,8 @@
         if (recoveryBox) recoveryBox.hidden = !recovery && !invalidMarker;
         if (reconcileButton) reconcileButton.disabled = working || confirming || !file
             || recovery?.portfolio_id !== workspace.id || invalidMarker;
-        if (acknowledge) acknowledge.disabled = !comparison || comparison.unknown > 0 || confirming;
-        if (fresh) fresh.disabled = working || confirming || !comparison || comparison.unknown > 0
+        if (acknowledge) acknowledge.disabled = !comparisonIsKnown() || confirming;
+        if (fresh) fresh.disabled = working || confirming || !comparisonIsKnown()
             || !acknowledge?.checked;
     }
     function announce(text, title) {
@@ -260,7 +264,8 @@
             || !Array.isArray(data.rows)
             || !equal(data.rows.map(row => row.row), metadata.reviewed_rows)
             || ![data.matching, data.mismatching, data.unknown].every(n => Number.isInteger(n) && n >= 0)
-            || data.matching + data.mismatching + data.unknown !== data.rows.length
+            || ["matching", "mismatching", "unknown"].some(statusName =>
+                data[statusName] !== data.rows.filter(row => row.status === statusName).length)
             || data.rows.some(row => !["matching", "mismatching", "unknown"].includes(row.status)
                 || !row.expected || !fields.every(field => Object.hasOwn(row.expected, field))
                 || (row.current !== null && (!row.current || !fields.every(field => Object.hasOwn(row.current, field))))
@@ -346,7 +351,7 @@
         }
     }
     function startFresh() {
-        if (!comparison || comparison.unknown || !acknowledge?.checked || working || confirming) return;
+        if (!comparisonIsKnown() || !acknowledge?.checked || working || confirming) return;
         try { forget(); } catch (_) { recoveryMessage("Recovery metadata could not be cleared."); return; }
         file = null; cancel();
     }

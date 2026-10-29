@@ -435,3 +435,18 @@ test("unavailable crypto keeps the preview read-only", async () => {
         Object.defineProperty(globalThis, "crypto", descriptor);
     }
 });
+
+test("misleading comparison summaries cannot unlock unknown rows", async () => {
+    const report = confirmable(), memory = storage();
+    memory.setItem(MARKER, JSON.stringify(marker(report)));
+    const malformed = comparison(report, "unknown");
+    malformed.unknown = 0;
+    malformed.mismatching = malformed.rows.length;
+    const ui = setup(async () => ok(malformed), { storage: memory });
+    await ui.controller.start(file());
+    assert.equal(ui.get("acknowledge").disabled, true);
+    assert.equal(ui.get("fresh").disabled, true);
+    ui.get("acknowledge").checked = true;
+    await ui.controller.startFresh();
+    assert.ok(memory.getItem(MARKER), "unknown rows must retain recovery metadata");
+});

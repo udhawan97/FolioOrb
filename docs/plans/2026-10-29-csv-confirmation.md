@@ -72,3 +72,8 @@ Combined local checks: 2,201 Python3.12 tests passed, 38 platform/PowerShell cas
 ### Implementation council correction
 
 Round1 found that JSON-serializable corrupt stored fields were treated as known mismatches. Six red regression cases reproduced negative shares/cost, invalid class/cadence, product overflow and overlong notes. Reconciliation now checks a copy through existing HoldingCreate and requires its persisted representation to match exactly, allowing only the established zero-cost input representation and legacy ticker casing. Invalid fields yield unknown/current null, with no database write. Stored unknown cost0 and unset cadence remain comparable. Forty-four confirmation cases and the existing unknown-state UI hold passed; disposable restarted-source Safari at390px showed1unknown with acknowledgement/fresh disabled and the recovery marker retained. Full corrected-source verification and final council remain required before integration.
+
+
+### Final implementation-review protocol correction
+
+A malformed comparison summary could claim zero unknown rows despite unknown row statuses. The adversarial Node test reproduced acknowledgement becoming enabled. Comparison now verifies each status count against actual rows, and acknowledgement/fresh eligibility independently requires every row to be matching or mismatching. The recovery marker remains under direct startFresh invocation. Full Node178tests and54focused Python confirmation/UI/continuity cases passed; no backend product change after the full2208Python pass. Fresh exact-head hosted checks and targeted reviewer closure remain integration gates.
