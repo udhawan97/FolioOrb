@@ -70,6 +70,13 @@ def local_database_selection(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
 
+@pytest.fixture(autouse=True, params=["native", "contents"])
+def cutover_mode(request, monkeypatch):
+    """Exercise Windows content transactions locally as well as the native path."""
+    if request.param == "contents":
+        monkeypatch.setattr(migrator, "WINDOWS_CONTENT_CUTOVER", True)
+
+
 def test_cutover_refuses_runtime_owner_before_snapshot_or_publication(tmp_path):
     source, destination = tmp_path / "source", tmp_path / "profile"
     database = _source(source)
@@ -112,20 +119,31 @@ def test_cutover_keeps_profile_leases_until_replacement_is_visible(tmp_path, mon
     source, destination = tmp_path / "source", tmp_path / "profile"
     _source(source)
     replacement = _replacement(tmp_path / "extracted")
-    rename = Path.rename
+    publish = migrator._publish_replacement
+    backup = migrator._backup_database
     observations = []
+    lease_identity = []
 
-    def inspect_leases(path, target):
-        if path == replacement:
-            moved_source = next(tmp_path.glob("source-profile-recovery-*"))
-            for root in (moved_source, destination):
-                with pytest.raises(RuntimeError, match="Quit the open"):
-                    with migrator._profile_lease(root):
-                        pytest.fail("Cutover released its profile lease early")
-            observations.append(True)
-        return rename(path, target)
+    def remember_lease(live, target):
+        lease_identity.append((source / ".runtime.lock").stat().st_ino)
+        return backup(live, target)
 
-    monkeypatch.setattr(Path, "rename", inspect_leases)
+    def inspect_leases(extracted, target, moved_entries=None):
+        moved_source = next(tmp_path.glob("source-profile-recovery-*"))
+        held_source = source if source.exists() else moved_source
+        assert (held_source / ".runtime.lock").stat().st_ino == lease_identity[0]
+        roots = [moved_source, destination]
+        if source.exists():
+            roots.append(source)
+        for root in roots:
+            with pytest.raises(RuntimeError, match="Quit the open"):
+                with migrator._profile_lease(root):
+                    pytest.fail("Cutover released its profile lease early")
+        observations.append(True)
+        return publish(extracted, target, moved_entries)
+
+    monkeypatch.setattr(migrator, "_publish_replacement", inspect_leases)
+    monkeypatch.setattr(migrator, "_backup_database", remember_lease)
     migrator.install_source(source, destination, replacement, tmp_path / "cutover.json")
     assert observations == [True]
 
@@ -134,14 +152,10 @@ def test_failed_source_replacement_restores_old_tree_and_preserves_snapshot(tmp_
     source, destination = tmp_path / "source", tmp_path / "profile"
     database = _source(source)
     replacement = _replacement(tmp_path / "extracted")
-    rename = Path.rename
+    def refuse_replacement(*_args):
+        raise OSError("Fixture replacement failure")
 
-    def refuse_replacement(path, target):
-        if path == replacement:
-            raise OSError("Fixture replacement failure")
-        return rename(path, target)
-
-    monkeypatch.setattr(Path, "rename", refuse_replacement)
+    monkeypatch.setattr(migrator, "_publish_replacement", refuse_replacement)
     with pytest.raises(OSError, match="Fixture replacement failure"):
         migrator.install_source(source, destination, replacement, tmp_path / "cutover.json")
     assert _rows(database) == _rows(destination / "database" / "portfolio.db") == [("LATEST",)]
@@ -211,3 +225,84 @@ def test_failed_receipt_rolls_back_fresh_source_publication(tmp_path):
         migrator.install_source(source, destination, replacement, tmp_path / "absent" / "receipt")
     assert not source.exists() and replacement.exists()
     assert destination.is_dir()
+
+
+def test_content_cutover_partial_publication_restores_every_old_fact(tmp_path, monkeypatch):
+    monkeypatch.setattr(migrator, "WINDOWS_CONTENT_CUTOVER", True)
+    source, destination = tmp_path / "source", tmp_path / "profile"
+    database = _source(source)
+    (source / "old-only.txt").write_text("original source fact\n")
+    replacement = _replacement(tmp_path / "extracted")
+    (replacement / "second.txt").write_text("new source fact\n")
+    original_rename = Path.rename
+    publication_moves = []
+
+    def fail_second_entry(path, target):
+        if path.parent == replacement:
+            if publication_moves:
+                raise OSError("Fixture partial publication failure")
+            result = original_rename(path, target)
+            publication_moves.append(path.name)
+            return result
+        return original_rename(path, target)
+
+    monkeypatch.setattr(Path, "rename", fail_second_entry)
+    with pytest.raises(OSError, match="Fixture partial publication failure"):
+        migrator.install_source(source, destination, replacement, tmp_path / "receipt.json")
+    assert _rows(database) == _rows(destination / "database" / "portfolio.db") == [("LATEST",)]
+    assert (source / "old-only.txt").read_text() == "original source fact\n"
+    assert (source / "run.py").read_text() == "backup_service.acquire_profile_lock()\n"
+    assert not (source / ".source-profile-path").exists()
+    assert (replacement / "run.py").read_text() == "# replacement fixture\n"
+    assert (replacement / "second.txt").read_text() == "new source fact\n"
+    assert len(publication_moves) == 1
+    assert not list(tmp_path.glob("source-profile-recovery-*"))
+
+
+def test_content_cutover_receipt_failure_restores_existing_pointer(tmp_path, monkeypatch):
+    monkeypatch.setattr(migrator, "WINDOWS_CONTENT_CUTOVER", True)
+    source, destination = tmp_path / "source", tmp_path / "profile"
+    database = _source(destination)
+    source.mkdir()
+    (source / "run.py").write_text("backup_service.acquire_profile_lock()\n")
+    pointer = source / ".source-profile-path"
+    pointer.write_text(str(destination))
+    replacement = _replacement(tmp_path / "extracted")
+    with pytest.raises(OSError):
+        migrator.install_source(source, destination, replacement, tmp_path / "absent" / "receipt")
+    assert pointer.read_text() == str(destination)
+    assert (source / "run.py").read_text() == "backup_service.acquire_profile_lock()\n"
+    assert (replacement / "run.py").read_text() == "# replacement fixture\n"
+    assert _rows(database) == [("LATEST",)]
+    assert not list(tmp_path.glob("source-update-rollback-*"))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Requires Windows directory-handle semantics")
+def test_windows_open_child_blocks_ancestor_rename_even_with_delete_sharing(tmp_path):
+    import ctypes
+    from ctypes import wintypes
+
+    source = tmp_path / "source"
+    source.mkdir()
+    recovery = tmp_path / "retained"
+    # No SQLite or fixture database is involved: isolate the CreateFileW child
+    # handle from all other possible sources of a directory rename refusal.
+    # https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel.CreateFileW
+    create_file.argtypes = (
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+    )
+    create_file.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = create_file(str(source / ".runtime.lock"), 0xC0000000, 0x7, None, 4, 0x80, None)
+    assert handle != wintypes.HANDLE(-1).value, ctypes.get_last_error()
+    try:
+        with pytest.raises(PermissionError):
+            source.rename(recovery)
+    finally:
+        assert kernel.CloseHandle(handle)
+    source.rename(recovery)
+    assert (recovery / ".runtime.lock").is_file()

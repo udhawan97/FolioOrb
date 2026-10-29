@@ -37,6 +37,7 @@ PROFILE_ENTRIES = (
 PROFILE_MARKER = ".source-profile-v1"
 DATABASE_NAME = "portfolio.db"
 DATABASE_URL_PREFIX = "sqlite:///"
+WINDOWS_CONTENT_CUTOVER = os.name == "nt"
 
 
 def _dotenv_database_url(env_path: Path) -> str | None:
@@ -202,31 +203,10 @@ def _existing_destination_status(
     return None
 
 
-def _open_lease(path: Path):
-    """Allow the installer to rename its own locked tree on Windows."""
-    if os.name != "nt":
-        return path.open("a+b")
-    import ctypes
-    import msvcrt
-    from ctypes import wintypes
-
-    create_file = ctypes.windll.kernel32.CreateFileW
-    create_file.argtypes = (
-        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
-        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
-    )
-    create_file.restype = wintypes.HANDLE
-    # FILE_SHARE_DELETE lets this handle survive the source-directory rename.
-    handle = create_file(str(path), 0xC0000000, 0x7, None, 4, 0x80, None)
-    if handle == wintypes.HANDLE(-1).value:
-        raise ctypes.WinError()
-    return os.fdopen(msvcrt.open_osfhandle(handle, os.O_RDWR), "a+b")
-
-
 @contextmanager
 def _profile_lease(root: Path):
     """Use the launcher's .runtime.lock contract without importing app dependencies."""
-    with _open_lease(root / ".runtime.lock") as handle:
+    with (root / ".runtime.lock").open("a+b") as handle:
         try:
             if os.name == "nt":
                 import msvcrt
@@ -356,6 +336,68 @@ def _migrate(source: Path, destination: Path) -> str:
     return "MIGRATED" if has_legacy_profile else "READY"
 
 
+def _publish_replacement(replacement: Path, source: Path, moved_entries=None) -> None:
+    """Publish extracted code; Windows retains the source directory's held lease."""
+    if moved_entries is None:
+        replacement.rename(source)
+        return
+    for entry in replacement.iterdir():
+        if entry.name == ".runtime.lock":
+            # Runtime leases belong to the running installer, never an archive.
+            continue
+        target = source / entry.name
+        entry.rename(target)
+        moved_entries.append((entry, target))
+
+
+def _windows_cutover(source: Path, replacement: Path, recovery: Path,
+                     receipt: Path, status: str) -> None:
+    """Move contents while source, recovery and durable-profile leases stay held.
+
+    Windows refuses to rename a directory containing an open child handle, even
+    when that child allows FILE_SHARE_DELETE. Keep .runtime.lock in its original
+    directory and move every other entry, with a separately leased recovery tree.
+    """
+    existed = source.exists()
+    old_entries = []
+    installed_entries = []
+    with ExitStack() as leases:
+        if existed:
+            recovery.mkdir()
+            leases.enter_context(_profile_lease(recovery))
+        else:
+            source.mkdir()
+            leases.enter_context(_profile_lease(source))
+        try:
+            if existed:
+                for entry in source.iterdir():
+                    if entry.name == ".runtime.lock":
+                        continue
+                    target = recovery / entry.name
+                    entry.rename(target)
+                    old_entries.append((entry, target))
+            _publish_replacement(replacement, source, installed_entries)
+            # No profile facts are excluded. An archive's ephemeral lease is not
+            # published over the live source lease or retained as user data.
+            (replacement / ".runtime.lock").unlink(missing_ok=True)
+            replacement.rmdir()
+            receipt.write_text(json.dumps({
+                "status": status, "recovery": str(recovery) if existed else None,
+            }) + "\n", encoding="utf-8")
+        except OSError:
+            replacement.mkdir(exist_ok=True)
+            for original, installed in reversed(installed_entries):
+                installed.rename(original)
+            for original, retained in reversed(old_entries):
+                retained.rename(original)
+            # All original facts are restored before releasing either lease.
+            leases.close()
+            empty_root = recovery if existed else source
+            (empty_root / ".runtime.lock").unlink(missing_ok=True)
+            empty_root.rmdir()
+            raise
+
+
 def install_source(source: Path, destination: Path, replacement: Path, receipt: Path) -> str:
     """Keep the old profile leased until the new source points at its durable copy."""
     source, destination = source.expanduser().resolve(), destination.expanduser().resolve()
@@ -374,13 +416,16 @@ def install_source(source: Path, destination: Path, replacement: Path, receipt: 
         # Windows cannot rename a tree with SQLite handles open; the app lease stays held.
         if connection is not None:
             connection.close()
+        if WINDOWS_CONTENT_CUTOVER:
+            _windows_cutover(source, replacement, recovery, receipt, status)
+            return status
         moved = False
         installed = False
         try:
             if source.exists():
                 source.rename(recovery)
                 moved = True
-            replacement.rename(source)
+            _publish_replacement(replacement, source)
             installed = True
             receipt.write_text(json.dumps({
                 "status": status, "recovery": str(recovery) if moved else None,
