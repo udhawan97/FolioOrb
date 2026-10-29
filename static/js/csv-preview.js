@@ -62,7 +62,7 @@
             const resultLabel = (row.status === "would_add" ? "Would add" : row.status)
                 + (row.normalized ? "" : " (supplied text)");
             for (const value of [row.row, resultLabel,
-                row.ticker, values.shares, values.avg_cost, values.is_watchlist,
+                row.normalized ? row.ticker : values.ticker, values.shares, values.avg_cost, values.is_watchlist,
                 values.hold_class, values.notes, row.reason]) {
                 const td = document.createElement("td");
                 td.textContent = value === null || value === undefined || value === "" ? "—" : String(value);

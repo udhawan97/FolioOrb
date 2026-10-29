@@ -132,6 +132,7 @@ test("invalid input is labeled supplied text while provider errors retain normal
     report.would_add = 0; report.errors = 2;
     report.rows[0].status = "error"; report.rows[0].normalized = false;
     report.rows[0].values.shares = "NaN";
+    report.rows[0].ticker = "BAD"; report.rows[0].values.ticker = " bad ";
     report.rows[0].reason = "Input should be a finite number";
     report.rows[1].status = "error";
     report.rows[1].reason = "Could not validate: symbol may be invalid or the provider unavailable.";
@@ -139,6 +140,7 @@ test("invalid input is labeled supplied text while provider errors retain normal
     await ui.controller.start(file());
     const rows = ui.get("table").children[0].children[2].children;
     assert.equal(rows[0].children[1].textContent, "error (supplied text)");
+    assert.equal(rows[0].children[2].textContent, " bad ");
     assert.equal(rows[0].children[3].textContent, "NaN");
     assert.equal(rows[1].children[1].textContent, "error");
     assert.equal(rows[1].children[3].textContent, "1");
