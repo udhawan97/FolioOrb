@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from datetime import date
 from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
 
@@ -227,4 +227,27 @@ class DcaBulkAction(BaseModel):
     def unique_contribution_ids(cls, value):
         if len(value) != len(set(value)):
             raise ValueError("contribution_ids must be unique")
+        return value
+
+
+class CsvConfirmation(BaseModel):
+    model_config = {"extra": "forbid"}
+    token: str = Field(min_length=43, max_length=43, pattern=r"^[A-Za-z0-9_-]+$")
+    normalized_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CsvReconciliation(BaseModel):
+    model_config = {"extra": "forbid"}
+    portfolio_id: PositiveInt
+    input_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    normalized_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reviewed_rows: list[Annotated[int, Field(strict=True, ge=2, le=201)]] = Field(
+        min_length=1, max_length=200
+    )
+
+    @field_validator("reviewed_rows")
+    @classmethod
+    def unique_rows(cls, value):
+        if value != sorted(set(value)):
+            raise ValueError("Reviewed rows must be unique and ordered")
         return value

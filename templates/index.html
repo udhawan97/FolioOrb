@@ -2986,6 +2986,16 @@
                         <h4 id="csv-preview-heading" tabindex="-1">CSV preview — nothing saved</h4>
                         <p id="csv-preview-status" role="status" aria-live="polite"></p>
                         <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-close">Close preview</button>
+                        <button type="button" class="btn btn-success btn-sm" id="csv-preview-confirm" hidden>Confirm additions</button>
+                        <p class="import-mode-body">Confirmation saves only the reviewed valid additions together.
+                            Closing during confirmation does not undo a save. If the outcome is uncertain,
+                            compare the original CSV before another import; no automatic retry is sent.</p>
+                        <div id="csv-preview-recovery" hidden>
+                            <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-reconcile">Refresh and compare reviewed rows</button>
+                            <label class="import-mode-body"><input type="checkbox" id="csv-preview-acknowledge" disabled>
+                                I inspected the current records and compared every reviewed field.</label>
+                            <button type="button" class="btn btn-sm manage-io-btn" id="csv-preview-fresh" disabled>Start a fresh preview</button>
+                        </div>
                         <div id="csv-preview-table" class="csv-preview-table" tabindex="0"
                              role="region" aria-label="CSV preview rows"></div>
                         <div id="csv-preview-paging" class="import-actions" hidden>
