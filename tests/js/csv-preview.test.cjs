@@ -125,3 +125,22 @@ test("HTTP and network failures stay explicit with no saved-success UI", async (
         assert.equal(ui.get("table").textContent, "");
     }
 });
+
+
+test("invalid input is labeled supplied text while provider errors retain normalized values", async () => {
+    const report = data();
+    report.would_add = 0; report.errors = 2;
+    report.rows[0].status = "error"; report.rows[0].normalized = false;
+    report.rows[0].values.shares = "NaN";
+    report.rows[0].reason = "Input should be a finite number";
+    report.rows[1].status = "error";
+    report.rows[1].reason = "Could not validate: symbol may be invalid or the provider unavailable.";
+    const ui = setup(async () => ({ ok: true, json: async () => report }));
+    await ui.controller.start(file());
+    const rows = ui.get("table").children[0].children[2].children;
+    assert.equal(rows[0].children[1].textContent, "error (supplied text)");
+    assert.equal(rows[0].children[3].textContent, "NaN");
+    assert.equal(rows[1].children[1].textContent, "error");
+    assert.equal(rows[1].children[3].textContent, "1");
+    assert.match(ui.get("table").textContent, /Values are normalized unless Result says supplied text/);
+});

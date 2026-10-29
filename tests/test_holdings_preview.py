@@ -185,6 +185,16 @@ def test_row_cap_boundary_and_all_rows_available(api_client, db, validator):
     assert not validator
 
 
+def test_exact_byte_cap_reaches_normal_validation(api_client, db, validator):
+    base = b"ticker,shares\nSYN,1\n"
+    text = base + b"\n" * (holdings_csv.MAX_IMPORT_BYTES - len(base))
+    assert len(text) == holdings_csv.MAX_IMPORT_BYTES
+    response = preview(api_client, db, text)
+    assert response.status_code == 200
+    assert response.json()["would_add"] == 1
+    assert validator == ["SYN"]
+
+
 @pytest.mark.parametrize("prefix", ["", "\ufeff"])
 def test_quoted_and_multiline_notes_and_bom(api_client, db, prefix):
     output = io.StringIO()

@@ -42,7 +42,7 @@
     function renderPage() {
         const table = document.createElement("table");
         const caption = document.createElement("caption");
-        caption.textContent = "Normalized values where validation succeeded; otherwise supplied text. "
+        caption.textContent = "Values are normalized unless Result says supplied text. "
             + "Snapshot " + report.snapshot_at;
         table.append(caption);
         const header = document.createElement("tr");
@@ -59,7 +59,9 @@
         for (const row of report.rows.slice(page * 25, (page + 1) * 25)) {
             const tr = document.createElement("tr");
             const values = row.values || {};
-            for (const value of [row.row, row.status === "would_add" ? "Would add" : row.status,
+            const resultLabel = (row.status === "would_add" ? "Would add" : row.status)
+                + (row.normalized ? "" : " (supplied text)");
+            for (const value of [row.row, resultLabel,
                 row.ticker, values.shares, values.avg_cost, values.is_watchlist,
                 values.hold_class, values.notes, row.reason]) {
                 const td = document.createElement("td");
