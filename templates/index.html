@@ -2981,7 +2981,8 @@
                     <p class="import-mode-body">Preview CSV only: template columns, up to 200 rows, nothing saved.
                         Ticker symbols may be sent to Yahoo Finance for validation; the full CSV and notes
                         are not sent to Yahoo or Claude. This uses existing import rules: unrecognized
-                        research flags become false, and finite amounts have no maximum magnitude limit.</p>
+                        research flags become false. Entered amounts and shares multiplied by average cost
+                        must remain finite; preview does not calculate portfolio totals.</p>
                     <section id="csv-preview-result" class="csv-preview-result" hidden
                              aria-labelledby="csv-preview-heading" aria-busy="false">
                         <h4 id="csv-preview-heading" tabindex="-1">CSV preview — nothing saved</h4>

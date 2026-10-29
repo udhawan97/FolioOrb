@@ -128,8 +128,8 @@ up to 200 strict template rows for the selected portfolio. The table shows norma
 values and any duplicate, validation or provider-availability reasons, 25 rows at a time.
 Use **Previous rows** / **Next rows** to inspect all rows. **Close preview** discards it;
 no holdings, trades, targets or snapshots are saved. Research flags that are not recognized
-normalize to false, so check the displayed values. Very large finite amounts can pass
-existing input rules; preview does not calculate or approve portfolio totals.
+normalize to false, so check the displayed values. Entered shares and costs, and shares
+multiplied by average cost, must be finite. Preview does not calculate or approve portfolio totals.
 
 Preview parses locally and never calls Claude. Ticker validation may send symbols to Yahoo
 Finance; the full CSV and notes are not sent there. A preview is a point-in-time snapshot.
