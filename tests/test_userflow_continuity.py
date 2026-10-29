@@ -39,8 +39,15 @@ def test_portfolio_manager_is_modal_and_owns_keyboard_focus():
 def test_research_ideas_do_not_fill_invested_overview_or_projection_ui():
     html, js, _css = _sources()
 
-    assert "const investedHoldings = data.holdings.filter" in js
-    assert "!h.is_watchlist && toNumber(h.shares) > 0" in js
+    assert "const investedHoldings = data.holdings.filter(isReportingHolding)" in js
+    eligibility = js.split("function isReportingHolding(holding)", maxsplit=1)[1].split(
+        "\n}", maxsplit=1
+    )[0]
+    assert "!holding.is_watchlist" in eligibility
+    assert "holding.reporting_eligible !== false" in eligibility
+    assert "holding.quote_available !== false" in eligibility
+    assert "isFiniteNumber(holding.current_value)" in eligibility
+    assert "Number(holding.current_value) > 0" in eligibility
     assert "summary.hidden = !latestProjectionData.has_holdings" in js
     assert "S&P 500 index: ${spyIdx[idx].toFixed(1)}" in js
     assert "S&amp;P 500 as an index (100 = start), not a dollar portfolio" in html

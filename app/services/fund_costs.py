@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
+from app.services import financial_currency
 from app.services.security_type import SecurityType, classify_security
 
 # Expense ratios are decimals here (0.0003 = 3bps), matching etf_quality's idiom.
@@ -75,6 +76,9 @@ def _fee_rows(holdings_with_data: list[dict]) -> tuple[list[dict], list[dict], d
             counts["stock" if kind is SecurityType.STOCK else "other"] += 1
             continue
 
+        if not financial_currency.eligible_valuation_row(item):
+            uncovered.append({"ticker": ticker, "value": None, "reason": "price_or_currency"})
+            continue
         value = float(item.get("current_value") or 0.0)
         expense_ratio = _expense_ratio(item)
         # None means the provider had nothing. A real 0.0 means a free fund, and
@@ -116,6 +120,11 @@ def _flags(uncovered: list[dict]) -> list[str]:
             f"Expense ratio unavailable for {', '.join(no_data)} — "
             "their fees are not counted here"
         )
+    unpriced = [row["ticker"] for row in uncovered if row["reason"] == "price_or_currency"]
+    if unpriced:
+        flags.append(
+            f"No usable USD valuation for {', '.join(unpriced)} — their fees are not counted here"
+        )
     return flags
 
 
@@ -137,7 +146,7 @@ def compute_fee_drag(
     covered_value = sum(row["value"] for row in priced)
     annual_fee_cost = sum(row["annual_fee"] for row in priced)
     horizon_fee_cost = sum(row["horizon_fee"] for row in priced)
-    uncovered_value = sum(row["value"] for row in uncovered)
+    uncovered_value = sum(row["value"] or 0.0 for row in uncovered)
     blended = annual_fee_cost / covered_value if covered_value > 0 else None
     fund_count = len(priced) + len(uncovered)
 

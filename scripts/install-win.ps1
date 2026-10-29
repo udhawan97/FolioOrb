@@ -47,10 +47,9 @@ if (-not $ref) {
     } catch { $ref = $null }
 }
 if (-not $ref) {
-    Write-Host "  Could not resolve the latest release - falling back to 'main'."
-    $ref = "main"
+    throw "Could not resolve the latest stable release. Retry, or set FOLIO_REF explicitly."
 }
-if ($ref -ne "main" -and $ref -ne "latest-main") {
+if (-not $env:FOLIO_REF -or ($ref -ne "main" -and $ref -ne "latest-main")) {
     if ($ref -notmatch '^v(\d+)\.(\d+)\.(\d+)$' -or
         [version]::new([int]$Matches[1], [int]$Matches[2], [int]$Matches[3]) -lt [version]"5.16.0") {
         throw "Source installs support stable tags v5.16.0 or newer; choose a supported tag, latest-main, or main."
@@ -106,34 +105,28 @@ try {
 
     # v5.16.0 predates the helper but already honors FOLIOORB_DATA_DIR.
     $migrationTool = Join-Path $extracted.FullName "scripts\migrate_source_profile.py"
-    if (-not (Test-Path $migrationTool)) {
+    if (-not (Test-Path $migrationTool) -or
+        -not (Select-String -LiteralPath $migrationTool -SimpleMatch '--replace-source' -Quiet)) {
         $migrationTool = Join-Path $tmp "migrate_source_profile.py"
         Invoke-WebRequest "https://raw.githubusercontent.com/$repo/main/scripts/migrate_source_profile.py" `
             -OutFile $migrationTool -UseBasicParsing
     }
 
     # -- Preserve the complete writable profile -------------------------------
-    $migrationOutput = & $pythonCmd $migrationTool --source $installDir --destination $dataDir
+    $receipt = Join-Path $tmp "cutover.json"
+    $migrationOutput = & $pythonCmd $migrationTool --source $installDir --destination $dataDir `
+        --replace-source $extracted.FullName --receipt $receipt
     if ($LASTEXITCODE -ne 0) { throw "Profile migration failed safely." }
     $migrationStatus = $migrationOutput | Select-Object -Last 1
+    $cutover = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+    $rollbackDir = $cutover.recovery
     $keepRecovery = $migrationStatus -eq "MIGRATED"
     if ($keepRecovery) {
         Write-Host "  OK Portfolio, backups, settings, and update state migrated"
     }
 
-    # -- Install transaction ---------------------------------------------------
-    New-Item -ItemType Directory -Force -Path (Split-Path $installDir) | Out-Null
-    if (Test-Path $installDir) {
-        $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ") + "-$PID"
-        $suffix = if ($keepRecovery) { "profile-recovery" } else { "update-rollback" }
-        $rollbackDir = "$installDir-$suffix-$stamp"
-        Move-Item $installDir $rollbackDir
-    }
-    Move-Item $extracted.FullName $installDir
+    # The helper publishes source and profile pointer while holding the lease.
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText(
-        (Join-Path $installDir ".source-profile-path"), "$dataDir`n", $utf8NoBom
-    )
     $env:FOLIOORB_DATA_DIR = $dataDir
 
     Write-Host "  Installing dependencies (one-time, ~60 s)..."

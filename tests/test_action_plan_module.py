@@ -62,10 +62,14 @@ def _scan(signals=None, allocation=None, positions=None, exposure=None):
 
 def _valuation(monkeypatch, **overrides):
     row = {
-        "holdings": [{"ticker": "AAPL", "total_return_pct": 80.0}],
+        "holdings": [
+            {"ticker": "AAPL", "allocation_pct": 55.0, "total_return_pct": 80.0},
+            {"ticker": "MSFT", "allocation_pct": 45.0},
+        ],
         "total_value": 5000.0,
         "data_quality": "complete",
         "missing_tickers": (),
+        "foreign_currency_tickers": (),
         "priced_position_count": 2,
         "expected_position_count": 2,
     }
@@ -102,7 +106,7 @@ def _quiet_analytics(monkeypatch):
 class TestCacheType:
     def test_key_carries_the_portfolio_state_signature(self):
         scan = _scan()
-        assert action_plan.cache_type(scan) == f"action_plan_v3:{scan.state['summary_type']}"
+        assert action_plan.cache_type(scan) == f"action_plan_v4:{scan.state['summary_type']}"
 
     def test_a_book_that_flips_its_action_mix_reads_a_different_key(self):
         holds = _scan()
@@ -153,6 +157,14 @@ class TestBuildSnapshot:
 
         assert all(not k.startswith("_") for entry in snapshot["holdings"] for k in entry)
 
+    def test_missing_allocation_rows_override_a_price_only_complete_label(self, monkeypatch):
+        _valuation(monkeypatch, holdings=[{"ticker": "AAPL", "allocation_pct": 100}])
+        snapshot = action_plan.build_snapshot(None, _scan())
+        assert snapshot["allocation_complete"] is False
+        assert snapshot["valuation"]["data_quality"] == "partial"
+        assert all(row["alloc_pct"] is None for row in snapshot["holdings"])
+        assert snapshot["concentration_hhi"] is None
+
     def test_a_valuation_failure_is_declared_not_guessed(self, monkeypatch):
         def explode(_db, _pid):
             raise RuntimeError("quotes down")
@@ -164,6 +176,7 @@ class TestBuildSnapshot:
         assert snapshot["valuation"] == {
             "data_quality": "unavailable",
             "missing_tickers": ["AAPL", "MSFT"],
+            "foreign_currency_tickers": [],
             "priced_position_count": 0,
             "expected_position_count": 2,
         }
@@ -190,7 +203,10 @@ def test_build_plan_stamps_provenance_regime_and_disclaimer():
 
 class TestBuildFallback:
     def test_buckets_come_straight_from_the_verdict_actions(self):
-        plan = action_plan.build_fallback(_scan())
+        plan = action_plan.build_fallback(_scan(), {
+            "valuation": {"data_quality": "complete"},
+            "holdings": [{"t": "AAPL", "alloc_pct": 55}, {"t": "MSFT", "alloc_pct": 45}],
+        })
 
         assert plan["source"] == "local-fallback"
         assert plan["buckets"] == {
@@ -249,16 +265,18 @@ class TestBuildFallback:
 
         assert [holding["t"] for holding in snapshot["holdings"]] == ["MSFT"]
 
-    def test_no_snapshot_and_a_complete_snapshot_read_identically(self):
+    def test_no_snapshot_cannot_claim_complete_sizing(self):
         scan = _scan()
         complete = {"valuation": {"data_quality": "complete", "missing_tickers": []}}
 
         bare = action_plan.build_fallback(scan)
         priced = action_plan.build_fallback(scan, complete)
 
-        assert bare["source"] == priced["source"] == "local-fallback"
-        assert bare["headline"] == priced["headline"]
-        assert "data_quality" not in bare and "data_quality" not in priced
+        assert bare["source"] == "data-unavailable"
+        assert priced["source"] == "local-fallback"
+        assert bare["data_quality"] == "unavailable"
+        assert priced["data_quality"] == "complete"
+        assert "largest position" not in bare["best_return_note"]
 
     def test_a_partly_priced_book_says_so_instead_of_quoting_totals(self):
         plan = action_plan.build_fallback(
@@ -270,7 +288,7 @@ class TestBuildFallback:
         assert plan["data_quality"] == "partial"
         assert plan["missing_tickers"] == ["MSFT"]
         assert plan["headline"] == "Live Portfolio valuation is partial"
-        assert "unpriced positions" in plan["thesis"]
+        assert "coverage is incomplete" in plan["thesis"]
         # The deterministic buckets survive the override — they need no prices.
         assert plan["buckets"]["hold"][0]["ticker"] == "AAPL"
 
@@ -280,3 +298,33 @@ class TestBuildFallback:
         assert plan["source"] == "data-unavailable"
         assert plan["data_quality"] == "unavailable"
         assert plan["missing_tickers"] == []
+
+    @pytest.mark.parametrize("allocation", [{}, {"AAPL": 100}, {"AAPL": 100, "MSFT": 0}])
+    def test_recovered_valuation_replaces_older_scan_weights(self, monkeypatch, allocation):
+        _valuation(monkeypatch, holdings=[
+            {"ticker": "AAPL", "allocation_pct": 25, "total_return_pct": 10},
+            {"ticker": "MSFT", "allocation_pct": 75, "total_return_pct": 20},
+        ])
+        scan = _scan(allocation=allocation)
+        snapshot = action_plan.build_snapshot(None, scan)
+        assert {row["t"]: row["alloc_pct"] for row in snapshot["holdings"]} == {
+            "AAPL": 25, "MSFT": 75,
+        }
+        assert snapshot["concentration_hhi"] is None
+        assert snapshot["exposure"] == {"top_sectors": [], "top_countries": []}
+        result = action_plan.build_fallback(scan, snapshot)
+        assert "MSFT is your largest position at 75%" in result["best_return_note"]
+        assert result["buckets"]["hold"] and result["buckets"]["add"]
+
+    @pytest.mark.parametrize("rows", [
+        [], [{"t": "AAPL", "alloc_pct": 100}],
+        [{"t": "AAPL", "alloc_pct": 0}, {"t": "MSFT", "alloc_pct": 0}],
+        [{"t": "AAPL", "alloc_pct": float("inf")}, {"t": "MSFT", "alloc_pct": 45}],
+    ])
+    def test_price_quality_alone_does_not_establish_finite_allocations(self, rows):
+        result = action_plan.build_fallback(_scan(), {
+            "valuation": {"data_quality": "complete"}, "holdings": rows,
+        })
+        assert result["allocation_complete"] is False
+        assert "largest position" not in result["best_return_note"]
+        assert "concentration is unavailable" in result["best_return_note"]

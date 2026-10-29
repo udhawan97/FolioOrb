@@ -15,7 +15,7 @@ function plan(value) {
         actual_weight_bps: 10000, drift_bps: null }], target_total_bps: value,
         remaining_bps: 10000 - value, complete: false, drift_available: false };
 }
-function harness({ backups = null } = {}) {
+function harness({ backups = null, report = null, deferReports = false, comparison = null } = {}) {
     let inputs = [];
     const elements = new Map();
     const listeners = {};
@@ -29,7 +29,7 @@ function harness({ backups = null } = {}) {
             insertAdjacentHTML(_, value) { markup = value + markup; },
             get innerHTML() { return markup; },
             set innerHTML(value) {
-                markup = value;
+                markup = String(value);
                 if (id === "review-target-table") {
                     inputs = [...value.matchAll(/data-holding-id="(\d+)" value="([^"]*)"/g)]
                         .map(([, holdingId, target]) => ({ dataset: { holdingId }, value: target,
@@ -48,6 +48,17 @@ function harness({ backups = null } = {}) {
         querySelector: selector => selector.startsWith("[data-review-") ? get(selector) : null,
         querySelectorAll: selector => {
             if (selector === ".review-target-input") return inputs;
+            if (selector === "[data-report-period]") {
+                return ["month", "quarter"].map(period => {
+                    const button = get(`period-${period}`); button.dataset.reportPeriod = period; return button;
+                });
+            }
+            if (selector === ".review-watchlist-pick input:checked") {
+                return ["LEFT", "RIGHT"].map(value => ({ value, dataset: { kind: "ETF" } }));
+            }
+            if (selector === "[data-report-export]") {
+                const button = get("report-export"); button.dataset.reportExport = "csv"; return [button];
+            }
             if (selector === "[data-review-snapshot-export]") {
                 get("review-plan-export").dataset.reviewSnapshotExport = "plan";
                 return [get("review-plan-export")];
@@ -56,7 +67,7 @@ function harness({ backups = null } = {}) {
         },
         addEventListener: (name, callback) => { listeners[name] = callback; },
     };
-    const reads = [], puts = [], exports = [], messages = [];
+    const reads = [], puts = [], exports = [], messages = [], reportReads = [];
     const workspace = { json: (url, init) => {
         if (init?.method === "PUT") {
             const request = deferred(); puts.push({ ...request, body: JSON.parse(init.body) });
@@ -66,6 +77,11 @@ function harness({ backups = null } = {}) {
             const request = deferred(); reads.push(request); return request.promise;
         }
         if (url === "/api/review/backups") return Promise.resolve(backups);
+        if (url.startsWith("/api/review/report?")) {
+            if (!deferReports) return Promise.resolve(report);
+            const request = deferred(); reportReads.push({ ...request, url }); return request.promise;
+        }
+        if (url.startsWith("/api/review/compare?")) return Promise.resolve(comparison);
         if (url === "/api/review/overview") return Promise.resolve({ items: [], known_value_usd: 0 });
         return Promise.reject(new Error("Unused review surface"));
     }, response: async url => { exports.push(url); throw new Error("export reached"); } };
@@ -77,12 +93,15 @@ function harness({ backups = null } = {}) {
             (Array.isArray(values[i]) ? values[i].join("") : values[i] ?? ""), ""),
         apiErrorMessage: (error, fallback) => error?.message || fallback,
         Intl, requestAnimationFrame: callback => callback(),
+        formatHoldingMoney: (item, value) => value == null ? "Unavailable" : item.currency.toUpperCase() === "USD"
+            ? `$${Number(value).toFixed(2)}` : `${Number(value).toFixed(2)} ${item.currency}`,
         showToast: message => messages.push(message),
     };
-    vm.runInNewContext(fs.readFileSync(require.resolve("../../static/js/review-orbit.js"), "utf8"), context);
+    vm.runInNewContext(fs.readFileSync(require.resolve("../../static/js/core.js"), "utf8")
+        + "\n" + fs.readFileSync(require.resolve("../../static/js/review-orbit.js"), "utf8"), context);
     listeners.DOMContentLoaded();
     return {
-        get, reads, puts, exports, messages, orbit: context.window.ReviewOrbit,
+        get, reads, puts, exports, messages, reportReads, orbit: context.window.ReviewOrbit,
         value: () => inputs[0]?.value,
         edit: value => { inputs[0].value = value; get("review-target-form").events.input({ target: inputs[0] }); },
         save: () => get("review-target-form").events.submit({ preventDefault() {} }),
@@ -92,6 +111,29 @@ function harness({ backups = null } = {}) {
         },
     };
 }
+
+test("Review Pack distinguishes unavailable full value from known subtotal and real zero", async () => {
+    const report = { current: { total_value: null, known_value: 0, total_return: null, total_return_pct: null },
+        period_activity: { value_change: null, realized_gain: 0 }, snapshot_count: 1,
+        observed_start: "2026-09-25", data_quality: { history: "complete", valuation: "unavailable", missing_prices: ["VTI"] },
+        foreign_currency_tickers: ["VOD.L"], thesis_attention: [] };
+    const h = harness({ report });
+    h.orbit.activateTab("report"); await flush();
+    const markup = h.get("review-report-summary").innerHTML;
+    assert.match(markup, /Current value<\/span><strong>Unavailable/);
+    assert.match(markup, /Known USD subtotal · incomplete<\/span><strong>\$0/);
+    assert.match(markup, /Value change since 2026-09-25<\/span><strong>Unavailable/);
+    assert.match(markup, /Realized this period<\/span><strong>\$0/);
+    assert.match(markup, /Missing prices: VTI/);
+    assert.match(markup, /Foreign-priced, excluded from USD: VOD.L/);
+    assert.doesNotMatch(markup, /0%/);
+
+    const empty = harness({ report: { ...report, current: { total_value: 0, known_value: 0, total_return: 0, total_return_pct: 0 },
+        data_quality: { valuation: "complete", history: "unavailable", missing_prices: [] }, foreign_currency_tickers: [] } });
+    empty.orbit.activateTab("report"); await flush();
+    assert.match(empty.get("review-report-summary").innerHTML, /Current value<\/span><strong>\$0/);
+    assert.doesNotMatch(empty.get("review-report-summary").innerHTML, /Known USD subtotal/);
+});
 
 test("delayed save and readback preserve edits typed during both requests", async () => {
     const h = harness(); await h.start();
@@ -218,4 +260,71 @@ test("a failed save preserves newer input and permits an explicit retry", async 
     h.reads[1].resolve(plan(3000)); await retry;
     assert.equal(h.value(), "3000");
     assert.equal(h.get("review-plan-export").disabled, false);
+});
+
+function periodReport(value) {
+    return { current: { total_value: value, total_return: 0, total_return_pct: 0 },
+        period_activity: { value_change: value, realized_gain: 0 }, snapshot_count: 1,
+        observed_start: '2026-10-01', data_quality: { valuation: 'complete', history: 'complete' },
+        thesis_attention: [] };
+}
+
+test('latest selected report period owns metrics, stale responses, and export', async () => {
+    const h = harness({ deferReports: true });
+    h.orbit.activateTab('report');
+    h.get('period-quarter').events.click();
+    assert.match(h.reportReads[0].url, /period=month/);
+    assert.match(h.reportReads[1].url, /period=quarter/);
+    h.reportReads[1].resolve(periodReport(300)); await flush();
+    assert.match(h.get('review-report-title').textContent, /Quarterly/);
+    assert.match(h.get('review-report-summary').innerHTML, /\$300/);
+    h.reportReads[0].resolve(periodReport(100)); await flush();
+    assert.match(h.get('review-report-summary').innerHTML, /\$300/);
+    assert.doesNotMatch(h.get('review-report-summary').innerHTML, /\$100/);
+    await h.get('report-export').events.click(); await flush();
+    assert.match(h.exports[0], /period=quarter/);
+});
+
+test('older failed report cannot replace the latest success with a stale error', async () => {
+    const h = harness({ deferReports: true }); h.orbit.activateTab('report');
+    h.get('period-quarter').events.click();
+    h.reportReads[1].resolve(periodReport(300)); await flush();
+    h.reportReads[0].reject(new Error('old month failed')); await flush();
+    assert.doesNotMatch(h.get('review-report-summary').innerHTML, /old month failed/);
+    assert.match(h.get('review-report-summary').innerHTML, /\$300/);
+});
+
+test('retained report identifies its actual period while a new period loads or fails', async () => {
+    const h = harness({ deferReports: true }); h.orbit.activateTab('report');
+    h.reportReads[0].resolve(periodReport(100)); await flush();
+    h.get('period-quarter').events.click();
+    assert.match(h.get('review-report-summary').innerHTML, /previous month report while the quarter report loads/);
+    h.reportReads[1].reject(new Error('quarter unavailable')); await flush();
+    assert.match(h.get('review-report-summary').innerHTML, /last successful month report/);
+    assert.match(h.get('review-report-summary').innerHTML, /\$100/);
+});
+
+test('Compare preserves GBp/CAD price units and escaped ETF text without inventing market-cap currency', async () => {
+    const items = [
+        { ticker: 'LEFT', name: 'London', current_price: 100, currency: 'GBp', day_change_pct: 1,
+            metrics: { category: 'Large Blend', concentration: '<img src=x onerror=alert(1)>', expense_ratio: 0.001, aum: 1000000, pe_ratio: 20, top_holdings: [{ ticker: 'A' }] }, thesis: { status: 'missing' } },
+        { ticker: 'RIGHT', name: 'Canada', current_price: 12.5, currency: 'CAD', day_change_pct: null,
+            metrics: { category: null, concentration: 'Moderate' }, thesis: { status: 'missing' } },
+    ];
+    const h = harness({ comparison: { items } }); await h.get('review-compare-run').events.click();
+    const markup = h.get('review-compare-results').innerHTML;
+    assert.match(markup, /100\.00 GBp/); assert.match(markup, /12\.50 CAD/);
+    assert.match(markup, /Large Blend/); assert.match(markup, /Moderate/);
+    assert.match(markup, /&lt;img src=x onerror=alert\(1\)&gt;/);
+    assert.doesNotMatch(markup, /<img|NaN|\$/);
+    assert.match(markup, /currency unverified/); assert.match(markup, /Unavailable/);
+});
+
+test('Compare does not imply USD when a provider omits currency', async () => {
+    const items = [null, 'USD'].map((currency, index) => ({ ticker: index ? 'RIGHT' : 'LEFT', name: 'Example',
+        current_price: 10, currency, day_change_pct: null, metrics: {}, thesis: { status: 'missing' } }));
+    const h = harness({ comparison: { items } }); await h.get('review-compare-run').events.click();
+    const markup = h.get('review-compare-results').innerHTML;
+    assert.match(markup, /Unavailable \(quote currency unknown\)/);
+    assert.match(markup, /\$10\.00/);
 });

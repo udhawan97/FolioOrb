@@ -499,10 +499,10 @@
 
                         <div class="hero-primary">
                             <div class="hero-stat">
-                                <div class="stat-label">Total value
+                                <div class="stat-label"><span id="total-value-label">Total value</span>
                                     <button class="tip-trigger" onclick="event.stopPropagation()"
                                         data-tip-title="Portfolio Value"
-                                        data-tip-body="Combined market value of all your positions, refreshed every 5 minutes."
+                                        data-tip-body="USD market value of eligible positions, refreshed every 5 minutes. Incomplete coverage is labelled known USD value; foreign prices are not converted."
                                         data-tip-hint="Press R to refresh now"
                                         data-tip-icon="bi-wallet2">
                                         <i class="bi bi-info-circle"></i>
@@ -563,6 +563,7 @@
                             </div>
                         </div>
 
+                        <p class="small text-secondary mb-0" id="portfolio-coverage-notice" hidden></p>
                     </div>
                 </div>
             </div>
@@ -760,10 +761,10 @@
                             <i class="bi bi-layers"></i>
                         </div>
                         <div style="min-width:0">
-                            <div class="stat-label">Largest holding
+                            <div class="stat-label"><span id="largest-holding-label">Largest holding</span>
                                 <button class="tip-trigger" onclick="event.stopPropagation()"
                                     data-tip-title="Largest Position"
-                                    data-tip-body="The holding with the highest current market value. Click to jump to it in the holdings table."
+                                    data-tip-body="The eligible USD holding with the highest known market value. Foreign and unavailable prices are excluded. Click to jump to it in the holdings table."
                                     data-tip-hint="Click card to highlight in table"
                                     data-tip-icon="bi-layers">
                                     <i class="bi bi-info-circle"></i>
@@ -3160,5 +3161,7 @@
             </form>
         </div>
     </div>
+    <div class="visually-hidden" id="toast-status" role="status"
+         aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

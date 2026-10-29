@@ -21,6 +21,7 @@ from app.services import (
     financial_currency,
     holdings_repository,
     portfolio_lifecycle,
+    portfolio_valuation,
     write_serialization,
 )
 from app.services.stock_service import (
@@ -212,9 +213,15 @@ class DcaLedger:
             .all()
         )
         by_status = {status: (count, amount, shares) for status, count, amount, shares in rows}
+        self._require_finite_amounts(
+            plan.amount, *(value for row in rows for value in row[2:]),
+        )
         applied_count, applied_amount, applied_shares = by_status.get(
             "applied", (0, 0.0, 0.0)
         )
+        applied_avg_cost = applied_amount / applied_shares if applied_shares > 0 else None
+        if applied_avg_cost is not None:
+            self._require_finite_amounts(applied_avg_cost)
         pending_count = by_status.get("pending", (0, 0.0, 0.0))[0]
         trusted_usd = self._plan_has_trusted_usd(plan)
         next_date = dca_service.next_scheduled_date(
@@ -241,9 +248,7 @@ class DcaLedger:
             "applied_amount": round(float(applied_amount), 2),
             "applied_shares": round(float(applied_shares), 6),
             "applied_avg_cost": (
-                round(float(applied_amount) / float(applied_shares), 4)
-                if applied_shares > 0
-                else None
+                round(float(applied_avg_cost), 4) if applied_avg_cost is not None else None
             ),
             "next_date": (
                 next_date.isoformat()
@@ -254,6 +259,9 @@ class DcaLedger:
 
     @staticmethod
     def _contribution_dict(contribution: DcaContribution) -> dict:
+        DcaLedger._require_finite_amounts(
+            contribution.price, contribution.shares, contribution.amount,
+        )
         return {
             "id": contribution.id,
             "plan_id": contribution.plan_id,
@@ -350,13 +358,16 @@ class DcaLedger:
             return 0, True
         if not closes:
             return 0, False
-        computed = dca_service.plan_contributions(
-            plan.frequency,
-            plan.amount,
-            start,
-            today,
-            sorted((date.fromisoformat(day), price) for day, price in closes.items()),
-        )
+        try:
+            computed = dca_service.plan_contributions(
+                plan.frequency,
+                plan.amount,
+                start,
+                today,
+                sorted((date.fromisoformat(day), price) for day, price in closes.items()),
+            )
+        except dca_service.DcaArithmeticError as exc:
+            raise DcaConflictError(str(exc)) from exc
         added = 0
         for item in computed:
             scheduled = item["scheduled_date"].isoformat()
@@ -376,7 +387,33 @@ class DcaLedger:
                 )
             )
             added += 1
+        self.db.flush()
+        self._validate_financial_state(plan)
         return added, True
+
+    @staticmethod
+    def _require_finite_amounts(*values: float) -> None:
+        try:
+            portfolio_valuation.require_finite_amounts(*values)
+        except portfolio_valuation.FinancialArithmeticError as exc:
+            raise DcaConflictError(str(exc)) from exc
+
+    def _validate_financial_state(self, plan: DcaPlan) -> None:
+        """Reject overflowing ledger/portfolio totals inside the caller's write."""
+        totals = (
+            self.db.query(
+                func.coalesce(func.sum(DcaContribution.amount), 0.0),
+                func.coalesce(func.sum(DcaContribution.shares), 0.0),
+            )
+            .filter(DcaContribution.plan_id == plan.id)
+            .group_by(DcaContribution.status)
+            .all()
+        )
+        self._require_finite_amounts(*(value for row in totals for value in row))
+        try:
+            portfolio_valuation.validate_stored_financial_totals(self.db, plan.portfolio_id)
+        except portfolio_valuation.FinancialArithmeticError as exc:
+            raise DcaConflictError(str(exc)) from exc
 
     def create_plan(
         self,
@@ -683,12 +720,15 @@ class DcaLedger:
                 )
             if holding is None:
                 raise DcaConflictError("The holding changed while applying this buy")
-        holding.shares, holding.avg_cost = dca_service.apply_to_holding(
-            holding.shares or 0.0,
-            holding.avg_cost or 0.0,
-            contribution.shares,
-            contribution.amount,
-        )
+        try:
+            holding.shares, holding.avg_cost = dca_service.apply_to_holding(
+                holding.shares or 0.0,
+                holding.avg_cost or 0.0,
+                contribution.shares,
+                contribution.amount,
+            )
+        except dca_service.DcaArithmeticError as exc:
+            raise DcaConflictError(str(exc)) from exc
         holding.is_watchlist = False
         contribution.status = "applied"
         contribution.applied_holding_id = holding.id
@@ -702,6 +742,8 @@ class DcaLedger:
         if contribution.status != "pending":
             raise DcaConflictError(f"Buy is already {contribution.status}")
         holding = self._apply(contribution)
+        self.db.flush()
+        self._validate_financial_state(contribution.plan)
         self.db.commit()
         return {
             "message": (
@@ -770,6 +812,8 @@ class DcaLedger:
             self._require_trusted_contribution(contribution)
         for contribution in pending:
             self._apply(contribution)
+        self.db.flush()
+        self._validate_financial_state(plan)
         self.db.commit()
         return {"applied": len(pending), "ticker": plan.ticker}
 

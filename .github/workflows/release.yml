@@ -410,6 +410,8 @@ jobs:
           tests/test_backup_policy.py
           tests/test_backup_service.py
           tests/test_source_installer_profile.py
+          tests/test_source_profile_cutover.py
+          tests/test_source_installer_channels.py
       - name: Exercise Windows source installer and parser gate
         shell: pwsh
         timeout-minutes: 10

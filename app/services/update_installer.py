@@ -34,8 +34,8 @@ _lock = threading.Lock()
 _cancel = threading.Event()
 # Mutable runtime handles kept in a dict so they can be reassigned without
 # module-level `global` statements: the download thread, the verified package
-# path, and the desktop shell's app-quit callback.
-_rt: dict = {"thread": None, "path": None, "exit_hook": None}
+# path and accepted digest, and the desktop shell's app-quit callback.
+_rt: dict = {"thread": None, "path": None, "sha256": None, "exit_hook": None}
 
 
 def register_exit_hook(func) -> None:
@@ -46,34 +46,38 @@ def register_exit_hook(func) -> None:
 def start_download() -> dict:
     """Begin downloading the available update on a background thread."""
     with _lock:
-        state = update_service.get_state()
-        info = state.get("available")
-        if state.get("status") != "available" or not info:
+        if _rt["thread"] and _rt["thread"].is_alive():
+            return update_service.get_state()
+        claimed, state = update_service.claim(
+            UpdateStatus.DOWNLOADING, expected=UpdateStatus.AVAILABLE, downloaded_bytes=0,
+        )
+        if not claimed:
             return state
-        if not info.get("download_url") or not info.get("asset_name"):
+        info = state.get("available")
+        if not info or not info.get("download_url") or not info.get("asset_name"):
             return update_service.mark(
                 UpdateStatus.ERROR, error="No installer is available for this platform."
             )
-        if _rt["thread"] and _rt["thread"].is_alive():
-            return state
         _cancel.clear()
+        _rt.update(path=None, sha256=None)
+        update_service.mark(UpdateStatus.DOWNLOADING, total_bytes=info.get("size_bytes") or 0)
         _rt["thread"] = threading.Thread(
             target=_run, args=(info,), name="update-download", daemon=True
         )
-        _rt["thread"].start()
+        try:
+            _rt["thread"].start()
+        except RuntimeError:
+            return update_service.mark(UpdateStatus.ERROR, error="Couldn't start the download.")
         update_log.event(
             f"download start version={info.get('version')} size={info.get('size_bytes')}"
         )
-        return update_service.mark(
-            UpdateStatus.DOWNLOADING,
-            downloaded_bytes=0,
-            total_bytes=info.get("size_bytes") or 0,
-        )
+        return update_service.get_state()
 
 
 def _run(info: dict) -> None:
     fallback_total = info.get("size_bytes") or 0
     dest = None
+    _rt.update(path=None, sha256=None)
     try:
         dest = update_downloader.pending_dir() / info["asset_name"]
 
@@ -112,6 +116,7 @@ def _run(info: dict) -> None:
             return
 
         _rt["path"] = dest
+        _rt["sha256"] = update_downloader.parse_sha256sums(sums, info["asset_name"])
         update_service.mark(UpdateStatus.READY)
         update_log.event(
             f"download verified version={info.get('version')} asset={info.get('asset_name')}"
@@ -153,17 +158,25 @@ def install() -> dict:
     """
     from app import paths
 
-    if not paths.is_frozen():
-        return update_service.mark(
-            UpdateStatus.ERROR, error="In-app install is only available in the packaged app."
-        )
-
     with _lock:
-        state = update_service.get_state()
-        if state.get("status") != "ready" or _rt["path"] is None:
+        claimed, state = update_service.claim(
+            UpdateStatus.BACKING_UP, expected=UpdateStatus.READY,
+        )
+        if not claimed:
             return state
+        if not paths.is_frozen():
+            return update_service.mark(
+                UpdateStatus.ERROR, error="In-app install is only available in the packaged app."
+            )
 
-        update_service.mark(UpdateStatus.BACKING_UP)
+        try:
+            update_downloader.require_matching_digest(_rt["path"], _rt["sha256"])
+        except (OSError, TypeError, ValueError):
+            _rt.update(path=None, sha256=None)
+            return update_service.mark(
+                UpdateStatus.ERROR,
+                error="The update file changed or is missing. Download it again.",
+            )
         rollback = _create_rollback_point()
         if rollback is None:
             update_log.event("install aborted: pre-update backup failed")
@@ -173,7 +186,7 @@ def install() -> dict:
             )
 
         try:
-            _launch_installer(_rt["path"])
+            _launch_installer(_rt["path"], _rt["sha256"])
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to launch installer")
             return update_service.mark(
@@ -186,9 +199,9 @@ def install() -> dict:
     return update_service.get_state()
 
 
-def launch_installer(path) -> None:
+def launch_installer(path, expected_sha256: str) -> None:
     """Public handoff so other services (rollback) can launch an installer."""
-    _launch_installer(path)
+    _launch_installer(path, expected_sha256)
 
 
 def verify_release_installer(path: Path, info: dict) -> str | None:
@@ -240,12 +253,17 @@ def _create_rollback_point() -> dict | None:
         "installer": None,  # the archived current-version installer (Phase 6)
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    app_settings.save_settings({"rollback_point": rollback})
+    try:
+        app_settings.save_settings({"rollback_point": rollback})
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Could not record pre-update backup: %s", type(exc).__name__)
+        return None
     update_log.event(f"pre-update backup ok version={__version__}")
     return rollback
 
 
-def _launch_installer(path) -> None:
+def _launch_installer(path, expected_sha256: str) -> None:
+    update_downloader.require_matching_digest(path, expected_sha256)
     platform = update_service.current_platform_key()
     if platform == "windows":
         # Per-user, silent; installer closes the app and relaunches it. Detached
@@ -260,7 +278,7 @@ def _launch_installer(path) -> None:
         # the DMG for a manual drag-install.
         from app.services import macos_updater
 
-        if not macos_updater.launch_swap(Path(path)):
+        if not macos_updater.launch_swap(Path(path), expected_sha256):
             subprocess.Popen(  # noqa: S603,S607  pylint: disable=consider-using-with
                 ["open", str(path)]
             )
@@ -302,4 +320,4 @@ def _safe_unlink(path) -> None:
 
 def _reset_for_tests() -> None:
     _cancel.clear()
-    _rt.update({"thread": None, "path": None, "exit_hook": None})
+    _rt.update({"thread": None, "path": None, "sha256": None, "exit_hook": None})

@@ -5,9 +5,11 @@ import re
 import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 from app.routers import stocks, portfolio, ai
 from app.routers import news
@@ -19,6 +21,7 @@ from app.database import engine
 from app.schema_meta import apply_migrations_safely
 from app.paths import resource_dir
 from app.services.local_request_guard import LocalRequestGuardMiddleware
+from app.services.portfolio_valuation import FinancialArithmeticError
 from app.version import __version__
 
 # Absolute paths to bundled resources so the app works whether it is run from a
@@ -121,6 +124,21 @@ app = FastAPI(
     version=__version__,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error(_request, exc: RequestValidationError):
+    """Keep invalid nonfinite inputs out of the JSON error response itself."""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(exc.errors(), exclude={"input", "ctx"})},
+    )
+
+
+@app.exception_handler(FinancialArithmeticError)
+async def financial_arithmetic_error(_request, exc: FinancialArithmeticError):
+    """Report unrepresentable financial totals without emitting nonfinite JSON."""
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 # Allow the local dashboard to call the API without exposing it to every origin.
 # Methods are restricted to only what the API actually uses.
