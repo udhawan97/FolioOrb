@@ -109,7 +109,11 @@ SHORTCUT="$("$PYTHON_BIN" -c 'import os,sys; print(os.path.abspath(os.path.expan
 MIGRATION_COMPLETE="$DATA_DIR/.source-install-migration-complete"
 
 # ── Download ──────────────────────────────────────────────────────────────────
-TMP="$(mktemp -d)"
+# Cutover uses rename, so extraction must share the installation filesystem.
+# This mutation follows successful stable-ref validation.
+INSTALL_PARENT="$(dirname "$INSTALL_DIR")"
+mkdir -p "$INSTALL_PARENT"
+TMP="$(mktemp -d "$INSTALL_PARENT/.folioorb-install.XXXXXX")"
 echo "  Downloading FolioOrb ($REF)..."
 curl -fsSL --progress-bar "$RELEASE_URL" -o "$TMP/folio.zip"
 

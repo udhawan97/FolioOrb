@@ -17,6 +17,60 @@ MIGRATOR = ROOT / "scripts" / "migrate_source_profile.py"
 POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
 
 
+@pytest.mark.skipif(POWERSHELL is None, reason="Requires a compatible PowerShell runtime")
+@pytest.mark.parametrize("explicit", [None, "main"])
+@pytest.mark.parametrize("relative", [False, True])
+def test_windows_extraction_is_install_sibling_only_after_metadata_acceptance(
+    tmp_path, explicit, relative,
+):
+    """System TEMP may be a different drive; no parent exists on metadata refusal."""
+    log = tmp_path / "archive-path.txt"
+    wrapper = tmp_path / "layout-fixture.ps1"
+    wrapper.write_text("""$ErrorActionPreference = 'Stop'
+function Invoke-RestMethod { param($Uri, [switch] $UseBasicParsing); throw 'metadata unavailable' }
+function Invoke-WebRequest {
+    param($Uri, $OutFile, [switch] $UseBasicParsing)
+    Set-Content -LiteralPath $env:REQUEST_LOG -Value $OutFile
+    throw 'Fixture stops archive I/O'
+}
+function py { & $env:FIXTURE_PYTHON @args }
+& $env:FIXTURE_INSTALLER
+""", encoding="utf-8")
+    install = tmp_path / "install" if relative else tmp_path / "new install parent" / "install"
+    other_temp = tmp_path / "unrelated system temp"
+    other_temp.mkdir()
+    profile = tmp_path / "other profile"
+    env = dict(os.environ)
+    env.pop("FOLIO_REF", None)
+    env.setdefault("LOCALAPPDATA", str(tmp_path / "unused default"))
+    env.update(
+        TEMP=str(other_temp), TMP=str(other_temp), REQUEST_LOG=str(log),
+        FIXTURE_PYTHON=sys.executable, FIXTURE_INSTALLER=str(ROOT / "scripts" / "install-win.ps1"),
+        FOLIOORB_INSTALL_DIR="install" if relative else str(install),
+        FOLIOORB_DATA_DIR=str(profile),
+        FOLIOORB_SHORTCUT=str(tmp_path / "shortcut.lnk"), FOLIOORB_INSTALL_NO_START="1",
+    )
+    if explicit:
+        env["FOLIO_REF"] = explicit
+    result = subprocess.run(
+        [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+         "-File", str(wrapper)],
+        env=env, cwd=tmp_path, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode != 0  # Archive I/O is deliberately stopped before cutover.
+    if explicit:
+        archive = Path(log.read_text(encoding="utf-8-sig").strip())
+        assert archive.parent.parent == install.parent
+        assert archive.parent.name.startswith(".folioorb-install-")
+        assert not archive.parent.exists()
+    else:
+        if not relative:
+            assert not install.parent.exists()
+        assert not log.exists()
+    assert not install.exists() and not profile.exists()
+    assert not list(other_temp.iterdir())
+
+
 def _run_migrator(
     source: Path, destination: Path, *, database_url: str | None = None
 ) -> subprocess.CompletedProcess[str]:

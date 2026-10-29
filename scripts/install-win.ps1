@@ -94,7 +94,11 @@ Write-Host "  OK $(& $pythonCmd --version)"
 
 try {
     # -- Download --------------------------------------------------------------
-    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
+    # Cutover renames extracted entries: stage beside the install, never on a
+    # possibly different system-temp drive. Stable metadata was validated above.
+    $installParent = Split-Path ([System.IO.Path]::GetFullPath($installDir)) -Parent
+    New-Item -ItemType Directory -Force -Path $installParent | Out-Null
+    $tmp = Join-Path $installParent (".folioorb-install-" + [System.IO.Path]::GetRandomFileName())
     New-Item -ItemType Directory -Path $tmp | Out-Null
     Write-Host "  Downloading FolioOrb ($ref)..."
     Invoke-WebRequest $releaseUrl -OutFile (Join-Path $tmp "folio.zip") -UseBasicParsing

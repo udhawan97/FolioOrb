@@ -86,3 +86,51 @@ def test_windows_stable_resolution_has_no_implicit_main_fallback():
     resolution = source[source.index("$ref = $env:FOLIO_REF"):source.index("# -- Python")]
     assert 'throw "Could not resolve the latest stable release.' in resolution
     assert '$ref = "main"' not in resolution
+
+
+@pytest.mark.skipif(not Path("/bin/bash").exists(), reason="Requires Bash source installer")
+@pytest.mark.parametrize("explicit", [None, "main"])
+def test_mac_extraction_is_install_sibling_only_after_metadata_acceptance(tmp_path, explicit):
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    (binaries / "python3.12").symlink_to(sys.executable)
+    log = tmp_path / "archive-path.txt"
+    curl = binaries / "curl"
+    curl.write_text("""#!/bin/bash
+case "$*" in *api.github.com*) exit 22 ;; esac
+while (( $# )); do
+  if [[ "$1" == "-o" ]]; then printf '%s\\n' "$2" > "$REQUEST_LOG"; break; fi
+  shift
+done
+exit 22
+""", encoding="utf-8")
+    curl.chmod(0o755)
+    install = tmp_path / "new install parent" / "install"
+    other_temp = tmp_path / "unrelated system temp"
+    other_temp.mkdir()
+    profile = tmp_path / "other profile"
+    env = dict(os.environ)
+    env.setdefault("HOME", str(Path.home()))
+    env.pop("FOLIO_REF", None)
+    env.update(
+        PATH=f"{binaries}:{env['PATH']}", REQUEST_LOG=str(log), TMPDIR=str(other_temp),
+        FOLIOORB_INSTALL_DIR=str(install), FOLIOORB_DATA_DIR=str(profile),
+        FOLIOORB_SHORTCUT=str(tmp_path / "shortcut"), FOLIOORB_INSTALL_NO_START="1",
+    )
+    if explicit:
+        env["FOLIO_REF"] = explicit
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts" / "install-mac.sh")],
+        env=env, capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0  # Archive I/O is deliberately stopped before cutover.
+    if explicit:
+        archive = Path(log.read_text().strip())
+        assert archive.parent.parent == install.parent
+        assert archive.parent.name.startswith(".folioorb-install.")
+        assert not archive.parent.exists()  # Failure cleanup owns the temporary sibling.
+    else:
+        assert not install.parent.exists()  # Metadata refusal precedes parent creation.
+        assert not log.exists()
+    assert not install.exists() and not profile.exists()
+    assert not list(other_temp.iterdir())
