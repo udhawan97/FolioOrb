@@ -12,11 +12,21 @@ from __future__ import annotations
 from bisect import bisect_left
 from calendar import monthrange
 from datetime import date, timedelta
+import math
 
 # Supported cadences. "daily" books one buy per *trading* day; "weekly" and
 # "monthly" step from the start date and execute on the first trading day on or
 # after each step (mirroring how a broker fills on the next market open).
 FREQUENCIES = ("daily", "weekly", "monthly")
+
+
+class DcaArithmeticError(ValueError):
+    """A contribution cannot be represented by finite financial arithmetic."""
+
+
+def _require_finite(*values: float) -> None:
+    if not all(math.isfinite(value) for value in values):
+        raise DcaArithmeticError("DCA amounts must produce finite shares and cost basis")
 
 
 def add_months(d: date, n: int) -> date:
@@ -125,12 +135,14 @@ def plan_contributions(
         exec_date, price = hit
         if exec_date > today or price <= 0:
             continue
+        shares = amount / price
+        _require_finite(amount, price, shares)
         out.append(
             {
                 "scheduled_date": sched,
                 "exec_date": exec_date,
                 "price": price,
-                "shares": amount / price,
+                "shares": shares,
                 "amount": amount,
             }
         )
@@ -146,10 +158,14 @@ def apply_to_holding(
     by that amount and the new average is basis / shares.
     """
     new_shares = old_shares + buy_shares
+    _require_finite(old_shares, old_avg, buy_shares, buy_amount, new_shares)
     if new_shares <= 0:
         return 0.0, 0.0
     old_basis = old_shares * (old_avg or 0.0)
-    return new_shares, (old_basis + buy_amount) / new_shares
+    new_basis = old_basis + buy_amount
+    new_avg = new_basis / new_shares
+    _require_finite(old_basis, new_basis, new_avg)
+    return new_shares, new_avg
 
 
 def undo_from_holding(
@@ -169,6 +185,7 @@ def undo_from_holding(
     old_basis = old_shares * (old_avg or 0.0)
     new_shares = old_shares - buy_shares
     new_basis = old_basis - buy_amount
+    _require_finite(old_shares, old_avg, buy_shares, buy_amount, old_basis, new_shares, new_basis)
 
     # A later sale can consume shares or basis that belonged to this buy. In
     # that state the contribution is no longer independently reversible: the
@@ -182,4 +199,6 @@ def undo_from_holding(
         return 0.0, 0.0
     if new_basis < 0:
         new_basis = 0.0
-    return new_shares, new_basis / new_shares
+    new_avg = new_basis / new_shares
+    _require_finite(new_avg)
+    return new_shares, new_avg

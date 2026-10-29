@@ -1160,9 +1160,11 @@ def get_action_plan(
     if not action_plan.has_invested_positions(scan):
         return action_plan.build_fallback(scan)
 
-    # Local-only path: skip Claude entirely — return deterministic buckets instantly
+    # Local-only plans still need price coverage before making sizing claims.
     if force_local:
-        return action_plan.build_fallback(scan)
+        return action_plan.build_fallback(
+            scan, action_plan.build_snapshot(db, scan, portfolio_id)
+        )
 
     return ai_narrative.narrative(
         db,

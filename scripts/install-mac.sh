@@ -56,8 +56,8 @@ if [[ -z "$REF" ]]; then
         | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1 || true)"
 fi
 if [[ -z "$REF" ]]; then
-  echo "  Could not resolve the latest release — falling back to 'main'."
-  REF="main"
+  echo "  Could not resolve the latest stable release. Retry, or set FOLIO_REF explicitly." >&2
+  exit 1
 fi
 echo "  Installing ref: $REF"
 
@@ -87,7 +87,7 @@ if [[ -z "$PYTHON_BIN" ]]; then
 fi
 echo "  ✓ $("$PYTHON_BIN" --version)"
 
-if [[ "$REF" != "main" && "$REF" != "latest-main" ]]; then
+if [[ -z "${FOLIO_REF:-}" || ( "$REF" != "main" && "$REF" != "latest-main" ) ]]; then
   if ! "$PYTHON_BIN" - "$REF" <<'PY'
 import re
 import sys
@@ -109,7 +109,11 @@ SHORTCUT="$("$PYTHON_BIN" -c 'import os,sys; print(os.path.abspath(os.path.expan
 MIGRATION_COMPLETE="$DATA_DIR/.source-install-migration-complete"
 
 # ── Download ──────────────────────────────────────────────────────────────────
-TMP="$(mktemp -d)"
+# Cutover uses rename, so extraction must share the installation filesystem.
+# This mutation follows successful stable-ref validation.
+INSTALL_PARENT="$(dirname "$INSTALL_DIR")"
+mkdir -p "$INSTALL_PARENT"
+TMP="$(mktemp -d "$INSTALL_PARENT/.folioorb-install.XXXXXX")"
 echo "  Downloading FolioOrb ($REF)..."
 curl -fsSL --progress-bar "$RELEASE_URL" -o "$TMP/folio.zip"
 
@@ -125,7 +129,7 @@ fi
 # the migration helper. Use the selected archive's helper when present and the
 # current compatibility helper otherwise.
 MIGRATION_TOOL="$EXTRACTED/scripts/migrate_source_profile.py"
-if [[ ! -f "$MIGRATION_TOOL" ]]; then
+if [[ ! -f "$MIGRATION_TOOL" ]] || ! grep -q -- '--replace-source' "$MIGRATION_TOOL"; then
   MIGRATION_TOOL="$TMP/migrate_source_profile.py"
   curl -fsSL "https://raw.githubusercontent.com/$REPO/main/scripts/migrate_source_profile.py" \
     -o "$MIGRATION_TOOL"
@@ -133,27 +137,17 @@ fi
 
 # ── Preserve the complete writable profile ───────────────────────────────────
 MIGRATION_STATUS="$(
-  "$PYTHON_BIN" "$MIGRATION_TOOL" --source "$INSTALL_DIR" --destination "$DATA_DIR"
+  "$PYTHON_BIN" "$MIGRATION_TOOL" --source "$INSTALL_DIR" --destination "$DATA_DIR" \
+    --replace-source "$EXTRACTED" --receipt "$TMP/cutover.json"
 )"
+ROLLBACK_DIR="$("$PYTHON_BIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["recovery"] or "")' "$TMP/cutover.json")"
 KEEP_RECOVERY=0
 if [[ "$MIGRATION_STATUS" == "MIGRATED" ]]; then
   KEEP_RECOVERY=1
   echo "  ✓ Portfolio, backups, settings, and update state migrated"
 fi
 
-# ── Install transaction ───────────────────────────────────────────────────────
-mkdir -p "$(dirname "$INSTALL_DIR")"
-if [[ -e "$INSTALL_DIR" ]]; then
-  STAMP="$(date -u '+%Y%m%dT%H%M%SZ')-$$"
-  if (( KEEP_RECOVERY == 1 )); then
-    ROLLBACK_DIR="${INSTALL_DIR}-profile-recovery-$STAMP"
-  else
-    ROLLBACK_DIR="${INSTALL_DIR}-update-rollback-$STAMP"
-  fi
-  mv "$INSTALL_DIR" "$ROLLBACK_DIR"
-fi
-mv "$EXTRACTED" "$INSTALL_DIR"
-printf '%s\n' "$DATA_DIR" > "$INSTALL_DIR/.source-profile-path"
+# Source replacement and its profile pointer were published under the same lease.
 export FOLIOORB_DATA_DIR="$DATA_DIR"
 
 echo "  Installing dependencies (one-time, ~60 s)..."

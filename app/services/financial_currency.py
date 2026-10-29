@@ -7,6 +7,8 @@ but persistence and reporting never use that fallback as provenance.
 """
 from __future__ import annotations
 
+import math
+
 from sqlalchemy import and_, func
 
 REPORTING_CURRENCY = "USD"
@@ -37,6 +39,19 @@ def is_reporting_currency(value) -> bool:
     """True only when ``value`` explicitly names FolioOrb's reporting currency."""
     currency = normalize_currency(value)
     return bool(currency and currency.upper() == REPORTING_CURRENCY)
+
+
+def eligible_valuation_row(row: dict) -> bool:
+    """Whether a priced row can enter a dollar calculation, without converting FX."""
+    value = row.get("current_value")
+    return bool(
+        not row.get("is_watchlist")
+        and row.get("quote_available", True)
+        and row.get("reporting_eligible", True)
+        and is_reporting_currency(quote_currency(row.get("currency")))
+        and isinstance(value, (int, float))
+        and math.isfinite(value)
+    )
 
 
 def is_trusted_reporting_fact(currency, provenance) -> bool:

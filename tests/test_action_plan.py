@@ -125,12 +125,16 @@ def _patch_compute_portfolio(monkeypatch):
     monkeypatch.setattr(
         "app.services.portfolio_valuation.evaluate",
         lambda db, pid: SimpleNamespace(
-            holdings=[],
+            holdings=[
+                {"ticker": "AAPL", "allocation_pct": 55.0},
+                {"ticker": "MSFT", "allocation_pct": 45.0},
+            ],
             total_value=5000.0,
             data_quality="complete",
             missing_tickers=(),
-            priced_position_count=0,
-            expected_position_count=0,
+            foreign_currency_tickers=(),
+            priced_position_count=2,
+            expected_position_count=2,
         ),
     )
 
@@ -143,6 +147,7 @@ def _patch_partial_compute_portfolio(monkeypatch):
             total_value=1800.0,
             data_quality="partial",
             missing_tickers=("MSFT",),
+            foreign_currency_tickers=(),
             priced_position_count=1,
             expected_position_count=2,
         ),
@@ -376,6 +381,68 @@ class TestActionPlanFallback:
 
 class TestActionPlanForceLocal:
     """Verify force_local=True skips Claude and returns a deterministic local plan."""
+
+    @pytest.mark.parametrize("quality,foreign", [
+        ("partial", ()), ("unavailable", ()), ("unavailable", ("VOD.L",)),
+    ])
+    def test_force_local_retains_coverage_without_sizing_claims(
+        self, monkeypatch, quality, foreign
+    ):
+        db = _make_db()
+        _patch_scan(monkeypatch)
+        monkeypatch.setattr("app.services.portfolio_valuation.evaluate", lambda _db, _pid: (
+            SimpleNamespace(
+                holdings=[], total_value=0.0, data_quality=quality,
+                missing_tickers=("AAPL",), foreign_currency_tickers=foreign,
+                priced_position_count=0, expected_position_count=2,
+            )
+        ))
+        monkeypatch.setattr(ai_router, "generate_action_plan", lambda _snapshot: pytest.fail(
+            "Local plans must never call Claude"
+        ))
+        plan = ai_router.get_action_plan(force_local=True, db=db)
+        assert plan["data_quality"] == quality
+        assert plan["missing_tickers"] == ["AAPL"]
+        assert plan["foreign_currency_tickers"] == list(foreign)
+        assert "largest position" not in plan["best_return_note"]
+        assert "highest-impact" not in plan["best_return_note"]
+        assert plan["buckets"]["hold"]
+
+    @pytest.mark.parametrize("allocation", [{}, {"AAPL": 100}, {"AAPL": 100, "MSFT": 0}])
+    @pytest.mark.parametrize("force_local", [True, False])
+    def test_scan_then_recovered_snapshot_uses_snapshot_allocations(
+        self, monkeypatch, allocation, force_local
+    ):
+        db = _make_db()
+        calls = []
+        scan = _fake_scan()
+        scan.allocation_pct = allocation
+
+        def load_scan(*_args, **_kwargs):
+            calls.append("scan")
+            return scan
+
+        def recovered(_db, _portfolio_id):
+            calls.append("valuation")
+            return SimpleNamespace(
+                holdings=[
+                    {"ticker": "AAPL", "allocation_pct": 25},
+                    {"ticker": "MSFT", "allocation_pct": 75},
+                ],
+                total_value=5000, data_quality="complete", missing_tickers=(),
+                foreign_currency_tickers=(), priced_position_count=2, expected_position_count=2,
+            )
+
+        monkeypatch.setattr(verdict_pipeline, "scan_portfolio", load_scan)
+        monkeypatch.setattr("app.services.portfolio_valuation.evaluate", recovered)
+        monkeypatch.setattr(ai_router, "generate_action_plan", lambda _snapshot:
+                            (_ for _ in ()).throw(TypeError("Offline local fallback")))
+        _patch_analytics(monkeypatch)
+        plan = ai_router.get_action_plan(force_local=force_local, db=db)
+        assert calls == ["scan", "valuation"]
+        assert plan["allocation_complete"] is True
+        assert "MSFT is your largest position at 75%" in plan["best_return_note"]
+        assert "at 0%" not in plan["best_return_note"]
 
     def test_force_local_returns_local_source(self, monkeypatch):
         db = _make_db()

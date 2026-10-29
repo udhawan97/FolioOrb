@@ -673,7 +673,7 @@ def apply_pending_restore() -> dict | None:
                 pending["installer_sha256"]
             ):
                 raise ValueError("Queued installer changed before handoff")
-            update_installer.launch_installer(Path(pending["installer"]))
+            update_installer.launch_installer(pending["installer"], pending["installer_sha256"])
             result["installer_status"] = "installing"
         except Exception:
             logger.exception("Earlier data restored, but rollback installer could not start")

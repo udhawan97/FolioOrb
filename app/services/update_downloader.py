@@ -130,6 +130,12 @@ def compute_sha256(path) -> str:
     return digest.hexdigest()
 
 
+def require_matching_digest(path, expected_sha256: str) -> None:
+    """Refuse missing or changed installer bytes at their consumption boundary."""
+    if not expected_sha256 or compute_sha256(path) != expected_sha256:
+        raise ValueError("Verified installer changed before handoff")
+
+
 def parse_sha256sums(text: str, filename: str) -> str | None:
     """Return the lowercase hash for ``filename`` from ``shasum``-format text."""
     target = Path(filename).name

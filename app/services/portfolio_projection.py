@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 
+from app.services import financial_currency
 from app.services.returns_math import (
     annualized,
     log_returns as _log_returns,
@@ -148,7 +149,7 @@ def compute_portfolio_projection(
 ) -> dict[str, Any]:
     active = [
         h for h in holdings
-        if not h.get("is_watchlist") and (h.get("current_value") or 0) > 0
+        if financial_currency.eligible_valuation_row(h) and (h.get("current_value") or 0) > 0
     ]
 
     tickers = [h["ticker"] for h in active]
@@ -233,10 +234,11 @@ def get_cached_projection(
     total_value: float,
 ) -> dict[str, Any]:
     now = time.time()
-    cache_key = (
-        f"{round(total_value, 2)}:"
-        f"{','.join(sorted(h['ticker'] for h in holdings if not h.get('is_watchlist')))}"
+    positions = sorted(
+        f"{h['ticker']}:{h['current_value']}"
+        for h in holdings if financial_currency.eligible_valuation_row(h)
     )
+    cache_key = f"{round(total_value, 2)}:{','.join(positions)}"
     cached = _cache.get("payload")
     if cached and _cache.get("key") == cache_key and now < _cache.get("expires_at", 0):
         return {**cached, "cached": True}

@@ -34,10 +34,10 @@ FAILED_MARKER = "last-update-failed"
 OK_MARKER = "last-update-ok"
 
 # Static, argument-driven so no untrusted value is ever interpolated into shell.
-# Args: $1 DMG  $2 BUNDLE  $3 PID  $4 LOGDIR  $5 MARKERDIR
+# Args: $1 DMG  $2 BUNDLE  $3 PID  $4 LOGDIR  $5 MARKERDIR  $6 SHA256
 _SWAP_SCRIPT = r"""#!/bin/bash
 set -u
-DMG="$1"; BUNDLE="$2"; PID="$3"; LOGDIR="$4"; MARKERDIR="$5"
+DMG="$1"; BUNDLE="$2"; PID="$3"; LOGDIR="$4"; MARKERDIR="$5"; SHA256="$6"
 mkdir -p "$LOGDIR" "$MARKERDIR"
 exec >>"$LOGDIR/macos-update.log" 2>&1
 echo "$(date -u) swap start dmg=$DMG bundle=$BUNDLE pid=$PID"
@@ -49,6 +49,8 @@ fail() {
 }
 # Wait for the running app to exit (up to ~30s), then swap.
 for _ in $(seq 1 60); do /bin/kill -0 "$PID" 2>/dev/null || break; sleep 0.5; done
+ACTUAL="$(/usr/bin/shasum -a 256 "$DMG")" || fail "checksum-unreadable"
+[ "${ACTUAL%% *}" = "$SHA256" ] || fail "checksum-changed"
 MNT="$(/usr/bin/mktemp -d /tmp/folio-update.XXXXXX)"
 trap '/bin/rm -rf "$MNT"' EXIT
 /usr/bin/hdiutil attach "$DMG" -nobrowse -noverify -mountpoint "$MNT" -quiet || fail "mount"
@@ -96,7 +98,7 @@ def _markers_dir() -> Path:
     return directory
 
 
-def launch_swap(dmg: Path) -> bool:
+def launch_swap(dmg: Path, expected_sha256: str) -> bool:
     """Write and launch the detached swap script for ``dmg``.
 
     Returns True if the swap was handed off, False if this isn't a bundle we can
@@ -122,7 +124,7 @@ def launch_swap(dmg: Path) -> bool:
 
     subprocess.Popen(  # noqa: S603  pylint: disable=consider-using-with
         ["/bin/bash", str(script), str(dmg), str(bundle), str(os.getpid()),
-         str(log_dir), str(markers)],
+         str(log_dir), str(markers), expected_sha256],
         start_new_session=True,  # survive this app quitting
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

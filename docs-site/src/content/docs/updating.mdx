@@ -1,13 +1,13 @@
 ---
 title: Updating
-description: How FolioOrb updates itself with your permission, and why your portfolio data survives every update.
+description: How FolioOrb updates with your permission, separates your profile from code, and uses verified backups for recovery.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-FolioOrb can update itself — with your permission, and without ever putting your holdings
-at risk. Your database and config live in a separate per-user data directory, so they're
-preserved automatically, and a verified backup is taken before anything is installed.
+FolioOrb installs updates with your permission. Your database and config live in a separate
+per-user data directory, and installation requires a verified safety backup. Keep an exported
+backup on another device as well; an update or rollback is not a guarantee against data loss.
 
 ## In-app updates (v4.4.1+)
 
@@ -22,11 +22,11 @@ You can also check any time:
 
 Opening it shows a Software Update panel with the current and latest versions, what changed,
 the download size, and whether a relaunch is needed. Choose **Update Now** to download and
-install, or **Later** to dismiss. On both macOS and Windows this is fully automatic: the app
-downloads the update, verifies it, backs up your data, installs, and reopens on the new version
-— no manual dragging or running an installer yourself.
+install, or **Later** to dismiss. The packaged app downloads and verifies the update, takes
+a safety backup, then hands off installation. Eligible macOS bundles can be swapped
+automatically; when that handoff is unavailable, the DMG opens for manual installation.
 
-<Aside type="tip" title="Your data is protected at every step">
+<Aside type="tip" title="A verified backup is required">
 Before an update installs, FolioOrb takes a verified backup of your portfolio database and
 your settings. If that backup can't be made, the update is **paused** rather than risking your
 data. After updating, a quiet confirmation notes your holdings came through intact.
@@ -35,11 +35,17 @@ data. After updating, a quiet confirmation notes your holdings came through inta
 Every download is checked against the checksums published with the release before it's
 installed; a corrupted or interrupted download is rejected or resumed automatically.
 
+**Source candidate, proposed for the next release:** checks preserve an already downloaded
+update, and overlapping check, download, install, and rollback requests leave the active
+operation in control. An explicit rollback can replace a ready update. Installer bytes are
+checked again before handoff; the detached macOS helper also checks after waiting for the
+app to exit and before mounting. Missing or changed bytes stop installation.
+
 ### If an update misbehaves
 
 Open **Settings → Software Update → Restore previous version…** to roll back to the version you
-were on before. FolioOrb always snapshots your current data first, so nothing is lost
-either way — you choose whether to also restore your pre-update data. If the app fails to start
+were on before. FolioOrb requires a verified snapshot of your current data before handoff; that snapshot
+remains available for recovery. You choose whether to also restore your pre-update data. If the app fails to start
 after an update, it offers the rollback for you automatically.
 
 Keeping current data remains the default. If you also choose the earlier data,
@@ -74,7 +80,7 @@ You can always update by hand instead:
   copy.
 - **Windows** — run the newer `-Setup.exe`; it upgrades the existing install in place.
 
-Your holdings, snapshots, cached AI output, and `.env` all carry over. See where that data
+Your holdings, snapshots, cached AI output, and `.env` remain in their separate profile. See where that data
 lives for [macOS](/FolioOrb/install-macos/#where-your-data-lives) and
 [Windows](/FolioOrb/install-windows/#where-your-data-lives).
 

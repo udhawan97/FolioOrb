@@ -1,3 +1,31 @@
+# Proposed release notes — unpublished source candidate
+
+These changes are intended for the next release. No release tag or published installer
+has been created for this work; native installation and screen-reader acceptance remain
+separate from source verification.
+
+## Fixed
+
+- Keep saved positions visible when quotes fail, and keep unavailable prices distinct from zero.
+- Label known USD subtotals; withhold incomplete whole-portfolio returns, allocations, and
+  Review Pack value changes. Preserve native foreign units without FX conversion.
+- Count all eligible period sales in Review Packs, beyond the ordinary 100-row trade display.
+- Disclose Local plan coverage before making sizing or concentration claims.
+- Reject nonfinite inputs and overflowing financial amounts without saving partial facts or
+  invalid snapshots; preserve existing facts when totals cannot be represented.
+- Preserve ownership of active update/rollback operations and recheck trusted installer
+  bytes before handoff, including the macOS helper's post-exit check.
+- Stop source installation before code/profile changes when stable-release resolution fails.
+- Hold exclusive source-profile ownership through automatic migration and code replacement;
+  refuse running or unsupported legacy launchers while retaining the original profile.
+- Announce global toast feedback through one persistent polite status region.
+- Serialize holding edits and read back interrupted saves before another dependent change;
+  preserve newer inputs and cancelled-sale drafts.
+- Preserve native Compare price units and ETF text labels; keep report results aligned with
+  the latest selected month or quarter when requests finish out of order.
+
+---
+
 # FolioOrb v5.16.1 Release Notes
 
 **Release date:** August 26, 2026

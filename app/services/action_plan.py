@@ -18,6 +18,7 @@ concentration has moved reads a fresh plan instead of a stale one.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -29,11 +30,9 @@ from app.services.verdict_pipeline import VERDICT_DISCLAIMER, ScanResult
 
 logger = logging.getLogger(__name__)
 
-# Bumped v2 → v3: portfolio_state_signature now folds in the secondary action
-# (fixing a cache collision between e.g. "2 hold, 1 add" and "2 hold, 1 trim"
-# books). Bumping the version cleanly orphans any pre-fix cached rows instead
-# of risking a stale, collision-prone entry being read under the old key.
-_CACHE_TYPE = "action_plan_v3"
+# Fresh valuation weights now own sizing; older narratives may have used
+# missing or stale scan allocations, so do not serve them under the new contract.
+_CACHE_TYPE = "action_plan_v4"
 
 _GAP_TYPE_LABEL: dict[str, str] = {
     "heavy_hold":    "large position on hold",
@@ -67,6 +66,21 @@ def has_invested_positions(scan: ScanResult) -> bool:
     return bool(invested_tickers(scan))
 
 
+def _complete_allocations(tickers: list[str], allocations: dict) -> bool:
+    """All invested weights must be known, finite and reconcile after rounding."""
+    if set(allocations) != set(tickers):
+        return False
+    if not tickers:
+        return True
+    if not all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        and math.isfinite(value) and 0 <= value <= 100
+        for value in allocations.values()
+    ):
+        return False
+    return abs(sum(allocations.values()) - 100) <= len(tickers) * 0.05 + 1e-6
+
+
 def build_snapshot(
     db: Session, scan: ScanResult, portfolio_id: int = 1
 ) -> dict:  # pylint: disable=too-many-locals
@@ -83,7 +97,6 @@ def build_snapshot(
     )
 
     signals = scan.signals
-    alloc_map = scan.allocation_pct
     portfolio_exposure = scan.exposure
     regime = scan.regime
     active_tickers = invested_tickers(scan)
@@ -93,11 +106,13 @@ def build_snapshot(
         valuation = portfolio_valuation.evaluate(db, portfolio_id)
         holdings_rows = [
             row for row in valuation.holdings if row.get("ticker") in active_tickers
+            and row.get("reporting_eligible", True)
         ]
         total_value = valuation.total_value
         valuation_quality = {
             "data_quality": valuation.data_quality,
             "missing_tickers": list(valuation.missing_tickers),
+            "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
             "priced_position_count": valuation.priced_position_count,
             "expected_position_count": valuation.expected_position_count,
         }
@@ -110,9 +125,24 @@ def build_snapshot(
         valuation_quality = {
             "data_quality": "unavailable",
             "missing_tickers": list(active_tickers),
+            "foreign_currency_tickers": [],
             "priced_position_count": 0,
             "expected_position_count": len(active_tickers),
         }
+
+    alloc_map = {row["ticker"]: row.get("allocation_pct") for row in holdings_rows}
+    allocation_complete = (
+        valuation_quality["data_quality"] == "complete"
+        and valuation_quality["expected_position_count"] == len(active_tickers)
+        and _complete_allocations(active_tickers, alloc_map)
+    )
+    if valuation_quality["data_quality"] == "complete" and not allocation_complete:
+        valuation_quality["data_quality"] = "partial" if holdings_rows else "unavailable"
+    # Exposure was calculated in the earlier scan. Reuse it only when its
+    # weights agree with this valuation; otherwise its concentration is unknown.
+    exposure_current = allocation_complete and scan.allocation_pct == alloc_map
+    if not exposure_current:
+        portfolio_exposure = {}
 
     return_map = {
         h["ticker"]: float(h.get("total_return_pct") or 0)
@@ -128,7 +158,7 @@ def build_snapshot(
             "t": ticker,
             "action": sig.get("action", "needs-data"),
             "conf": sig.get("confidence", 0),
-            "alloc_pct": alloc_map.get(ticker, 0),
+            "alloc_pct": alloc_map.get(ticker) if allocation_complete else None,
             "ret_pct": return_map.get(ticker, 0),
             "reason": (sig.get("reasons") or [""])[0][:80],
             "risk": (sig.get("risks") or [""])[0][:60],
@@ -164,7 +194,7 @@ def build_snapshot(
     # "sectors"/"countries" here silently shipped Claude an empty exposure block.
     sectors = (portfolio_exposure.get("sector_exposure") or [])[:4]
     countries = (portfolio_exposure.get("country_exposure") or [])[:3]
-    hhi = float(portfolio_exposure.get("concentration_hhi") or 0)
+    hhi = float(portfolio_exposure.get("concentration_hhi") or 0) if exposure_current else None
 
     # Conviction gaps summary
     gap_items = (conviction_data.get("gaps") or [])[:3]
@@ -172,13 +202,14 @@ def build_snapshot(
     snapshot: dict = {
         "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "valuation": valuation_quality,
+        "allocation_complete": allocation_complete,
         "total_value": round(total_value, 0),
         "regime": {
             "label": regime.get("label", ""),
             "mood": regime.get("mood", ""),
         },
-        "concentration_hhi": round(hhi, 3),
-        "hhi_band": exposure_service.concentration_band(hhi),
+        "concentration_hhi": round(hhi, 3) if hhi is not None else None,
+        "hhi_band": exposure_service.concentration_band(hhi) if hhi is not None else "unavailable",
         "holdings": holdings_data,
         "exposure": {
             "top_sectors": [
@@ -229,13 +260,12 @@ def build_plan(scan: ScanResult, parsed: dict) -> dict:
     }
 
 
-def _local_plan(scan: ScanResult) -> dict:
+def _local_plan(scan: ScanResult, allocations: dict) -> dict:
     """
     Deterministic fallback when Claude is unavailable or force_local=True.
     Buckets holdings purely from their existing verdict actions.
     """
     signals = scan.signals
-    alloc_map = scan.allocation_pct
     active_tickers = invested_tickers(scan)
     regime = scan.regime
 
@@ -291,7 +321,7 @@ def _local_plan(scan: ScanResult) -> dict:
     )
 
     alloc_sorted = sorted(
-        [(t, alloc_map.get(t, 0)) for t in active_tickers],
+        list(allocations.items()),
         key=lambda x: x[1],
         reverse=True,
     )
@@ -325,6 +355,8 @@ def _local_plan(scan: ScanResult) -> dict:
             f"{largest_ticker} is your largest position at {largest_alloc:.0f}% — "
             "right-sizing concentration is the highest-impact lever."
             if largest_ticker else
+            "Portfolio concentration is unavailable until complete finite USD allocations exist."
+            if active_tickers else
             "Add shares to build an invested portfolio before reading concentration."
         ),
         "regime": regime,
@@ -336,15 +368,31 @@ def _local_plan(scan: ScanResult) -> dict:
 def build_fallback(scan: ScanResult, snapshot: dict | None = None) -> dict:
     """The plan FolioOrb writes on its own.
 
-    ``snapshot`` is the read Claude would have seen, or ``None`` when there is
-    none — forced local, or the snapshot itself could not be built.  When it says
+    ``snapshot`` is the read Claude would have seen, or ``None`` when the snapshot
+    itself could not be built. When it says
     the book is only partly priced, the plan says so rather than quoting
     Portfolio-level totals it cannot stand behind.
     """
-    plan = _local_plan(scan)
     if snapshot is None:
-        return plan
+        snapshot = {"valuation": {
+            "data_quality": "unavailable" if has_invested_positions(scan) else "complete",
+        }}
     valuation = snapshot.get("valuation") or {}
+    allocations = {
+        row["t"]: row.get("alloc_pct") for row in snapshot.get("holdings", [])
+        if row.get("t") in invested_tickers(scan)
+    }
+    allocation_complete = (
+        valuation.get("data_quality") == "complete"
+        and _complete_allocations(invested_tickers(scan), allocations)
+    )
+    plan = _local_plan(scan, allocations if allocation_complete else {})
+    plan.update({
+        "allocation_complete": allocation_complete,
+        "data_quality": valuation.get("data_quality", "unavailable"),
+        "missing_tickers": list(valuation.get("missing_tickers") or []),
+        "foreign_currency_tickers": list(valuation.get("foreign_currency_tickers") or []),
+    })
     if valuation.get("data_quality") == "complete":
         return plan
 
@@ -356,8 +404,11 @@ def build_fallback(scan: ScanResult, snapshot: dict | None = None) -> dict:
             "missing_tickers": list(valuation.get("missing_tickers") or []),
             "headline": f"Live Portfolio valuation is {data_quality}",
             "thesis": (
-                "No Claude plan was generated because unpriced positions would make "
-                "Portfolio-level totals incomplete."
+                "USD valuation coverage is incomplete. Local signal buckets remain "
+                "available; portfolio sizing and concentration need complete USD prices."
+            ),
+            "best_return_note": (
+                "Portfolio concentration is unavailable until USD prices are complete."
             ),
         }
     )
