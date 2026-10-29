@@ -28,7 +28,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from app import paths
-from app.services import env_file
+from app.services import env_file, database_generation
 
 logger = logging.getLogger(__name__)
 
@@ -867,13 +867,13 @@ def create_verified_backup(
     return VerifiedBackup(database=database, environment=environment)
 
 
+@database_generation.replacement
 def restore_backup(backup_path: Path, target_db: Path, ts: str | None = None) -> bool:
     """Restore ``backup_path`` over ``target_db`` without destroying the current file.
 
     All profile connections must be closed. Stage and verify the replacement
     before moving the database and WAL sidecars to ``*.failed-<timestamp>``.
     Keep a persistent startup barrier if canonical recovery is incomplete.
-    Returns True after publication, including nonfatal directory-sync faults.
     """
     backup_path, target_db = Path(backup_path), Path(target_db)
     require_completed_restore(target_db)

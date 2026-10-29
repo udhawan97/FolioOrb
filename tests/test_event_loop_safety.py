@@ -35,7 +35,6 @@ import app.routers
 # endpoint name -> why it is allowed to occupy the event loop.
 # The bar: it must either `await` real async I/O, or do no I/O at all.
 GENUINELY_ASYNC = {
-    "preview_holdings": "awaits bounded upload and offloads provider validation",
     "import_holdings": "awaits UploadFile.read() — genuine async I/O",
     "verify_review_bundle_upload": "streams a bounded body and offloads verification",
     "get_market_status": "pure clock arithmetic, no I/O to hand to a thread",

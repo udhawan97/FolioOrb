@@ -69,14 +69,26 @@ The desktop and browser paths run the same FastAPI + SQLite dashboard on your ma
   <sub>The current dashboard with fictional demo holdings. Values are illustrative; missing data remains explicit.</sub>
 </p>
 
-### Inspect a CSV first (current source builds)
+### Review and confirm a CSV (current source builds)
 
 In **Manage → Import CSV**, choose **Preview CSV…** to inspect up to 200 template rows
-without saving. Review normalized values, duplicates and errors; **Close preview** discards
-it. **Import immediately…** is a separate action that saves valid rows. Preview uses no
-Claude, but ticker validation may send symbols to Yahoo Finance; the full CSV and notes
-are not sent there. Preview is a snapshot, not a promise that later import will be identical.
-This source feature is not included in the existing v5.16.1 installers.
+without saving. Review the proposed persisted values, duplicates and errors, then choose
+**Confirm N additions** to save exactly the reviewed valid rows together. Invalid/skipped
+rows stay excluded. A changed portfolio or expired preview requires a fresh review; a busy
+database permits an explicit retry. Cost 0 means unknown cost, and unset thesis cadence is
+shown explicitly.
+
+If the response is lost, do not repeat the import. **Refresh and compare reviewed rows**
+compares every persisted field with the original CSV. After a reload, choose that same file
+again. Inspect the comparison and acknowledge it before **Start a fresh preview**. Matching
+records do not prove this request created them. Closing never undoes a committed import.
+Recovery metadata stays in the same tab session; tokens, files and raw holdings values are
+not stored there. This does not promise exactly-once execution across crashes.
+
+**Import immediately…** remains a separate legacy action. Preview uses no Claude; ticker
+validation may send symbols to Yahoo Finance, but the CSV and notes are not sent there.
+Confirmation and reconciliation call neither provider nor AI. These source features are not
+included in the existing v5.16.1 installers; native acceptance and publication are separate.
 
 ## What FolioOrb helps you answer
 

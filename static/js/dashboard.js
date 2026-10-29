@@ -13599,7 +13599,7 @@ function toggleCsvImportPanel() {
     const open = panel.hidden;
     panel.hidden = !open;
     btn?.setAttribute("aria-expanded", String(open));
-    if (open) updateImportPanelMode();
+    if (open) { updateImportPanelMode(); window.holdingsCsvPreview?.open(); }
     else window.holdingsCsvPreview?.cancel(false);
 }
 
@@ -13760,7 +13760,21 @@ function initCsvImport() {
     const input = document.getElementById("import-csv-input");
     if (!input || input.dataset.bound) return;
     input.dataset.bound = "true";
-    window.holdingsCsvPreview = createCsvPreview({ document, workspace: PortfolioWorkspace });
+    let csvRecoveryStorage = null;
+    try { csvRecoveryStorage = window.sessionStorage; } catch (_) { /* preview stays read-only */ }
+    window.holdingsCsvPreview = createCsvPreview({
+        document, workspace: PortfolioWorkspace, storage: csvRecoveryStorage,
+        refresh: async portfolioId => {
+            invalidateManageHoldingsLoad();
+            const requestId = manageHoldingsRequestId;
+            const data = await PortfolioWorkspace.json("/api/portfolio/holdings");
+            if (requestId !== manageHoldingsRequestId || PortfolioWorkspace.id !== portfolioId
+                || data.portfolio_id !== portfolioId
+                || !Array.isArray(data.holdings)) throw new Error("Portfolio refresh could not be verified");
+            renderManageHoldingsData(data.holdings);
+            refreshPortfolioMutationInBackground();
+        },
+    });
     input.addEventListener("change", () => {
         const file = input.files && input.files[0];
         if (file) handleImportFile(file);

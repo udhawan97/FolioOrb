@@ -1,15 +1,17 @@
 # pylint: disable=too-many-lines
 from datetime import date, datetime, timezone
 import math
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
+from pydantic import ValidationError
 from app.database import get_db
-from app.models import Holding, Portfolio, RealizedTrade
+from app.models import Holding, RealizedTrade
 from app.routers.deps import require_portfolio
 from app.schemas import (
+    CsvConfirmation, CsvReconciliation,
     HoldingCreate,
     HoldingRemoval,
     HoldingUpdate,
@@ -26,7 +28,7 @@ from app.services.stock_service import (
 from app.services import dividend_calendar
 from app.services import financial_currency
 from app.services import holdings_csv
-from app.services import holdings_preview
+from app.services import holdings_preview, csv_confirmation
 from app.services import holdings_repository
 from app.services import portfolio_lifecycle
 from app.services import portfolio_valuation
@@ -361,29 +363,62 @@ def _prepare_import_external(header, data_rows, force_local, existing_tickers):
 
 
 @router.post("/holdings/preview")
-async def preview_holdings(
+def preview_holdings(
     file: UploadFile = File(...), portfolio_id: int = 1, db: Session = Depends(get_db)
 ):
-    """Inspect a strict CSV against a point-in-time portfolio; never save rows."""
-    raw = await file.read(holdings_csv.MAX_IMPORT_BYTES + 1)
-    # The lifecycle guard seeds portfolio 1. Preview must use SELECT only.
-    with db.no_autoflush:
-        portfolio = db.get(Portfolio, portfolio_id)
-        if portfolio is None:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
-        identity = {"id": portfolio.id, "name": portfolio.name}
-        existing = set(holdings_repository.active_tickers(db, portfolio_id))
-    db.rollback()
-    snapshot_at = datetime.now(timezone.utc).isoformat()
+    """Inspect a CSV without writes; issue a bounded process-local confirmation."""
+    raw = file.file.read(holdings_csv.MAX_IMPORT_BYTES + 1)
+    reservation = None
     try:
-        result = await run_in_threadpool(
-            holdings_preview.prepare_preview, raw, file.filename, file.content_type,
-            existing, validate_ticker_symbol,
+        reservation, existing = csv_confirmation.store.reserve(db, portfolio_id)
+        prepared = holdings_preview.prepare_preview(
+            raw, file.filename, file.content_type, existing, validate_ticker_symbol
         )
+        return csv_confirmation.store.issue(db, reservation, prepared)
     except holdings_csv.ImportFileError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    return {"portfolio_id": portfolio_id, "portfolio": identity,
-            "snapshot_at": snapshot_at, **result}
+    except csv_confirmation.ConfirmationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+    finally:
+        if reservation and csv_confirmation.store.pending.get(reservation, {}).get("state") \
+                == "preparing":
+            csv_confirmation.store.discard(reservation)
+
+
+@router.post("/holdings/confirm")
+def confirm_holdings(
+    data: CsvConfirmation, portfolio_id: int = 1, db: Session = Depends(get_db)
+):
+    """Commit only the additions bound to this reviewed capability."""
+    try:
+        return csv_confirmation.store.confirm(
+            db, portfolio_id, data.token, data.normalized_digest
+        )
+    except csv_confirmation.ConfirmationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+
+@router.post("/holdings/reconcile")
+def reconcile_holdings(
+    file: UploadFile = File(...), manifest: str = Form(..., max_length=4096),
+    portfolio_id: int = 1, db: Session = Depends(get_db)
+):
+    """Compare the original reviewed fields to current records without any write."""
+    try:
+        metadata = CsvReconciliation.model_validate_json(manifest)
+        if metadata.portfolio_id != portfolio_id:
+            raise csv_confirmation.ConfirmationError(400, "scope", "Select the reviewed portfolio.")
+        raw = file.file.read(holdings_csv.MAX_IMPORT_BYTES + 1)
+        expected = csv_confirmation.reviewed_rows(raw, file.filename, file.content_type, metadata)
+        return csv_confirmation.store.compare(db, portfolio_id, expected, metadata)
+    except holdings_csv.ImportFileError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except csv_confirmation.ConfirmationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+    except (ValidationError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400, detail="Reviewed metadata could not be verified."
+        ) from exc
 
 
 @router.post("/holdings/import")
