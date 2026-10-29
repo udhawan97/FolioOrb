@@ -300,6 +300,12 @@ class PreviewStore:
                     reason = "No active holding" if not matches else "Compare all fields"
                     try:
                         _json(actual)
+                        if actual is not None:
+                            # Stored cost zero means unknown; ticker casing can be legacy text.
+                            checked = {**actual, "ticker": str(actual["ticker"]).strip().upper()}
+                            inputs = {**checked, "avg_cost": checked["avg_cost"] or None}
+                            if persisted_values(HoldingCreate(**inputs)) != checked:
+                                raise ValueError("Stored fields are not canonical")
                     except (ValueError, TypeError):
                         actual = None
                         status, reason = "unknown", "Stored fields cannot be verified"

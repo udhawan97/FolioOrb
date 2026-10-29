@@ -712,3 +712,33 @@ def test_confirm_preserves_current_main_aggregate_guard(api_client, db, state, l
     token = report["confirmation"]["token"]
     assert token not in state[0].pending and token not in state[0].receipts
     assert confirm(api_client, report).json()["detail"]["code"] == "reconcile"
+
+
+@pytest.mark.parametrize("changes", [
+    {"shares": -1}, {"avg_cost": -1}, {"hold_class": "invalid"},
+    {"thesis_review_interval_days": -1}, {"shares": 1e308, "avg_cost": 1e308},
+    {"notes": "x" * 501},
+])
+def test_reconciliation_keeps_corrupt_stored_values_unknown(api_client, db, changes):
+    report = preview(api_client)
+    assert confirm(api_client, report).status_code == 200
+    holding = db.query(Holding).one()
+    for field, value in changes.items():
+        setattr(holding, field, value)
+    db.commit()
+    with forbid_writes(db):
+        result = compare(api_client, report).json()
+    assert result["unknown"] == 1
+    assert result["matching"] == result["mismatching"] == 0
+    assert result["rows"][0]["current"] is None
+
+
+def test_reconciliation_accepts_stored_unknown_cost_and_unset_cadence(api_client, db):
+    raw = "ticker,shares\nSYN,2\n"
+    report = preview(api_client, raw)
+    assert confirm(api_client, report).status_code == 200
+    with forbid_writes(db):
+        result = compare(api_client, report, raw).json()
+    assert result["matching"] == 1 and result["unknown"] == 0
+    assert result["rows"][0]["current"]["avg_cost"] == 0
+    assert result["rows"][0]["current"]["thesis_review_interval_days"] is None
