@@ -157,6 +157,8 @@ def build_target_plan(
         "reporting_currency": portfolio_valuation.REPORTING_CURRENCY,
         "known_value": valuation.total_value,
         "valuation_quality": valuation.data_quality,
+        "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+        "realized_data_quality": valuation.realized_data_quality,
         "missing_tickers": list(valuation.missing_tickers),
         "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "drift_available": usable,
