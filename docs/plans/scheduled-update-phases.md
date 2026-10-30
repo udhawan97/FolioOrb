@@ -178,8 +178,8 @@ Update in place; use one row per bounded slice. Qualify recurring acceptance sli
 | 1A | Source merged; transport verified | None | Preserve exact-artifact native acceptance before publication |
 | 1B | Source merged; incompatible upgrades deferred | 1A | Revisit NumPy only with a Python-minimum decision; validate grouped Pydantic proposals |
 | 2 | Source merged and Pages verified | 1A disposition satisfied | Preserve native/publication gates |
-| 3 | Implemented; integration gates pending | 2 source integration satisfied | Verify exact candidate, implementation council and hosted checks |
-| 4 | Planned | 1A baseline disposition | Run cross-surface synthetic quality matrix |
+| 3 | Source merged; Pages verified | 2 source integration satisfied | Preserve native/publication gates |
+| 4 | Implemented; verification pending | Verified current baseline | Verify matrix, explanations and capture metadata; implementation council and exact-head gates |
 | 5A | Planned | 4 | Establish fields safely comparable from v1 receipts |
 | 5B | Planned | 5A | Add bounded accessible comparison UI |
 | 6A | Planned | Selected completed feature slice | Rehearse complete disposable-profile journey |
@@ -341,3 +341,8 @@ Owner `capo-phase3-20261029`, base `0a8eedac8b92e49cdfcfe1286502a1333fa2aa97`. [
 Baseline confirmPOST405 and115existing focused tests passed. Final local gates:2049Python3.12 tests,134Node tests, compileall, full Pylint10.00/10 with no messages and diff-check passed. Docs npmci/build23pages/audit0vulnerabilities passed. Graphify incremental code update/scoped query passed; semantic documentation/community labels are not acceptance proof. Actual Safari26.5.2 used only verified disposable fictional SQLite, fake quotes, blankkey/disabledscheduler, denied externalHTTP/AI and SQL-write guards. Preview/confirm, repeatedCSV, staleness, realbusy/manualretry, loss before/aftercommit, reload, wrongfile/unavailableread holds, known/mismatch acknowledgement, saved-refreshfailure, actualserverrestart, pendingclose/no-latefocus, portfolioswitch, expiry and390px long/literalnotes passed. The initial disabled-target focus gap was corrected to the enabled panel toggle and rechecked. All preview/reconciliation database receipts are unchanged; confirm permitted only holding inserts, no other table mutations.
 
 Implementation council, exact-head hosted checks and integration remain pending at this checkpoint. No native, VoiceOver, physicalkeyboard, installed-app, screenshot, signing or release acceptance. Same-process replay is bounded and cannot establish exactly-once acrosscrashes; tabclosure can lose session metadata. No tag, softwarepublication or protectedapproval. Latest stable remains v5.16.1. Run evidence: `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/folioorb-phase3-20261029`. After verified integration, nextPhase4 is the evidence-driven incomplete-data explanation matrix; do not repeatPhase3.
+
+
+## Phase 4 implementation checkpoint — October 30, 2026
+
+Base `88c8ef4b7ada91faeb128df6b7c923bea4322d29`; [bounded plan](2026-10-30-financial-data-matrix.md). Two complete plan council rounds with four independent roles each accepted the slice. Baseline probes reproduced missing realized-exclusion explanations and absent standalone report CSV capture time. The matrix and focused adapters/presentation changes are implemented; exact-candidate implementation council and integration gates remain pending. Original absolute queue remains the writable canonical ledger. No native acceptance, software release, schema or dependency change is claimed.

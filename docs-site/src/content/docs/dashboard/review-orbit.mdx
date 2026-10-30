@@ -290,3 +290,20 @@ If staging or verification fails, the live database is left untouched. The next 
 reports whether the restore succeeded and names the retained safety backup.
 A queued restore remains visible in Backup Vault and disables another Restore action until the
 clean restart consumes it.
+
+### Source builds: explaining partial valuation
+
+Current source builds distinguish **Valuation coverage** from price coverage alone.
+A book may have every current USD price and still have partial valuation because
+some realized records have non-USD or unsupported currency/price provenance.
+Trust Center, Review Pack and the target plan name the number excluded from USD
+returns **across all time**. That count is separate from the selected period's
+realized P&L. Existing availability and drift restrictions continue to apply.
+
+Their CSV/HTML receipts retain the same exclusion explanation. Review CSV also
+records its generation time, so captures made at different times remain distinct.
+Generation time says when a receipt was produced; it does not prove when a quote
+was observed or fetched. Those quote timestamps remain unavailable in the current
+contract, and coverage does not establish freshness. These source changes are not
+included in the existing v5.16.1 installers; native acceptance and software
+publication remain separate gates.

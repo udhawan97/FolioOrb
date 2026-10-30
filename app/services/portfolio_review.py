@@ -36,6 +36,21 @@ EarningsLoader = Callable[[list[str], int], list[dict]]
 
 _QUALITY_RANK = {"complete": 0, "not_applicable": 0, "partial": 1, "unavailable": 2}
 _PERIOD_DAYS = {"month": 31, "quarter": 92}
+REALIZED_EXCLUSION_CAVEAT = (
+    "Realized records with non-USD or unsupported currency/price provenance are "
+    "excluded from USD returns (all time)."
+)
+
+
+def _realized_coverage_rows(writer, data, section=None):
+    """Preserve absent fields in older payloads rather than inventing coverage."""
+    for key in ("realized_data_quality", "excluded_realized_trade_count"):
+        if key in data:
+            values = [key, data[key]]
+            _write_safe_csv_row(writer, [section, *values] if section else values)
+    if data.get("excluded_realized_trade_count"):
+        values = ["realized_exclusion_caveat", REALIZED_EXCLUSION_CAVEAT]
+        _write_safe_csv_row(writer, [section, *values] if section else values)
 
 
 def _utc_now() -> datetime:
@@ -177,17 +192,21 @@ def build_trust_center(
     areas = [
         {
             "key": "prices",
-            "label": "Position prices",
+            "label": "Valuation coverage",
             "quality": valuation.data_quality,
             "covered": valuation.priced_position_count,
             "expected": valuation.expected_position_count,
             "missing": list(valuation.missing_tickers),
             "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
             "source": "Yahoo Finance via the local market-data cache",
-            "caveat": (
+            "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+            "realized_data_quality": valuation.realized_data_quality,
+            "caveat": " ".join(filter(None, [
                 "Foreign-priced positions are named separately and excluded from USD totals."
-                if valuation.foreign_currency_tickers else None
-            ),
+                if valuation.foreign_currency_tickers else None,
+                (f"{valuation.excluded_realized_trade_count} realized records excluded (all time). "
+                 + REALIZED_EXCLUSION_CAVEAT) if valuation.excluded_realized_trade_count else None,
+            ])) or None,
         },
         {
             "key": "fundamentals",
@@ -260,6 +279,8 @@ def build_trust_center(
         "portfolio_id": portfolio_id,
         "generated_at": _utc_now().isoformat(),
         "overall_quality": overall,
+        "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+        "realized_data_quality": valuation.realized_data_quality,
         "reporting_currency": portfolio_valuation.REPORTING_CURRENCY,
         "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "areas": areas,
@@ -456,6 +477,8 @@ def build_review_report(
         "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "data_quality": {
             "valuation": valuation.data_quality,
+            "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+            "realized_data_quality": valuation.realized_data_quality,
             "history": history_quality,
             "missing_prices": list(valuation.missing_tickers),
             "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
@@ -489,7 +512,7 @@ def build_review_report(
                     if opening else
                     "No stored opening snapshot is available. "
                 )
-                + ("Current price coverage is incomplete; value change is unavailable. "
+                + ("Valuation inputs are incomplete; value change is unavailable. "
                    if valuation.data_quality != "complete" else "")
                 + "Value change includes contributions and withdrawals; it is "
                 "not a time-weighted investment return."
@@ -511,6 +534,8 @@ def report_csv(report: dict) -> str:
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["section", "metric", "value"])
+    _write_safe_csv_row(writer, ["coverage", "generated_at", report.get("generated_at")])
+    _realized_coverage_rows(writer, report["data_quality"], "coverage")
     for key, value in report["current"].items():
         _write_safe_csv_row(writer, ["current", key, value])
     for key, value in report["period_activity"].items():
@@ -549,6 +574,7 @@ def trust_center_csv(trust: dict) -> str:
     _write_safe_csv_row(writer, ["generated_at", trust.get("generated_at")])
     _write_safe_csv_row(writer, ["portfolio_id", trust.get("portfolio_id")])
     _write_safe_csv_row(writer, ["overall_quality", trust.get("overall_quality")])
+    _realized_coverage_rows(writer, trust)
     _write_safe_csv_row(writer, ["reporting_currency", trust.get("reporting_currency")])
     _write_safe_csv_row(writer, [
         "foreign_currency_tickers",
@@ -594,6 +620,7 @@ def target_plan_csv(plan: dict, *, generated_at: str | None = None) -> str:
     _write_safe_csv_row(writer, ["reporting_currency", plan.get("reporting_currency")])
     _write_safe_csv_row(writer, ["known_value", plan.get("known_value")])
     _write_safe_csv_row(writer, ["valuation_quality", plan.get("valuation_quality")])
+    _realized_coverage_rows(writer, plan)
     _write_safe_csv_row(writer, ["target_course_complete", plan.get("complete")])
     _write_safe_csv_row(writer, ["drift_available", plan.get("drift_available")])
     _write_safe_csv_row(
@@ -657,6 +684,11 @@ def report_html(report: dict) -> str:
         if report["data_quality"]["valuation"] != "complete" else ""
     )
     excluded = ", ".join(report.get("foreign_currency_tickers", []))
+    excluded_realized = report["data_quality"].get("excluded_realized_trade_count")
+    realized_caveat = (
+        f"{excluded_realized} realized records excluded (all time). {REALIZED_EXCLUSION_CAVEAT}"
+        if excluded_realized else ""
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>FolioOrb {esc(report['period'])} review</title>
@@ -679,7 +711,7 @@ to {esc(report['period_end'])}</p>
 <p class="muted">Generated locally at {esc(report['generated_at'])}.
 Valuation coverage: {esc(report['data_quality']['valuation'])}.</p>
 <p class="muted">{subtotal}{('Excluded foreign-priced positions: ' + esc(excluded) + '.')
-if excluded else ''}</p>
+if excluded else ''} {esc(realized_caveat)}</p>
 <section class="grid">
 <div class="metric">Current value<b>{money(current['total_value'])}</b></div>
 <div class="metric">Total return

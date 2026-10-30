@@ -370,8 +370,9 @@ window.ReviewOrbit = (() => {
             <article class="review-report-card"><span>Stored snapshots</span><strong>${data.snapshot_count}</strong></article>
             <article class="review-report-card"><span>History coverage</span><strong>${data.data_quality.history}</strong></article>
             <article class="review-report-card"><span>Theses needing attention</span><strong>${data.thesis_attention.length}</strong></article>
-            <article class="review-report-card"><span>Price coverage</span><strong>${data.data_quality.valuation}</strong></article>
-            ${missing.length || foreign.length ? html`<p class="review-disclosure">${missing.length ? `Missing prices: ${missing.join(", ")}. ` : ""}${foreign.length ? `Foreign-priced, excluded from USD: ${foreign.join(", ")}.` : ""}</p>` : ""}`;
+            <article class="review-report-card"><span>Valuation coverage</span><strong>${data.data_quality.valuation}</strong></article>
+            ${missing.length || foreign.length ? html`<p class="review-disclosure">${missing.length ? `Missing prices: ${missing.join(", ")}. ` : ""}${foreign.length ? `Foreign-priced, excluded from USD: ${foreign.join(", ")}.` : ""}</p>` : ""}
+            ${realizedExclusion(data.data_quality)}`;
     }
 
     function syncReportPeriodUi() {
@@ -737,6 +738,13 @@ window.ReviewOrbit = (() => {
         }
     }
 
+    function realizedExclusion(data) {
+        const count = data?.excluded_realized_trade_count;
+        if (!Number.isInteger(count) || count <= 0) return "";
+        return html`<p class="review-disclosure">${count} realized records excluded from USD returns (all time): non-USD or unsupported currency/price provenance.
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.ReviewOrbit.activateTab('trust')">View Trust Center</button></p>`;
+    }
+
     function qualityText(value) {
         return String(value || "unavailable").replaceAll("_", " ");
     }
@@ -815,7 +823,7 @@ window.ReviewOrbit = (() => {
                     <p>${ringLabel}.</p>
                     <div class="review-course-legend"><span data-kind="actual">Actual</span><span data-kind="target">Target</span></div>
                 </div>
-            </div>`;
+            </div>${realizedExclusion(data)}`;
         const tableRows = data.items.map(item => html`
             <tr>
                 <th scope="row">${item.ticker}</th>

@@ -328,3 +328,27 @@ test('Compare does not imply USD when a provider omits currency', async () => {
     assert.match(markup, /Unavailable \(quote currency unknown\)/);
     assert.match(markup, /\$10\.00/);
 });
+
+for (const excluded of [undefined, 0, 2]) {
+    test(`review and target explanation preserves all-time scope and legacy fields: ${excluded}`, async () => {
+        const report = periodReport(null);
+        report.data_quality.valuation = 'partial';
+        if (excluded !== undefined) report.data_quality.excluded_realized_trade_count = excluded;
+        const h = harness({ report });
+        h.orbit.activateTab('report'); await flush();
+        const markup = h.get('review-report-summary').innerHTML;
+        assert.match(markup, /Valuation coverage/);
+        assert.doesNotMatch(markup, /Price coverage/);
+        if (excluded === 2) {
+            assert.match(markup, /2 realized records excluded from USD returns \(all time\)/);
+            assert.match(markup, /View Trust Center/);
+        } else assert.doesNotMatch(markup, /realized records excluded/);
+        h.orbit.activateTab('plan');
+        h.reads[0].resolve({ ...plan(10000), complete: true, valuation_quality: 'partial',
+            ...(excluded === undefined ? {} : { excluded_realized_trade_count: excluded }) });
+        await flush();
+        const target = h.get('review-course-summary').innerHTML;
+        if (excluded === 2) assert.match(target, /2 realized records excluded.*all time/);
+        else assert.doesNotMatch(target, /realized records excluded/);
+    });
+}
