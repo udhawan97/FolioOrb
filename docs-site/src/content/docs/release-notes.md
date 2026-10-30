@@ -7,7 +7,27 @@ import { Aside } from '@astrojs/starlight/components';
 
 The full changelog lives in
 [`RELEASE_NOTES.md`](https://github.com/udhawan97/FolioOrb/blob/main/RELEASE_NOTES.md)
-in the repository. Highlights of the current stable are below.
+in the repository. Proposed source changes are separate from the current stable highlights.
+
+## Proposed for the next release — unpublished source candidate
+
+- Saved holdings remain visible through quote outages; missing figures stay unavailable.
+- Incomplete Review Packs show a known USD subtotal, withhold whole-portfolio comparisons,
+  and include every eligible period sale. Foreign amounts retain native units and remain
+  excluded from USD calculations.
+- Local plans disclose incomplete coverage before making sizing claims. Invalid or
+  overflowing financial amounts are rejected without saving partial facts.
+- Update and rollback requests preserve the active operation. Installer bytes are checked
+  again at handoff, and source installers stop when stable-release resolution fails.
+- Global toast feedback uses one persistent polite live region. Native screen-reader and
+  installed-app acceptance remain separate verification steps.
+- Interrupted holding edits read back saved state before dependent changes, preserve newer
+  drafts, and serialize saves. Compare retains native price units and ETF text; reports keep
+  the newest period selection when responses arrive out of order.
+- Automatic source migration requires a stopped app and supported launcher ownership;
+  unsupported older launchers are refused while preserving the original source/profile.
+
+These changes have no release tag or published installer yet.
 
 ## v5.16.1 — One public review loop
 

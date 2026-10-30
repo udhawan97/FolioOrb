@@ -410,6 +410,8 @@ jobs:
           tests/test_backup_policy.py
           tests/test_backup_service.py
           tests/test_source_installer_profile.py
+          tests/test_source_profile_cutover.py
+          tests/test_source_installer_channels.py
       - name: Exercise Windows source installer and parser gate
         shell: pwsh
         timeout-minutes: 10
@@ -441,7 +443,25 @@ jobs:
           $env:FOLIOORB_DATA_DIR = Join-Path $sandbox "profile with spaces"
           $env:FOLIOORB_SHORTCUT = Join-Path $sandbox "Desktop\FolioOrb.lnk"
           $env:FOLIOORB_INSTALL_NO_START = "1"
-          $env:FOLIO_REF = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "main" }
+          $candidateSha = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $candidateSha -ne $env:GITHUB_SHA -or $candidateSha -notmatch '^[0-9a-f]{40}$') {
+            throw "Source smoke checkout must match the exact workflow candidate SHA."
+          }
+          # Keep public ref validation unchanged; this smoke's transport fetches
+          # only the immutable candidate, never the selected development branch.
+          $env:FOLIO_REF = "main"
+          $env:FOLIOORB_SMOKE_ARCHIVE_URL = "https://github.com/$env:GITHUB_REPOSITORY/archive/$candidateSha.zip"
+          $env:FOLIOORB_SMOKE_REQUEST_LOG = Join-Path $sandbox "archive-requests.log"
+          function Invoke-WebRequest {
+            param($Uri, $OutFile, [switch] $UseBasicParsing)
+            $requestUri = $Uri
+            if ($Uri -eq "https://github.com/udhawan97/FolioOrb/archive/refs/heads/main.zip") {
+              $requestUri = $env:FOLIOORB_SMOKE_ARCHIVE_URL
+              Add-Content -LiteralPath $env:FOLIOORB_SMOKE_REQUEST_LOG -Value $requestUri
+            }
+            Microsoft.PowerShell.Utility\Invoke-WebRequest $requestUri `
+              -OutFile $OutFile -UseBasicParsing:$UseBasicParsing
+          }
 
           New-Item -ItemType Directory -Force -Path "$env:FOLIOORB_INSTALL_DIR\database" | Out-Null
           New-Item -ItemType Directory -Force -Path "$env:FOLIOORB_INSTALL_DIR\backups" | Out-Null
@@ -459,6 +479,10 @@ jobs:
           Set-Content "$env:FOLIOORB_INSTALL_DIR\.env" "DATABASE_URL=sqlite:///./database/portfolio.db"
           Set-Content "$env:FOLIOORB_INSTALL_DIR\settings.json" '{"notify_updates":false}'
           Set-Content "$env:FOLIOORB_INSTALL_DIR\backups\manual.db" "backup-fixture"
+          # Model a supported, stopped lease-aware source install. Unsupported
+          # legacy launchers remain covered by the separate refusal regression.
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "run.py") `
+            -Destination (Join-Path $env:FOLIOORB_INSTALL_DIR "run.py")
 
           & .\scripts\install-win.ps1
           if ($LASTEXITCODE -ne 0) { throw "First source install failed." }
@@ -476,7 +500,6 @@ jobs:
           with sqlite3.connect(database) as connection:
               assert connection.execute("SELECT value FROM proof").fetchone() == ("preserved",)
           '@ | python -
-
           $parent = Split-Path $env:FOLIOORB_INSTALL_DIR
           $leaf = Split-Path $env:FOLIOORB_INSTALL_DIR -Leaf
           $recoveries = @(Get-ChildItem $parent -Directory -Filter "$leaf-profile-recovery-*")
@@ -484,6 +507,10 @@ jobs:
 
           & .\scripts\install-win.ps1
           if ($LASTEXITCODE -ne 0) { throw "Routine source update failed." }
+          $archiveRequests = @(Get-Content -LiteralPath $env:FOLIOORB_SMOKE_REQUEST_LOG)
+          if ($archiveRequests.Count -ne 2 -or @($archiveRequests | Where-Object { $_ -ne $env:FOLIOORB_SMOKE_ARCHIVE_URL }).Count) {
+            throw "Both source installs must fetch only the exact candidate archive."
+          }
           $after = @(Get-ChildItem $parent -Directory -Filter "$leaf-profile-recovery-*")
           if ($after.Count -ne 1) { throw "Routine update created or removed a recovery copy." }
           @'

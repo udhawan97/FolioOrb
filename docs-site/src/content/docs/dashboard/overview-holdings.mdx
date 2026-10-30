@@ -25,6 +25,21 @@ keeps prices current without a manual reload.
 At phone widths the filter and action controls stack into a content-sized header, so the
 first holding row remains reachable without scrolling through a desktop-sized spacer.
 
+### Source candidate: incomplete prices
+
+Proposed for the next release: every saved row remains available through a price outage,
+including its details and management controls. Unknown prices and price comparisons say
+**Unavailable**. A partial book shows **Known USD value**; whole-portfolio return and
+allocation comparisons wait for complete coverage. Foreign price and value cells retain
+native units such as `GBp` or `CAD` and stay out of USD comparisons. A recovered quote
+updates the same holding rather than creating another row.
+
+In the same source candidate, holding edits save one request at a time. If a connection
+fails, FolioOrb reads back the saved holding and any affected realized history before a
+dependent edit or removal. Newer input stays on screen as an unsaved draft. If readback is
+unreachable, the save remains **Status unknown**; editing again checks the saved facts before
+sending another change. Cancelling a sale confirmation sends no sale request.
+
 <SenpaiTip>
 	Toggle Research mode when adding a ticker to follow the idea without treating it as money
 	you own — it stays out of P&L, allocation, largest-holding stats, briefings, and action-plan
@@ -108,11 +123,50 @@ CSV with six columns: `ticker, shares, avg_cost, is_watchlist, hold_class, notes
 opens correctly in Excel, and it *is* the import template, so whatever you export imports
 straight back in.
 
+**Current source builds — review, then confirm.** Open **Import CSV → Preview CSV…** to
+inspect up to 200 strict template rows for the selected portfolio, 25 rows per page. The table
+shows proposed persisted values and duplicate/validation/provider reasons. Cost 0 means an
+unknown cost under the existing storage convention; unset thesis cadence is shown as —.
+Unrecognized research flags still become false. Entered shares and costs, and shares
+multiplied by average cost, must be finite. Confirmation also checks stored financial totals
+before committing. Preview does not calculate or approve portfolio totals.
+
+**Confirm N additions** saves exactly the reviewed valid additions in one transaction;
+invalid/skipped rows stay excluded. A preview expires after 15 minutes, and the process keeps
+at most 16 outstanding preparations/previews and 16 successful replay receipts. Changed
+selected holdings or portfolio identity require a fresh preview. Database busy permits an
+explicit manual retry; the app never retries the write automatically. **Close preview**
+before confirmation discards the view. Closing while confirmation is running does not undo
+a save or prove the request stopped.
+
+**If the outcome is uncertain:** choose **Refresh and compare reviewed rows**. After a
+reload, reselect the original reviewed CSV. Comparison checks ticker, shares, average cost,
+research state, classification, notes and thesis cadence against the current selected
+portfolio. It shows reviewed→current values as matching, mismatching or unknown; matching
+records do not prove this request created them. Inspect every field, acknowledge the
+comparison, then explicitly choose **Start a fresh preview**. Missing records are a known
+mismatch; unknown state keeps a fresh import blocked. Comparison cannot undo records and
+sends no import. A verified save followed by a failed display refresh says **Saved, but
+refresh failed**; compare instead of confirming again.
+
+The same tab retains bounded recovery metadata derived from the reviewed file (digests and
+row numbers), not the file, token, tickers, notes or holdings values. Server restart
+invalidates tokens. A restored/replaced database blocks old-process CSV operations until
+restart; then compare the original CSV. Tab closure can lose session metadata. There is no
+durable idempotency ledger or exactly-once guarantee across crashes.
+
+Preview parses locally and never calls Claude. Ticker validation may send symbols to Yahoo
+Finance; the full CSV and notes are not sent there. Confirmation/comparison use no provider
+or AI. **Import immediately…** remains separate and saves valid rows when a file is chosen.
+These source preview/confirmation features are not in the existing v5.16.1 installers;
+their existing file-choice action imports immediately. Native acceptance/publication remain
+separate gates.
+
 **Import** reads holdings back in, and how forgiving it is depends on whether Claude is
 connected — the panel tells you which mode you're in:
 
 - **Local mode (no API key needed).** Uses the exact template above: plain numbers, the
-  six known columns, up to 200 rows. Predictable and completely offline. If your file
+  six known columns, up to 200 rows. Parsing is local; ticker validation can contact Yahoo Finance. If your file
   has columns it doesn't recognize, it says so plainly and points you at the template —
   it never fails silently.
 - **Claude assist (when a key is configured).** Drop in almost any brokerage export —

@@ -81,7 +81,10 @@ def test_foreign_holding_still_appears_with_its_currency():
     row = next(r for r in valuation.holdings if r["ticker"] == "VOD.L")
     assert row["currency"] == "GBp"
     assert row["current_price"] == 70.0
-    assert row["allocation_pct"] == 0
+    assert row["allocation_pct"] is None
+    assert row["quote_available"] is True
+    assert row["reporting_eligible"] is False
+    assert row["unrealized_gain"] is None
 
 
 def test_foreign_holding_degrades_data_quality():

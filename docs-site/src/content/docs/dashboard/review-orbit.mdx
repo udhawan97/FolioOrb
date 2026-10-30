@@ -77,6 +77,20 @@ that number; it is not mislabeled as a time-weighted investment return. The exac
 opening-snapshot date appears beside the comparison, and history is marked partial when that
 snapshot is more than three days from the requested month or quarter boundary.
 
+### Source candidate: incomplete valuation
+
+Proposed for the next release: when required USD prices are missing or foreign-priced,
+the full current value, return, and value change remain **Unavailable** beside a labelled
+known USD subtotal. Missing and foreign-priced tickers are named. Independent realized
+facts remain available, including a genuine zero; an empty portfolio also retains its
+legitimate zero. Period accounting includes every eligible sale, even when the ordinary
+trade display is limited to its latest 100 rows. HTML, CSV, and Review Bundle exports use
+the same report values and exclusions.
+
+Month and Quarter requests keep the newest selection in control. While another period loads
+or fails, retained data identifies its actual period; an older response cannot replace the
+latest report.
+
 ### Review Bundle with a manifest
 
 <Aside type="note" title="Shipped in v5.16.0">
@@ -221,6 +235,11 @@ Compare is deliberately limited to active **Research mode** rows:
 Mixed stock/ETF selections and owned-position tickers are rejected instead of being forced
 into one misleading table. Missing provider fields render as unavailable.
 
+**Source candidate, proposed for the next release:** Compare retains native quote units,
+including `GBp` for pence and `CAD` for Canadian dollars. It shows ETF category and concentration
+as text. Market cap and AUM remain provider magnitudes with currency unverified, so those
+figures are not labelled as USD or converted.
+
 ## Local Backup Vault
 
 The Backups tab creates transactionally consistent SQLite snapshots with SQLite's online
@@ -271,3 +290,20 @@ If staging or verification fails, the live database is left untouched. The next 
 reports whether the restore succeeded and names the retained safety backup.
 A queued restore remains visible in Backup Vault and disables another Restore action until the
 clean restart consumes it.
+
+### Source builds: explaining partial valuation
+
+Current source builds distinguish **Valuation coverage** from price coverage alone.
+A book may have every current USD price and still have partial valuation because
+some realized records have non-USD or unsupported currency/price provenance.
+Trust Center, Review Pack and the target plan name the number excluded from USD
+returns **across all time**. That count is separate from the selected period's
+realized P&L. Existing availability and drift restrictions continue to apply.
+
+Their CSV/HTML receipts retain the same exclusion explanation. Review CSV also
+records its generation time, so captures made at different times remain distinct.
+Generation time says when a receipt was produced; it does not prove when a quote
+was observed or fetched. Those quote timestamps remain unavailable in the current
+contract, and coverage does not establish freshness. These source changes are not
+included in the existing v5.16.1 installers; native acceptance and software
+publication remain separate gates.

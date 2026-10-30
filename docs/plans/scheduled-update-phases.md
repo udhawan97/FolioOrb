@@ -4,7 +4,7 @@ Prepared October 20, 2026, America/Chicago. Planning baseline: `224fdac37b7860ce
 
 Advance FolioOrb through six bounded phases: compatibility, import preview, import confirmation, data-quality explanations, review comparison, and recovery acceptance. Scheduled runs should finish one useful slice at a time, preserve financial records, and leave reproducible evidence for the next run.
 
-This is the canonical implementation queue for this initiative. Existing shipped plans remain design history. Phase 1 source integration and acceptance-bound publication controls landed in PR 99; later product phases remain unimplemented. See the exact integration and transport receipts below. This queue alone does not authorize a release. CAPO retains its existing repository-selection priorities and release authority, subject to all gates below.
+This is the canonical implementation queue for this initiative. Existing shipped plans remain design history. Phase 1 source integration and acceptance-bound publication controls landed in PR 99. Phase 2 source landed in [PR111](https://github.com/udhawan97/FolioOrb/pull/111). Phase 3 confirmation and reconciliation are implemented; integration outcomes are recorded in the dated run ledger. Later product phases remain unimplemented. See the exact integration and transport receipts below. This queue alone does not authorize a release. CAPO retains its existing repository-selection priorities and release authority, subject to all gates below.
 
 ## Planning baseline evidence
 
@@ -177,9 +177,9 @@ Update in place; use one row per bounded slice. Qualify recurring acceptance sli
 | --- | --- | --- | --- |
 | 1A | Source merged; transport verified | None | Preserve exact-artifact native acceptance before publication |
 | 1B | Source merged; incompatible upgrades deferred | 1A | Revisit NumPy only with a Python-minimum decision; validate grouped Pydantic proposals |
-| 2 | Ready for a bounded implementation run | 1A disposition satisfied | Review strict local preview contract on current main |
-| 3 | Planned | 2 | Review confirmation token, transaction, and reconciliation contract |
-| 4 | Planned | 1A baseline disposition | Run cross-surface synthetic quality matrix |
+| 2 | Source merged and Pages verified | 1A disposition satisfied | Preserve native/publication gates |
+| 3 | Source merged; Pages verified | 2 source integration satisfied | Preserve native/publication gates |
+| 4 | Implemented; verification pending | Verified current baseline | Verify matrix, explanations and capture metadata; implementation council and exact-head gates |
 | 5A | Planned | 4 | Establish fields safely comparable from v1 receipts |
 | 5B | Planned | 5A | Add bounded accessible comparison UI |
 | 6A | Planned | Selected completed feature slice | Rehearse complete disposable-profile journey |
@@ -313,3 +313,36 @@ Fresh packaging audits exposed setuptools84.0.0 GHSA-xmj3-9gf7-h52w in both desk
 Local application verification on identical product source/requirements:1980 Python tests passed in disposable data with blank AI key and disabled scheduler,115 Node tests passed, compile passed, Pylint10.00/10, and generated-lock verification passed. The first macOS/Windows audits identified the advisory; the normal requirements audit crashed during managed-Python ensurepip (SIGABRT), so that audit result is unknown locally. Require fresh normal four-way hosted auditing on final head. Do not replace it with a partial direct-dependency audit. Candidate source, hosted gates, packaging build/install checks and implementation council are pending at this checkpoint.
 
 Graphify AST refresh/query passed with generated output ignored; semantic documentation extraction and graph navigation are not behavior evidence. Last released version remains v5.16.1. No tag, application release or native installer acceptance is claimed. Follow build-only unsigned branch candidate checks, require effective publish/signing outputs false, and preserve protected exact-artifact publication controls. Next product phase remains Phase2 CSV preview after this security baseline and its final delivery checks. Private evidence: `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/capo-2026-10-25/folio-*`.
+
+
+## Phase 2 claim — October29,2026
+
+Owner `capo-phase2-20261029`; branch `capo/2026-10-29-csv-preview`; base `82e6828fa0246cf2ec71a93ea88ccb2691ad8c0b`. Implement one read-only strict CSV preview slice from [reviewed plan](2026-10-29-csv-preview.md). Shared claim in Git common directory `folioorb-scheduled-claims/phase-2`; clean isolated worktree `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/folioorb-phase2-20261029/repo`. Other owned refinement work and the active read-only f18 audit are preserved. Baseline preview POST405; existing focused CSV tests69passed with disposable data. Plan council2rounds×4independent roles accepted; packet digest `9d13474e672a22a8b449fad043c3384e04edd217e9fc9099495fd8d59ed37664`. No product implementation, source integration, native acceptance or release claim yet. Phase3 remains separately planned.
+
+
+## Phase 2 implementation checkpoint — October 29, 2026
+
+Owner `capo-phase2-20261029`, base `82e6828fa0246cf2ec71a93ea88ccb2691ad8c0b`; [bounded source plan](2026-10-29-csv-preview.md). Two complete plan-council rounds, four independent roles each, no remaining blockers. Implemented strict read-only preview through the shared CSV row validator: selected portfolio and digest/mode contract, normalized rows/counts/reasons, no AI, no database writes or default-portfolio seeding. Separate immediate import remains explicit. All 200 rows are reachable in bounded 25-row pages; close, stale-response fencing, reload and portfolio identity are covered. No confirmation/apply or Phase3 token/persistence is implemented.
+
+Local verification on identical product source: baseline absent preview POST405 and69focused tests; initial106focused tests; revised2014full Python3.12 tests,122Node tests, compileall, full Pylint10.00/10 and diff-check passed. Docs npm ci/build(23pages)/audit(0vulnerabilities) passed. Actual Safari26.5.2 used only fictional task-owned SQLite with blank AI key, disabled scheduler, fake quotes, denied external I/O and SQL-write guard. Valid/duplicate/invalid, malformed/provider-unavailable, all53rows pagination, cancel/reload, selected portfolio2 and390px same-origin narrow frame passed; pending fake-provider cancellation remained closed after completion. Every recorded preview whole-database digest remained unchanged. Physical keyboard, VoiceOver and native installer acceptance are unperformed. Graphify code update and scoped `prepare_preview process_import_rows` query passed; documentation semantic extraction/community labels remain unrefreshed and graph navigation is not behavior proof.
+
+Source candidate, hosted checks, implementation council and integration remain pending at this checkpoint. Evidence retained at `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/folioorb-phase2-20261029`. No dependencies, versions, signing flags, publication approvals, release tags or software releases changed. Current main push workflow stages candidates only; native/publication gates remain separate. After verified integration, Phase3 confirmation contract is the next ready product phase, with new plan/council and snapshot revalidation required.
+
+
+### Phase 2 implementation review correction
+
+Round1 implementation council: four actual independent roles, no blockers. Corrected the opening phase status, added a valid upload exactly at the256KiB boundary (in addition to existing excess-byte rejection), and labeled invalid input rows as supplied text while normalized provider-error rows remain distinguishable. Revised full suite2014Python tests and122Node tests passed; actual Safari verified the new caption and raw-NaN row label. Second implementation council, fresh final-head hosted checks and source integration remain pending.
+
+
+## Phase 3 implementation checkpoint — October29,2026
+
+Owner `capo-phase3-20261029`, base `0a8eedac8b92e49cdfcfe1286502a1333fa2aa97`. [Concrete plan](2026-10-29-csv-confirmation.md); original absolute queue remains canonical. Plan council completed exactly2rounds/four independent roles each, with targeted race/protocol clarifications accepted. Source implements bounded preparing/pending capabilities and replay receipts, token/digest confirmation under BEGINIMMEDIATE, generation/restore/lifecycle invalidation, atomic reviewed additions, read-only complete-field reconciliation and a reload recovery marker without tokens/raw values. Legacy immediate import and Phase2 normalized values remain compatible. No schema/dependency/version/workflow/signing change.
+
+Baseline confirmPOST405 and115existing focused tests passed. Final local gates:2049Python3.12 tests,134Node tests, compileall, full Pylint10.00/10 with no messages and diff-check passed. Docs npmci/build23pages/audit0vulnerabilities passed. Graphify incremental code update/scoped query passed; semantic documentation/community labels are not acceptance proof. Actual Safari26.5.2 used only verified disposable fictional SQLite, fake quotes, blankkey/disabledscheduler, denied externalHTTP/AI and SQL-write guards. Preview/confirm, repeatedCSV, staleness, realbusy/manualretry, loss before/aftercommit, reload, wrongfile/unavailableread holds, known/mismatch acknowledgement, saved-refreshfailure, actualserverrestart, pendingclose/no-latefocus, portfolioswitch, expiry and390px long/literalnotes passed. The initial disabled-target focus gap was corrected to the enabled panel toggle and rechecked. All preview/reconciliation database receipts are unchanged; confirm permitted only holding inserts, no other table mutations.
+
+Implementation council, exact-head hosted checks and integration remain pending at this checkpoint. No native, VoiceOver, physicalkeyboard, installed-app, screenshot, signing or release acceptance. Same-process replay is bounded and cannot establish exactly-once acrosscrashes; tabclosure can lose session metadata. No tag, softwarepublication or protectedapproval. Latest stable remains v5.16.1. Run evidence: `/Users/umang/Documents/Codex/2026-10-13/new-chat/work/folioorb-phase3-20261029`. After verified integration, nextPhase4 is the evidence-driven incomplete-data explanation matrix; do not repeatPhase3.
+
+
+## Phase 4 implementation checkpoint — October 30, 2026
+
+Base `88c8ef4b7ada91faeb128df6b7c923bea4322d29`; [bounded plan](2026-10-30-financial-data-matrix.md). Two complete plan council rounds with four independent roles each accepted the slice. Baseline probes reproduced missing realized-exclusion explanations and absent standalone report CSV capture time. The matrix and focused adapters/presentation changes are implemented; exact-candidate implementation council and integration gates remain pending. Original absolute queue remains the writable canonical ledger. No native acceptance, software release, schema or dependency change is claimed.

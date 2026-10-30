@@ -17,7 +17,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.models import DcaContribution, DcaPlan, Holding
-from app.services import holdings_csv, holdings_repository, portfolio_valuation
+from app.services import financial_currency, holdings_csv, holdings_repository, portfolio_valuation
 from app.services.dividend_income import compute_portfolio_income
 from app.services.earnings_radar import get_earnings_events
 from app.services.etf_overlap import compute_etf_overlap, overlap_between
@@ -36,6 +36,21 @@ EarningsLoader = Callable[[list[str], int], list[dict]]
 
 _QUALITY_RANK = {"complete": 0, "not_applicable": 0, "partial": 1, "unavailable": 2}
 _PERIOD_DAYS = {"month": 31, "quarter": 92}
+REALIZED_EXCLUSION_CAVEAT = (
+    "Realized records with non-USD or unsupported currency/price provenance are "
+    "excluded from USD returns (all time)."
+)
+
+
+def _realized_coverage_rows(writer, data, section=None):
+    """Preserve absent fields in older payloads rather than inventing coverage."""
+    for key in ("realized_data_quality", "excluded_realized_trade_count"):
+        if key in data:
+            values = [key, data[key]]
+            _write_safe_csv_row(writer, [section, *values] if section else values)
+    if data.get("excluded_realized_trade_count"):
+        values = ["realized_exclusion_caveat", REALIZED_EXCLUSION_CAVEAT]
+        _write_safe_csv_row(writer, [section, *values] if section else values)
 
 
 def _utc_now() -> datetime:
@@ -177,17 +192,21 @@ def build_trust_center(
     areas = [
         {
             "key": "prices",
-            "label": "Position prices",
+            "label": "Valuation coverage",
             "quality": valuation.data_quality,
             "covered": valuation.priced_position_count,
             "expected": valuation.expected_position_count,
             "missing": list(valuation.missing_tickers),
             "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
             "source": "Yahoo Finance via the local market-data cache",
-            "caveat": (
+            "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+            "realized_data_quality": valuation.realized_data_quality,
+            "caveat": " ".join(filter(None, [
                 "Foreign-priced positions are named separately and excluded from USD totals."
-                if valuation.foreign_currency_tickers else None
-            ),
+                if valuation.foreign_currency_tickers else None,
+                (f"{valuation.excluded_realized_trade_count} realized records excluded (all time). "
+                 + REALIZED_EXCLUSION_CAVEAT) if valuation.excluded_realized_trade_count else None,
+            ])) or None,
         },
         {
             "key": "fundamentals",
@@ -260,6 +279,8 @@ def build_trust_center(
         "portfolio_id": portfolio_id,
         "generated_at": _utc_now().isoformat(),
         "overall_quality": overall,
+        "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+        "realized_data_quality": valuation.realized_data_quality,
         "reporting_currency": portfolio_valuation.REPORTING_CURRENCY,
         "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "areas": areas,
@@ -396,7 +417,7 @@ def build_review_report(
     valuation = portfolio_valuation.evaluate(
         db, portfolio_id, quote_loader=quote_loader
     )
-    performance = portfolio_valuation.load_performance(db, portfolio_id)
+    performance = portfolio_valuation.load_performance(db, portfolio_id, trade_limit=None)
     within = [
         row for row in performance.history
         if row["date"] >= cutoff.isoformat()
@@ -413,10 +434,11 @@ def build_review_report(
         if row.get("date") and row["date"][:10] >= cutoff.isoformat()
     ]
     realized_period = round(sum(float(row["realized_gain"]) for row in trades), 2)
+    portfolio_valuation.require_finite_amounts(realized_period)
     closing_value = valuation.total_value
     value_change = (
         round(closing_value - float(opening["total_value"]), 2)
-        if opening else None
+        if opening and valuation.data_quality == "complete" else None
     )
     theses = [thesis_state(row) for row in _active_holdings(db, portfolio_id)]
     attention = [
@@ -431,7 +453,8 @@ def build_review_report(
                 "unrealized_gain": row["unrealized_gain"],
             }
             for row in valuation.holdings
-            if not row["is_watchlist"] and row["total_return_pct"] is not None
+            if financial_currency.eligible_valuation_row(row)
+            and row["total_return_pct"] is not None
         ],
         key=lambda row: abs(float(row["unrealized_gain"])),
         reverse=True,
@@ -450,22 +473,36 @@ def build_review_report(
         "period": period,
         "period_start": cutoff.isoformat(),
         "period_end": today.isoformat(),
+        "reporting_currency": portfolio_valuation.REPORTING_CURRENCY,
+        "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         "data_quality": {
             "valuation": valuation.data_quality,
+            "excluded_realized_trade_count": valuation.excluded_realized_trade_count,
+            "realized_data_quality": valuation.realized_data_quality,
             "history": history_quality,
             "missing_prices": list(valuation.missing_tickers),
+            "foreign_currency_tickers": list(valuation.foreign_currency_tickers),
         },
         "opening_snapshot": opening,
         "observed_start": opening["date"] if opening else None,
         "history_start_gap_days": history_gap_days,
         "snapshot_count": len(within),
         "current": {
-            "total_value": closing_value,
-            "total_cost_basis": valuation.total_cost_basis,
-            "unrealized_gain": valuation.total_unrealized_gain,
+            "known_value": closing_value,
+            "total_value": closing_value if valuation.data_quality == "complete" else None,
+            "total_cost_basis": (
+                valuation.total_cost_basis if valuation.data_quality == "complete" else None
+            ),
+            "unrealized_gain": (
+                valuation.total_unrealized_gain if valuation.data_quality == "complete" else None
+            ),
             "realized_gain_all_time": valuation.realized_gain,
-            "total_return": valuation.total_return,
-            "total_return_pct": valuation.total_return_pct,
+            "total_return": (
+                valuation.total_return if valuation.data_quality == "complete" else None
+            ),
+            "total_return_pct": (
+                valuation.total_return_pct if valuation.data_quality == "complete" else None
+            ),
         },
         "period_activity": {
             "value_change": value_change,
@@ -475,6 +512,8 @@ def build_review_report(
                     if opening else
                     "No stored opening snapshot is available. "
                 )
+                + ("Valuation inputs are incomplete; value change is unavailable. "
+                   if valuation.data_quality != "complete" else "")
                 + "Value change includes contributions and withdrawals; it is "
                 "not a time-weighted investment return."
             ),
@@ -495,6 +534,8 @@ def report_csv(report: dict) -> str:
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["section", "metric", "value"])
+    _write_safe_csv_row(writer, ["coverage", "generated_at", report.get("generated_at")])
+    _realized_coverage_rows(writer, report["data_quality"], "coverage")
     for key, value in report["current"].items():
         _write_safe_csv_row(writer, ["current", key, value])
     for key, value in report["period_activity"].items():
@@ -506,6 +547,13 @@ def report_csv(report: dict) -> str:
         writer, ["coverage", "history", report["data_quality"]["history"]]
     )
     _write_safe_csv_row(writer, ["coverage", "observed_start", report["observed_start"]])
+    _write_safe_csv_row(writer, [
+        "coverage", "foreign_currency_tickers",
+        " | ".join(report.get("foreign_currency_tickers", [])),
+    ])
+    _write_safe_csv_row(writer, [
+        "coverage", "missing_prices", " | ".join(report["data_quality"].get("missing_prices", [])),
+    ])
     for row in report["movers"]:
         _write_safe_csv_row(writer, ["mover", row["ticker"], row["total_return_pct"]])
     for row in report["thesis_attention"]:
@@ -526,6 +574,7 @@ def trust_center_csv(trust: dict) -> str:
     _write_safe_csv_row(writer, ["generated_at", trust.get("generated_at")])
     _write_safe_csv_row(writer, ["portfolio_id", trust.get("portfolio_id")])
     _write_safe_csv_row(writer, ["overall_quality", trust.get("overall_quality")])
+    _realized_coverage_rows(writer, trust)
     _write_safe_csv_row(writer, ["reporting_currency", trust.get("reporting_currency")])
     _write_safe_csv_row(writer, [
         "foreign_currency_tickers",
@@ -571,6 +620,7 @@ def target_plan_csv(plan: dict, *, generated_at: str | None = None) -> str:
     _write_safe_csv_row(writer, ["reporting_currency", plan.get("reporting_currency")])
     _write_safe_csv_row(writer, ["known_value", plan.get("known_value")])
     _write_safe_csv_row(writer, ["valuation_quality", plan.get("valuation_quality")])
+    _realized_coverage_rows(writer, plan)
     _write_safe_csv_row(writer, ["target_course_complete", plan.get("complete")])
     _write_safe_csv_row(writer, ["drift_available", plan.get("drift_available")])
     _write_safe_csv_row(
@@ -611,6 +661,9 @@ def report_html(report: dict) -> str:
     def esc(value) -> str:
         return html_lib.escape(str(value if value is not None else "Unavailable"))
 
+    def money(value) -> str:
+        return f"${esc(value)}" if value is not None else "Unavailable"
+
     movers = "".join(
         f"<tr><td>{esc(row['ticker'])}</td><td>{esc(row['total_return_pct'])}%</td>"
         f"<td>${esc(row['unrealized_gain'])}</td></tr>"
@@ -622,6 +675,20 @@ def report_html(report: dict) -> str:
     ) or "<li>No theses need attention.</li>"
     current = report["current"]
     activity = report["period_activity"]
+    total_return = (
+        f"{money(current['total_return'])} · {esc(current['total_return_pct'])}%"
+        if current["total_return"] is not None else "Unavailable"
+    )
+    subtotal = (
+        f"Known USD subtotal: {money(current.get('known_value'))}. "
+        if report["data_quality"]["valuation"] != "complete" else ""
+    )
+    excluded = ", ".join(report.get("foreign_currency_tickers", []))
+    excluded_realized = report["data_quality"].get("excluded_realized_trade_count")
+    realized_caveat = (
+        f"{excluded_realized} realized records excluded (all time). {REALIZED_EXCLUSION_CAVEAT}"
+        if excluded_realized else ""
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>FolioOrb {esc(report['period'])} review</title>
@@ -643,10 +710,12 @@ to {esc(report['period_end'])}</p>
 <h1>Your portfolio, reviewed</h1>
 <p class="muted">Generated locally at {esc(report['generated_at'])}.
 Valuation coverage: {esc(report['data_quality']['valuation'])}.</p>
+<p class="muted">{subtotal}{('Excluded foreign-priced positions: ' + esc(excluded) + '.')
+if excluded else ''} {esc(realized_caveat)}</p>
 <section class="grid">
-<div class="metric">Current value<b>${esc(current['total_value'])}</b></div>
+<div class="metric">Current value<b>{money(current['total_value'])}</b></div>
 <div class="metric">Total return
-<b>${esc(current['total_return'])} · {esc(current['total_return_pct'])}%</b></div>
+<b>{total_return}</b></div>
 <div class="metric">Period realized P&amp;L<b>${esc(activity['realized_gain'])}</b></div>
 </section>
 <div class="notice"><strong>Value change:</strong> {esc(activity['value_change'])}.
@@ -735,6 +804,10 @@ def compare_watchlist(
             "ticker": ticker,
             "name": quote.get("name") or ticker,
             "current_price": quote.get("current_price"),
+            "currency": (
+                financial_currency.quote_currency(quote.get("currency"))
+                if not quote.get("error") else None
+            ),
             "day_change_pct": quote.get("day_change_pct"),
             "fifty_two_week_high": quote.get("fifty_two_week_high"),
             "fifty_two_week_low": quote.get("fifty_two_week_low"),

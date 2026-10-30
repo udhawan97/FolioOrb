@@ -1,8 +1,9 @@
 import os
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import settings
+from app.services import database_generation
 
 _IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
 
@@ -33,11 +34,14 @@ if _IS_SQLITE:
 engine = create_engine(
     settings.DATABASE_URL,
     connect_args={"check_same_thread": False},
+    hide_parameters=True,  # financial values must stay out of debug SQL and error logs
     echo=settings.DEBUG,  # Prints all SQL queries to the console when DEBUG=True
     pool_size=10,
     max_overflow=50,
 )
 
+
+event.listen(Engine, "engine_connect", database_generation.track_connection)
 
 if _IS_SQLITE:
     @event.listens_for(engine, "connect")

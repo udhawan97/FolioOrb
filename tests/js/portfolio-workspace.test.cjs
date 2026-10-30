@@ -198,3 +198,28 @@ test("json rejects non-success responses with FastAPI detail", async () => {
         /Portfolio not found/,
     );
 });
+
+for (const endpoint of ['/api/portfolio/value', '/api/review/trust', '/api/review/plan', '/api/review/report?period=month']) {
+    test(`financial matrix scopes a refresh across portfolio navigation: ${endpoint}`, async () => {
+        let finish, navigations = 0;
+        const seen = [];
+        const workspace = createPortfolioWorkspace({
+            storage: storageWith(1), origin: 'http://folio.test',
+            reload: () => { navigations++; },
+            fetchFn: url => {
+                const id = Number(new URL(url, 'http://folio.test').searchParams.get('portfolio_id'));
+                seen.push(id);
+                if (id === 1) return new Promise(resolve => { finish = resolve; });
+                return Promise.resolve(new Response(JSON.stringify({ portfolio_id: id })));
+            },
+        });
+        const oldRead = workspace.cached(endpoint);
+        workspace.select(2);
+        assert.equal(navigations, 1, 'switch replaces the document owning the pending refresh');
+        assert.equal((await workspace.cached(endpoint)).portfolio_id, 2);
+        finish(new Response(JSON.stringify({ portfolio_id: 1 })));
+        await oldRead;
+        assert.equal((await workspace.cached(endpoint)).portfolio_id, 2);
+        assert.deepEqual(seen, [1, 2]);
+    });
+}

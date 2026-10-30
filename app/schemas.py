@@ -1,5 +1,6 @@
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from datetime import date
+import math
 from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
 
 from app.services.ticker import validated_ticker_shape
@@ -62,6 +63,8 @@ class HoldingCreate(BaseModel):
     def shares_required_for_positions(self):
         if not self.is_watchlist and (self.shares is None or self.shares <= 0):
             raise ValueError("shares must be greater than 0 unless research mode is on")
+        if not math.isfinite((self.shares or 0.0) * (self.avg_cost or 0.0)):
+            raise ValueError("shares multiplied by average cost must be finite")
         return self
 
 
@@ -69,6 +72,8 @@ class HoldingUpdate(BaseModel):
     """Fields that can be changed on an existing holding. All fields are optional."""
     shares: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
     avg_cost: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
+    expected_shares: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
+    expected_avg_cost: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
     notes: Optional[str] = Field(None, max_length=500)
     thesis_review_interval_days: Optional[int] = Field(None, ge=7, le=730)
     mark_thesis_reviewed: Optional[bool] = None
@@ -108,6 +113,8 @@ class HoldingRemoval(BaseModel):
     must carry that provenance as one indivisible request contract.
     """
 
+    expected_shares: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
+    expected_avg_cost: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
     sale_price: Optional[float] = Field(None, gt=0, allow_inf_nan=False)
     sale_currency: Optional[Literal["USD"]] = None
     sale_price_source: Optional[Literal["manual_entry"]] = None
@@ -227,4 +234,27 @@ class DcaBulkAction(BaseModel):
     def unique_contribution_ids(cls, value):
         if len(value) != len(set(value)):
             raise ValueError("contribution_ids must be unique")
+        return value
+
+
+class CsvConfirmation(BaseModel):
+    model_config = {"extra": "forbid"}
+    token: str = Field(min_length=43, max_length=43, pattern=r"^[A-Za-z0-9_-]+$")
+    normalized_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CsvReconciliation(BaseModel):
+    model_config = {"extra": "forbid"}
+    portfolio_id: PositiveInt
+    input_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    normalized_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reviewed_rows: list[Annotated[int, Field(strict=True, ge=2, le=201)]] = Field(
+        min_length=1, max_length=200
+    )
+
+    @field_validator("reviewed_rows")
+    @classmethod
+    def unique_rows(cls, value):
+        if value != sorted(set(value)):
+            raise ValueError("Reviewed rows must be unique and ordered")
         return value

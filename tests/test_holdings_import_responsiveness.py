@@ -15,7 +15,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Base, DcaContribution, DcaPlan, Holding, Portfolio
 from app.routers import portfolio as portfolio_router
-from app.services import holdings_repository
+from app.services import write_serialization
 from app.services.dca_ledger import DcaLedger
 
 
@@ -481,13 +481,14 @@ def test_import_racing_dca_apply_uses_one_active_holding(tmp_path, monkeypatch):
     monkeypatch.setattr(portfolio_router, "get_all_quotes", lambda _tickers: [])
     monkeypatch.setattr(portfolio_router, "validate_ticker_symbol", _valid_ticker)
     creation_barrier = threading.Barrier(2)
-    original_add_active = holdings_repository.add_active
+    original_begin = write_serialization.begin_financial_write
 
-    def synchronized_add_active(db, holding):
+    def synchronized_begin(db):
+        # Both callers now reserve SQLite's writer before reaching add_active.
         creation_barrier.wait(timeout=10)
-        return original_add_active(db, holding)
+        return original_begin(db)
 
-    monkeypatch.setattr(holdings_repository, "add_active", synchronized_add_active)
+    monkeypatch.setattr(write_serialization, "begin_financial_write", synchronized_begin)
 
     def apply_dca():
         with sessions() as db:

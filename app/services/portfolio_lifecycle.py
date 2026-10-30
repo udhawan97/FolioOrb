@@ -20,6 +20,7 @@ from app.models import (
     VerdictSnapshot,
 )
 from app.services.narrative_cache import NarrativeCache
+from app.services import database_generation
 
 
 class PortfolioLifecycleError(Exception):
@@ -89,6 +90,7 @@ def rename_portfolio(
     return portfolio
 
 
+@database_generation.guarded
 def delete_portfolio(db: Session, portfolio_id: int) -> str:
     """Delete one non-default Portfolio and every record it owns."""
     if portfolio_id == 1:
@@ -99,6 +101,9 @@ def delete_portfolio(db: Session, portfolio_id: int) -> str:
     portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
     if portfolio is None:
         raise PortfolioNotFoundError(f"Portfolio {portfolio_id} not found")
+
+    from app.services import csv_confirmation
+    csv_confirmation.store.revoke_portfolio(portfolio_id)
 
     plan_ids = [
         row[0]
