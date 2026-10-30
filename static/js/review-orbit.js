@@ -789,7 +789,7 @@ window.ReviewOrbit = (() => {
         const run = $("review-rehearsal-run");
         if (!data.items.length) {
             $("review-course-summary").innerHTML = html`
-                <div class="review-empty">Add an owned position before setting a target course. Research-only and zero-share rows stay outside the plan.</div>`;
+                <div class="review-empty">Add an owned position before setting a target course. Research-only and zero-share rows stay outside the plan.</div>${realizedExclusion(data)}`;
             $("review-target-table").innerHTML = "";
             if (select) select.innerHTML = '<option value="">No eligible positions</option>';
             if (save) save.disabled = true;

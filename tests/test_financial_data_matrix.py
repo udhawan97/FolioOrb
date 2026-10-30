@@ -23,6 +23,8 @@ CASES = [
     ("foreign_gbp", ["USD", "VOD.L", "CAD"], ["USD", "VOD.L", "CAD"],
      "partial", 40, [], ["CAD", "VOD.L"]),
     ("mixed_realized", ["USD"], ["USD"], "partial", 40, [], []),
+    ("mixed_realized_empty", [], [], "partial", 0, [], []),
+    ("mixed_realized_watchlist", ["WATCH"], ["WATCH"], "partial", 0, [], []),
     ("watchlist_only", ["WATCH"], ["WATCH"], "complete", 0, [], []),
     ("empty", [], [], "complete", 0, [], []),
 ]
@@ -113,7 +115,7 @@ def _assert_bundle_receipts(bundle, *, quality, known, excluded):
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case[0])
 def test_frozen_cross_surface_matrix(db, case):
     name, tickers, quoted, quality, known, missing, foreign = case
-    _seed(db, tickers, mixed=name == "mixed_realized")
+    _seed(db, tickers, mixed=name.startswith("mixed_realized"))
     load = _loader(quoted)
     before = _snapshot(db)
 
@@ -141,7 +143,7 @@ def test_frozen_cross_surface_matrix(db, case):
     assert price_area["expected"] == valued.expected_position_count == len(tickers) - (
         1 if "WATCH" in tickers else 0)
     assert price_area["covered"] == valued.priced_position_count == (1 if known else 0)
-    excluded = 2 if name == "mixed_realized" else 0
+    excluded = 2 if name.startswith("mixed_realized") else 0
     realized_quality = "partial" if excluded else "complete"
     for data in [trust, plan, report["data_quality"]]:
         assert data["excluded_realized_trade_count"] == excluded

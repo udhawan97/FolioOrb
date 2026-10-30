@@ -45,7 +45,7 @@ schema, dependency, version, workflow or signing changes are in scope.
 | One missing quote | Named missing position; subtotal only; no drift/full metrics or snapshot |
 | All missing | Known subtotal zero remains distinct from unavailable full value |
 | Foreign including GBp | Preserve pence spelling/native values; exclude foreign prices from USD totals |
-| Mixed realized evidence | Retain trusted USD gains; disclose all-time exclusions, including an old fact outside the period |
+| Mixed realized evidence | Retain trusted USD gains; disclose all-time exclusions, including an old fact outside the period, and empty/research-only books |
 | Watchlist only | Research rows stay outside owned-position totals and target eligibility |
 | Empty | Genuine zero/empty semantics; no invented missing positions |
 | Unavailable timestamp | Report generation never becomes quote observation or fetch time |
@@ -87,3 +87,12 @@ rewriting history or restoring an old database. If a gate fails, preserve the
 candidate and its evidence. Native acceptance and software publication stay separate.
 After verified Phase 4 delivery, Phase 5A must establish safely comparable fields
 from v1 receipts under its own plan and council; no historical comparison is added here.
+
+
+## Implementation review correction
+
+The first implementation council identified an empty-target-view intersection: a
+book without eligible current positions can still retain excluded realized history.
+The existing disclosure is now also rendered beside the empty-plan message; save,
+export and rehearsal remain disabled. A failing renderer case reproduced the
+omission; empty and research-only mixed-realized matrix cases cover the correction.

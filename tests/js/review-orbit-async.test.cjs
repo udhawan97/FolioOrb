@@ -352,3 +352,22 @@ for (const excluded of [undefined, 0, 2]) {
         else assert.doesNotMatch(target, /realized records excluded/);
     });
 }
+
+for (const excluded of [undefined, 0, 2]) {
+    test(`empty target view keeps controls disabled and explains only known exclusions: ${excluded}`, async () => {
+        const h = harness();
+        h.orbit.activateTab('plan');
+        h.reads[0].resolve({ ...plan(0), items: [],
+            ...(excluded === undefined ? {} : { excluded_realized_trade_count: excluded }) });
+        await flush();
+        const markup = h.get('review-course-summary').innerHTML;
+        assert.match(markup, /Add an owned position/);
+        assert.equal(h.get('review-target-save').disabled, true);
+        assert.equal(h.get('review-plan-export').disabled, true);
+        assert.equal(h.get('review-rehearsal-run').disabled, true);
+        if (excluded === 2) {
+            assert.match(markup, /2 realized records excluded.*all time/);
+            assert.match(markup, /View Trust Center/);
+        } else assert.doesNotMatch(markup, /realized records excluded/);
+    });
+}
