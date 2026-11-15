@@ -70,7 +70,7 @@ fi
 find_python() {
   for candidate in python3.12 python3.11 python3 python; do
     if command -v "$candidate" >/dev/null 2>&1; then
-      if "$candidate" -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)" 2>/dev/null; then
+      if "$candidate" -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11,5) else 1)" 2>/dev/null; then
         echo "$candidate"; return 0
       fi
     fi
@@ -80,7 +80,7 @@ find_python() {
 
 PYTHON_BIN="$(find_python || true)"
 if [[ -z "$PYTHON_BIN" ]]; then
-  echo "  Python 3.11+ is required."
+  echo "  Python 3.11.5+ is required."
   echo "  Opening the download page — install it, then run this command again."
   open "https://www.python.org/downloads/" 2>/dev/null || true
   exit 1

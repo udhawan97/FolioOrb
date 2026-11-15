@@ -12,7 +12,11 @@ if (-not (Test-Path $venvPython)) {
     exit 1
 }
 
+& $venvPython -m app.source_runtime
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 New-Item -ItemType Directory -Force -Path (Join-Path $profileDir "database") | Out-Null
 
 Write-Host "Starting FolioOrb at http://localhost:8000"
 & $venvPython run.py
+exit $LASTEXITCODE

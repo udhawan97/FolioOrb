@@ -7,8 +7,16 @@ import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 Run FolioOrb as a **local web app** straight from the source: one setup script starts the
 server and you use the dashboard in your browser at `http://localhost:8000`. It works on
-macOS (Apple Silicon or Intel), Windows, and Linux with **Python 3.11+** — no installer, no
+macOS (Apple Silicon or Intel), Windows, and Linux with **Python 3.11.5+** — no installer, no
 account, nothing hosted. (You can also build the desktop installers yourself — see below.)
+
+The packaged DMG and EXE include their own Python. To run an older release from a
+checkout, use the setup script and requirements from that tag.
+
+If setup reports an older Python inside `venv`, close FolioOrb and rename the
+`venv` folder to an unused backup name. Install a supported Python, then run
+`scripts/setup.sh` (macOS or Linux) or `scripts/setup.ps1` (Windows) in the same
+checkout. Keep your profile directory and its `.env` in place.
 
 ## Run from source
 

@@ -7,9 +7,13 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import venv
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from app import source_runtime
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -367,3 +371,74 @@ function py { & $env:FIXTURE_PYTHON @args }
     assert (install / "keep.txt").read_bytes() == b"existing code"
     assert (profile / "keep.txt").read_bytes() == b"existing profile"
     assert not shortcut.exists()
+
+
+@pytest.mark.parametrize("version", [(3, 11, 4), (3, 11, 5), (3, 12, 0)])
+def test_source_interpreter_minimum(monkeypatch, version):
+    interpreter = SimpleNamespace(version_info=version, executable="/fictional/venv/python")
+    monkeypatch.setattr(source_runtime, "sys", interpreter)
+    if version < (3, 11, 5):
+        with pytest.raises(SystemExit, match=r"Found 3\.11\.4 at /fictional/venv/python"):
+            source_runtime.require_source_python()
+    else:
+        source_runtime.require_source_python()
+
+
+def test_stale_venv_is_refused_by_source_entry_points(tmp_path):
+    """The supported host interpreter must not mask the venv actually used."""
+    root = tmp_path / "checkout"
+    for relative in (
+        "app/__init__.py", "app/source_runtime.py", "run.py",
+        "scripts/setup.sh", "scripts/start.sh", "FolioOrb.command",
+        "scripts/setup.ps1", "scripts/start.ps1", "FolioOrb.bat",
+    ):
+        dest = root / relative
+        dest.parent.mkdir(exist_ok=True, parents=True)
+        shutil.copyfile(ROOT / relative, dest)
+
+    virtualenv = root / "venv"
+    venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(virtualenv)
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    # Exercise the real entry points on each CI platform. Only the disposable
+    # venv advertises the old patch; the Python found on PATH stays supported.
+    (hooks / "sitecustomize.py").write_text(
+        "import os, sys\n"
+        "if os.path.normcase(os.path.abspath(sys.prefix)) == "
+        "os.path.normcase(os.environ['TEST_STALE_VENV']):\n"
+        "    sys.version_info = (3, 11, 4, 'final', 0)\n", encoding="utf-8",
+    )
+    profile = tmp_path / "disposable profile"
+    profile.mkdir()
+    sentinel = profile / "keep.txt"
+    sentinel.write_bytes(b"fictional profile")
+    env = {
+        **os.environ, "PYTHONPATH": str(hooks), "TEST_STALE_VENV": str(virtualenv),
+        "FOLIOORB_DATA_DIR": str(profile), "DATABASE_URL": f"sqlite:///{profile / 'test.db'}",
+        "FOLIO_DISABLE_UPDATE_SCHEDULER": "1", "ANTHROPIC_API_KEY": "",
+        "PIP_NO_INDEX": "1", "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    if os.name == "nt":
+        python = virtualenv / "Scripts/python.exe"
+        shell = POWERSHELL
+        assert shell
+        commands = [
+            [shell, "-NoProfile", "-File", "scripts/setup.ps1",
+             "-NoStart"],
+            [shell, "-NoProfile", "-File", "scripts/start.ps1"],
+            ["cmd.exe", "/d", "/c", "FolioOrb.bat"],
+        ]
+    else:
+        python = virtualenv / "bin/python"
+        commands = [["/bin/bash", name] for name in
+                    ("scripts/setup.sh", "scripts/start.sh", "FolioOrb.command")]
+    for command in [[str(python), "run.py"], *commands]:
+        result = subprocess.run(command, cwd=root, env=env, input="\n", text=True,
+                                capture_output=True, timeout=30, check=False)
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, command
+        assert "requires Python 3.11.5 or newer. Found 3.11.4" in output, output
+        assert "Installing dependencies" not in output
+        assert "browser will open" not in output
+        assert sentinel.read_bytes() == b"fictional profile"
+        assert list(profile.iterdir()) == [sentinel]

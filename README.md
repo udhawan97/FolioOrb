@@ -26,7 +26,7 @@
 <p align="center">
   <a href="https://github.com/udhawan97/FolioOrb/releases/latest"><img src="https://img.shields.io/github/v/release/udhawan97/FolioOrb?style=flat-square&color=6fd6f0" alt="Latest stable release"></a>
   <a href="https://github.com/udhawan97/FolioOrb/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/udhawan97/FolioOrb/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status"></a>
-  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer">
+  <img src="https://img.shields.io/badge/Python-3.11.5%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11.5 or newer">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square" alt="Apache 2.0 License"></a>
 </p>
 
@@ -40,7 +40,7 @@ The desktop and browser paths run the same FastAPI + SQLite dashboard on your ma
 | --- | --- | --- | --- |
 | **macOS desktop** | Apple Silicon · macOS 11+ | Nothing else | [Latest `.dmg`](https://github.com/udhawan97/FolioOrb/releases/latest) · [Install guide](https://udhawan97.github.io/FolioOrb/install-macos/) |
 | **Windows desktop** | x64 · Windows 10/11 | WebView2 if Windows asks for it | [Latest `.exe`](https://github.com/udhawan97/FolioOrb/releases/latest) · [Install guide](https://udhawan97.github.io/FolioOrb/install-windows/) |
-| **Local browser app** | macOS · Windows · Linux | Python 3.11+ | [Build from source](https://udhawan97.github.io/FolioOrb/build-from-source/) |
+| **Local browser app** | macOS · Windows · Linux | Python 3.11.5+ | [Build from source](https://udhawan97.github.io/FolioOrb/build-from-source/) |
 
 > [!IMPORTANT]
 > Desktop builds are not Developer ID/notarization or Authenticode signed yet. macOS and Windows
@@ -128,7 +128,7 @@ and prompt boundaries are documented in [Privacy & Data Handling](https://udhawa
 <details open>
 <summary><strong>Run from source in your browser</strong></summary>
 
-Requires Python 3.11+:
+Requires Python 3.11.5+:
 
 ```bash
 git clone https://github.com/udhawan97/FolioOrb.git

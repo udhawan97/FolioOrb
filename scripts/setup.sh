@@ -19,7 +19,7 @@ find_python() {
     if command -v "$candidate" >/dev/null 2>&1; then
       if "$candidate" - <<'PY' >/dev/null 2>&1
 import sys
-raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+raise SystemExit(0 if sys.version_info >= (3, 11, 5) else 1)
 PY
       then
         printf '%s\n' "$candidate"
@@ -32,7 +32,7 @@ PY
 
 PYTHON_BIN="$(find_python || true)"
 if [[ -z "$PYTHON_BIN" ]]; then
-  echo "Python 3.11+ is required. Install it from https://www.python.org/downloads/ and run this again."
+  echo "Python 3.11.5+ is required. Install it from https://www.python.org/downloads/ and run this again."
   exit 1
 fi
 
@@ -43,6 +43,7 @@ if [[ ! -d venv ]]; then
   "$PYTHON_BIN" -m venv venv
 fi
 
+venv/bin/python -m app.source_runtime
 source venv/bin/activate
 
 echo "Installing dependencies..."
