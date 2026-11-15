@@ -7,8 +7,16 @@ import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 Run FolioOrb as a **local web app** straight from the source: one setup script starts the
 server and you use the dashboard in your browser at `http://localhost:8000`. It works on
-macOS (Apple Silicon or Intel), Windows, and Linux with **Python 3.11+** — no installer, no
+macOS (Apple Silicon or Intel), Windows, and Linux with **Python 3.11.5+** — no installer, no
 account, nothing hosted. (You can also build the desktop installers yourself — see below.)
+
+The packaged DMG and EXE include their own Python. To run an older release from a
+checkout, use the setup script and requirements from that tag.
+
+If setup reports an older Python inside `venv`, close FolioOrb and rename the
+`venv` folder to an unused backup name. Install a supported Python, then run
+`scripts/setup.sh` (macOS or Linux) or `scripts/setup.ps1` (Windows) in the same
+checkout. Keep your profile directory and its `.env` in place.
 
 ## Run from source
 
@@ -29,8 +37,8 @@ account, nothing hosted. (You can also build the desktop installers yourself —
 	</TabItem>
 </Tabs>
 
-The setup script creates a virtual environment, installs dependencies, writes a local
-`.env`, prepares the `database/` folder, and starts the app at `http://localhost:8000`.
+The setup script creates a virtual environment, installs dependencies, creates a local
+`.env` if needed, prepares the `database/` folder, and starts the app at `http://localhost:8000`.
 For day-to-day use afterwards, run `./scripts/start.sh` (or `.\scripts\start.ps1`).
 
 <Aside type="note" title="Keep custom data in one profile">
@@ -43,14 +51,10 @@ restore marker, update file, or migration copy.
 
 ### Manual setup
 
-```bash
-python3 -m venv venv
-source venv/bin/activate            # Windows: .\venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-cp .env.example .env                # Windows: copy .env.example .env
-python run.py
-```
+From the checkout, run `./scripts/setup.sh --no-start` on macOS or Linux,
+or `.\scripts\setup.ps1 -NoStart` on Windows. This checks the Python version
+and installs dependencies while keeping your existing `.env`. When you are
+ready to launch, run `./scripts/start.sh` or `.\scripts\start.ps1`.
 
 ## One-line install scripts
 

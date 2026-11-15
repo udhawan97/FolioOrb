@@ -67,7 +67,7 @@ $releaseUrl = if ($ref -eq "main") {
 function Find-Python {
     foreach ($cmd in @("py", "python", "python3")) {
         if (Get-Command $cmd -ErrorAction SilentlyContinue) {
-            & $cmd -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)" 2>$null
+            & $cmd -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11,5) else 1)" 2>$null
             if ($LASTEXITCODE -eq 0) { return $cmd }
         }
     }
@@ -77,7 +77,7 @@ function Find-Python {
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
                     [System.Environment]::GetEnvironmentVariable("Path", "User")
         if (Get-Command python -ErrorAction SilentlyContinue) {
-            & python -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)" 2>$null
+            & python -c "import sys; raise SystemExit(0 if sys.version_info>=(3,11,5) else 1)" 2>$null
             if ($LASTEXITCODE -eq 0) { return "python" }
         }
     }
@@ -86,9 +86,9 @@ function Find-Python {
 
 $pythonCmd = Find-Python
 if (-not $pythonCmd) {
-    Write-Host "  Python 3.11+ is required."
+    Write-Host "  Python 3.11.5+ is required."
     Start-Process "https://www.python.org/downloads/"
-    throw "Python 3.11+ is required"
+    throw "Python 3.11.5+ is required"
 }
 Write-Host "  OK $(& $pythonCmd --version)"
 

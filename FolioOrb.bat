@@ -36,10 +36,18 @@ if not exist venv\ (
     )
 )
 
+venv\Scripts\python.exe -m app.source_runtime
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
 echo.
 echo  Starting FolioOrb...
 echo  Your browser will open automatically at http://localhost:8000
 echo  Keep this window open while using the app.  Press Ctrl+C to stop.
 echo.
 venv\Scripts\python.exe run.py
+set "FOLIOORB_EXIT=%ERRORLEVEL%"
 pause
+exit /b %FOLIOORB_EXIT%

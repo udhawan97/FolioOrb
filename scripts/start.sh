@@ -14,6 +14,7 @@ if [[ ! -d venv ]]; then
   exit 1
 fi
 
+venv/bin/python -m app.source_runtime
 source venv/bin/activate
 mkdir -p "$PROFILE_DIR/database"
 

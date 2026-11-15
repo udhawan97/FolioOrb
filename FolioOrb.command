@@ -11,7 +11,7 @@ if [[ -z "${FOLIOORB_DATA_DIR:-}" && -f .source-profile-path ]]; then
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
-    osascript -e 'display alert "Python not found" message "Install Python 3.11+ from python.org, then double-click this file again." buttons {"OK"} default button "OK"'
+    osascript -e 'display alert "Python not found" message "Install Python 3.11.5+ from python.org, then double-click this file again." buttons {"OK"} default button "OK"'
     exit 1
 fi
 
@@ -20,6 +20,8 @@ if [ ! -d venv ]; then
     echo
     bash scripts/setup.sh --no-start
 fi
+
+venv/bin/python -m app.source_runtime
 
 echo
 echo "Starting FolioOrb..."

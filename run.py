@@ -2,7 +2,7 @@ import threading
 import time
 import webbrowser
 
-import uvicorn
+from app.source_runtime import require_source_python
 
 URL = "http://localhost:8000"
 HOST = "127.0.0.1"
@@ -13,7 +13,9 @@ def _open_browser():
     webbrowser.open(URL)
 
 
-if __name__ == "__main__":
+def _start():
+    import uvicorn
+
     # Manual restores are swapped in before app.main imports SQLAlchemy and
     # opens the live SQLite file. The browser is opened only after that boundary.
     from app.paths import prepare_runtime_profile
@@ -31,3 +33,8 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
     )
+
+
+if __name__ == "__main__":
+    require_source_python()
+    _start()

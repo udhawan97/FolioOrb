@@ -25,7 +25,7 @@ function Get-PythonCommand {
         }
 
         $args = $candidate.Args
-        $versionCheck = "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
+        $versionCheck = "import sys; raise SystemExit(0 if sys.version_info >= (3, 11, 5) else 1)"
         & $command @args -c $versionCheck | Out-Null
         if ($LASTEXITCODE -eq 0) {
             return @{ Command = $command; Args = $args }
@@ -37,7 +37,7 @@ function Get-PythonCommand {
 
 $python = Get-PythonCommand
 if ($null -eq $python) {
-    Write-Host "Python 3.11+ is required. Install it from https://www.python.org/downloads/ and run this again."
+    Write-Host "Python 3.11.5+ is required. Install it from https://www.python.org/downloads/ and run this again."
     exit 1
 }
 
@@ -46,13 +46,18 @@ if ($null -eq $python) {
 if (-not (Test-Path "venv")) {
     Write-Host "Creating virtual environment..."
     & $python.Command @($python.Args + @("-m", "venv", "venv"))
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 $venvPython = Join-Path "venv" "Scripts\python.exe"
+& $venvPython -m app.source_runtime
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Installing dependencies..."
 & $venvPython -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $venvPython -m pip install -r requirements.txt
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $profileDir "database") | Out-Null
 

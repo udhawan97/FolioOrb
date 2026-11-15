@@ -7,9 +7,13 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import venv
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from app import source_runtime
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -367,3 +371,197 @@ function py { & $env:FIXTURE_PYTHON @args }
     assert (install / "keep.txt").read_bytes() == b"existing code"
     assert (profile / "keep.txt").read_bytes() == b"existing profile"
     assert not shortcut.exists()
+
+
+@pytest.mark.parametrize("version", [(3, 11, 4), (3, 11, 5), (3, 12, 0)])
+def test_source_interpreter_minimum(monkeypatch, version):
+    interpreter = SimpleNamespace(version_info=version, executable="/fictional/venv/python")
+    monkeypatch.setattr(source_runtime, "sys", interpreter)
+    if version < (3, 11, 5):
+        with pytest.raises(SystemExit, match=r"Found 3\.11\.4 at /fictional/venv/python"):
+            source_runtime.require_source_python()
+    else:
+        source_runtime.require_source_python()
+
+
+def test_stale_venv_is_refused_by_source_entry_points(tmp_path):
+    """The supported host interpreter must not mask the venv actually used."""
+    root = tmp_path / "checkout"
+    for relative in (
+        "app/__init__.py", "app/source_runtime.py", "run.py",
+        "scripts/setup.sh", "scripts/start.sh", "FolioOrb.command",
+        "scripts/setup.ps1", "scripts/start.ps1", "FolioOrb.bat",
+    ):
+        dest = root / relative
+        dest.parent.mkdir(exist_ok=True, parents=True)
+        shutil.copyfile(ROOT / relative, dest)
+
+    virtualenv = root / "venv"
+    venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(virtualenv)
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    # Exercise the real entry points on each CI platform. Only the disposable
+    # venv advertises the old patch; the Python found on PATH stays supported.
+    (hooks / "sitecustomize.py").write_text(
+        "import os, sys\n"
+        "if os.path.normcase(os.path.abspath(sys.prefix)) == "
+        "os.path.normcase(os.environ['TEST_STALE_VENV']):\n"
+        "    sys.version_info = (3, 11, 4, 'final', 0)\n", encoding="utf-8",
+    )
+    profile = tmp_path / "disposable profile"
+    profile.mkdir()
+    sentinel = profile / "keep.txt"
+    sentinel.write_bytes(b"fictional profile")
+    env = {
+        **os.environ, "PYTHONPATH": str(hooks), "TEST_STALE_VENV": str(virtualenv),
+        "FOLIOORB_DATA_DIR": str(profile), "DATABASE_URL": f"sqlite:///{profile / 'test.db'}",
+        "FOLIO_DISABLE_UPDATE_SCHEDULER": "1", "ANTHROPIC_API_KEY": "",
+        "PIP_NO_INDEX": "1", "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    if os.name == "nt":
+        python = virtualenv / "Scripts/python.exe"
+        shell = POWERSHELL
+        assert shell
+        commands = [
+            [shell, "-NoProfile", "-File", "scripts/setup.ps1",
+             "-NoStart"],
+            [shell, "-NoProfile", "-File", "scripts/start.ps1"],
+            ["cmd.exe", "/d", "/c", "FolioOrb.bat"],
+        ]
+    else:
+        python = virtualenv / "bin/python"
+        commands = [["/bin/bash", name] for name in
+                    ("scripts/setup.sh", "scripts/start.sh", "FolioOrb.command")]
+    for command in [[str(python), "run.py"], *commands]:
+        result = subprocess.run(command, cwd=root, env=env, input="\n", text=True,
+                                capture_output=True, timeout=30, check=False)
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, command
+        assert "requires Python 3.11.5 or newer. Found 3.11.4" in output, output
+        assert "Installing dependencies" not in output
+        assert "browser will open" not in output
+        assert sentinel.read_bytes() == b"fictional profile"
+        assert list(profile.iterdir()) == [sentinel]
+
+
+@pytest.fixture(name="setup_powershell", params=["powershell", "pwsh"])
+def installed_setup_powershell(request):
+    """Use each installed PowerShell engine, including Windows PowerShell 5.1."""
+    executable = shutil.which(request.param)
+    if not executable:
+        pytest.skip(f"{request.param} is unavailable")
+    return executable
+
+
+@pytest.mark.parametrize("existing_profile", [False, True])
+@pytest.mark.parametrize(("failure", "code", "calls"), [
+    ("venv", 31, ["venv"]),
+    ("bootstrap", 32, ["bootstrap"]),
+    ("requirements", 33, ["bootstrap", "requirements"]),
+])
+def test_windows_setup_stops_on_failed_native_command(
+    tmp_path, setup_powershell, *, existing_profile, failure, code, calls,
+):
+    checkout = tmp_path / "checkout"
+    scripts = checkout / "scripts"
+    scripts.mkdir(parents=True)
+    setup = scripts / "setup.ps1"
+    shutil.copyfile(ROOT / "scripts/setup.ps1", setup)
+    app = checkout / "app"
+    app.mkdir()
+    for name in ("__init__.py", "source_runtime.py"):
+        shutil.copyfile(ROOT / "app" / name, app / name)
+
+    if failure != "venv":
+        virtualenv = checkout / "venv"
+        venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(virtualenv)
+        if os.name != "nt":
+            # PowerShell on Unix can exercise the Windows script with a native interpreter.
+            (virtualenv / "Scripts").mkdir()
+            (virtualenv / "Scripts/python.exe").symlink_to(virtualenv / "bin/python")
+
+    hooks = tmp_path / "fixture modules"
+    hooks.mkdir()
+    stub = (
+        "import os, sys\nfrom pathlib import Path\n"
+        "stage = 'venv' if Path(__file__).stem == 'venv' else "
+        "('bootstrap' if '--upgrade' in sys.argv else 'requirements')\n"
+        "with open(os.environ['SETUP_TRACE'], 'a', encoding='ascii') as trace:\n"
+        "    print(stage, file=trace)\n"
+        "sys.exit(int(os.environ['SETUP_CODE']) if stage == os.environ['SETUP_FAILURE'] else 0)\n"
+    )
+    for module in ("pip.py", "venv.py"):
+        (hooks / module).write_text(stub, encoding="utf-8")
+    profile = tmp_path / "profile"
+    if existing_profile:
+        profile.mkdir()
+        (profile / ".env").write_bytes(b"FICTIONAL=keep\n")
+    trace = tmp_path / "calls.txt"
+    env = {
+        **os.environ, "PYTHONPATH": str(hooks), "SETUP_TRACE": str(trace),
+        "SETUP_FAILURE": failure, "SETUP_CODE": str(code), "PIP_NO_INDEX": "1",
+        "FOLIOORB_DATA_DIR": str(profile), "DATABASE_URL": f"sqlite:///{profile / 'test.db'}",
+        "FOLIO_DISABLE_UPDATE_SCHEDULER": "1", "ANTHROPIC_API_KEY": "",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    result = subprocess.run(
+        [setup_powershell, "-NoProfile", "-NonInteractive", "-File", str(setup), "-NoStart"],
+        cwd=checkout, env=env, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode == code, result.stdout + result.stderr
+    assert trace.read_text(encoding="ascii").splitlines() == calls
+    assert "Setup complete" not in result.stdout and "Starting FolioOrb" not in result.stdout
+    if existing_profile:
+        assert list(profile.iterdir()) == [profile / ".env"]
+        assert (profile / ".env").read_bytes() == b"FICTIONAL=keep\n"
+    else:
+        assert not profile.exists()
+
+
+@pytest.mark.parametrize(("missing", "pull_status", "setup_status", "calls"), [
+    ("git", 0, 0, []), ("setup", 0, 0, ["pull"]),
+    (None, 23, 0, ["pull"]), (None, 0, 24, ["pull", "setup"]),
+    (None, 0, 0, ["pull", "setup", "start"]),
+])
+def test_powershell_update_guide_launches_only_after_success(
+    tmp_path, setup_powershell, *, missing, pull_status, setup_status, calls,
+):
+    guide = (ROOT / "docs-site/src/content/docs/updating.mdx").read_text(encoding="utf-8")
+    section = guide.split("## Installed from source or a script?", 1)[1]
+    snippet = section.split("```powershell\n", 1)[1].split("\n```", 1)[0]
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    if missing != "setup":
+        (scripts / "setup.ps1").write_text(
+            "param([switch]$NoStart)\nif (-not $NoStart) { exit 81 }\n"
+            "Add-Content -LiteralPath $env:GUIDE_TRACE -Value setup -Encoding ASCII\n"
+            "exit ([int]$env:GUIDE_SETUP_EXIT)\n", encoding="utf-8",
+        )
+    (scripts / "start.ps1").write_text(
+        "Add-Content -LiteralPath $env:GUIDE_TRACE -Value start -Encoding ASCII\n",
+        encoding="utf-8",
+    )
+    git_stub = (
+        "function git {\n"
+        "  if (($args -join ' ') -ne 'pull --ff-only') { throw 'Unexpected Git command' }\n"
+        "  Add-Content -LiteralPath $env:GUIDE_TRACE -Value pull -Encoding ASCII\n"
+        "  & $env:GUIDE_PYTHON -c 'import sys; sys.exit(int(sys.argv[1]))' $env:GUIDE_PULL_EXIT\n"
+        "}\n"
+    )
+    wrapper = tmp_path / "update.ps1"
+    wrapper.write_text(
+        ("$env:PATH = $PSScriptRoot\n" if missing == "git" else git_stub)
+        + "& $env:GUIDE_PYTHON -c 'pass'\n" + snippet + "\n", encoding="utf-8",
+    )
+    trace = tmp_path / "calls.txt"
+    trace.touch()
+    result = subprocess.run(
+        [setup_powershell, "-NoProfile", "-NonInteractive", "-File", str(wrapper)],
+        cwd=tmp_path, env={
+            **os.environ, "GUIDE_TRACE": str(trace), "GUIDE_PYTHON": sys.executable,
+            "GUIDE_PULL_EXIT": str(pull_status), "GUIDE_SETUP_EXIT": str(setup_status),
+        },
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert trace.read_text(encoding="ascii").splitlines() == calls, result.stderr
+    assert (result.returncode == 0) == (calls[-1:] == ["start"]), result.stderr

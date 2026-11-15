@@ -54,7 +54,7 @@
   ═══════════════════════════════════════════════════════════ -->
   <rect x="16" y="184" width="828" height="225" rx="12" fill="#0A1628" stroke="#1B3D7A" stroke-width="1.5"/>
   <text x="36" y="204" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="9.5" font-weight="600" fill="#3B82F6" letter-spacing="0.9">FASTAPI SERVER  ·  localhost:8000, or embedded in the auto-updating desktop app</text>
-  <text x="36" y="217" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="8.5" fill="#2E5499">Python 3.11+  ·  FastAPI  ·  Uvicorn  ·  Pydantic 2  ·  SQLAlchemy 2  ·  pytest  ·  CodeQL + CI</text>
+  <text x="36" y="217" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="8.5" fill="#2E5499">Python 3.11.5+  ·  FastAPI  ·  Uvicorn  ·  Pydantic 2  ·  SQLAlchemy 2  ·  pytest  ·  CodeQL + CI</text>
 
   <!-- Router boxes — y=226, h=54 -->
   <rect x="36"  y="226" width="180" height="54" rx="8" fill="#111E35" stroke="#1E3F70" stroke-width="1"/>
