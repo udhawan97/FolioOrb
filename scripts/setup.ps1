@@ -46,6 +46,7 @@ if ($null -eq $python) {
 if (-not (Test-Path "venv")) {
     Write-Host "Creating virtual environment..."
     & $python.Command @($python.Args + @("-m", "venv", "venv"))
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 $venvPython = Join-Path "venv" "Scripts\python.exe"
@@ -54,7 +55,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Installing dependencies..."
 & $venvPython -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $venvPython -m pip install -r requirements.txt
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $profileDir "database") | Out-Null
 

@@ -406,7 +406,7 @@ jobs:
         run: python -m pip install --require-hashes -r requirements-desktop-windows.lock
       - name: Exercise Windows backup safety
         run: >-
-          python -m pytest -q
+          python -m pytest -v
           tests/test_backup_policy.py
           tests/test_backup_service.py
           tests/test_source_installer_profile.py

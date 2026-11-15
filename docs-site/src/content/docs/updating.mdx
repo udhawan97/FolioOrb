@@ -86,21 +86,30 @@ lives for [macOS](/FolioOrb/install-macos/#where-your-data-lives) and
 
 ## Installed from source or a script?
 
-For a manual clone, update the checkout and restart it through the repository
-launcher so the same runtime-profile checks apply:
+For a manual clone, quit FolioOrb and open a terminal in the existing checkout.
+These commands update the checkout, install the dependencies in its virtual
+environment, and start FolioOrb after both steps succeed.
 
-The desktop app and `python run.py` allow only one process to own a profile at a
-time. Directly starting Uvicorn bypasses these launcher checks and must not be
-used to perform a queued restore.
+**macOS and Linux**
 
 ```bash
-cd FolioOrb
-git pull
-python -m pip install -r requirements.txt
-./scripts/start.sh
+git pull --ff-only && ./scripts/setup.sh --no-start && ./scripts/start.sh
 ```
 
-On Windows, use `.\scripts\start.ps1` after `git pull` and dependency installation.
+**Windows PowerShell**
+
+```powershell
+git pull --ff-only
+if ($LASTEXITCODE -eq 0) {
+    .\scripts\setup.ps1 -NoStart
+    if ($LASTEXITCODE -eq 0) { .\scripts\start.ps1 }
+}
+```
+
+If setup fails, keep FolioOrb closed until setup succeeds. For an older Python
+in your checkout, follow the [virtual environment recovery instructions](/FolioOrb/build-from-source/).
+The desktop app and `python run.py` allow one process to own a profile at a time.
+Always use the repository launcher for a queued restore.
 
 For a one-line install, re-run the same
 [install script](/FolioOrb/build-from-source/#one-line-install-scripts). It stages the replacement,
