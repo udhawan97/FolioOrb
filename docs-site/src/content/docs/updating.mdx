@@ -100,9 +100,15 @@ git pull --ff-only && ./scripts/setup.sh --no-start && ./scripts/start.sh
 
 ```powershell
 git pull --ff-only
-if ($LASTEXITCODE -eq 0) {
+if ($? -and $LASTEXITCODE -eq 0) {
     .\scripts\setup.ps1 -NoStart
-    if ($LASTEXITCODE -eq 0) { .\scripts\start.ps1 }
+    if ($? -and $LASTEXITCODE -eq 0) {
+        .\scripts\start.ps1
+    } else {
+        throw "Setup failed. Keep FolioOrb closed and check the setup error above."
+    }
+} else {
+    throw "Git could not update this checkout. Check the error above."
 }
 ```
 

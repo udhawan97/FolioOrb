@@ -518,35 +518,43 @@ def test_windows_setup_stops_on_failed_native_command(
         assert not profile.exists()
 
 
-@pytest.mark.parametrize(("pull_status", "setup_status", "calls"), [
-    (23, 0, ["pull"]), (0, 24, ["pull", "setup"]), (0, 0, ["pull", "setup", "start"]),
+@pytest.mark.parametrize(("missing", "pull_status", "setup_status", "calls"), [
+    ("git", 0, 0, []), ("setup", 0, 0, ["pull"]),
+    (None, 23, 0, ["pull"]), (None, 0, 24, ["pull", "setup"]),
+    (None, 0, 0, ["pull", "setup", "start"]),
 ])
 def test_powershell_update_guide_launches_only_after_success(
-    tmp_path, setup_powershell, pull_status, setup_status, calls,
+    tmp_path, setup_powershell, *, missing, pull_status, setup_status, calls,
 ):
     guide = (ROOT / "docs-site/src/content/docs/updating.mdx").read_text(encoding="utf-8")
     section = guide.split("## Installed from source or a script?", 1)[1]
     snippet = section.split("```powershell\n", 1)[1].split("\n```", 1)[0]
     scripts = tmp_path / "scripts"
     scripts.mkdir()
-    (scripts / "setup.ps1").write_text(
-        "param([switch]$NoStart)\nif (-not $NoStart) { exit 81 }\n"
-        "Add-Content -LiteralPath $env:GUIDE_TRACE -Value setup -Encoding ASCII\n"
-        "exit ([int]$env:GUIDE_SETUP_EXIT)\n", encoding="utf-8",
-    )
+    if missing != "setup":
+        (scripts / "setup.ps1").write_text(
+            "param([switch]$NoStart)\nif (-not $NoStart) { exit 81 }\n"
+            "Add-Content -LiteralPath $env:GUIDE_TRACE -Value setup -Encoding ASCII\n"
+            "exit ([int]$env:GUIDE_SETUP_EXIT)\n", encoding="utf-8",
+        )
     (scripts / "start.ps1").write_text(
         "Add-Content -LiteralPath $env:GUIDE_TRACE -Value start -Encoding ASCII\n",
         encoding="utf-8",
     )
-    wrapper = tmp_path / "update.ps1"
-    wrapper.write_text(
+    git_stub = (
         "function git {\n"
         "  if (($args -join ' ') -ne 'pull --ff-only') { throw 'Unexpected Git command' }\n"
         "  Add-Content -LiteralPath $env:GUIDE_TRACE -Value pull -Encoding ASCII\n"
         "  & $env:GUIDE_PYTHON -c 'import sys; sys.exit(int(sys.argv[1]))' $env:GUIDE_PULL_EXIT\n"
-        "}\n" + snippet + "\n", encoding="utf-8",
+        "}\n"
+    )
+    wrapper = tmp_path / "update.ps1"
+    wrapper.write_text(
+        ("$env:PATH = $PSScriptRoot\n" if missing == "git" else git_stub)
+        + "& $env:GUIDE_PYTHON -c 'pass'\n" + snippet + "\n", encoding="utf-8",
     )
     trace = tmp_path / "calls.txt"
+    trace.touch()
     result = subprocess.run(
         [setup_powershell, "-NoProfile", "-NonInteractive", "-File", str(wrapper)],
         cwd=tmp_path, env={
@@ -556,3 +564,4 @@ def test_powershell_update_guide_launches_only_after_success(
         capture_output=True, text=True, timeout=30, check=False,
     )
     assert trace.read_text(encoding="ascii").splitlines() == calls, result.stderr
+    assert (result.returncode == 0) == (calls[-1:] == ["start"]), result.stderr
