@@ -37,8 +37,8 @@ checkout. Keep your profile directory and its `.env` in place.
 	</TabItem>
 </Tabs>
 
-The setup script creates a virtual environment, installs dependencies, writes a local
-`.env`, prepares the `database/` folder, and starts the app at `http://localhost:8000`.
+The setup script creates a virtual environment, installs dependencies, creates a local
+`.env` if needed, prepares the `database/` folder, and starts the app at `http://localhost:8000`.
 For day-to-day use afterwards, run `./scripts/start.sh` (or `.\scripts\start.ps1`).
 
 <Aside type="note" title="Keep custom data in one profile">
@@ -51,14 +51,10 @@ restore marker, update file, or migration copy.
 
 ### Manual setup
 
-```bash
-python3 -m venv venv
-source venv/bin/activate            # Windows: .\venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-cp .env.example .env                # Windows: copy .env.example .env
-python run.py
-```
+From the checkout, run `./scripts/setup.sh --no-start` on macOS or Linux,
+or `.\scripts\setup.ps1 -NoStart` on Windows. This checks the Python version
+and installs dependencies while keeping your existing `.env`. When you are
+ready to launch, run `./scripts/start.sh` or `.\scripts\start.ps1`.
 
 ## One-line install scripts
 
