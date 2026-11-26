@@ -4,7 +4,7 @@ Prepared October 20, 2026, America/Chicago. Planning baseline: `224fdac37b7860ce
 
 Advance FolioOrb through six bounded phases: compatibility, import preview, import confirmation, data-quality explanations, review comparison, and recovery acceptance. Scheduled runs should finish one useful slice at a time, preserve financial records, and leave reproducible evidence for the next run.
 
-This is the canonical implementation queue for this initiative. Existing shipped plans remain design history. Phase 1 source integration and acceptance-bound publication controls landed in PR 99. Phase 2 source landed in [PR111](https://github.com/udhawan97/FolioOrb/pull/111). Phase 3 confirmation and reconciliation are implemented; integration outcomes are recorded in the dated run ledger. Later product phases remain unimplemented. See the exact integration and transport receipts below. This queue alone does not authorize a release. CAPO retains its existing repository-selection priorities and release authority, subject to all gates below.
+This is the canonical implementation queue for this initiative. Existing shipped plans remain design history. Phase 1 source integration and acceptance-bound publication controls landed in PR 99. Phase 2 source landed in [PR111](https://github.com/udhawan97/FolioOrb/pull/111). Phase 3 confirmation/reconciliation and Phase 4 incomplete-data explanations are source merged. Phase 5A comparison is the current bounded slice; Phase 5B UI and Phase 6 native acceptance remain pending. See the exact integration and transport receipts below. This queue alone does not authorize a release. CAPO retains its existing repository-selection priorities and release authority, subject to all gates below.
 
 ## Planning baseline evidence
 
@@ -179,8 +179,8 @@ Update in place; use one row per bounded slice. Qualify recurring acceptance sli
 | 1B | Source merged; incompatible upgrades deferred | 1A | Revisit NumPy only with a Python-minimum decision; validate grouped Pydantic proposals |
 | 2 | Source merged and Pages verified | 1A disposition satisfied | Preserve native/publication gates |
 | 3 | Source merged; Pages verified | 2 source integration satisfied | Preserve native/publication gates |
-| 4 | Implemented; verification pending | Verified current baseline | Verify matrix, explanations and capture metadata; implementation council and exact-head gates |
-| 5A | Planned | 4 | Establish fields safely comparable from v1 receipts |
+| 4 | Source merged (PR114) | 3 | Preserve native/publication gates |
+| 5A | Implemented; delivery tracked in [PR124](https://github.com/udhawan97/FolioOrb/pull/124) | 4 source integration verified | Start5B after verifying PR124 merge and its final evidence |
 | 5B | Planned | 5A | Add bounded accessible comparison UI |
 | 6A | Planned | Selected completed feature slice | Rehearse complete disposable-profile journey |
 | 6B | Planned | 6A and exact platform artifacts | Verify native acceptance and publication gates |
@@ -346,3 +346,54 @@ Implementation council, exact-head hosted checks and integration remain pending 
 ## Phase 4 implementation checkpoint — October 30, 2026
 
 Base `88c8ef4b7ada91faeb128df6b7c923bea4322d29`; [bounded plan](2026-10-30-financial-data-matrix.md). Two complete plan council rounds with four independent roles each accepted the slice. Baseline probes reproduced missing realized-exclusion explanations and absent standalone report CSV capture time. The matrix and focused adapters/presentation changes are implemented; exact-candidate implementation council and integration gates remain pending. Original absolute queue remains the writable canonical ledger. No native acceptance, software release, schema or dependency change is claimed.
+
+
+## Phase 5A implementation checkpoint — November 25, 2026
+
+Owner `capo-phase5a-20261125`; branch `capo/2026-11-25-bundle-comparison`.
+Base `d305c9f29e5f6234b83de6a66cebd05e603a951c`. Current-main reconciliation
+confirms Phase2 PR111 (`0a8eedac8b92e49cdfcfe1286502a1333fa2aa97`), Phase3 PR113
+(`88c8ef4b7ada91faeb128df6b7c923bea4322d29`), Phase4 PR114
+(`e67e66d6f041498160986b0ab342a739b76a0080`) and Soup Sieve/Python3.11.5 repair
+PR122 (the base above) are merged ancestors. Earlier pending ledger entries are
+historical checkpoints; do not repeat these phases. Latest stable remains v5.16.1.
+
+[Phase5A contract](2026-11-25-review-comparison.md) records the supported v1 facts,
+limits, failure codes and rollback. Two four-role plan rounds completed before
+edits. Baseline2222passed/60skipped; a synthetic real exporter inspection established
+v1 semantic keys with zero export SQL writes/network calls. The implementation
+shares state-free archive validation, compares only recorded USD known value,
+saved whole-bps targets and semantic coverage, and requires same-portfolio
+confirmation. Plan review identified ZIP metadata allocation before member-count
+validation; comparison now bounds the central directory before stdlib parsing.
+Legacy verification retains its response contract. No UI, route, dependency,
+version, workflow, migration or installed-profile change.
+
+Exact-candidate full checks, two implementation rounds, PR and source integration
+are pending at this checkpoint. No native acceptance, release tag, software
+publication or Pages deployment is claimed. Release-publication still requires
+owner review of the same run's accepted macOS/Windows installer bytes; this run
+has no Windows runtime or new native acceptance receipt. Current main/tag pushes
+only stage candidates. Next after checked5A integration:5B accessible picker/view
+with disposable bundles and actual Safari behavior, preserving the service's
+coverage/identity/error semantics and the independent release gates.
+
+
+### Phase 5A first implementation review
+
+The initial candidate was `442c9cb6a8e7d391673aa6fadc9262fd31e973ba`.
+Local checks passed 2,318 tests on each of Python 3.11.5 and 3.12.10 (60 existing
+skips), 188 Node tests, compile/import, Pylint 10/10, lock reproduction and
+source/platform dependency audits. All eight required hosted contexts also passed.
+The source audit used a uv-resolved Linux/Python3.12 lock after the local managed
+Python resolver's `ensurepip` crashed; hosted Dependency Audit passed normally.
+
+Independent review nevertheless reproduced a Decimal-context defect: resetting
+only precision retained the caller's exponent limits/traps, so valid amounts
+could raise or become `NaN`. The correction uses an explicit full decimal context
+and adds trapped/untrapped regression cases without changing the caller's context.
+This is why green CI alone does not complete the council gate. First-round review
+had four roles; final confirmation and fresh-head checks remain required before
+integration. Exact final delivery is recorded in [PR124](https://github.com/udhawan97/FolioOrb/pull/124)
+and synchronized to the original canonical ledger. Phase5B and native/release
+acceptance remain separate pending work.
