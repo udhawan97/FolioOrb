@@ -9,7 +9,9 @@ import csv
 import io
 import re
 from datetime import date, datetime
-from decimal import Decimal, localcontext
+from decimal import (
+    Context, Decimal, DivisionByZero, InvalidOperation, Overflow, ROUND_HALF_EVEN, localcontext,
+)
 
 from app.services.review_bundle_verification import (
     BundleVerificationError, INTEGRITY_ONLY_NOTE, load_verified_bundle,
@@ -26,6 +28,10 @@ _AREAS = ("prices", "fundamentals", "fees", "income", "overlap", "theses", "hist
 _QUALITY_KEYS = ("review_valuation", "review_history", "trust", "target_plan_valuation")
 _PERIOD_DAYS = {"month": 31, "quarter": 92}
 _USD = re.compile(r"-?[0-9]+(?:\.[0-9]{1,2})?\Z")
+_MONEY_CONTEXT = Context(
+    prec=40, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999,
+    capitals=1, clamp=0, flags=[], traps=[InvalidOperation, DivisionByZero, Overflow],
+)
 _TARGET_HEADER = [
     "ticker", "target_weight_bps", "target_weight_pct", "actual_weight_bps",
     "actual_weight_pct", "drift_bps", "drift_direction",
@@ -110,8 +116,7 @@ def _money_text(value):
     if value is None:
         return None
     # Independent of an embedding application's ambient Decimal context.
-    with localcontext() as context:
-        context.prec = 40
+    with localcontext(_MONEY_CONTEXT):
         return format((value if value else Decimal(0)).quantize(Decimal("0.01")), ".2f")
 
 
@@ -284,8 +289,7 @@ def _value_comparison(before, after):
                   reason="Price coverage is incomplete, missing, or different.")
     if (before["value_eligible"] and after["value_eligible"]
             and before["coverage"]["areas"]["prices"] == after["coverage"]["areas"]["prices"]):
-        with localcontext() as context:
-            context.prec = 40
+        with localcontext(_MONEY_CONTEXT):
             result.update(delta=_money_text(right - left), status="comparable",
                           reason="Complete, matching recorded price coverage.")
     return result

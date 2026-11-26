@@ -180,7 +180,7 @@ Update in place; use one row per bounded slice. Qualify recurring acceptance sli
 | 2 | Source merged and Pages verified | 1A disposition satisfied | Preserve native/publication gates |
 | 3 | Source merged; Pages verified | 2 source integration satisfied | Preserve native/publication gates |
 | 4 | Source merged (PR114) | 3 | Preserve native/publication gates |
-| 5A | Implemented; exact-candidate verification pending | 4 source integration verified | Complete implementation councils and protected integration |
+| 5A | Implemented; delivery tracked in [PR124](https://github.com/udhawan97/FolioOrb/pull/124) | 4 source integration verified | Start5B after verifying PR124 merge and its final evidence |
 | 5B | Planned | 5A | Add bounded accessible comparison UI |
 | 6A | Planned | Selected completed feature slice | Rehearse complete disposable-profile journey |
 | 6B | Planned | 6A and exact platform artifacts | Verify native acceptance and publication gates |
@@ -377,3 +377,23 @@ has no Windows runtime or new native acceptance receipt. Current main/tag pushes
 only stage candidates. Next after checked5A integration:5B accessible picker/view
 with disposable bundles and actual Safari behavior, preserving the service's
 coverage/identity/error semantics and the independent release gates.
+
+
+### Phase 5A first implementation review
+
+The initial candidate was `442c9cb6a8e7d391673aa6fadc9262fd31e973ba`.
+Local checks passed 2,318 tests on each of Python 3.11.5 and 3.12.10 (60 existing
+skips), 188 Node tests, compile/import, Pylint 10/10, lock reproduction and
+source/platform dependency audits. All eight required hosted contexts also passed.
+The source audit used a uv-resolved Linux/Python3.12 lock after the local managed
+Python resolver's `ensurepip` crashed; hosted Dependency Audit passed normally.
+
+Independent review nevertheless reproduced a Decimal-context defect: resetting
+only precision retained the caller's exponent limits/traps, so valid amounts
+could raise or become `NaN`. The correction uses an explicit full decimal context
+and adds trapped/untrapped regression cases without changing the caller's context.
+This is why green CI alone does not complete the council gate. First-round review
+had four roles; final confirmation and fresh-head checks remain required before
+integration. Exact final delivery is recorded in [PR124](https://github.com/udhawan97/FolioOrb/pull/124)
+and synchronized to the original canonical ledger. Phase5B and native/release
+acceptance remain separate pending work.

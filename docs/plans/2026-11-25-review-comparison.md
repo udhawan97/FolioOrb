@@ -24,7 +24,8 @@ caller; the service never opens paths or extracts files.
   means a 31/92-day review window. Reversed capture chronology requires swapping
   the inputs; the service never silently reorders them.
 - `known_value` compares the recorded USD amount from `current/known_value` in the
-  review CSV. The target receipt must agree. Decimal strings preserve cents; a
+  review CSV. The target receipt must agree. An explicit decimal context isolates caller precision, exponent limits and traps.
+  Decimal strings preserve cents; a
   missing value is `null`. Gains, cost basis, returns, FX and forecasts are outside
   this schema. Value changes can include holdings/cash changes and **are not a
   return, tax gain or trading recommendation**.

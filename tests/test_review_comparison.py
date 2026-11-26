@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tracemalloc
 from datetime import datetime, timezone
-from decimal import localcontext
+from decimal import Inexact, InvalidOperation, localcontext
 from zipfile import ZIP_BZIP2, ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 import pytest
@@ -306,6 +306,25 @@ def test_decimal_arithmetic_is_independent_of_the_caller_context():
         result = _compare(_bundle(value="999999999999999.99"),
                           _bundle(value="1000000000000000.00"))
     assert result["known_value"]["delta"] == "0.01"
+
+
+@pytest.mark.parametrize("invalid_trap", [True, False])
+def test_decimal_exponent_limits_and_traps_cannot_corrupt_a_valid_comparison(invalid_trap):
+    before, after = _bundle(value="1000.00"), _bundle(value="1000.01")
+    with localcontext() as context:
+        context.prec = 2
+        context.Emax, context.Emin, context.clamp = 2, -2, 1
+        context.traps[InvalidOperation] = invalid_trap
+        context.traps[Inexact] = True
+        context.clear_flags()
+        result = _compare(before, after)
+        assert context.Emax == 2 and context.Emin == -2 and context.prec == 2
+        assert context.traps[InvalidOperation] is invalid_trap
+        assert not any(context.flags.values())
+    assert result["known_value"]["before"] == "1000.00"
+    assert result["known_value"]["after"] == "1000.01"
+    assert result["known_value"]["delta"] == "0.01"
+    assert result["known_value"]["status"] == "comparable"
 
 
 def _rewrite(payload, edit, *, compression=ZIP_DEFLATED):
